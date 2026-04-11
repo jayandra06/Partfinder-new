@@ -1,0 +1,29 @@
+<Page
+    x:Class="PartFinder.Views.Pages.TemplatesPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:components="using:PartFinder.Views.Components">
+    <Grid Padding="20" ColumnSpacing="14">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="300" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <Border Style="{ThemeResource AppCardBorderStyle}">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Templates" Style="{ThemeResource AppSectionTextStyle}" />
+                <ListView
+                    ItemsSource="{Binding Templates}"
+                    SelectedItem="{Binding SelectedTemplate, Mode=TwoWay}"
+                    DisplayMemberPath="Name" />
+            </StackPanel>
+        </Border>
+
+        <StackPanel Grid.Column="1" Spacing="12">
+            <components:PageHeader
+                Title="Template Builder"
+                Subtitle="Create and evolve dynamic schemas safely with versions" />
+            <components:DynamicFormRenderer Fields="{Binding SelectedTemplate.Fields, Mode=OneWay}" />
+        </StackPanel>
+    </Grid>
+</Page>
