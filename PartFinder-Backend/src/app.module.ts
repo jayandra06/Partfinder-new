@@ -6,7 +6,11 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { assertMongoUri, normalizeMongoUri } from './mongo-uri';
+import { DbClustersModule } from './db-clusters/db-clusters.module';
+import { DebugModule } from './debug/debug.module';
+import { LicenseModule } from './license/license.module';
 import { OrganizationsModule } from './organizations/organizations.module';
+import { SetupModule } from './setup/setup.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -27,6 +31,10 @@ import { UsersModule } from './users/users.module';
     UsersModule,
     AuthModule,
     OrganizationsModule,
+    DbClustersModule,
+    LicenseModule,
+    SetupModule,
+    DebugModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -41,4 +41,15 @@ export class UsersService {
   ): Promise<boolean> {
     return bcrypt.compare(plainPassword, user.passwordHash);
   }
+
+  async findById(id: string): Promise<AdminUserDocument | null> {
+    return this.adminUserModel.findById(id).exec();
+  }
+
+  async setPassword(userId: string, plainPassword: string): Promise<void> {
+    const passwordHash = await bcrypt.hash(plainPassword, BCRYPT_ROUNDS);
+    await this.adminUserModel
+      .findByIdAndUpdate(userId, { passwordHash })
+      .exec();
+  }
 }

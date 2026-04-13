@@ -15,6 +15,14 @@ namespace PartFinder
         {
             InitializeComponent();
             Services = ConfigureServices();
+            AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            {
+                DebugLogClient.Post(
+                    "error",
+                    "UnhandledException",
+                    e.ExceptionObject?.ToString());
+            };
+            DebugLogClient.Post("info", "PartFinder WinUI started", null);
         }
 
         private static IServiceProvider ConfigureServices()

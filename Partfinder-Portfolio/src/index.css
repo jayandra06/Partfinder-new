@@ -156,6 +156,12 @@ h3 {
   font: inherit;
 }
 
+.form-success {
+  margin: 0;
+  font-size: 14px;
+  color: #22c55e;
+}
+
 .form-error {
   margin: 0;
   color: #dc2626;
@@ -303,6 +309,10 @@ h3 {
   gap: 12px;
 }
 
+.org-toolbar--end {
+  justify-content: flex-end;
+}
+
 .org-toolbar input {
   width: min(360px, 100%);
   background: #0f1117;
@@ -396,6 +406,66 @@ h3 {
   color: #94a3b8;
 }
 
+.pill-enterprise {
+  background: #2e1065;
+  color: #c4b5fd;
+}
+
+.pill-demo {
+  background: #422006;
+  color: #fdba74;
+}
+
+.pill-trial {
+  background: #134e4a;
+  color: #5eead4;
+}
+
+.pill-starter {
+  background: #1e3a5f;
+  color: #93c5fd;
+}
+
+.pill-professional {
+  background: #312e81;
+  color: #a5b4fc;
+}
+
+.pill-annual {
+  background: #14532d;
+  color: #86efac;
+}
+
+.pill-lifetime {
+  background: #3b0764;
+  color: #e9d5ff;
+}
+
+.pill-plan-legacy {
+  background: #374151;
+  color: #e5e7eb;
+}
+
+.pill-suspended {
+  background: #450a0a;
+  color: #fca5a5;
+}
+
+.pill-license-ok {
+  background: #14532d;
+  color: #86efac;
+}
+
+.pill-license-temp {
+  background: #713f12;
+  color: #fcd34d;
+}
+
+.pill-license-revoked {
+  background: #450a0a;
+  color: #fca5a5;
+}
+
 .org-empty-cell {
   text-align: center;
   color: #9ca3af;
@@ -409,7 +479,77 @@ h3 {
 }
 
 .action-cell {
-  letter-spacing: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+}
+
+.btn-icon {
+  border: 1px solid #374151;
+  background: #1a1d24;
+  color: #e5e7eb;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.btn-icon:hover:not(:disabled) {
+  border-color: #6b7280;
+  background: #252830;
+}
+
+.btn-icon:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-icon-danger:hover:not(:disabled) {
+  border-color: #991b1b;
+  color: #fca5a5;
+}
+
+.btn-icon-success:hover:not(:disabled) {
+  border-color: #166534;
+  color: #86efac;
+}
+
+.ban-check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: #e5e7eb;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.ban-check-row input {
+  margin-top: 3px;
+}
+
+.ban-duration-hint {
+  margin: 0;
+  font-size: 13px;
+}
+
+.ban-duration-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.ban-duration-grid label {
+  display: block;
+  margin-bottom: 4px;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.ban-duration-grid input {
+  width: 100%;
 }
 
 .modal-overlay {
@@ -430,6 +570,29 @@ h3 {
   padding: 16px;
   display: grid;
   gap: 10px;
+}
+
+.modal-card--wide {
+  width: min(640px, 100%);
+}
+
+.db-cluster-uri-input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 100px;
+  resize: vertical;
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  background: #090b10;
+  border: 1px solid #2a2f3a;
+  color: #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.db-cluster-masked {
+  font-size: 13px;
+  color: #cbd5e1;
 }
 
 .modal-head {
@@ -462,7 +625,8 @@ h3 {
 }
 
 .modal-card input,
-.modal-card select {
+.modal-card select,
+.modal-card textarea {
   background: #090b10;
   border: 1px solid #2a2f3a;
   color: #e5e7eb;
@@ -561,6 +725,110 @@ h3 {
 .debug-item p {
   margin: 6px 0 0;
   color: #334155;
+}
+
+.debug-toolbar-field,
+.debug-toolbar-toggle {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.debug-toolbar-toggle {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.debug-select {
+  min-width: 160px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #2a2f3a;
+  background: #0f1117;
+  color: #e5e7eb;
+}
+
+.debug-clear-btn {
+  margin-left: auto;
+}
+
+.debug-hint {
+  margin: 0;
+  font-size: 13px;
+  color: #9ca3af;
+  line-height: 1.45;
+}
+
+.debug-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.debug-item-head time {
+  font-variant-numeric: tabular-nums;
+}
+
+.debug-level {
+  margin-left: auto;
+  color: #0f172a;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.debug-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.debug-src-backend {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.debug-src-portfolio {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.debug-src-partfinder-desktop {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.debug-msg {
+  margin: 8px 0 0;
+  color: #1e293b;
+  font-size: 14px;
+  word-break: break-word;
+}
+
+.debug-ctx {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  background: #f1f5f9;
+  border-radius: 6px;
+  font-size: 12px;
+  overflow-x: auto;
+  color: #475569;
+  white-space: pre-wrap;
+}
+
+.debug-item-empty p {
+  margin: 0;
+  color: #64748b;
 }
 
 .releases-wrap {

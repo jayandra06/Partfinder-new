@@ -47,6 +47,9 @@
   </Applications>
 
   <Capabilities>
+    <Capability Name="internetClient" />
+    <!-- Allows http://localhost / LAN API (PartFinder-Backend) from the packaged app -->
+    <Capability Name="privateNetworkClientServer" />
     <rescap:Capability Name="runFullTrust" />
     <systemai:Capability Name="systemAIModels"/>
   </Capabilities>

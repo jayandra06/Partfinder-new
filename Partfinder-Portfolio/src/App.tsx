@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 
 const ADMIN_TOKEN_KEY = 'pf_admin_token'
 
+/** In dev, prefer same-origin `/api` (Vite proxy) unless VITE_API_URL is set — avoids stale SW/caches to :3000. */
 const apiBase =
-  import.meta.env.VITE_API_URL?.replace(/\/$/, '') ?? 'http://localhost:3000'
+  import.meta.env.VITE_API_URL?.replace(/\/$/, '') ??
+  (import.meta.env.DEV ? '' : 'http://localhost:3000')
 
 function parseApiErrorMessage(body: unknown): string {
   if (!body || typeof body !== 'object') {
@@ -184,6 +186,9 @@ function AdminPortalPage() {
   const isSettingsPage = location.pathname.startsWith('/admin/settings')
   const isDebugPage = location.pathname.startsWith('/admin/debug')
   const isReleasesPage = location.pathname.startsWith('/admin/releases')
+  const isDatabaseManagementPage = location.pathname.startsWith(
+    '/admin/database-management',
+  )
   const pageTitle = isOrganizationsPage
     ? 'Organizations'
     : isUsersPage
@@ -194,7 +199,9 @@ function AdminPortalPage() {
           ? 'Debug Logs'
           : isReleasesPage
             ? 'Release Management'
-            : 'Dashboard'
+            : isDatabaseManagementPage
+              ? 'Database Management'
+              : 'Dashboard'
 
   return (
     <div className="admin-layout">
@@ -206,6 +213,7 @@ function AdminPortalPage() {
         <nav>
           <NavLink to="/admin/dashboard">Dashboard</NavLink>
           <NavLink to="/admin/organizations">Organizations</NavLink>
+          <NavLink to="/admin/database-management">Database Management</NavLink>
           <NavLink to="/admin/users">User Management</NavLink>
           <NavLink to="/admin/releases">Releases</NavLink>
           <button type="button" className="side-item-muted">Analytics</button>
@@ -231,13 +239,15 @@ function AdminPortalPage() {
             <p>
               {isOrganizationsPage
                 ? 'Manage platform organizations and their settings'
-                : isSettingsPage
-                  ? 'Manage administrator credentials and access'
-                  : isDebugPage
-                    ? 'Monitor system events and diagnostics'
-                    : isReleasesPage
-                      ? 'Manage PartFinder releases and installations'
-                      : 'Welcome to the admin portal'}
+                : isDatabaseManagementPage
+                  ? 'Register MongoDB clusters for default organization databases'
+                  : isSettingsPage
+                    ? 'Manage administrator credentials and access'
+                    : isDebugPage
+                      ? 'Monitor system events and diagnostics'
+                      : isReleasesPage
+                        ? 'Manage PartFinder releases and installations'
+                        : 'Welcome to the admin portal'}
             </p>
           </div>
         </header>
@@ -245,14 +255,22 @@ function AdminPortalPage() {
           <OrganizationsSection onSessionExpired={handleSessionExpired} />
         ) : null}
         {isUsersPage ? <UsersSection /> : null}
-        {isSettingsPage ? <SettingsSection /> : null}
-        {isDebugPage ? <DebugSection /> : null}
+        {isSettingsPage ? (
+          <SettingsSection onSessionExpired={handleSessionExpired} />
+        ) : null}
+        {isDebugPage ? (
+          <DebugSection onSessionExpired={handleSessionExpired} />
+        ) : null}
         {isReleasesPage ? <ReleasesSection /> : null}
+        {isDatabaseManagementPage ? (
+          <DatabaseManagementSection onSessionExpired={handleSessionExpired} />
+        ) : null}
         {!isOrganizationsPage &&
         !isUsersPage &&
         !isSettingsPage &&
         !isDebugPage &&
-        !isReleasesPage ? (
+        !isReleasesPage &&
+        !isDatabaseManagementPage ? (
           <DashboardSection />
         ) : null}
       </main>
@@ -287,16 +305,21 @@ type ApiOrganization = {
   plan: string
   validity: string
   status: string
+  licensePermanentlyBanned?: boolean
+  licenseBannedUntil?: string | null
   createdAt: string
 }
 
 type OrgRow = {
+  id: string
   code: string
   name: string
   type: string
   plan: string
   validity: string
   status: string
+  licensePermanentlyBanned: boolean
+  licenseBannedUntil: string | null
   created: string
 }
 
@@ -305,15 +328,99 @@ function mapOrgToRow(o: ApiOrganization): OrgRow {
   const created = o.createdAt
     ? new Date(o.createdAt).toLocaleDateString()
     : '—'
+  const until =
+    o.licenseBannedUntil == null || o.licenseBannedUntil === ''
+      ? null
+      : o.licenseBannedUntil
   return {
+    id: o.id,
     code: o.orgCode,
     name: o.name,
     type: o.type,
     plan: o.plan,
     validity,
     status: o.status,
+    licensePermanentlyBanned: Boolean(o.licensePermanentlyBanned),
+    licenseBannedUntil: until,
     created,
   }
+}
+
+function isLicenseCurrentlyBlocked(row: OrgRow): boolean {
+  if (row.licensePermanentlyBanned) {
+    return true
+  }
+  if (!row.licenseBannedUntil) {
+    return false
+  }
+  const t = new Date(row.licenseBannedUntil).getTime()
+  return !Number.isNaN(t) && Date.now() < t
+}
+
+/** True if reactivate should be offered (active ban or stale temporary end date to clear). */
+function showLicenseReactivateOption(row: OrgRow): boolean {
+  return row.licensePermanentlyBanned || Boolean(row.licenseBannedUntil)
+}
+
+function licensePillClass(row: OrgRow): string {
+  if (row.licensePermanentlyBanned) {
+    return 'pill pill-license-revoked'
+  }
+  if (row.licenseBannedUntil) {
+    const t = new Date(row.licenseBannedUntil).getTime()
+    if (!Number.isNaN(t) && Date.now() < t) {
+      return 'pill pill-license-temp'
+    }
+  }
+  return 'pill pill-license-ok'
+}
+
+function licensePillLabel(row: OrgRow): string {
+  if (row.licensePermanentlyBanned) {
+    return 'Revoked'
+  }
+  if (row.licenseBannedUntil) {
+    const t = new Date(row.licenseBannedUntil).getTime()
+    if (!Number.isNaN(t) && Date.now() < t) {
+      return `Until ${new Date(row.licenseBannedUntil).toLocaleString()}`
+    }
+  }
+  return 'OK'
+}
+
+function typePillClass(type: string): string {
+  if (type === 'premium') {
+    return 'pill pill-premium'
+  }
+  if (type === 'enterprise') {
+    return 'pill pill-enterprise'
+  }
+  return 'pill pill-standard'
+}
+
+function planPillClass(plan: string): string {
+  switch (plan) {
+    case 'demo':
+      return 'pill pill-demo'
+    case 'trial':
+      return 'pill pill-trial'
+    case 'starter':
+      return 'pill pill-starter'
+    case 'professional':
+      return 'pill pill-professional'
+    case 'annual':
+      return 'pill pill-annual'
+    case 'lifetime':
+      return 'pill pill-lifetime'
+    default:
+      return 'pill pill-plan-legacy'
+  }
+}
+
+function statusPillClass(status: string): string {
+  return status.trim().toLowerCase() === 'suspended'
+    ? 'pill pill-suspended'
+    : 'pill pill-active'
 }
 
 function OrganizationsSection({
@@ -321,57 +428,59 @@ function OrganizationsSection({
 }: {
   onSessionExpired: () => void
 }) {
+  type ModalMode = 'create' | 'edit'
+  const [modalMode, setModalMode] = useState<ModalMode>('create')
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [orgName, setOrgName] = useState('')
   const [orgType, setOrgType] = useState('')
   const [orgPlan, setOrgPlan] = useState('')
+  const [orgStatus, setOrgStatus] = useState('Active')
   const [generatedCode, setGeneratedCode] = useState('')
   const [search, setSearch] = useState('')
   const [rows, setRows] = useState<OrgRow[]>([])
   const [loadError, setLoadError] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [modalError, setModalError] = useState('')
+  const [banModalRow, setBanModalRow] = useState<OrgRow | null>(null)
+  const [banPermanent, setBanPermanent] = useState(false)
+  const [banMinutes, setBanMinutes] = useState('')
+  const [banHours, setBanHours] = useState('')
+  const [banDays, setBanDays] = useState('')
+  const [banSaving, setBanSaving] = useState(false)
+  const [banModalError, setBanModalError] = useState('')
+  const [reactivatingId, setReactivatingId] = useState<string | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
-    const run = async () => {
-      setLoadError('')
-      setLoading(true)
-      try {
-        const response = await fetch(`${apiBase}/api/organizations`, {
-          headers: authJsonHeaders(),
-        })
-        if (response.status === 401) {
-          onSessionExpired()
-          return
-        }
-        const data: unknown = await response.json().catch(() => null)
-        if (!response.ok) {
-          if (!cancelled) {
-            setLoadError(parseApiErrorMessage(data))
-          }
-          return
-        }
-        const list = Array.isArray(data) ? (data as ApiOrganization[]) : []
-        if (!cancelled) {
-          setRows(list.map(mapOrgToRow))
-        }
-      } catch {
-        if (!cancelled) {
-          setLoadError('Cannot load organizations. Is the API running?')
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false)
-        }
+  const loadOrganizations = useCallback(async () => {
+    setLoadError('')
+    setLoading(true)
+    try {
+      const response = await fetch(`${apiBase}/api/organizations`, {
+        headers: authJsonHeaders(),
+      })
+      if (response.status === 401) {
+        onSessionExpired()
+        return
       }
-    }
-    void run()
-    return () => {
-      cancelled = true
+      const data: unknown = await response.json().catch(() => null)
+      if (!response.ok) {
+        setLoadError(parseApiErrorMessage(data))
+        return
+      }
+      const list = Array.isArray(data) ? (data as ApiOrganization[]) : []
+      setRows(list.map(mapOrgToRow))
+    } catch {
+      setLoadError('Cannot load organizations. Is the API running?')
+    } finally {
+      setLoading(false)
     }
   }, [onSessionExpired])
+
+  useEffect(() => {
+    void loadOrganizations()
+  }, [loadOrganizations])
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -386,41 +495,86 @@ function OrganizationsSection({
     )
   }, [rows, search])
 
-  const canCreate = useMemo(() => {
-    return Boolean(orgName.trim() && orgType && orgPlan && generatedCode)
-  }, [orgName, orgType, orgPlan, generatedCode])
+  const canSave = useMemo(() => {
+    if (modalMode === 'create') {
+      return Boolean(orgName.trim() && orgType && orgPlan && generatedCode)
+    }
+    return Boolean(editingId && orgName.trim() && orgType && orgPlan && orgStatus)
+  }, [modalMode, editingId, orgName, orgType, orgPlan, orgStatus, generatedCode])
 
   const generateCode = () => {
     const code = Math.floor(100000 + Math.random() * 900000).toString()
     setGeneratedCode(code)
   }
 
+  const openCreateModal = () => {
+    setModalMode('create')
+    setEditingId(null)
+    setOrgName('')
+    setOrgType('')
+    setOrgPlan('')
+    setOrgStatus('Active')
+    setGeneratedCode('')
+    setModalError('')
+    setIsModalOpen(true)
+  }
+
+  const openEditModal = (row: OrgRow) => {
+    setModalMode('edit')
+    setEditingId(row.id)
+    setOrgName(row.name)
+    setOrgType(row.type)
+    setOrgPlan(row.plan)
+    setOrgStatus(row.status)
+    setGeneratedCode(row.code)
+    setModalError('')
+    setIsModalOpen(true)
+  }
+
   const closeModal = () => {
     setIsModalOpen(false)
+    setModalMode('create')
+    setEditingId(null)
     setModalError('')
     setOrgName('')
     setOrgType('')
     setOrgPlan('')
+    setOrgStatus('Active')
     setGeneratedCode('')
   }
 
-  const createOrganization = async () => {
-    if (!canCreate) {
+  const saveOrganization = async () => {
+    if (!canSave) {
       return
     }
     setModalError('')
     setSaving(true)
     try {
-      const response = await fetch(`${apiBase}/api/organizations`, {
-        method: 'POST',
-        headers: authJsonHeaders(),
-        body: JSON.stringify({
-          name: orgName.trim(),
-          type: orgType,
-          plan: orgPlan,
-          orgCode: generatedCode,
-        }),
-      })
+      const isCreate = modalMode === 'create'
+      const response = await fetch(
+        isCreate
+          ? `${apiBase}/api/organizations`
+          : `${apiBase}/api/organizations/${editingId}`,
+        {
+          method: isCreate ? 'POST' : 'PATCH',
+          headers: authJsonHeaders(),
+          body: JSON.stringify(
+            isCreate
+              ? {
+                  name: orgName.trim(),
+                  type: orgType,
+                  plan: orgPlan,
+                  orgCode: generatedCode,
+                }
+              : {
+                  name: orgName.trim(),
+                  type: orgType,
+                  plan: orgPlan,
+                  status: orgStatus,
+                },
+          ),
+        },
+      )
       if (response.status === 401) {
         onSessionExpired()
         return
@@ -440,6 +594,142 @@ function OrganizationsSection({
     }
   }
 
+  const openBanModal = (row: OrgRow) => {
+    setBanModalRow(row)
+    setBanPermanent(false)
+    setBanMinutes('')
+    setBanHours('')
+    setBanDays('')
+    setBanModalError('')
+  }
+
+  const closeBanModal = () => {
+    setBanModalRow(null)
+    setBanModalError('')
+    setBanSaving(false)
+  }
+
+  const banDurationTotalMs = useMemo(() => {
+    const m = Number.parseInt(banMinutes, 10)
+    const h = Number.parseInt(banHours, 10)
+    const d = Number.parseInt(banDays, 10)
+    const minutes = Number.isFinite(m) && m > 0 ? m : 0
+    const hours = Number.isFinite(h) && h > 0 ? h : 0
+    const days = Number.isFinite(d) && d > 0 ? d : 0
+    return ((days * 24 + hours) * 60 + minutes) * 60 * 1000
+  }, [banMinutes, banHours, banDays])
+
+  const canSubmitBan = banPermanent || banDurationTotalMs > 0
+
+  const submitBan = async () => {
+    if (!banModalRow || !canSubmitBan) {
+      return
+    }
+    setBanModalError('')
+    setBanSaving(true)
+    try {
+      const body = banPermanent
+        ? { permanent: true }
+        : {
+            minutes: Number.parseInt(banMinutes, 10) || 0,
+            hours: Number.parseInt(banHours, 10) || 0,
+            days: Number.parseInt(banDays, 10) || 0,
+          }
+      const response = await fetch(
+        `${apiBase}/api/organizations/${banModalRow.id}/license/ban`,
+        {
+          method: 'POST',
+          headers: authJsonHeaders(),
+          body: JSON.stringify(body),
+        },
+      )
+      if (response.status === 401) {
+        onSessionExpired()
+        return
+      }
+      const data: unknown = await response.json().catch(() => null)
+      if (!response.ok) {
+        setBanModalError(parseApiErrorMessage(data))
+        return
+      }
+      const list = Array.isArray(data) ? (data as ApiOrganization[]) : []
+      setRows(list.map(mapOrgToRow))
+      closeBanModal()
+    } catch {
+      setBanModalError('Cannot reach the server.')
+    } finally {
+      setBanSaving(false)
+    }
+  }
+
+  const reactivateLicense = async (row: OrgRow) => {
+    const blocked = isLicenseCurrentlyBlocked(row)
+    const ok = window.confirm(
+      blocked
+        ? `Reactivate license for "${row.name}" (code ${row.code})? Clients can use the app again if the org is Active and the subscription is still valid.`
+        : `Clear license ban flags for "${row.name}" (code ${row.code})? This removes any stored ban end time from the server.`,
+    )
+    if (!ok) {
+      return
+    }
+    setReactivatingId(row.id)
+    try {
+      const response = await fetch(
+        `${apiBase}/api/organizations/${row.id}/license/reactivate`,
+        {
+          method: 'POST',
+          headers: authJsonHeaders(),
+        },
+      )
+      if (response.status === 401) {
+        onSessionExpired()
+        return
+      }
+      const data: unknown = await response.json().catch(() => null)
+      if (!response.ok) {
+        setLoadError(parseApiErrorMessage(data))
+        return
+      }
+      const list = Array.isArray(data) ? (data as ApiOrganization[]) : []
+      setRows(list.map(mapOrgToRow))
+    } catch {
+      setLoadError('Cannot reactivate license. Is the API running?')
+    } finally {
+      setReactivatingId(null)
+    }
+  }
+
+  const deleteOrganization = async (row: OrgRow) => {
+    const ok = window.confirm(
+      `Delete organization "${row.name}" (code ${row.code})? This cannot be undone.`,
+    )
+    if (!ok) {
+      return
+    }
+    setDeletingId(row.id)
+    try {
+      const response = await fetch(`${apiBase}/api/organizations/${row.id}`, {
+        method: 'DELETE',
+        headers: authJsonHeaders(),
+      })
+      if (response.status === 401) {
+        onSessionExpired()
+        return
+      }
+      const data: unknown = await response.json().catch(() => null)
+      if (!response.ok) {
+        setLoadError(parseApiErrorMessage(data))
+        return
+      }
+      const list = Array.isArray(data) ? (data as ApiOrganization[]) : []
+      setRows(list.map(mapOrgToRow))
+    } catch {
+      setLoadError('Cannot delete organization. Is the API running?')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   return (
     <section className="organizations-section">
       <div className="org-toolbar">
@@ -449,7 +739,7 @@ function OrganizationsSection({
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
-        <button type="button" className="btn-light" onClick={() => setIsModalOpen(true)}>
+        <button type="button" className="btn-light" onClick={openCreateModal}>
           + Add Organization
         </button>
       </div>
@@ -465,6 +755,7 @@ function OrganizationsSection({
               <th>Plan</th>
               <th>Validity</th>
               <th>Status</th>
+              <th>License</th>
               <th>Created</th>
               <th>Actions</th>
             </tr>
@@ -472,31 +763,69 @@ function OrganizationsSection({
           <tbody>
             {!loading && filteredRows.length === 0 ? (
               <tr>
-                <td colSpan={8} className="org-empty-cell">
+                <td colSpan={9} className="org-empty-cell">
                   No organizations yet. Add one to get started.
                 </td>
               </tr>
             ) : null}
             {filteredRows.map((row) => (
-              <tr key={row.code}>
+              <tr key={row.id}>
                 <td>{row.code}</td>
                 <td>{row.name}</td>
                 <td>
-                  <span
-                    className={
-                      row.type === 'premium' ? 'pill pill-premium' : 'pill pill-standard'
-                    }
-                  >
-                    {row.type}
-                  </span>
+                  <span className={typePillClass(row.type)}>{row.type}</span>
                 </td>
-                <td>{row.plan}</td>
+                <td>
+                  <span className={planPillClass(row.plan)}>{row.plan}</span>
+                </td>
                 <td>{row.validity}</td>
                 <td>
-                  <span className="pill pill-active">{row.status}</span>
+                  <span className={statusPillClass(row.status)}>{row.status}</span>
+                </td>
+                <td>
+                  <span className={licensePillClass(row)} title={licensePillLabel(row)}>
+                    {licensePillLabel(row)}
+                  </span>
                 </td>
                 <td>{row.created}</td>
-                <td className="action-cell">✎ 🗑</td>
+                <td className="action-cell">
+                  <button
+                    type="button"
+                    className="btn-icon"
+                    aria-label={`Edit ${row.name}`}
+                    onClick={() => openEditModal(row)}
+                  >
+                    ✎
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-icon"
+                    aria-label={`Ban license ${row.code}`}
+                    onClick={() => openBanModal(row)}
+                  >
+                    ⛔
+                  </button>
+                  {showLicenseReactivateOption(row) ? (
+                    <button
+                      type="button"
+                      className="btn-icon btn-icon-success"
+                      aria-label={`Reactivate license ${row.code}`}
+                      disabled={reactivatingId === row.id}
+                      onClick={() => void reactivateLicense(row)}
+                    >
+                      {reactivatingId === row.id ? '…' : '↩'}
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="btn-icon btn-icon-danger"
+                    aria-label={`Delete ${row.name}`}
+                    disabled={deletingId === row.id}
+                    onClick={() => void deleteOrganization(row)}
+                  >
+                    {deletingId === row.id ? '…' : '🗑'}
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -507,8 +836,12 @@ function OrganizationsSection({
           <div className="modal-card">
             <div className="modal-head">
               <div>
-                <h3>Create New Organization</h3>
-                <p>Add a new organization to the platform.</p>
+                <h3>{modalMode === 'create' ? 'Create New Organization' : 'Edit Organization'}</h3>
+                <p>
+                  {modalMode === 'create'
+                    ? 'Add a new organization to the platform.'
+                    : 'Update name, tier, plan, or status. Changing plan resets validity from today.'}
+                </p>
               </div>
               <button type="button" className="modal-close" onClick={closeModal}>
                 ×
@@ -525,34 +858,60 @@ function OrganizationsSection({
             <label>Type *</label>
             <select value={orgType} onChange={(event) => setOrgType(event.target.value)}>
               <option value="">Select type</option>
-              <option value="premium">premium</option>
-              <option value="standard">standard</option>
+              <option value="standard">Standard — single location / small catalog</option>
+              <option value="premium">Premium — multi-branch, advanced ops</option>
+              <option value="enterprise">Enterprise — OEM / distributor scale</option>
             </select>
 
             <label>Plan *</label>
             <select value={orgPlan} onChange={(event) => setOrgPlan(event.target.value)}>
               <option value="">Select plan</option>
-              <option value="lifetime">lifetime</option>
-              <option value="annual">annual</option>
+              <option value="demo">Demo — 1 day (prospect evaluation)</option>
+              <option value="trial">Trial — 14 days full access</option>
+              <option value="starter">Starter — monthly (small vendor)</option>
+              <option value="professional">Professional — monthly (larger vendor)</option>
+              <option value="annual">Annual — yearly subscription</option>
+              <option value="lifetime">Lifetime — perpetual (special)</option>
             </select>
 
-            <div className="generated-code-row">
-              <label>Organization Code</label>
-              <button type="button" className="btn-dark" onClick={generateCode}>
-                Generate Code
-              </button>
-            </div>
+            {modalMode === 'edit' ? (
+              <>
+                <label>Status *</label>
+                <select value={orgStatus} onChange={(event) => setOrgStatus(event.target.value)}>
+                  <option value="Active">Active</option>
+                  <option value="Suspended">Suspended</option>
+                </select>
+              </>
+            ) : null}
 
-            <div className="generated-code-box">
-              {generatedCode ? (
-                <>
-                  <span>Generated Code</span>
-                  <strong>{generatedCode}</strong>
-                </>
-              ) : (
-                <span>Click &quot;Generate Code&quot; to create a unique 6-digit organization code</span>
-              )}
-            </div>
+            {modalMode === 'create' ? (
+              <>
+                <div className="generated-code-row">
+                  <label>Organization Code</label>
+                  <button type="button" className="btn-dark" onClick={generateCode}>
+                    Generate Code
+                  </button>
+                </div>
+
+                <div className="generated-code-box">
+                  {generatedCode ? (
+                    <>
+                      <span>Generated Code</span>
+                      <strong>{generatedCode}</strong>
+                    </>
+                  ) : (
+                    <span>
+                      Click &quot;Generate Code&quot; to create a unique 6-digit organization code
+                    </span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="generated-code-box">
+                <span>Organization code (read-only)</span>
+                <strong>{generatedCode}</strong>
+              </div>
+            )}
 
             {modalError ? <p className="form-error">{modalError}</p> : null}
 
@@ -563,11 +922,363 @@ function OrganizationsSection({
               <button
                 type="button"
                 className="btn-light"
-                disabled={!canCreate || saving}
-                onClick={() => void createOrganization()}
+                disabled={!canSave || saving}
+                onClick={() => void saveOrganization()}
               >
-                {saving ? 'Creating…' : 'Create Organization'}
+                {saving
+                  ? modalMode === 'create'
+                    ? 'Creating…'
+                    : 'Saving…'
+                  : modalMode === 'create'
+                    ? 'Create Organization'
+                    : 'Save changes'}
               </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {banModalRow ? (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="modal-card">
+            <div className="modal-head">
+              <div>
+                <h3>Ban license</h3>
+                <p>
+                  Block the Windows client for{' '}
+                  <strong>{banModalRow.name}</strong> (code {banModalRow.code}). Subscription
+                  status is unchanged; this only affects license verification.
+                </p>
+              </div>
+              <button type="button" className="modal-close" onClick={closeBanModal}>
+                ×
+              </button>
+            </div>
+
+            <label className="ban-check-row">
+              <input
+                type="checkbox"
+                checked={banPermanent}
+                onChange={(event) => setBanPermanent(event.target.checked)}
+              />
+              <span>Permanent ban (must use Reactivate to allow clients again)</span>
+            </label>
+
+            {!banPermanent ? (
+              <>
+                <p className="admin-muted ban-duration-hint">
+                  Temporary ban: set one or more of minutes, hours, or days (counts from now).
+                </p>
+                <div className="ban-duration-grid">
+                  <div>
+                    <label>Minutes</label>
+                    <input
+                      type="number"
+                      min={0}
+                      inputMode="numeric"
+                      value={banMinutes}
+                      onChange={(event) => setBanMinutes(event.target.value)}
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label>Hours</label>
+                    <input
+                      type="number"
+                      min={0}
+                      inputMode="numeric"
+                      value={banHours}
+                      onChange={(event) => setBanHours(event.target.value)}
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label>Days</label>
+                    <input
+                      type="number"
+                      min={0}
+                      inputMode="numeric"
+                      value={banDays}
+                      onChange={(event) => setBanDays(event.target.value)}
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+              </>
+            ) : null}
+
+            {banModalError ? <p className="form-error">{banModalError}</p> : null}
+
+            <div className="modal-actions">
+              <button type="button" className="btn-ghost" onClick={closeBanModal}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-light"
+                disabled={!canSubmitBan || banSaving}
+                onClick={() => void submitBan()}
+              >
+                {banSaving ? 'Applying…' : 'Apply ban'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  )
+}
+
+type DbClusterRow = {
+  id: string
+  uriMasked: string
+  createdAt: string
+}
+
+function DatabaseManagementSection({
+  onSessionExpired,
+}: {
+  onSessionExpired: () => void
+}) {
+  const [rows, setRows] = useState<DbClusterRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+  const [modalOpen, setModalOpen] = useState(false)
+  const [uri, setUri] = useState('')
+  const [testPhase, setTestPhase] = useState<'idle' | 'testing' | 'success' | 'error'>(
+    'idle',
+  )
+  const [testMessage, setTestMessage] = useState('')
+  const [savePending, setSavePending] = useState(false)
+  const [modalError, setModalError] = useState('')
+
+  const loadClusters = useCallback(async () => {
+    setLoadError('')
+    setLoading(true)
+    try {
+      const response = await fetch(`${apiBase}/api/admin/db-clusters`, {
+        headers: authJsonHeaders(),
+      })
+      if (response.status === 401) {
+        onSessionExpired()
+        return
+      }
+      const data: unknown = await response.json().catch(() => null)
+      if (!response.ok) {
+        setLoadError(parseApiErrorMessage(data))
+        setRows([])
+        return
+      }
+      const list = Array.isArray(data) ? (data as DbClusterRow[]) : []
+      setRows(list)
+    } catch {
+      setLoadError('Cannot load clusters. Is the API running?')
+      setRows([])
+    } finally {
+      setLoading(false)
+    }
+  }, [onSessionExpired])
+
+  useEffect(() => {
+    void loadClusters()
+  }, [loadClusters])
+
+  const openModal = () => {
+    setModalOpen(true)
+    setUri('')
+    setTestPhase('idle')
+    setTestMessage('')
+    setModalError('')
+  }
+
+  const closeModal = () => {
+    setModalOpen(false)
+    setUri('')
+    setTestPhase('idle')
+    setTestMessage('')
+    setModalError('')
+  }
+
+  const onUriChange = (value: string) => {
+    setUri(value)
+    setTestPhase('idle')
+    setTestMessage('')
+    setModalError('')
+  }
+
+  const runTest = async () => {
+    const trimmed = uri.trim()
+    if (!trimmed) {
+      return
+    }
+    setModalError('')
+    setTestPhase('testing')
+    setTestMessage('')
+    try {
+      const response = await fetch(`${apiBase}/api/admin/db-clusters/test`, {
+        method: 'POST',
+        headers: authJsonHeaders(),
+        body: JSON.stringify({ uri: trimmed }),
+      })
+      if (response.status === 401) {
+        onSessionExpired()
+        return
+      }
+      const data: unknown = await response.json().catch(() => null)
+      if (!response.ok) {
+        setTestPhase('error')
+        setTestMessage(parseApiErrorMessage(data))
+        return
+      }
+      const probe = data as { ok?: boolean; message?: string }
+      if (probe.ok === true) {
+        setTestPhase('success')
+        setTestMessage('Connection successful. You can save this cluster.')
+        return
+      }
+      setTestPhase('error')
+      setTestMessage(
+        typeof probe.message === 'string' && probe.message.trim()
+          ? probe.message
+          : 'Connection test failed.',
+      )
+    } catch {
+      setTestPhase('error')
+      setTestMessage('Cannot reach the server.')
+    }
+  }
+
+  const saveCluster = async () => {
+    const trimmed = uri.trim()
+    if (!trimmed || testPhase !== 'success') {
+      return
+    }
+    setModalError('')
+    setSavePending(true)
+    try {
+      const response = await fetch(`${apiBase}/api/admin/db-clusters`, {
+        method: 'POST',
+        headers: authJsonHeaders(),
+        body: JSON.stringify({ uri: trimmed }),
+      })
+      if (response.status === 401) {
+        onSessionExpired()
+        return
+      }
+      const data: unknown = await response.json().catch(() => null)
+      if (!response.ok) {
+        setModalError(parseApiErrorMessage(data))
+        return
+      }
+      closeModal()
+      void loadClusters()
+    } catch {
+      setModalError('Cannot reach the server. Is the API running?')
+    } finally {
+      setSavePending(false)
+    }
+  }
+
+  const uriNonEmpty = uri.trim().length > 0
+  const canSave = testPhase === 'success' && uriNonEmpty && !savePending
+
+  return (
+    <section className="organizations-section">
+      <div className="org-toolbar org-toolbar--end">
+        <button type="button" className="btn-light" onClick={openModal}>
+          + Add new cluster
+        </button>
+      </div>
+      {loadError ? <p className="form-error">{loadError}</p> : null}
+      {loading ? <p className="admin-muted">Loading clusters…</p> : null}
+      <div className="org-table-wrap">
+        <table className="org-table">
+          <thead>
+            <tr>
+              <th>Connection (masked)</th>
+              <th>Added</th>
+            </tr>
+          </thead>
+          <tbody>
+            {!loading && rows.length === 0 ? (
+              <tr>
+                <td colSpan={2} className="org-empty-cell">
+                  No clusters yet. Add a MongoDB URI to register a cluster.
+                </td>
+              </tr>
+            ) : null}
+            {rows.map((row) => (
+              <tr key={row.id}>
+                <td>
+                  <code className="db-cluster-masked">{row.uriMasked}</code>
+                </td>
+                <td>{new Date(row.createdAt).toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {modalOpen ? (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="modal-card modal-card--wide">
+            <div className="modal-head">
+              <div>
+                <h3>Add new cluster</h3>
+                <p>Paste the MongoDB URI for this cluster, test the connection, then save.</p>
+              </div>
+              <button type="button" className="modal-close" onClick={closeModal}>
+                ×
+              </button>
+            </div>
+
+            <label htmlFor="db-cluster-uri">MongoDB URI</label>
+            <textarea
+              id="db-cluster-uri"
+              className="db-cluster-uri-input"
+              rows={4}
+              placeholder="mongodb://… or mongodb+srv://…"
+              value={uri}
+              onChange={(e) => onUriChange(e.target.value)}
+              autoComplete="off"
+              spellCheck={false}
+            />
+
+            <div>
+              <button
+                type="button"
+                className="btn-light"
+                disabled={!uriNonEmpty || testPhase === 'testing'}
+                onClick={() => void runTest()}
+              >
+                {testPhase === 'testing' ? 'Testing…' : 'Test connection'}
+              </button>
+            </div>
+
+            {testMessage ? (
+              <p
+                className={
+                  testPhase === 'success' ? 'form-success' : testPhase === 'error' ? 'form-error' : 'admin-muted'
+                }
+              >
+                {testMessage}
+              </p>
+            ) : null}
+            {modalError ? <p className="form-error">{modalError}</p> : null}
+
+            <div className="modal-actions">
+              <button type="button" className="btn-ghost" onClick={closeModal}>
+                Cancel
+              </button>
+              {testPhase === 'success' ? (
+                <button
+                  type="button"
+                  className="btn-light"
+                  disabled={!canSave}
+                  onClick={() => void saveCluster()}
+                >
+                  {savePending ? 'Saving…' : 'Save'}
+                </button>
+              ) : null}
             </div>
           </div>
         </div>
@@ -585,60 +1296,460 @@ function UsersSection() {
   )
 }
 
-function SettingsSection() {
+function SettingsSection({
+  onSessionExpired,
+}: {
+  onSessionExpired: () => void
+}) {
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmNewPassword, setConfirmNewPassword] = useState('')
+  const [changeError, setChangeError] = useState('')
+  const [changeOk, setChangeOk] = useState('')
+  const [changePending, setChangePending] = useState(false)
+
+  const [newAdminEmail, setNewAdminEmail] = useState('')
+  const [newAdminPassword, setNewAdminPassword] = useState('')
+  const [newAdminConfirm, setNewAdminConfirm] = useState('')
+  const [createError, setCreateError] = useState('')
+  const [createOk, setCreateOk] = useState('')
+  const [createPending, setCreatePending] = useState(false)
+
+  const submitChangePassword = async () => {
+    setChangeError('')
+    setChangeOk('')
+    if (!currentPassword.trim() || !newPassword.trim()) {
+      setChangeError('Enter current and new password.')
+      return
+    }
+    if (newPassword.length < 8) {
+      setChangeError('New password must be at least 8 characters.')
+      return
+    }
+    if (newPassword !== confirmNewPassword) {
+      setChangeError('New password and confirmation do not match.')
+      return
+    }
+    setChangePending(true)
+    try {
+      const response = await fetch(`${apiBase}/api/auth/admin/change-password`, {
+        method: 'POST',
+        headers: authJsonHeaders(),
+        body: JSON.stringify({
+          currentPassword,
+          newPassword,
+        }),
+      })
+      if (response.status === 401) {
+        onSessionExpired()
+        return
+      }
+      const data: unknown = await response.json().catch(() => null)
+      if (!response.ok) {
+        setChangeError(parseApiErrorMessage(data))
+        return
+      }
+      setChangeOk('Password updated successfully.')
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmNewPassword('')
+    } catch {
+      setChangeError('Cannot reach the server. Is the API running?')
+    } finally {
+      setChangePending(false)
+    }
+  }
+
+  const submitCreateAdmin = async () => {
+    setCreateError('')
+    setCreateOk('')
+    if (!newAdminEmail.trim() || !newAdminPassword.trim()) {
+      setCreateError('Enter email and password.')
+      return
+    }
+    if (newAdminPassword.length < 8) {
+      setCreateError('Password must be at least 8 characters.')
+      return
+    }
+    if (newAdminPassword !== newAdminConfirm) {
+      setCreateError('Password and confirmation do not match.')
+      return
+    }
+    setCreatePending(true)
+    try {
+      const response = await fetch(`${apiBase}/api/auth/admin/admins`, {
+        method: 'POST',
+        headers: authJsonHeaders(),
+        body: JSON.stringify({
+          email: newAdminEmail.trim(),
+          password: newAdminPassword,
+        }),
+      })
+      if (response.status === 401) {
+        onSessionExpired()
+        return
+      }
+      const data: unknown = await response.json().catch(() => null)
+      if (!response.ok) {
+        setCreateError(parseApiErrorMessage(data))
+        return
+      }
+      const email = (data as { user?: { email?: string } }).user?.email
+      setCreateOk(
+        email ? `Admin created: ${email}` : 'Admin user created successfully.',
+      )
+      setNewAdminEmail('')
+      setNewAdminPassword('')
+      setNewAdminConfirm('')
+    } catch {
+      setCreateError('Cannot reach the server. Is the API running?')
+    } finally {
+      setCreatePending(false)
+    }
+  }
+
   return (
     <section className="settings-grid">
       <article className="card dark-card">
         <h3>Change Password</h3>
         <p>Update your admin account password</p>
-        <label>Current Password</label>
-        <input placeholder="Enter current password" type="password" />
-        <label>New Password</label>
-        <input placeholder="Enter new password" type="password" />
-        <label>Confirm New Password</label>
-        <input placeholder="Confirm new password" type="password" />
-        <button type="button" className="btn-light full-width">
-          Change Password
+        <label htmlFor="settings-current-pw">Current Password</label>
+        <input
+          id="settings-current-pw"
+          placeholder="Enter current password"
+          type="password"
+          autoComplete="current-password"
+          value={currentPassword}
+          onChange={(e) => setCurrentPassword(e.target.value)}
+        />
+        <label htmlFor="settings-new-pw">New Password</label>
+        <input
+          id="settings-new-pw"
+          placeholder="Enter new password (min 8 characters)"
+          type="password"
+          autoComplete="new-password"
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+        />
+        <label htmlFor="settings-confirm-pw">Confirm New Password</label>
+        <input
+          id="settings-confirm-pw"
+          placeholder="Confirm new password"
+          type="password"
+          autoComplete="new-password"
+          value={confirmNewPassword}
+          onChange={(e) => setConfirmNewPassword(e.target.value)}
+        />
+        {changeError ? <p className="form-error">{changeError}</p> : null}
+        {changeOk ? <p className="admin-muted">{changeOk}</p> : null}
+        <button
+          type="button"
+          className="btn-light full-width"
+          disabled={changePending}
+          onClick={() => void submitChangePassword()}
+        >
+          {changePending ? 'Updating…' : 'Change Password'}
         </button>
       </article>
 
       <article className="card dark-card">
         <h3>Add New Admin</h3>
         <p>Create a new admin user who can access the admin panel</p>
-        <label>Email Address</label>
-        <input placeholder="Enter email address" type="email" />
-        <label>Password</label>
-        <input placeholder="Enter password" type="password" />
-        <label>Confirm Password</label>
-        <input placeholder="Confirm password" type="password" />
-        <button type="button" className="btn-light full-width">
-          Create Admin User
+        <label htmlFor="settings-admin-email">Email Address</label>
+        <input
+          id="settings-admin-email"
+          placeholder="Enter email address"
+          type="email"
+          autoComplete="email"
+          value={newAdminEmail}
+          onChange={(e) => setNewAdminEmail(e.target.value)}
+        />
+        <label htmlFor="settings-admin-pw">Password</label>
+        <input
+          id="settings-admin-pw"
+          placeholder="Enter password (min 8 characters)"
+          type="password"
+          autoComplete="new-password"
+          value={newAdminPassword}
+          onChange={(e) => setNewAdminPassword(e.target.value)}
+        />
+        <label htmlFor="settings-admin-confirm">Confirm Password</label>
+        <input
+          id="settings-admin-confirm"
+          placeholder="Confirm password"
+          type="password"
+          autoComplete="new-password"
+          value={newAdminConfirm}
+          onChange={(e) => setNewAdminConfirm(e.target.value)}
+        />
+        {createError ? <p className="form-error">{createError}</p> : null}
+        {createOk ? <p className="admin-muted">{createOk}</p> : null}
+        <button
+          type="button"
+          className="btn-light full-width"
+          disabled={createPending}
+          onClick={() => void submitCreateAdmin()}
+        >
+          {createPending ? 'Creating…' : 'Create Admin User'}
         </button>
       </article>
     </section>
   )
 }
 
-function DebugSection() {
-  const logs = [
-    { level: 'INFO', message: 'Initializing MongoDB client in production mode' },
-    { level: 'INFO', message: 'API call initiated /api/organizations' },
-    { level: 'DEBUG', message: 'Database operation: connect on collection partfinder' },
-    { level: 'INFO', message: 'MongoDB client connected successfully in production mode' },
-  ]
+type DebugLogEntry = {
+  id: string
+  ts: string
+  source: string
+  level: string
+  message: string
+  context?: string
+}
+
+function formatArgs(args: unknown[]): string {
+  return args
+    .map((a) => {
+      if (typeof a === 'string') return a
+      try {
+        return JSON.stringify(a)
+      } catch {
+        return String(a)
+      }
+    })
+    .join(' ')
+}
+
+function DebugSection({
+  onSessionExpired,
+}: {
+  onSessionExpired: () => void
+}) {
+  const [logs, setLogs] = useState<DebugLogEntry[]>([])
+  const [filterSource, setFilterSource] = useState<string>('all')
+  const [filterLevel, setFilterLevel] = useState<string>('all')
+  const [loadError, setLoadError] = useState('')
+  const [paused, setPaused] = useState(false)
+  const [clearPending, setClearPending] = useState(false)
+  const portfolioQueueRef = useRef<
+    { source: 'portfolio'; level: string; message: string; context?: string }[]
+  >([])
+  const flushTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const fetchLogs = useCallback(async () => {
+    setLoadError('')
+    try {
+      const response = await fetch(`${apiBase}/api/admin/debug/logs`, {
+        headers: authJsonHeaders(),
+      })
+      if (response.status === 401) {
+        onSessionExpired()
+        return
+      }
+      const data: unknown = await response.json().catch(() => null)
+      if (!response.ok) {
+        setLoadError(parseApiErrorMessage(data))
+        return
+      }
+      const list = (data as { logs?: DebugLogEntry[] }).logs
+      setLogs(Array.isArray(list) ? list : [])
+    } catch {
+      setLoadError('Cannot reach the server. Is the API running?')
+    }
+  }, [onSessionExpired])
+
+  useEffect(() => {
+    if (paused) {
+      return
+    }
+    void fetchLogs()
+    const id = window.setInterval(() => void fetchLogs(), 2500)
+    return () => window.clearInterval(id)
+  }, [fetchLogs, paused])
+
+  const flushPortfolio = useCallback(async () => {
+    const batch = portfolioQueueRef.current.splice(0, portfolioQueueRef.current.length)
+    if (batch.length === 0) return
+    try {
+      await fetch(`${apiBase}/api/admin/debug/logs`, {
+        method: 'POST',
+        headers: authJsonHeaders(),
+        body: JSON.stringify({ items: batch }),
+      })
+    } catch {
+      portfolioQueueRef.current.unshift(...batch)
+    }
+  }, [])
+
+  useEffect(() => {
+    const methods = ['log', 'info', 'warn', 'error', 'debug'] as const
+    const originals: Partial<Record<(typeof methods)[number], typeof console.log>> = {}
+    for (const m of methods) {
+      originals[m] = console[m].bind(console)
+    }
+    const capture = (level: string, args: unknown[]) => {
+      portfolioQueueRef.current.push({
+        source: 'portfolio',
+        level,
+        message: formatArgs(args),
+      })
+    }
+    console.log = (...a: unknown[]) => {
+      originals.log?.(...a)
+      capture('log', a)
+    }
+    console.info = (...a: unknown[]) => {
+      originals.info?.(...a)
+      capture('info', a)
+    }
+    console.warn = (...a: unknown[]) => {
+      originals.warn?.(...a)
+      capture('warn', a)
+    }
+    console.error = (...a: unknown[]) => {
+      originals.error?.(...a)
+      capture('error', a)
+    }
+    console.debug = (...a: unknown[]) => {
+      originals.debug?.(...a)
+      capture('debug', a)
+    }
+    flushTimerRef.current = window.setInterval(() => void flushPortfolio(), 3000)
+    return () => {
+      if (flushTimerRef.current) {
+        window.clearInterval(flushTimerRef.current)
+        flushTimerRef.current = null
+      }
+      console.log = originals.log ?? console.log
+      console.info = originals.info ?? console.info
+      console.warn = originals.warn ?? console.warn
+      console.error = originals.error ?? console.error
+      console.debug = originals.debug ?? console.debug
+      void flushPortfolio()
+    }
+  }, [flushPortfolio])
+
+  const handleClear = async () => {
+    setClearPending(true)
+    setLoadError('')
+    try {
+      const response = await fetch(`${apiBase}/api/admin/debug/logs`, {
+        method: 'DELETE',
+        headers: authJsonHeaders(),
+      })
+      if (response.status === 401) {
+        onSessionExpired()
+        return
+      }
+      if (!response.ok) {
+        const data: unknown = await response.json().catch(() => null)
+        setLoadError(parseApiErrorMessage(data))
+        return
+      }
+      await fetchLogs()
+    } catch {
+      setLoadError('Cannot reach the server.')
+    } finally {
+      setClearPending(false)
+    }
+  }
+
+  const filtered = useMemo(() => {
+    return logs.filter((entry) => {
+      if (filterSource !== 'all' && entry.source !== filterSource) {
+        return false
+      }
+      if (filterLevel !== 'all' && entry.level !== filterLevel) {
+        return false
+      }
+      return true
+    })
+  }, [logs, filterSource, filterLevel])
+
+  const levels = useMemo(() => {
+    const s = new Set<string>()
+    for (const e of logs) s.add(e.level)
+    return ['all', ...Array.from(s).sort()]
+  }, [logs])
 
   return (
     <section className="debug-wrap">
       <div className="debug-toolbar card dark-card">
-        <span>Filters</span>
-        <span>Level</span>
-        <span>Operation</span>
+        <label className="debug-toolbar-field">
+          <span>Source</span>
+          <select
+            value={filterSource}
+            onChange={(e) => setFilterSource(e.target.value)}
+            className="debug-select"
+          >
+            <option value="all">All</option>
+            <option value="backend">Backend API</option>
+            <option value="portfolio">Admin (browser)</option>
+            <option value="partfinder-desktop">PartFinder app</option>
+          </select>
+        </label>
+        <label className="debug-toolbar-field">
+          <span>Level</span>
+          <select
+            value={filterLevel}
+            onChange={(e) => setFilterLevel(e.target.value)}
+            className="debug-select"
+          >
+            {levels.map((lv) => (
+              <option key={lv} value={lv}>
+                {lv === 'all' ? 'All' : lv}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="debug-toolbar-toggle">
+          <input
+            type="checkbox"
+            checked={paused}
+            onChange={(e) => setPaused(e.target.checked)}
+          />
+          Pause refresh
+        </label>
+        <button
+          type="button"
+          className="btn-light"
+          onClick={() => void fetchLogs()}
+          disabled={paused}
+        >
+          Refresh now
+        </button>
+        <button
+          type="button"
+          className="btn-light debug-clear-btn"
+          onClick={() => void handleClear()}
+          disabled={clearPending}
+        >
+          {clearPending ? 'Clearing…' : 'Clear server log'}
+        </button>
       </div>
+      {loadError ? <p className="form-error">{loadError}</p> : null}
+      <p className="debug-hint">
+        Streams Nest logs and HTTP traffic from the API, browser console from this admin
+        tab, and (when configured) the PartFinder Windows app via ingest key.
+      </p>
       <div className="debug-list">
-        {logs.map((log, index) => (
-          <article key={`${log.level}-${index}`} className="debug-item">
-            <strong>{log.level}</strong>
-            <p>{log.message}</p>
+        {filtered.length === 0 ? (
+          <article className="debug-item debug-item-empty">
+            <p>No log lines match the current filters.</p>
+          </article>
+        ) : null}
+        {filtered.map((log) => (
+          <article key={log.id} className="debug-item">
+            <div className="debug-item-head">
+              <span className={`debug-badge debug-src-${log.source}`}>
+                {log.source}
+              </span>
+              <time dateTime={log.ts}>{log.ts}</time>
+              <strong className="debug-level">{log.level}</strong>
+            </div>
+            <p className="debug-msg">{log.message}</p>
+            {log.context ? (
+              <pre className="debug-ctx">{log.context}</pre>
+            ) : null}
           </article>
         ))}
       </div>

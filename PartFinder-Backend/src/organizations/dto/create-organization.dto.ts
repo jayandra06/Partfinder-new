@@ -1,4 +1,5 @@
 import { IsIn, IsString, Matches, MinLength } from 'class-validator';
+import { ORG_PLANS, ORG_TYPES } from '../org.constants';
 
 export class CreateOrganizationDto {
   @IsString()
@@ -6,11 +7,11 @@ export class CreateOrganizationDto {
   name: string;
 
   @IsString()
-  @IsIn(['premium', 'standard'])
+  @IsIn([...ORG_TYPES])
   type: string;
 
   @IsString()
-  @IsIn(['lifetime', 'annual'])
+  @IsIn([...ORG_PLANS])
   plan: string;
 
   @IsString()

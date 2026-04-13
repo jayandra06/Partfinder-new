@@ -22,6 +22,24 @@ export class Organization {
 
   @Prop({ default: 'Active' })
   status: string;
+
+  /** When true, license verification always fails until cleared via reactivate. */
+  @Prop({ default: false })
+  licensePermanentlyBanned: boolean;
+
+  /** When set and in the future, license fails until this instant (UTC). Ignored if permanently banned. */
+  @Prop({ type: Date, default: null })
+  licenseBannedUntil: Date | null;
+
+  /** Per-organization MongoDB connection string (tenant data). Set only after tenant DB init succeeds. */
+  @Prop({ type: String, default: null })
+  orgDatabaseUri: string | null;
+
+  @Prop({ default: 50 })
+  maxUsers: number;
+
+  @Prop({ default: 100000 })
+  maxParts: number;
 }
 
 export const OrganizationSchema = SchemaFactory.createForClass(Organization);
