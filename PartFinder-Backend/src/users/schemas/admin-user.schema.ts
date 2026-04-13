@@ -10,6 +10,13 @@ export class AdminUser {
 
   @Prop({ required: true })
   passwordHash: string;
+
+  /** Base32 TOTP secret (same algorithm as authenticator apps). Optional; used for password recovery. */
+  @Prop({ required: false })
+  totpSecretBase32?: string;
+
+  @Prop({ required: false, default: false })
+  totpEnabled?: boolean;
 }
 
 export const AdminUserSchema = SchemaFactory.createForClass(AdminUser);

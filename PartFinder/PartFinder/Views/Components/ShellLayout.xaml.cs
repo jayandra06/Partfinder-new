@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using PartFinder.Services;
 using PartFinder.ViewModels;
+using System.ComponentModel;
 
 namespace PartFinder.Views.Components;
 
@@ -11,18 +12,44 @@ public sealed partial class ShellLayout : UserControl
     public ShellLayout()
     {
         InitializeComponent();
-        DataContext = App.Services.GetRequiredService<ShellViewModel>();
-        Loaded += OnLoaded;
+        var vm = App.Services.GetRequiredService<ShellViewModel>();
+        DataContext = vm;
+        vm.PropertyChanged += OnShellVmPropertyChanged;
+        Loaded += OnShellLayoutLoaded;
+        ApplySidebarWidth();
     }
 
-    private void OnLoaded(object sender, RoutedEventArgs e)
+    private void OnShellVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(ShellViewModel.IsSidebarCollapsed))
+        {
+            ApplySidebarWidth();
+        }
+    }
+
+    private void ApplySidebarWidth()
+    {
+        if (DataContext is ShellViewModel vm)
+        {
+            SidebarColumn.Width = new GridLength(vm.IsSidebarCollapsed ? 56 : 240);
+            SidebarRoot.Padding = vm.IsSidebarCollapsed
+                ? new Thickness(4, 8, 4, 16)
+                : new Thickness(16, 16, 16, 24);
+            NavListView.Margin = vm.IsSidebarCollapsed
+                ? new Thickness(0, 4, 0, 0)
+                : new Thickness(0, 8, 0, 0);
+        }
+    }
+
+    private async void OnShellLayoutLoaded(object sender, RoutedEventArgs e)
+    {
+        Loaded -= OnShellLayoutLoaded;
         var navigationService = App.Services.GetRequiredService<INavigationService>();
         navigationService.Initialize(ContentFrame);
 
-        if (DataContext is ShellViewModel shellViewModel && shellViewModel.SelectedNavigationItem is not null)
+        if (DataContext is ShellViewModel shellViewModel)
         {
-            navigationService.Navigate(shellViewModel.SelectedNavigationItem.Page);
+            await shellViewModel.InitializeAsync().ConfigureAwait(true);
         }
     }
 }

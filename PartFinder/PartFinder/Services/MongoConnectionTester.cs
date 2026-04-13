@@ -9,7 +9,8 @@ public static class MongoConnectionTester
     {
         try
         {
-            var client = new MongoClient(connectionString);
+            var cs = MongoConnectionStringUtil.Normalize(connectionString);
+            var client = new MongoClient(cs);
             _ = await client.GetDatabase("admin")
                 .RunCommandAsync<BsonDocument>(new BsonDocument("ping", 1), cancellationToken: ct)
                 .ConfigureAwait(true);

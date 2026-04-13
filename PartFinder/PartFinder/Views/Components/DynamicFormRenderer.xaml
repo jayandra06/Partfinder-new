@@ -11,9 +11,13 @@
         </ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="models:TemplateFieldDefinition">
-                <StackPanel Margin="0,0,12,12">
-                    <TextBlock Text="{x:Bind Label}" />
-                    <TextBox PlaceholderText="{x:Bind Key}" />
+                <StackPanel Margin="0,0,12,12" Spacing="4">
+                    <TextBlock FontWeight="SemiBold" Text="{x:Bind Label}" TextWrapping="WrapWholeWords" />
+                    <TextBlock
+                        FontSize="12"
+                        Foreground="{ThemeResource AppSubtleTextBrush}"
+                        Text="{x:Bind Type}"
+                        TextWrapping="WrapWholeWords" />
                 </StackPanel>
             </DataTemplate>
         </ItemsControl.ItemTemplate>

@@ -7,6 +7,10 @@ export type DbClusterDocument = HydratedDocument<DbCluster>;
 export class DbCluster {
   @Prop({ required: true })
   connectionUri: string;
+
+  /** Max tenant databases (orgs on “Default”) per cluster. */
+  @Prop({ default: 250 })
+  maxDatabases: number;
 }
 
 export const DbClusterSchema = SchemaFactory.createForClass(DbCluster);

@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument } from 'mongoose';
+import { HydratedDocument, Schema as MongooseSchema } from 'mongoose';
 
 export type OrganizationDocument = HydratedDocument<Organization>;
 
@@ -34,6 +34,10 @@ export class Organization {
   /** Per-organization MongoDB connection string (tenant data). Set only after tenant DB init succeeds. */
   @Prop({ type: String, default: null })
   orgDatabaseUri: string | null;
+
+  /** Set when tenant DB was provisioned via “Default” mode (admin DBClusters pool). */
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'DbCluster', default: null })
+  assignedDbClusterId: MongooseSchema.Types.ObjectId | null;
 
   @Prop({ default: 50 })
   maxUsers: number;

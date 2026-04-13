@@ -1,29 +1,163 @@
 <Page
     x:Class="PartFinder.Views.Pages.TemplatesPage"
+    x:Name="TemplatesPageRoot"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:components="using:PartFinder.Views.Components">
+    xmlns:components="using:PartFinder.Views.Components"
+    xmlns:converters="using:PartFinder.Converters"
+    xmlns:viewmodels="using:PartFinder.ViewModels"
+    >
+    <Page.Resources>
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+        <converters:InvertedBoolToVisibilityConverter x:Key="InvertedBoolToVisibilityConverter" />
+    </Page.Resources>
     <Grid Padding="20" ColumnSpacing="14">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="300" />
+            <ColumnDefinition Width="280" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
         <Border Style="{ThemeResource AppCardBorderStyle}">
-            <StackPanel Spacing="12">
-                <TextBlock Text="Templates" Style="{ThemeResource AppSectionTextStyle}" />
+            <StackPanel Padding="4" Spacing="12">
+                <TextBlock Style="{ThemeResource AppSectionTextStyle}" Text="Templates" />
+                <TextBlock
+                    Foreground="{ThemeResource AppSubtleTextBrush}"
+                    Text="Create templates for your business data here. You can define your own column names and types, then use those templates in Data Entry and Parts."
+                    TextWrapping="WrapWholeWords"
+                    Visibility="{Binding CanAddAnotherTemplate, Converter={StaticResource InvertedBoolToVisibilityConverter}}" />
                 <ListView
+                    MinHeight="120"
+                    DisplayMemberPath="Name"
                     ItemsSource="{Binding Templates}"
                     SelectedItem="{Binding SelectedTemplate, Mode=TwoWay}"
-                    DisplayMemberPath="Name" />
+                    Visibility="{Binding ShowTemplateList, Converter={StaticResource BoolToVisibilityConverter}}" />
+                <Button
+                    Command="{Binding StartNewCustomTemplateCommand}"
+                    Content="New template"
+                    IsEnabled="{Binding CanAddAnotherTemplate}"
+                    Visibility="{Binding CanAddAnotherTemplate, Converter={StaticResource BoolToVisibilityConverter}}" />
             </StackPanel>
         </Border>
 
-        <StackPanel Grid.Column="1" Spacing="12">
-            <components:PageHeader
-                Title="Template Builder"
-                Subtitle="Create and evolve dynamic schemas safely with versions" />
-            <components:DynamicFormRenderer Fields="{Binding SelectedTemplate.Fields, Mode=OneWay}" />
-        </StackPanel>
+        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="16">
+                <TextBlock
+                    Foreground="IndianRed"
+                    Text="No tenant database is configured. Complete setup with a valid organization and database connection."
+                    TextWrapping="WrapWholeWords"
+                    Visibility="{Binding ShowDbMissingBanner, Converter={StaticResource BoolToVisibilityConverter}}" />
+
+                <StackPanel Visibility="{Binding ShowTemplateEditor, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <components:PageHeader
+                        Subtitle="Name each column like a spreadsheet header. Turn on Link column only when this column should point at a row in another template (optional)."
+                        Title="{Binding EditorHeaderTitle}" />
+                    <TextBlock Margin="0,8,0,0" Text="Template name" />
+                    <TextBox IsReadOnly="{Binding IsTemplateNameReadOnly}" Text="{Binding NewTemplateName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock
+                        Foreground="{ThemeResource AppSubtleTextBrush}"
+                        Text="When this is your first template, the name stays Master Data."
+                        TextWrapping="WrapWholeWords"
+                        Visibility="{Binding IsTemplateNameReadOnly, Converter={StaticResource BoolToVisibilityConverter}}" />
+                    <TextBlock Margin="0,12,0,0" Text="Columns" />
+                    <ItemsControl ItemsSource="{Binding ColumnLabels}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Padding="0,8" Spacing="8">
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox
+                                            Grid.Column="0"
+                                            PlaceholderText="Column name"
+                                            Text="{Binding Label, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <Button
+                                            Grid.Column="1"
+                                            VerticalAlignment="Center"
+                                            Click="OnRemoveColumnClick"
+                                            Content="Remove" />
+                                    </Grid>
+                                    <ToggleSwitch
+                                        OffContent="Plain text / number column"
+                                        OnContent="Link column (reference another template)"
+                                        IsOn="{Binding IsLinkColumn, Mode=TwoWay}" />
+                                    <ComboBox
+                                        MinWidth="240"
+                                        HorizontalAlignment="Left"
+                                        DisplayMemberPath="Name"
+                                        ItemsSource="{Binding DataContext.LinkTargetCandidates, ElementName=TemplatesPageRoot}"
+                                        PlaceholderText="Choose template to link to…"
+                                        SelectedValue="{Binding LinkedTemplateId, Mode=TwoWay}"
+                                        SelectedValuePath="Id"
+                                        Visibility="{Binding IsLinkColumn, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Button
+                        Margin="0,8,0,0"
+                        HorizontalAlignment="Left"
+                        Command="{Binding AddColumnCommand}"
+                        Content="Add another label" />
+                    <StackPanel Margin="0,16,0,0" Orientation="Horizontal" Spacing="8">
+                        <Button Command="{Binding SaveTemplateCommand}" Content="Save template" />
+                        <Button Command="{Binding CancelCreateCommand}" Content="Cancel" />
+                    </StackPanel>
+                    <TextBlock
+                        Margin="0,8,0,0"
+                        Foreground="IndianRed"
+                        Text="{Binding FormError}"
+                        TextWrapping="WrapWholeWords" />
+                </StackPanel>
+
+                <StackPanel Visibility="{Binding ShowTemplatePreviewPanel, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <components:PageHeader Subtitle="Fields for the selected template" Title="Template preview" />
+                    <Button
+                        Margin="0,0,0,12"
+                        HorizontalAlignment="Left"
+                        Command="{Binding BeginEditSelectedTemplateCommand}"
+                        Content="Edit columns"
+                        IsEnabled="{Binding CanEditSelectedTemplate}" />
+                    <components:DynamicFormRenderer Fields="{Binding SelectedTemplate.Fields, Mode=OneWay}" />
+
+                    <StackPanel
+                        Margin="0,20,0,0"
+                        Spacing="10"
+                        Visibility="{Binding ShowContextActionsEditor, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Style="{ThemeResource AppSectionTextStyle}" Text="Cell actions (data grid)" />
+                        <TextBlock
+                            Foreground="{ThemeResource AppSubtleTextBrush}"
+                            Text="Add right-click menu entries for this template. Each action opens rows from another template when all match rules succeed (AND). Use a literal to force a fixed value (e.g. filter Location = London)."
+                            TextWrapping="WrapWholeWords" />
+                        <ListView
+                            MaxHeight="220"
+                            SelectedItem="{Binding SelectedContextAction, Mode=TwoWay}"
+                            ItemsSource="{Binding ContextActionRows}">
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="viewmodels:ContextActionListRow">
+                                    <StackPanel Padding="4">
+                                        <TextBlock FontWeight="SemiBold" Text="{x:Bind Action.MenuLabel}" />
+                                        <TextBlock
+                                            FontSize="12"
+                                            Foreground="{ThemeResource AppSubtleTextBrush}"
+                                            Text="{x:Bind SummaryLine}"
+                                            TextWrapping="WrapWholeWords" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Click="OnAddContextActionClick" Content="Add cell action…" />
+                            <Button Command="{Binding DeleteContextActionCommand}" Content="Remove selected" />
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Visibility="{Binding ShowSelectTemplatePromptPanel, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <components:PageHeader Subtitle="Select a template on the left to preview its columns." Title="Templates" />
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
     </Grid>
 </Page>

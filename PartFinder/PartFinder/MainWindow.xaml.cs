@@ -20,15 +20,13 @@ public sealed partial class MainWindow : Window
     private string? _cachedOrgDatabaseUri;
     private SetupStatusResult? _lastStatus;
 
-    private readonly string _setupFilePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "PartFinder",
-        "setup-state.json");
+    private readonly string _setupFilePath = SetupPaths.SetupStateFilePath;
 
     public MainWindow()
     {
         InitializeComponent();
-        ExtendsContentIntoTitleBar = true;
+        // Use native caption/title bar buttons to avoid overlap with app content.
+        ExtendsContentIntoTitleBar = false;
         BackButton.IsEnabled = false;
 
         if (IsSetupCompleted())
@@ -55,12 +53,13 @@ public sealed partial class MainWindow : Window
     {
         try
         {
-            if (!File.Exists(_setupFilePath))
+            var existingPath = SetupPaths.FindExistingSetupStatePath();
+            if (!File.Exists(existingPath))
             {
                 return new SetupState();
             }
 
-            return JsonSerializer.Deserialize<SetupState>(File.ReadAllText(_setupFilePath), SetupJson)
+            return JsonSerializer.Deserialize<SetupState>(File.ReadAllText(existingPath), SetupJson)
                    ?? new SetupState();
         }
         catch

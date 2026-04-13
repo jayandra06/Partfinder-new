@@ -1,0 +1,90 @@
+<Page
+    x:Class="PartFinder.Views.Pages.MasterDataPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:components="using:PartFinder.Views.Components"
+    xmlns:converters="using:PartFinder.Converters">
+    <Page.Resources>
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+        <converters:InvertedBoolToVisibilityConverter x:Key="InvertedBoolToVisibilityConverter" />
+        <converters:StringToVisibilityConverter x:Key="StringToVisibilityConverter" />
+    </Page.Resources>
+    <Grid x:Name="RootGrid" Padding="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <components:PageHeader
+            Grid.Row="0"
+            Title="Template data"
+            Subtitle="Each template has its own grid. Switch templates from the list. Click Edit Data to enable changes, then Save." />
+        <ComboBox
+            Grid.Row="1"
+            Margin="0,12,0,0"
+            MinWidth="280"
+            HorizontalAlignment="Left"
+            DisplayMemberPath="Name"
+            ItemsSource="{Binding DataTemplates}"
+            PlaceholderText="Choose template…"
+            SelectedItem="{Binding SelectedDataTemplate, Mode=TwoWay}"
+            Visibility="{Binding ShowTemplatePicker, Converter={StaticResource BoolToVisibilityConverter}}" />
+        <Border Grid.Row="2" Margin="0,12,0,0" Padding="12" Style="{ThemeResource AppCardBorderStyle}">
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Button Click="OnToggleEditModeClicked" Content="{Binding EditModeButtonText}" />
+                    <Button Command="{Binding AddRowCommand}" Content="Add row" IsEnabled="{Binding IsEditMode}" />
+                    <Button Click="OnSaveGridClicked" Content="Save" IsEnabled="{Binding IsEditMode}" />
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        Foreground="{ThemeResource AppSubtleTextBrush}"
+                        Text="View mode"
+                        Visibility="{Binding IsEditMode, Converter={StaticResource InvertedBoolToVisibilityConverter}}" />
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        Foreground="{ThemeResource AppSubtleTextBrush}"
+                        Text="Edit mode"
+                        Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibilityConverter}}" />
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        Foreground="{ThemeResource AppSubtleTextBrush}"
+                        Text="Loading..."
+                        Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <Button Click="OnExportTemplateClicked" Content="Export Excel template" />
+                    <Button Click="OnImportExcelClicked" Content="Import Excel data" />
+                </StackPanel>
+            </Grid>
+        </Border>
+        <StackPanel Grid.Row="3" Margin="0,8,0,8" Spacing="6">
+            <TextBlock
+                Foreground="{ThemeResource AppSubtleTextBrush}"
+                Text="{Binding StatusMessage}"
+                TextWrapping="Wrap"
+                Visibility="{Binding StatusMessage, Converter={StaticResource StringToVisibilityConverter}}" />
+            <TextBlock
+                Foreground="{ThemeResource AppSubtleTextBrush}"
+                Text="Create and save a Master Data template under Templates to see columns here."
+                TextWrapping="Wrap"
+                Visibility="{Binding ShowNoTemplateHint, Converter={StaticResource BoolToVisibilityConverter}}" />
+            <TextBlock
+                Foreground="{ThemeResource AppSubtleTextBrush}"
+                Text="No tenant database is configured. Complete setup with a valid organization and database connection."
+                TextWrapping="Wrap"
+                Visibility="{Binding ShowNoDatabaseHint, Converter={StaticResource BoolToVisibilityConverter}}" />
+        </StackPanel>
+        <ContentControl
+            x:Name="SpreadsheetHost"
+            Grid.Row="4"
+            Margin="0,8,0,0"
+            HorizontalContentAlignment="Stretch"
+            VerticalContentAlignment="Stretch" />
+    </Grid>
+</Page>

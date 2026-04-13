@@ -6,6 +6,8 @@ import { AdminBootstrapDto } from './dto/bootstrap.dto';
 import { ChangeAdminPasswordDto } from './dto/change-admin-password.dto';
 import { CreateAdminUserDto } from './dto/create-admin-user.dto';
 import { AdminLoginDto } from './dto/login.dto';
+import { AdminSyncTotpDto } from './dto/admin-sync-totp.dto';
+import { AdminResetPasswordWithTotpDto } from './dto/admin-reset-password-with-totp.dto';
 
 type AuthedRequest = Request & { user: { userId: string; email: string } };
 
@@ -36,5 +38,22 @@ export class AuthController {
   @UseGuards(AuthGuard('jwt'))
   createAdmin(@Body() dto: CreateAdminUserDto) {
     return this.authService.createAdminUser(dto);
+  }
+
+  @Post('admin/two-factor/sync')
+  @UseGuards(AuthGuard('jwt'))
+  syncTotp(@Req() req: AuthedRequest, @Body() dto: AdminSyncTotpDto) {
+    return this.authService.syncAdminTotp(req.user.userId, dto);
+  }
+
+  @Post('admin/two-factor/clear')
+  @UseGuards(AuthGuard('jwt'))
+  clearTotp(@Req() req: AuthedRequest) {
+    return this.authService.clearAdminTotp(req.user.userId);
+  }
+
+  @Post('admin/reset-password-with-totp')
+  resetPasswordWithTotp(@Body() dto: AdminResetPasswordWithTotpDto) {
+    return this.authService.resetPasswordWithTotp(dto);
   }
 }

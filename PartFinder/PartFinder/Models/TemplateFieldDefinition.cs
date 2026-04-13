@@ -9,4 +9,10 @@ public sealed class TemplateFieldDefinition
     public int DisplayOrder { get; init; }
     public string? ValidationPattern { get; init; }
     public IReadOnlyList<string>? Options { get; init; }
+
+    /// <summary>When <see cref="Type"/> is <see cref="TemplateFieldType.RecordLink"/>, id of the target template.</summary>
+    public string? LinkedTemplateId { get; init; }
+
+    /// <summary>Optional field key on the target template used as the visible label; default = first column.</summary>
+    public string? LinkedDisplayFieldKey { get; init; }
 }

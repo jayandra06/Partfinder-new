@@ -2,14 +2,20 @@
     x:Class="PartFinder.Views.Components.ShellLayout"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:converters="using:PartFinder.Converters"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:viewModels="using:PartFinder.ViewModels"
     mc:Ignorable="d">
 
+    <UserControl.Resources>
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+        <converters:InvertedBoolToVisibilityConverter x:Key="InvertedBoolToVisibilityConverter" />
+    </UserControl.Resources>
+
     <Grid Background="{ThemeResource AppBackgroundBrush}">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="240" />
+            <ColumnDefinition x:Name="SidebarColumn" Width="240" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
@@ -17,21 +23,50 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Border Grid.RowSpan="2" Background="{ThemeResource AppSidebarBrush}">
-            <StackPanel Spacing="8" Padding="16,16,16,24">
-                <TextBlock Text="PartFinder" Style="{ThemeResource AppTitleTextStyle}" />
-                <TextBlock Text="{Binding CurrentTenant}" Foreground="{ThemeResource AppSubtleTextBrush}" />
+        <Border Grid.RowSpan="2" Grid.Column="0" Background="{ThemeResource AppSidebarBrush}">
+            <StackPanel x:Name="SidebarRoot" Padding="16,16,16,24" Spacing="8">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel
+                        Grid.Column="0"
+                        Spacing="2"
+                        Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InvertedBoolToVisibilityConverter}}">
+                        <TextBlock Text="PartFinder" Style="{ThemeResource AppTitleTextStyle}" />
+                        <TextBlock Text="{Binding CurrentTenant}" Foreground="{ThemeResource AppSubtleTextBrush}" />
+                    </StackPanel>
+                    <Button
+                        Grid.Column="1"
+                        Padding="8,4"
+                        VerticalAlignment="Top"
+                        AutomationProperties.Name="Collapse or expand navigation"
+                        Command="{Binding ToggleSidebarCommand}"
+                        Content="{Binding SidebarToggleGlyph}"
+                        FontFamily="{ThemeResource SymbolThemeFontFamily}" />
+                </Grid>
 
                 <ListView
-                    Margin="0,16,0,0"
+                    x:Name="NavListView"
+                    Margin="0,8,0,0"
                     ItemsSource="{Binding NavigationItems}"
                     SelectedItem="{Binding SelectedNavigationItem, Mode=TwoWay}"
                     SelectionMode="Single">
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="viewModels:NavItemViewModel">
-                            <StackPanel Orientation="Horizontal" Spacing="10" Padding="8,6">
+                            <StackPanel
+                                Padding="{x:Bind NavRowPadding, Mode=OneWay}"
+                                HorizontalAlignment="{x:Bind NavRowAlignment, Mode=OneWay}"
+                                Orientation="Horizontal"
+                                Spacing="10"
+                                AutomationProperties.Name="{x:Bind Label}"
+                                ToolTipService.ToolTip="{x:Bind Label}">
                                 <FontIcon Glyph="{x:Bind IconGlyph}" />
-                                <TextBlock Text="{x:Bind Label}" />
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    Text="{x:Bind Label}"
+                                    Visibility="{x:Bind ShowNavLabel, Converter={StaticResource BoolToVisibilityConverter}, Mode=OneWay}" />
                             </StackPanel>
                         </DataTemplate>
                     </ListView.ItemTemplate>

@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Param,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -19,6 +20,11 @@ export class DbClustersController {
   @Get()
   list() {
     return this.dbClustersService.findAllForAdmin();
+  }
+
+  @Get(':id/organizations')
+  listOrganizations(@Param('id') id: string) {
+    return this.dbClustersService.findOrganizationsForCluster(id);
   }
 
   @Post('test')

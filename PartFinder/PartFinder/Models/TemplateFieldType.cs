@@ -7,5 +7,8 @@ public enum TemplateFieldType
     Decimal,
     Dropdown,
     Date,
-    Boolean
+    Boolean,
+
+    /// <summary>Optional link to a row in another template (stored value = target row id).</summary>
+    RecordLink,
 }

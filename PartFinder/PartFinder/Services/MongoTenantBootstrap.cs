@@ -14,13 +14,14 @@ public static class MongoTenantBootstrap
     {
         try
         {
-            var url = new MongoUrl(uri);
+            var cs = MongoConnectionStringUtil.Normalize(uri);
+            var url = new MongoUrl(cs);
             if (string.IsNullOrEmpty(url.DatabaseName))
             {
                 return false;
             }
 
-            var client = new MongoClient(uri);
+            var client = new MongoClient(cs);
             var db = client.GetDatabase(url.DatabaseName);
             var admins = db.GetCollection<BsonDocument>(OrgAdminCollection);
             var emailKey = Builders<BsonDocument>.IndexKeys.Ascending("email");
@@ -51,13 +52,14 @@ public static class MongoTenantBootstrap
     {
         try
         {
-            var url = new MongoUrl(uri);
+            var cs = MongoConnectionStringUtil.Normalize(uri);
+            var url = new MongoUrl(cs);
             if (string.IsNullOrEmpty(url.DatabaseName))
             {
                 return 0;
             }
 
-            var client = new MongoClient(uri);
+            var client = new MongoClient(cs);
             var db = client.GetDatabase(url.DatabaseName);
             var coll = db.GetCollection<BsonDocument>(OrgAdminCollection);
             return await coll.CountDocumentsAsync(FilterDefinition<BsonDocument>.Empty, cancellationToken: ct)

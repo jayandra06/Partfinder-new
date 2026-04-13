@@ -42,4 +42,7 @@ public sealed class InMemoryTemplateSchemaService : ITemplateSchemaService
 
     public Task<PartTemplateDefinition?> GetTemplateAsync(string templateId, CancellationToken cancellationToken = default)
         => Task.FromResult(_templates.FirstOrDefault(t => t.Id == templateId));
+
+    public Task SaveTemplateAsync(PartTemplateDefinition template, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("In-memory template store is read-only.");
 }

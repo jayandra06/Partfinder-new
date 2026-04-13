@@ -189,6 +189,10 @@ function AdminPortalPage() {
   const isDatabaseManagementPage = location.pathname.startsWith(
     '/admin/database-management',
   )
+  const databaseClusterDetailMatch = location.pathname.match(
+    /^\/admin\/database-management\/cluster\/([^/]+)\/?$/,
+  )
+  const databaseClusterDetailId = databaseClusterDetailMatch?.[1] ?? null
   const pageTitle = isOrganizationsPage
     ? 'Organizations'
     : isUsersPage
@@ -200,7 +204,9 @@ function AdminPortalPage() {
           : isReleasesPage
             ? 'Release Management'
             : isDatabaseManagementPage
-              ? 'Database Management'
+              ? databaseClusterDetailId
+                ? 'Cluster organizations'
+                : 'Database Management'
               : 'Dashboard'
 
   return (
@@ -240,7 +246,9 @@ function AdminPortalPage() {
               {isOrganizationsPage
                 ? 'Manage platform organizations and their settings'
                 : isDatabaseManagementPage
-                  ? 'Register MongoDB clusters for default organization databases'
+                  ? databaseClusterDetailId
+                    ? 'Organizations provisioned on this cluster via Default database mode'
+                    : 'Register MongoDB clusters for default organization databases'
                   : isSettingsPage
                     ? 'Manage administrator credentials and access'
                     : isDebugPage
@@ -263,7 +271,14 @@ function AdminPortalPage() {
         ) : null}
         {isReleasesPage ? <ReleasesSection /> : null}
         {isDatabaseManagementPage ? (
-          <DatabaseManagementSection onSessionExpired={handleSessionExpired} />
+          databaseClusterDetailId ? (
+            <DatabaseClusterOrganizationsSection
+              clusterId={databaseClusterDetailId}
+              onSessionExpired={handleSessionExpired}
+            />
+          ) : (
+            <DatabaseManagementSection onSessionExpired={handleSessionExpired} />
+          )
         ) : null}
         {!isOrganizationsPage &&
         !isUsersPage &&
@@ -891,7 +906,7 @@ function OrganizationsSection({
                   <button type="button" className="btn-dark" onClick={generateCode}>
                     Generate Code
                   </button>
-                </div>
+        </div>
 
                 <div className="generated-code-box">
                   {generatedCode ? (
@@ -941,14 +956,14 @@ function OrganizationsSection({
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal-card">
             <div className="modal-head">
-              <div>
+        <div>
                 <h3>Ban license</h3>
-                <p>
+          <p>
                   Block the Windows client for{' '}
                   <strong>{banModalRow.name}</strong> (code {banModalRow.code}). Subscription
                   status is unchanged; this only affects license verification.
-                </p>
-              </div>
+          </p>
+        </div>
               <button type="button" className="modal-close" onClick={closeBanModal}>
                 ×
               </button>
@@ -1012,19 +1027,19 @@ function OrganizationsSection({
               <button type="button" className="btn-ghost" onClick={closeBanModal}>
                 Cancel
               </button>
-              <button
+        <button
                 type="button"
                 className="btn-light"
                 disabled={!canSubmitBan || banSaving}
                 onClick={() => void submitBan()}
               >
                 {banSaving ? 'Applying…' : 'Apply ban'}
-              </button>
+        </button>
             </div>
           </div>
         </div>
       ) : null}
-    </section>
+      </section>
   )
 }
 
@@ -1032,6 +1047,129 @@ type DbClusterRow = {
   id: string
   uriMasked: string
   createdAt: string
+  databasesUsed: number
+  maxDatabases: number
+  databasesFree: number
+}
+
+type ClusterAssignedOrgRow = {
+  id: string
+  orgCode: string
+  name: string
+  status: string
+  createdAt: string
+}
+
+function DatabaseClusterOrganizationsSection({
+  clusterId,
+  onSessionExpired,
+}: {
+  clusterId: string
+  onSessionExpired: () => void
+}) {
+  const navigate = useNavigate()
+  const [orgs, setOrgs] = useState<ClusterAssignedOrgRow[]>([])
+  const [uriMasked, setUriMasked] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+
+  const load = useCallback(async () => {
+    setLoadError('')
+    setLoading(true)
+    try {
+      const headers = authJsonHeaders()
+      const [orgsRes, clustersRes] = await Promise.all([
+        fetch(`${apiBase}/api/admin/db-clusters/${encodeURIComponent(clusterId)}/organizations`, {
+          headers,
+        }),
+        fetch(`${apiBase}/api/admin/db-clusters`, { headers }),
+      ])
+      if (orgsRes.status === 401 || clustersRes.status === 401) {
+        onSessionExpired()
+        return
+      }
+      if (!clustersRes.ok) {
+        setUriMasked(null)
+      } else {
+        const list: unknown = await clustersRes.json().catch(() => null)
+        const rows = Array.isArray(list) ? (list as DbClusterRow[]) : []
+        const meta = rows.find((r) => r.id === clusterId)
+        setUriMasked(meta?.uriMasked ?? null)
+      }
+      if (!orgsRes.ok) {
+        const data: unknown = await orgsRes.json().catch(() => null)
+        setLoadError(parseApiErrorMessage(data))
+        setOrgs([])
+        return
+      }
+      const data: unknown = await orgsRes.json().catch(() => null)
+      const list = Array.isArray(data) ? (data as ClusterAssignedOrgRow[]) : []
+      setOrgs(list)
+    } catch {
+      setLoadError('Cannot load data. Is the API running?')
+      setOrgs([])
+      setUriMasked(null)
+    } finally {
+      setLoading(false)
+    }
+  }, [clusterId, onSessionExpired])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  return (
+    <section className="organizations-section">
+      <div className="org-toolbar">
+        <button
+          type="button"
+          className="btn-ghost"
+          onClick={() => navigate('/admin/database-management')}
+        >
+          Back to clusters
+        </button>
+        </div>
+      {uriMasked ? (
+        <p className="admin-muted">
+          Cluster connection: <code className="db-cluster-masked">{uriMasked}</code>
+        </p>
+      ) : null}
+      {loadError ? <p className="form-error">{loadError}</p> : null}
+      {loading ? <p className="admin-muted">Loading organizations…</p> : null}
+      <div className="org-table-wrap">
+        <table className="org-table">
+          <thead>
+            <tr>
+              <th>Org code</th>
+              <th>Name</th>
+              <th>Status</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody>
+            {!loading && orgs.length === 0 && !loadError ? (
+              <tr>
+                <td colSpan={4} className="org-empty-cell">
+                  No organizations are assigned to this cluster yet. Organizations appear here after
+                  they complete setup with Default database mode.
+                </td>
+              </tr>
+            ) : null}
+            {orgs.map((row) => (
+              <tr key={row.id}>
+                <td>
+                  <code>{row.orgCode}</code>
+                </td>
+                <td>{row.name}</td>
+                <td>{row.status}</td>
+                <td>{new Date(row.createdAt).toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
 }
 
 function DatabaseManagementSection({
@@ -1039,6 +1177,7 @@ function DatabaseManagementSection({
 }: {
   onSessionExpired: () => void
 }) {
+  const navigate = useNavigate()
   const [rows, setRows] = useState<DbClusterRow[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -1188,6 +1327,9 @@ function DatabaseManagementSection({
           + Add new cluster
         </button>
       </div>
+      <p className="admin-muted">
+        Right-click a cluster row to open the list of organizations using that cluster.
+      </p>
       {loadError ? <p className="form-error">{loadError}</p> : null}
       {loading ? <p className="admin-muted">Loading clusters…</p> : null}
       <div className="org-table-wrap">
@@ -1195,21 +1337,34 @@ function DatabaseManagementSection({
           <thead>
             <tr>
               <th>Connection (masked)</th>
+              <th>Tenant databases</th>
               <th>Added</th>
             </tr>
           </thead>
           <tbody>
             {!loading && rows.length === 0 ? (
               <tr>
-                <td colSpan={2} className="org-empty-cell">
+                <td colSpan={3} className="org-empty-cell">
                   No clusters yet. Add a MongoDB URI to register a cluster.
                 </td>
               </tr>
             ) : null}
             {rows.map((row) => (
-              <tr key={row.id}>
+              <tr
+                key={row.id}
+                className="db-cluster-row"
+                title="Right-click to view organizations on this cluster"
+                onContextMenu={(event) => {
+                  event.preventDefault()
+                  navigate(`/admin/database-management/cluster/${row.id}`)
+                }}
+              >
                 <td>
                   <code className="db-cluster-masked">{row.uriMasked}</code>
+                </td>
+                <td className="admin-muted">
+                  {row.databasesUsed} / {row.maxDatabases} used ·{' '}
+                  {row.databasesFree} free
                 </td>
                 <td>{new Date(row.createdAt).toLocaleString()}</td>
               </tr>
@@ -1279,11 +1434,11 @@ function DatabaseManagementSection({
                   {savePending ? 'Saving…' : 'Save'}
                 </button>
               ) : null}
-            </div>
+        </div>
           </div>
         </div>
       ) : null}
-    </section>
+      </section>
   )
 }
 

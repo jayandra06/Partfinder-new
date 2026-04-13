@@ -20,3 +20,34 @@ export function assertMongoUri(uri: string): void {
     );
   }
 }
+
+/**
+ * `mongodb+srv://` implies TLS. Plain `mongodb://` does not unless `tls` / `ssl` is set.
+ * MongoDB Atlas (`*.mongodb.net`) requires TLS — matches WinUI `MongoConnectionStringUtil`.
+ */
+export function ensureAtlasTlsForStandardUri(uri: string): string {
+  const s = uri.trim();
+  if (s.startsWith('mongodb+srv://')) {
+    return s;
+  }
+  if (!s.startsWith('mongodb://')) {
+    return s;
+  }
+  if (!s.includes('.mongodb.net')) {
+    return s;
+  }
+  const q = s.indexOf('?');
+  const tail = q >= 0 ? s.slice(q + 1) : '';
+  const lower = tail.toLowerCase();
+  const hasTls =
+    /\btls=(true|1)\b/.test(lower) || /\bssl=(true|1)\b/.test(lower);
+  if (hasTls) {
+    return s;
+  }
+  return q >= 0 ? `${s}&tls=true` : `${s}?tls=true`;
+}
+
+/** Normalize + Atlas TLS fix for driver connections (admin DB clusters, probes). */
+export function prepareMongoUriForDriver(raw: string | undefined): string {
+  return ensureAtlasTlsForStandardUri(normalizeMongoUri(raw));
+}

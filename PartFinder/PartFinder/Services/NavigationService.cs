@@ -7,9 +7,11 @@ public sealed class NavigationService : INavigationService
 {
     private readonly Dictionary<AppPage, Type> _routes = new()
     {
+        [AppPage.MasterData] = typeof(MasterDataPage),
         [AppPage.Dashboard] = typeof(DashboardPage),
         [AppPage.Parts] = typeof(PartsPage),
-        [AppPage.Templates] = typeof(TemplatesPage)
+        [AppPage.Templates] = typeof(TemplatesPage),
+        [AppPage.Settings] = typeof(SettingsPage)
     };
 
     private Frame? _frame;

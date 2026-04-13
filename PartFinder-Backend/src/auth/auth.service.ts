@@ -10,6 +10,9 @@ import { AdminBootstrapDto } from './dto/bootstrap.dto';
 import { ChangeAdminPasswordDto } from './dto/change-admin-password.dto';
 import { CreateAdminUserDto } from './dto/create-admin-user.dto';
 import { AdminLoginDto } from './dto/login.dto';
+import { AdminResetPasswordWithTotpDto } from './dto/admin-reset-password-with-totp.dto';
+import { AdminSyncTotpDto } from './dto/admin-sync-totp.dto';
+import { isPlausibleTotpSecretBase32, verifyTotp } from './totp.util';
 
 export type JwtPayload = { sub: string; email: string };
 
@@ -74,5 +77,49 @@ export class AuthService {
     }
     const user = await this.usersService.createAdmin(dto.email, dto.password);
     return { user: { id: user.id, email: user.email } };
+  }
+
+  async syncAdminTotp(userId: string, dto: AdminSyncTotpDto) {
+    if (!isPlausibleTotpSecretBase32(dto.secretBase32)) {
+      throw new BadRequestException('Invalid authenticator secret');
+    }
+    await this.usersService.setTotpSecret(userId, dto.secretBase32.trim());
+    return { ok: true as const };
+  }
+
+  async clearAdminTotp(userId: string) {
+    await this.usersService.clearTotp(userId);
+    return { ok: true as const };
+  }
+
+  async resetPasswordWithTotp(dto: AdminResetPasswordWithTotpDto) {
+    const user = await this.usersService.findByEmail(dto.email);
+    if (
+      !user ||
+      !user.totpEnabled ||
+      !user.totpSecretBase32 ||
+      !verifyTotp(user.totpSecretBase32, dto.totpCode)
+    ) {
+      throw new UnauthorizedException('Recovery failed');
+    }
+    this.assertStrongPassword(dto.newPassword);
+    await this.usersService.setPassword(user.id, dto.newPassword);
+    return { ok: true as const };
+  }
+
+  private assertStrongPassword(password: string) {
+    if (password.length < 8) {
+      throw new BadRequestException(
+        'New password must be at least 8 characters',
+      );
+    }
+    const hasUpper = /[A-Z]/.test(password);
+    const hasLower = /[a-z]/.test(password);
+    const hasDigit = /\d/.test(password);
+    if (!hasUpper || !hasLower || !hasDigit) {
+      throw new BadRequestException(
+        'New password must include upper, lower, and a number',
+      );
+    }
   }
 }

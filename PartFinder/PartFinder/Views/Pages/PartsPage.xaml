@@ -4,7 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:components="using:PartFinder.Views.Components">
     <StackPanel Padding="20" Spacing="12">
-        <components:PageHeader Title="Parts" Subtitle="Template-driven dynamic table with async incremental loading">
+        <components:PageHeader Title="Parts Explorer" Subtitle="Browse template rows. Right-click any cell or use row actions (...) to open linked views like suppliers/prices/delivery.">
             <components:PageHeader.Actions>
                 <Button Content="Refresh" Command="{Binding RefreshCommand}" />
             </components:PageHeader.Actions>
@@ -27,14 +27,23 @@
                 Command="{Binding LoadMoreCommand}" />
         </Grid>
 
-        <components:FilterBuilderControl />
+        <Border Style="{ThemeResource AppCardBorderStyle}">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Column Search" Style="{ThemeResource AppSectionTextStyle}" />
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                    <StackPanel x:Name="ColumnFiltersPanel" Orientation="Horizontal" Spacing="8" />
+                </ScrollViewer>
+            </StackPanel>
+        </Border>
 
         <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" MinHeight="420">
             <StackPanel>
-                <ItemsControl x:Name="ColumnsHeader" Margin="0,0,0,8" />
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,0,8">
+                    <StackPanel x:Name="ColumnsHeaderPanel" Orientation="Horizontal" Spacing="0" />
+                </ScrollViewer>
                 <ListView
                     x:Name="PartsListView"
-                    ItemsSource="{Binding Records}"
+                    ItemsSource="{Binding FilteredRecords}"
                     ContainerContentChanging="OnContainerContentChanging">
                     <ListView.ItemsPanel>
                         <ItemsPanelTemplate>
@@ -43,13 +52,13 @@
                     </ListView.ItemsPanel>
                     <ListView.ItemTemplate>
                         <DataTemplate>
-                            <ItemsControl Loaded="OnRowLoaded" />
+                            <Grid />
                         </DataTemplate>
                     </ListView.ItemTemplate>
                 </ListView>
                 <StackPanel Margin="0,8,0,0" Orientation="Horizontal" Spacing="8">
                     <ProgressRing Width="16" Height="16" IsActive="{Binding IsLoading}" />
-                    <TextBlock Foreground="{ThemeResource AppSubtleTextBrush}" Text="Infinite loading active for large datasets." />
+                    <TextBlock Foreground="{ThemeResource AppSubtleTextBrush}" Text="Tip: use right-click on a cell or the ... button at row end for actions." />
                 </StackPanel>
             </StackPanel>
         </ScrollViewer>

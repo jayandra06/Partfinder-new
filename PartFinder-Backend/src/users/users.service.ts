@@ -52,4 +52,22 @@ export class UsersService {
       .findByIdAndUpdate(userId, { passwordHash })
       .exec();
   }
+
+  async setTotpSecret(userId: string, secretBase32: string): Promise<void> {
+    await this.adminUserModel
+      .findByIdAndUpdate(userId, {
+        totpSecretBase32: secretBase32.trim(),
+        totpEnabled: true,
+      })
+      .exec();
+  }
+
+  async clearTotp(userId: string): Promise<void> {
+    await this.adminUserModel
+      .findByIdAndUpdate(userId, {
+        $set: { totpEnabled: false },
+        $unset: { totpSecretBase32: 1 },
+      })
+      .exec();
+  }
 }

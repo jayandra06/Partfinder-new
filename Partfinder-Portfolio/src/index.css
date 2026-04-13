@@ -595,6 +595,10 @@ h3 {
   color: #cbd5e1;
 }
 
+.db-cluster-row {
+  cursor: context-menu;
+}
+
 .modal-head {
   display: flex;
   justify-content: space-between;

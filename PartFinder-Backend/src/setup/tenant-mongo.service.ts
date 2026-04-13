@@ -1,6 +1,7 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import type { Connection } from 'mongoose';
 import mongoose from 'mongoose';
+import { createMongooseConnectionWithSrvDnsRetry } from '../mongo-srv-dns-retry';
 
 export const ORG_ADMIN_COLLECTION = 'org_admin_users';
 const SETUP_META_COLLECTION = '_partfinder_setup';
@@ -25,9 +26,8 @@ export class TenantMongoService implements OnModuleDestroy {
   }
 
   async pingUri(uri: string): Promise<void> {
-    const c = mongoose.createConnection(uri);
+    const c = await createMongooseConnectionWithSrvDnsRetry(uri);
     try {
-      await c.asPromise();
       await c.db?.admin().command({ ping: 1 });
     } finally {
       await c.close().catch(() => undefined);
@@ -40,8 +40,7 @@ export class TenantMongoService implements OnModuleDestroy {
       if (c) {
         await c.close().catch(() => undefined);
       }
-      c = mongoose.createConnection(uri);
-      await c.asPromise();
+      c = await createMongooseConnectionWithSrvDnsRetry(uri);
       this.connections.set(uri, c);
     }
     return c;
