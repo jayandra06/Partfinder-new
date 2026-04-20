@@ -9,8 +9,11 @@ public sealed class NavigationService : INavigationService
     {
         [AppPage.MasterData] = typeof(MasterDataPage),
         [AppPage.Dashboard] = typeof(DashboardPage),
-        [AppPage.Parts] = typeof(PartsPage),
+        [AppPage.Parts] = typeof(MasterDataPage),
         [AppPage.Templates] = typeof(TemplatesPage),
+        [AppPage.WorksheetRelations] = typeof(WorksheetRelationsPage),
+        [AppPage.ViewData] = typeof(ViewDataPage),
+        [AppPage.UserManagement] = typeof(UserManagementPage),
         [AppPage.Settings] = typeof(SettingsPage)
     };
 

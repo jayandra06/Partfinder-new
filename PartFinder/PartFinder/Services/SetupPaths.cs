@@ -45,4 +45,22 @@ internal static class SetupPaths
 
         return SetupStateFilePath;
     }
+
+    public static void ClearAllSetupStateFiles()
+    {
+        foreach (var p in SetupStateCandidatePaths)
+        {
+            try
+            {
+                if (File.Exists(p))
+                {
+                    File.Delete(p);
+                }
+            }
+            catch
+            {
+                // Ignore failures and continue; best-effort logout cleanup.
+            }
+        }
+    }
 }

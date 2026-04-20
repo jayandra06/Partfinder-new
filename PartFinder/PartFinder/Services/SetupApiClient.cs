@@ -24,6 +24,24 @@ public sealed class SetupTestOkResponse
     public bool Ok { get; set; }
 }
 
+public sealed class SetupInviteUserResponse
+{
+    public bool Ok { get; set; }
+    public string? Email { get; set; }
+    public string? OrganizationCode { get; set; }
+    public string? TemporaryPassword { get; set; }
+    public bool EmailSent { get; set; }
+    public string? EmailError { get; set; }
+}
+
+public sealed class SetupInviteLoginResponse
+{
+    public bool Ok { get; set; }
+    public string? Message { get; set; }
+    public string? Email { get; set; }
+    public string? Role { get; set; }
+}
+
 public static class SetupApiClient
 {
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(45) };
@@ -174,14 +192,14 @@ public static class SetupApiClient
 
     public static async Task<(bool ok, string? error, SetupOrgAdminResponse? body)> CreateOrgAdminAsync(
         string orgCode,
-        string name,
         string email,
-        string password,
+        string oldPassword,
+        string newPassword,
         CancellationToken ct = default)
     {
         var (success, err, text) = await RawPostAsync(
             "/api/public/setup/org-admin",
-            new { orgCode, name, email, password },
+            new { orgCode, email, oldPassword, newPassword },
             ct).ConfigureAwait(true);
         if (!success || string.IsNullOrWhiteSpace(text))
         {
@@ -194,6 +212,84 @@ public static class SetupApiClient
             if (o?.Ok == true)
             {
                 return (true, null, o);
+            }
+        }
+        catch
+        {
+        }
+
+        return (false, err ?? ParseApiError(text), null);
+    }
+
+    public static async Task<(bool ok, string? error, SetupInviteUserResponse? body)> InviteUserAsync(
+        string orgCode,
+        string name,
+        string email,
+        string role,
+        bool partsAllTemplates,
+        IReadOnlyList<string> allowedTemplateIds,
+        CancellationToken ct = default)
+    {
+        var (success, err, text) = await RawPostAsync(
+            "/api/public/setup/invite-user",
+            new
+            {
+                orgCode,
+                name,
+                email,
+                role,
+                partsAllTemplates,
+                allowedTemplateIds,
+            },
+            ct).ConfigureAwait(true);
+
+        if (!success || string.IsNullOrWhiteSpace(text))
+        {
+            return (false, err ?? "Request failed.", null);
+        }
+
+        try
+        {
+            var o = JsonSerializer.Deserialize<SetupInviteUserResponse>(text, ReadJson);
+            if (o?.Ok == true)
+            {
+                return (true, null, o);
+            }
+        }
+        catch
+        {
+        }
+
+        return (false, err ?? ParseApiError(text), null);
+    }
+
+    public static async Task<(bool ok, string? error, SetupInviteLoginResponse? body)> ValidateInviteLoginAsync(
+        string orgCode,
+        string email,
+        string temporaryPassword,
+        CancellationToken ct = default)
+    {
+        var (success, err, text) = await RawPostAsync(
+            "/api/public/setup/invite-login",
+            new
+            {
+                orgCode,
+                email,
+                temporaryPassword,
+            },
+            ct).ConfigureAwait(true);
+
+        if (!success || string.IsNullOrWhiteSpace(text))
+        {
+            return (false, err ?? "Request failed.", null);
+        }
+
+        try
+        {
+            var o = JsonSerializer.Deserialize<SetupInviteLoginResponse>(text, ReadJson);
+            if (o is not null)
+            {
+                return (o.Ok, o.Ok ? null : (o.Message ?? "Invalid invited credentials."), o);
             }
         }
         catch

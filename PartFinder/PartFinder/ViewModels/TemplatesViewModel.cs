@@ -108,6 +108,17 @@ public partial class TemplatesViewModel : ViewModelBase
             t => !IsEditingExisting
                  || !string.Equals(t.Id, EditingTemplateId, StringComparison.Ordinal));
 
+    public IReadOnlyList<TemplateFieldTypeOption> FieldTypeOptions { get; } =
+    [
+        new(TemplateFieldType.Text, "Text"),
+        new(TemplateFieldType.Number, "Whole number"),
+        new(TemplateFieldType.Decimal, "Decimal"),
+        new(TemplateFieldType.Date, "Date"),
+        new(TemplateFieldType.Boolean, "Yes / No"),
+        new(TemplateFieldType.Dropdown, "Dropdown"),
+        new(TemplateFieldType.RecordLink, "Link to another template"),
+    ];
+
     public bool CanEditSelectedTemplate => !IsCreatingTemplate && SelectedTemplate is not null;
 
     public string EditorHeaderTitle => IsEditingExisting ? "Edit template" : "New template";
@@ -234,6 +245,87 @@ public partial class TemplatesViewModel : ViewModelBase
         await ReloadContextActionsAsync(cancellationToken).ConfigureAwait(true);
     }
 
+    public async Task<bool> InsertColumnIntoSelectedTemplateAsync(int insertAt, string columnName, CancellationToken cancellationToken = default)
+    {
+        if (SelectedTemplate is null)
+        {
+            return false;
+        }
+
+        var trimmed = columnName.Trim();
+        if (trimmed.Length == 0)
+        {
+            FormError = "Column name cannot be empty.";
+            return false;
+        }
+
+        var fields = SelectedTemplate.Fields.OrderBy(f => f.DisplayOrder).ToList();
+        var safeIndex = Math.Clamp(insertAt, 0, fields.Count);
+        fields.Insert(
+            safeIndex,
+            new TemplateFieldDefinition
+            {
+                Key = MakeFieldKey(trimmed, safeIndex),
+                Label = trimmed,
+                Type = TemplateFieldType.Text,
+                IsRequired = false,
+                DisplayOrder = safeIndex,
+                ValidationPattern = null,
+                Options = null,
+                LinkedTemplateId = null,
+                LinkedDisplayFieldKey = null,
+            });
+
+        var remapped = fields
+            .Select((f, i) => new TemplateFieldDefinition
+            {
+                Key = string.IsNullOrWhiteSpace(f.Key) ? MakeFieldKey(f.Label, i) : f.Key,
+                Label = f.Label,
+                Type = f.Type,
+                IsRequired = f.IsRequired,
+                DisplayOrder = i,
+                ValidationPattern = f.ValidationPattern,
+                Options = f.Options,
+                LinkedTemplateId = f.LinkedTemplateId,
+                LinkedDisplayFieldKey = f.LinkedDisplayFieldKey,
+            })
+            .ToList();
+
+        return await SavePatchedTemplateAsync(remapped, cancellationToken).ConfigureAwait(true);
+    }
+
+    public async Task<bool> RemoveColumnFromSelectedTemplateAsync(int index, CancellationToken cancellationToken = default)
+    {
+        if (SelectedTemplate is null)
+        {
+            return false;
+        }
+
+        var fields = SelectedTemplate.Fields.OrderBy(f => f.DisplayOrder).ToList();
+        if (index < 0 || index >= fields.Count || fields.Count <= 1)
+        {
+            return false;
+        }
+
+        fields.RemoveAt(index);
+        var remapped = fields
+            .Select((f, i) => new TemplateFieldDefinition
+            {
+                Key = f.Key,
+                Label = f.Label,
+                Type = f.Type,
+                IsRequired = f.IsRequired,
+                DisplayOrder = i,
+                ValidationPattern = f.ValidationPattern,
+                Options = f.Options,
+                LinkedTemplateId = f.LinkedTemplateId,
+                LinkedDisplayFieldKey = f.LinkedDisplayFieldKey,
+            })
+            .ToList();
+
+        return await SavePatchedTemplateAsync(remapped, cancellationToken).ConfigureAwait(true);
+    }
+
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
         FormError = string.Empty;
@@ -292,6 +384,25 @@ public partial class TemplatesViewModel : ViewModelBase
     private void AddColumn()
     {
         ColumnLabels.Add(new ColumnLabelDraft());
+    }
+
+    [RelayCommand]
+    private void InsertColumnAfter(ColumnLabelDraft? draft)
+    {
+        if (draft is null)
+        {
+            ColumnLabels.Add(new ColumnLabelDraft());
+            return;
+        }
+
+        var index = ColumnLabels.IndexOf(draft);
+        if (index < 0)
+        {
+            ColumnLabels.Add(new ColumnLabelDraft());
+            return;
+        }
+
+        ColumnLabels.Insert(index + 1, new ColumnLabelDraft());
     }
 
     [RelayCommand]
@@ -538,4 +649,37 @@ public partial class TemplatesViewModel : ViewModelBase
 
         return $"{baseKey}_{index}";
     }
+
+    private async Task<bool> SavePatchedTemplateAsync(IReadOnlyList<TemplateFieldDefinition> fields, CancellationToken cancellationToken)
+    {
+        if (SelectedTemplate is null)
+        {
+            return false;
+        }
+
+        FormError = string.Empty;
+        var def = new PartTemplateDefinition
+        {
+            Id = SelectedTemplate.Id,
+            Name = SelectedTemplate.Name,
+            Version = SelectedTemplate.Version + 1,
+            IsPublished = true,
+            Fields = fields.ToList(),
+        };
+
+        try
+        {
+            await _templateSchema.SaveTemplateAsync(def, cancellationToken).ConfigureAwait(true);
+            await LoadAsync(cancellationToken).ConfigureAwait(true);
+            SelectedTemplate = Templates.FirstOrDefault(t => t.Id == def.Id) ?? Templates.FirstOrDefault();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            FormError = ex.Message;
+            return false;
+        }
+    }
 }
+
+public sealed record TemplateFieldTypeOption(TemplateFieldType Value, string Label);

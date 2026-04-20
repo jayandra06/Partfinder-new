@@ -6,5 +6,8 @@ public enum AppPage
     Dashboard,
     Parts,
     Templates,
+    WorksheetRelations,
+    ViewData,
+    UserManagement,
     Settings
 }

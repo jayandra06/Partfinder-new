@@ -1,0 +1,70 @@
+<UserControl
+    x:Class="PartFinder.Views.Components.InviteUserControl"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:converters="using:PartFinder.Converters"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+    <UserControl.Resources>
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+        <converters:InvertedBoolToVisibilityConverter x:Key="InvertedBoolToVisibilityConverter" />
+    </UserControl.Resources>
+    <StackPanel MinWidth="360" Spacing="10">
+        <StackPanel Spacing="4">
+            <TextBlock Style="{ThemeResource AppSectionTextStyle}" Text="Name" />
+            <TextBox
+                PlaceholderText="Full name"
+                Text="{Binding InviteName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        </StackPanel>
+        <StackPanel Spacing="4">
+            <TextBlock Style="{ThemeResource AppSectionTextStyle}" Text="Email" />
+            <TextBox
+                PlaceholderText="name@company.com"
+                Text="{Binding InviteEmail, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        </StackPanel>
+        <StackPanel Spacing="4">
+            <TextBlock Style="{ThemeResource AppSectionTextStyle}" Text="Role" />
+            <ComboBox
+                ItemsSource="{Binding RoleOptions}"
+                PlaceholderText="Role"
+                SelectedItem="{Binding InviteRole, Mode=TwoWay}" />
+        </StackPanel>
+        <TextBlock
+            Foreground="{ThemeResource AppSubtleTextBrush}"
+            Text="Admin: full access. Employee: Parts only (Master Data and Templates hidden). Casbin-ready policy layer."
+            TextWrapping="WrapWholeWords" />
+        <StackPanel Visibility="{Binding IsEmployeeRole, Converter={StaticResource BoolToVisibilityConverter}}">
+            <CheckBox Content="All part templates" IsChecked="{Binding InvitePartsAllTemplates, Mode=TwoWay}" />
+            <TextBlock
+                Margin="0,4,0,0"
+                Foreground="{ThemeResource AppSubtleTextBrush}"
+                Text="Template access list (uncheck 'All part templates' to select specific ones)." />
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,2,0,0">
+                <Button
+                    Content="Select all"
+                    Command="{Binding SelectAllTemplatesCommand}"
+                    IsEnabled="{Binding CanPickSpecificTemplates}" />
+                <Button
+                    Content="Clear all"
+                    Command="{Binding ClearTemplateSelectionCommand}"
+                    IsEnabled="{Binding CanPickSpecificTemplates}" />
+            </StackPanel>
+            <ScrollViewer
+                MaxHeight="220"
+                Margin="0,4,0,0"
+                VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding TemplateChoices}" IsEnabled="{Binding CanPickSpecificTemplates}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <CheckBox
+                                Margin="0,2,0,0"
+                                Content="{Binding Name}"
+                                IsChecked="{Binding IsSelected, Mode=TwoWay}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

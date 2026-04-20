@@ -11,6 +11,7 @@ public partial class PartsViewModel : ViewModelBase
     private readonly IPartsDataService _partsDataService;
     private readonly IContextActionsService _contextActions;
     private readonly IMasterDataRecordsService _records;
+    private readonly ICurrentUserAccessService _access;
     private CancellationTokenSource? _loadCts;
     private int _offset;
     private IReadOnlyList<TemplateContextAction> _loadedContextActions = Array.Empty<TemplateContextAction>();
@@ -20,18 +21,22 @@ public partial class PartsViewModel : ViewModelBase
         ITemplateSchemaService templateSchemaService,
         IPartsDataService partsDataService,
         IContextActionsService contextActions,
-        IMasterDataRecordsService records)
+        IMasterDataRecordsService records,
+        ICurrentUserAccessService access)
     {
         _templateSchemaService = templateSchemaService;
         _partsDataService = partsDataService;
         _contextActions = contextActions;
         _records = records;
+        _access = access;
     }
 
     public ObservableCollection<PartTemplateDefinition> Templates { get; } = [];
     public ObservableCollection<GridColumnDefinition> DynamicColumns { get; } = [];
     public ObservableCollection<PartRecord> Records { get; } = [];
     public ObservableCollection<PartRecord> FilteredRecords { get; } = [];
+    public int FilteredRecordsCount => FilteredRecords.Count;
+    public int TotalRecordsCount => Records.Count;
 
     private PartTemplateDefinition? _selectedTemplate;
     public PartTemplateDefinition? SelectedTemplate
@@ -62,9 +67,11 @@ public partial class PartsViewModel : ViewModelBase
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
+        await _access.RefreshAsync(cancellationToken).ConfigureAwait(true);
         var templates = await _templateSchemaService.GetTemplatesAsync(cancellationToken);
+        var filtered = _access.FilterTemplatesForParts(templates);
         Templates.Clear();
-        foreach (var template in templates)
+        foreach (var template in filtered)
         {
             Templates.Add(template);
         }
@@ -168,6 +175,102 @@ public partial class PartsViewModel : ViewModelBase
         RebuildFilteredRecords();
     }
 
+    [RelayCommand]
+    private void ClearAllFilters()
+    {
+        _columnFilters.Clear();
+        RebuildFilteredRecords();
+    }
+
+    public async Task<bool> UpdateColumnHeadersAsync(
+        IReadOnlyDictionary<string, string> headerUpdates,
+        CancellationToken cancellationToken = default)
+    {
+        if (SelectedTemplate is null || headerUpdates.Count == 0)
+        {
+            return false;
+        }
+
+        var updatedFields = SelectedTemplate.Fields
+            .OrderBy(f => f.DisplayOrder)
+            .Select(
+                f => new TemplateFieldDefinition
+                {
+                    Key = f.Key,
+                    Label = headerUpdates.TryGetValue(f.Key, out var updatedLabel) && !string.IsNullOrWhiteSpace(updatedLabel)
+                        ? updatedLabel.Trim()
+                        : f.Label,
+                    Type = f.Type,
+                    IsRequired = f.IsRequired,
+                    DisplayOrder = f.DisplayOrder,
+                    ValidationPattern = f.ValidationPattern,
+                    Options = f.Options,
+                    LinkedTemplateId = f.LinkedTemplateId,
+                    LinkedDisplayFieldKey = f.LinkedDisplayFieldKey,
+                })
+            .ToList();
+
+        var updatedTemplate = new PartTemplateDefinition
+        {
+            Id = SelectedTemplate.Id,
+            Name = SelectedTemplate.Name,
+            Version = SelectedTemplate.Version + 1,
+            IsPublished = true,
+            Fields = updatedFields,
+        };
+
+        await _templateSchemaService.SaveTemplateAsync(updatedTemplate, cancellationToken).ConfigureAwait(true);
+        SelectedTemplate = updatedTemplate;
+        await RefreshAsync().ConfigureAwait(true);
+        return true;
+    }
+
+    public async Task<bool> AddColumnToSelectedTemplateAsync(
+        string headerLabel,
+        CancellationToken cancellationToken = default)
+    {
+        if (SelectedTemplate is null)
+        {
+            return false;
+        }
+
+        var trimmed = headerLabel.Trim();
+        if (trimmed.Length == 0)
+        {
+            return false;
+        }
+
+        var fields = SelectedTemplate.Fields.OrderBy(f => f.DisplayOrder).ToList();
+        var newOrder = fields.Count;
+        fields.Add(
+            new TemplateFieldDefinition
+            {
+                Key = BuildFieldKey(trimmed, newOrder),
+                Label = trimmed,
+                Type = TemplateFieldType.Text,
+                IsRequired = false,
+                DisplayOrder = newOrder,
+                ValidationPattern = null,
+                Options = null,
+                LinkedTemplateId = null,
+                LinkedDisplayFieldKey = null,
+            });
+
+        var updatedTemplate = new PartTemplateDefinition
+        {
+            Id = SelectedTemplate.Id,
+            Name = SelectedTemplate.Name,
+            Version = SelectedTemplate.Version + 1,
+            IsPublished = true,
+            Fields = fields,
+        };
+
+        await _templateSchemaService.SaveTemplateAsync(updatedTemplate, cancellationToken).ConfigureAwait(true);
+        SelectedTemplate = updatedTemplate;
+        await RefreshAsync().ConfigureAwait(true);
+        return true;
+    }
+
     public async Task<(PartTemplateDefinition? targetTemplate, IReadOnlyList<MasterDataRowRecord> rows)> RunContextActionAsync(
         TemplateContextAction action,
         IReadOnlyDictionary<string, string> sourceRowValues,
@@ -260,5 +363,21 @@ public partial class PartsViewModel : ViewModelBase
         {
             FilteredRecords.Add(row);
         }
+
+        OnPropertyChanged(nameof(FilteredRecordsCount));
+        OnPropertyChanged(nameof(TotalRecordsCount));
+    }
+
+    private static string BuildFieldKey(string label, int index)
+    {
+        var lowered = label.ToLowerInvariant();
+        var chars = lowered.Where(static c => char.IsLetterOrDigit(c) || c == '_').ToArray();
+        var baseKey = new string(chars);
+        if (string.IsNullOrWhiteSpace(baseKey))
+        {
+            baseKey = "column";
+        }
+
+        return $"{baseKey}_{index}";
     }
 }

@@ -1,5 +1,7 @@
 import { Body, Controller, Post } from '@nestjs/common';
 import { SetupCustomDatabaseDto } from './dto/setup-custom-database.dto';
+import { SetupInviteLoginDto } from './dto/setup-invite-login.dto';
+import { SetupInviteUserDto } from './dto/setup-invite-user.dto';
 import { SetupOrgAdminDto } from './dto/setup-org-admin.dto';
 import { SetupOrgCodeDto } from './dto/setup-org-code.dto';
 import { SetupTestDatabaseDto } from './dto/setup-test-database.dto';
@@ -33,5 +35,15 @@ export class SetupController {
   @Post('org-admin')
   createOrgAdmin(@Body() dto: SetupOrgAdminDto) {
     return this.setupService.createOrgAdmin(dto);
+  }
+
+  @Post('invite-user')
+  inviteUser(@Body() dto: SetupInviteUserDto) {
+    return this.setupService.inviteOrgUser(dto);
+  }
+
+  @Post('invite-login')
+  inviteLogin(@Body() dto: SetupInviteLoginDto) {
+    return this.setupService.validateInviteLogin(dto);
   }
 }

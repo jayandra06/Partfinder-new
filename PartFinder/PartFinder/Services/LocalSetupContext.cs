@@ -12,27 +12,38 @@ public sealed class LocalSetupContext : ILocalSetupContext
 
     private string? _cachedUri;
     private string? _cachedOrgCode;
+    private string? _cachedAdminEmail;
 
     public string? OrgCode => _cachedOrgCode;
+
+    public string? AdminEmail => _cachedAdminEmail;
 
     public void Refresh()
     {
         _cachedUri = null;
         _cachedOrgCode = null;
+        _cachedAdminEmail = null;
         try
         {
-            var path = SetupPaths.FindExistingSetupStatePath();
-            if (!File.Exists(path))
+            // Multiple setup-state.json copies can exist (LocalAppData vs Roaming, older builds).
+            // The first file found on disk is not always the one that contains dbUri. Merge all
+            // completed setups so org code and Mongo URI resolve consistently with the shell UI.
+            foreach (var path in SetupPaths.SetupStateCandidatePaths)
             {
-                return;
-            }
+                if (!File.Exists(path))
+                {
+                    continue;
+                }
 
-            var json = File.ReadAllText(path);
-            using var doc = JsonDocument.Parse(json);
-            var root = doc.RootElement;
-            if (root.TryGetProperty("completed", out var c) && c.ValueKind == JsonValueKind.True)
-            {
-                if (root.TryGetProperty("dbUri", out var db) && db.ValueKind == JsonValueKind.String)
+                using var doc = JsonDocument.Parse(File.ReadAllText(path));
+                var root = doc.RootElement;
+                var isCompleted = root.TryGetProperty("completed", out var completed) &&
+                                  completed.ValueKind == JsonValueKind.True;
+
+                // Last non-empty wins so a complete Roaming copy can override an incomplete Local copy.
+                if (isCompleted &&
+                    root.TryGetProperty("dbUri", out var db) &&
+                    db.ValueKind == JsonValueKind.String)
                 {
                     var u = db.GetString()?.Trim();
                     if (!string.IsNullOrEmpty(u))
@@ -43,7 +54,20 @@ public sealed class LocalSetupContext : ILocalSetupContext
 
                 if (root.TryGetProperty("orgCode", out var oc) && oc.ValueKind == JsonValueKind.String)
                 {
-                    _cachedOrgCode = oc.GetString()?.Trim();
+                    var code = oc.GetString()?.Trim();
+                    if (!string.IsNullOrEmpty(code))
+                    {
+                        _cachedOrgCode = code;
+                    }
+                }
+
+                if (root.TryGetProperty("adminEmail", out var ae) && ae.ValueKind == JsonValueKind.String)
+                {
+                    var em = ae.GetString()?.Trim();
+                    if (!string.IsNullOrEmpty(em))
+                    {
+                        _cachedAdminEmail = em;
+                    }
                 }
             }
         }
@@ -51,6 +75,7 @@ public sealed class LocalSetupContext : ILocalSetupContext
         {
             _cachedUri = null;
             _cachedOrgCode = null;
+            _cachedAdminEmail = null;
         }
     }
 

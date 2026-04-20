@@ -1,9 +1,11 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Media;
 using PartFinder.Models;
+using PartFinder.Services;
 using PartFinder.ViewModels;
 using System.Collections.Specialized;
 using System.Linq;
@@ -13,6 +15,15 @@ namespace PartFinder.Views.Pages;
 
 public sealed partial class PartsPage : Page
 {
+    private const double DataCellTextWidth = 160;
+    private const double DataCellHorizontalPadding = 10;
+    private const double FilterColumnWidth = DataCellTextWidth + (DataCellHorizontalPadding * 2);
+    private const double ActionColumnWidth = 72;
+    private const double ActionPanelWidth = 320;
+    private readonly List<ActionResultDisplayItem> _actionResultRows = new();
+    private bool _isHeaderEditMode;
+    private readonly Dictionary<string, string> _pendingHeaderEdits = new(StringComparer.OrdinalIgnoreCase);
+
     public PartsPage()
     {
         InitializeComponent();
@@ -25,61 +36,144 @@ public sealed partial class PartsPage : Page
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         ViewModel.DynamicColumns.CollectionChanged += OnColumnsChanged;
+        ViewModel.FilteredRecords.CollectionChanged += OnFilteredRowsChanged;
         await ViewModel.InitializeAsync();
         BuildGridColumns();
+        BuildSelectedRowActionsPanel(null);
         AttachScrollHandler();
     }
 
     private void OnColumnsChanged(object? sender, NotifyCollectionChangedEventArgs e) => BuildGridColumns();
 
+    private void OnPartsSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        BuildSelectedRowActionsPanel(PartsListView.SelectedItem as PartRecord);
+    }
+
+    private void OnFilteredRowsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (PartsListView.SelectedItem is PartRecord selected && !ViewModel.FilteredRecords.Contains(selected))
+        {
+            PartsListView.SelectedItem = null;
+        }
+        BuildSelectedRowActionsPanel(PartsListView.SelectedItem as PartRecord);
+    }
+
     private void BuildGridColumns()
     {
-        ColumnsHeaderPanel.Children.Clear();
         ColumnFiltersPanel.Children.Clear();
 
         foreach (var col in ViewModel.DynamicColumns)
         {
-            var headerText = new TextBlock
+            if (_isHeaderEditMode)
             {
-                Text = col.Header,
-                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                Width = 160,
-                TextTrimming = TextTrimming.CharacterEllipsis,
-            };
-
-            var headerBorder = new Border
+                var headerEditor = new TextBox
+                {
+                    Width = FilterColumnWidth,
+                    Text = _pendingHeaderEdits.TryGetValue(col.Key, out var pending) ? pending : col.Header,
+                    Tag = col.Key,
+                    Style = (Style)Application.Current.Resources["StandardTextBoxStyle"],
+                };
+                headerEditor.TextChanged += OnHeaderEditTextChanged;
+                ColumnFiltersPanel.Children.Add(headerEditor);
+            }
+            else
             {
-                BorderThickness = new Thickness(0, 0, 1, 1),
-                BorderBrush = (Brush)Application.Current.Resources["AppBorderBrush"],
-                Padding = new Thickness(10, 8, 10, 8),
-                Child = headerText,
-            };
-            ColumnsHeaderPanel.Children.Add(headerBorder);
-
-            var filterBox = new TextBox
-            {
-                Width = 160,
-                PlaceholderText = col.Header,
-                Tag = col.Key,
-            };
-            filterBox.TextChanged += OnColumnFilterTextChanged;
-            ColumnFiltersPanel.Children.Add(filterBox);
+                var filterBox = new TextBox
+                {
+                    Width = FilterColumnWidth,
+                    PlaceholderText = col.Header,
+                    Tag = col.Key,
+                    Style = (Style)Application.Current.Resources["GridFilterTextBoxStyle"],
+                };
+                filterBox.TextChanged += OnColumnFilterTextChanged;
+                ColumnFiltersPanel.Children.Add(filterBox);
+            }
         }
 
-        var actionsHeader = new Border
+        var actionSpacer = new Border
         {
-            BorderThickness = new Thickness(0, 0, 1, 1),
-            BorderBrush = (Brush)Application.Current.Resources["AppBorderBrush"],
-            Padding = new Thickness(10, 8, 10, 8),
-            Child = new TextBlock
-            {
-                Text = "Actions",
-                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                Width = 74,
-                HorizontalTextAlignment = TextAlignment.Center,
-            },
+            Width = ActionColumnWidth,
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            BorderBrush = (Brush)Application.Current.Resources["BorderDefaultBrush"],
+            Background = (Brush)Application.Current.Resources["GridHeaderBackgroundBrush"],
         };
-        ColumnsHeaderPanel.Children.Add(actionsHeader);
+        if (_isHeaderEditMode)
+        {
+            var headerEditActions = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Spacing = 4,
+            };
+            var saveHeadersButton = new Button
+            {
+                Width = 32,
+                Height = 32,
+                Style = (Style)Application.Current.Resources["GhostButtonStyle"],
+                Content = new SymbolIcon(Symbol.Accept),
+            };
+            ToolTipService.SetToolTip(saveHeadersButton, "Save header names");
+            saveHeadersButton.Click += OnSaveHeadersInlineClick;
+
+            var cancelHeadersButton = new Button
+            {
+                Width = 32,
+                Height = 32,
+                Style = (Style)Application.Current.Resources["GhostButtonStyle"],
+                Content = new SymbolIcon(Symbol.Cancel),
+            };
+            ToolTipService.SetToolTip(cancelHeadersButton, "Cancel header edit");
+            cancelHeadersButton.Click += OnCancelHeadersInlineClick;
+
+            headerEditActions.Children.Add(saveHeadersButton);
+            headerEditActions.Children.Add(cancelHeadersButton);
+            actionSpacer.Child = headerEditActions;
+        }
+        else
+        {
+            var hoverHost = new Grid();
+            hoverHost.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            hoverHost.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            hoverHost.HorizontalAlignment = HorizontalAlignment.Center;
+            hoverHost.VerticalAlignment = VerticalAlignment.Center;
+            hoverHost.ColumnSpacing = 4;
+
+            var editHeadersButton = new Button
+            {
+                Width = 32,
+                Height = 32,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Style = (Style)Application.Current.Resources["GhostButtonStyle"],
+                Content = new SymbolIcon(Symbol.Edit),
+            };
+            ToolTipService.SetToolTip(editHeadersButton, "Rename column headers");
+            editHeadersButton.Click += OnStartInlineHeaderEditClick;
+            Grid.SetColumn(editHeadersButton, 0);
+            hoverHost.Children.Add(editHeadersButton);
+
+            var addHeaderButton = new Button
+            {
+                Width = 32,
+                Height = 32,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Style = (Style)Application.Current.Resources["GhostButtonStyle"],
+                Content = "+",
+                Visibility = Visibility.Collapsed,
+            };
+            ToolTipService.SetToolTip(addHeaderButton, "Add new header");
+            addHeaderButton.Click += OnAddHeaderClick;
+            Grid.SetColumn(addHeaderButton, 1);
+            hoverHost.Children.Add(addHeaderButton);
+
+            actionSpacer.PointerEntered += (_, _) => addHeaderButton.Visibility = Visibility.Visible;
+            actionSpacer.PointerExited += (_, _) => addHeaderButton.Visibility = Visibility.Collapsed;
+            actionSpacer.Child = hoverHost;
+        }
+        ColumnFiltersPanel.Children.Add(actionSpacer);
     }
 
     private void OnColumnFilterTextChanged(object sender, TextChangedEventArgs e)
@@ -92,10 +186,98 @@ public sealed partial class PartsPage : Page
         ViewModel.SetColumnFilter(fieldKey, box.Text);
     }
 
-    private void BindRowCells(Grid rowGrid, PartRecord row)
+    private void OnHeaderEditTextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (sender is not TextBox box || box.Tag is not string fieldKey)
+        {
+            return;
+        }
+
+        _pendingHeaderEdits[fieldKey] = box.Text;
+    }
+
+    private void OnStartInlineHeaderEditClick(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.DynamicColumns.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var col in ViewModel.DynamicColumns)
+        {
+            _pendingHeaderEdits[col.Key] = col.Header;
+        }
+
+        _isHeaderEditMode = true;
+        BuildGridColumns();
+    }
+
+    private async void OnSaveHeadersInlineClick(object sender, RoutedEventArgs e)
+    {
+        if (_pendingHeaderEdits.Count == 0)
+        {
+            _isHeaderEditMode = false;
+            BuildGridColumns();
+            return;
+        }
+
+        var updates = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var col in ViewModel.DynamicColumns)
+        {
+            var raw = _pendingHeaderEdits.TryGetValue(col.Key, out var v) ? v : col.Header;
+            updates[col.Key] = string.IsNullOrWhiteSpace(raw) ? col.Header : raw.Trim();
+        }
+
+        await ViewModel.UpdateColumnHeadersAsync(updates).ConfigureAwait(true);
+        _pendingHeaderEdits.Clear();
+        _isHeaderEditMode = false;
+        BuildGridColumns();
+    }
+
+    private async void OnAddHeaderClick(object sender, RoutedEventArgs e)
+    {
+        if (XamlRoot is null)
+        {
+            return;
+        }
+
+        var input = new TextBox
+        {
+            PlaceholderText = "New header name",
+        };
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = "Add header",
+            Content = input,
+            PrimaryButtonText = "Add",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+        };
+
+        var result = await dialog.ShowAsync();
+        if (result != ContentDialogResult.Primary)
+        {
+            return;
+        }
+
+        _ = await ViewModel.AddColumnToSelectedTemplateAsync(input.Text).ConfigureAwait(true);
+    }
+
+    private void OnCancelHeadersInlineClick(object sender, RoutedEventArgs e)
+    {
+        _pendingHeaderEdits.Clear();
+        _isHeaderEditMode = false;
+        BuildGridColumns();
+    }
+
+    private void BindRowCells(Grid rowGrid, PartRecord row, int rowIndex)
     {
         rowGrid.Children.Clear();
         rowGrid.ColumnDefinitions.Clear();
+        rowGrid.MinHeight = 48;
+        rowGrid.Background = (Brush)Application.Current.Resources[
+            rowIndex % 2 == 0 ? "CardBackgroundBrush" : "GridRowAltBackgroundBrush"];
 
         for (var i = 0; i < ViewModel.DynamicColumns.Count; i++)
         {
@@ -106,15 +288,17 @@ public sealed partial class PartsPage : Page
             var textBlock = new TextBlock
             {
                 Text = text,
-                Width = 160,
+                Width = DataCellTextWidth,
                 TextTrimming = TextTrimming.CharacterEllipsis,
+                Foreground = (Brush)Application.Current.Resources["TextPrimaryBrush"],
+                VerticalAlignment = VerticalAlignment.Center,
             };
 
             var border = new Border
             {
                 BorderThickness = new Thickness(0, 0, 1, 1),
-                BorderBrush = (Brush)Application.Current.Resources["AppBorderBrush"],
-                Padding = new Thickness(10, 6, 10, 6),
+                BorderBrush = (Brush)Application.Current.Resources["BorderDefaultBrush"],
+                Padding = new Thickness(DataCellHorizontalPadding, 6, DataCellHorizontalPadding, 6),
                 Child = textBlock,
                 ContextFlyout = BuildCellMenu(col.Key, text, row),
             };
@@ -124,14 +308,16 @@ public sealed partial class PartsPage : Page
         }
 
         // Explicit row action affordance so users don't need to discover right-click.
-        rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(ActionColumnWidth, GridUnitType.Pixel) });
         var actionsBtn = new Button
         {
             Content = "...",
-            Width = 56,
+            Width = 48,
+            Height = 32,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(8, 2, 8, 2),
+            Style = (Style)Application.Current.Resources["GhostButtonStyle"],
             ContextFlyout = BuildRowMenu(row),
         };
         actionsBtn.Click += (_, _) =>
@@ -150,7 +336,7 @@ public sealed partial class PartsPage : Page
         if (args.ItemContainer.ContentTemplateRoot is Grid rowGrid
             && args.Item is PartRecord row)
         {
-            BindRowCells(rowGrid, row);
+            BindRowCells(rowGrid, row, args.ItemIndex);
         }
 
         if (args.ItemIndex + 8 >= sender.Items.Count && ViewModel.LoadMoreCommand.CanExecute(null))
@@ -242,7 +428,7 @@ public sealed partial class PartsPage : Page
 
     private async Task ShowContextActionResultsAsync(TemplateContextAction action, PartRecord row)
     {
-        if (XamlRoot is null)
+        if (XamlRoot is null || ActionResultsPanel is null || ActionRowsListView is null)
         {
             return;
         }
@@ -254,63 +440,101 @@ public sealed partial class PartsPage : Page
             return;
         }
 
-        var stack = new StackPanel { Spacing = 10 };
-        stack.Children.Add(
-            new TextBlock
-            {
-                Text = $"{rows.Count} row(s) in {targetDef.Name}",
-                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                TextWrapping = TextWrapping.WrapWholeWords,
-            });
+        ActionTitleText.Text = action.MenuLabel;
+        ActionCountText.Text = $"{rows.Count} row(s) in {targetDef.Name}";
+        _actionResultRows.Clear();
 
         if (rows.Count == 0)
         {
-            stack.Children.Add(
-                new TextBlock
-                {
-                    Text = "No rows matched your rules for this line.",
-                    TextWrapping = TextWrapping.WrapWholeWords,
-                    Foreground = (Brush)Application.Current.Resources["AppSubtleTextBrush"],
-                });
+            _actionResultRows.Add(
+                new ActionResultDisplayItem(
+                    "No matches",
+                    new[] { "No rows matched your rules for this line." }));
         }
         else
         {
             var fieldOrder = ResolveDisplayFields(targetDef, action.DisplayFieldKeys);
+            var rowNumber = 1;
             foreach (var resultRow in rows)
             {
-                var card = new Border
-                {
-                    BorderBrush = (Brush)Application.Current.Resources["AppBorderBrush"],
-                    BorderThickness = new Thickness(1),
-                    Padding = new Thickness(10, 8, 10, 8),
-                    Margin = new Thickness(0, 0, 0, 8),
-                };
-                var inner = new StackPanel { Spacing = 4 };
+                var lines = new List<string>(fieldOrder.Count);
                 foreach (var f in fieldOrder)
                 {
                     var val = resultRow.Values.TryGetValue(f.Key, out var v) ? v : string.Empty;
-                    inner.Children.Add(
-                        new TextBlock
-                        {
-                            Text = $"{f.Label}: {val}",
-                            TextWrapping = TextWrapping.WrapWholeWords,
-                        });
+                    lines.Add($"{f.Label}: {val}");
                 }
 
-                card.Child = inner;
-                stack.Children.Add(card);
+                _actionResultRows.Add(new ActionResultDisplayItem($"Row {rowNumber}", lines));
+                rowNumber++;
             }
         }
 
-        var dlg = new ContentDialog
+        ActionRowsListView.ItemsSource = _actionResultRows;
+        OpenActionPanel();
+    }
+
+    private void OnCloseActionPanelClick(object sender, RoutedEventArgs e)
+    {
+        CloseActionPanel();
+    }
+
+    private void OnActionOverlayTapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e)
+    {
+        CloseActionPanel();
+    }
+
+    private void OpenActionPanel()
+    {
+        if (ActionResultsPanel is null || ActionResultsTransform is null || ActionResultsOverlay is null)
         {
-            Title = action.MenuLabel,
-            Content = new ScrollViewer { MaxHeight = 440, Content = stack },
-            CloseButtonText = "Close",
-            DefaultButton = ContentDialogButton.Close,
-            XamlRoot = XamlRoot,
+            return;
+        }
+
+        ActionResultsPanel.Visibility = Visibility.Visible;
+        ActionResultsOverlay.Visibility = Visibility.Visible;
+
+        var animation = new DoubleAnimation
+        {
+            Duration = TimeSpan.FromMilliseconds(200),
+            From = ActionPanelWidth,
+            To = 0,
+            EasingFunction = new ExponentialEase { EasingMode = EasingMode.EaseOut, Exponent = 5 },
+            EnableDependentAnimation = true,
         };
-        _ = await dlg.ShowAsync();
+        Storyboard.SetTarget(animation, ActionResultsTransform);
+        Storyboard.SetTargetProperty(animation, "X");
+
+        var storyboard = new Storyboard();
+        storyboard.Children.Add(animation);
+        storyboard.Begin();
+    }
+
+    private void CloseActionPanel()
+    {
+        if (ActionResultsPanel is null || ActionResultsTransform is null || ActionResultsOverlay is null)
+        {
+            return;
+        }
+
+        var animation = new DoubleAnimation
+        {
+            Duration = TimeSpan.FromMilliseconds(200),
+            From = 0,
+            To = ActionPanelWidth,
+            EasingFunction = new ExponentialEase { EasingMode = EasingMode.EaseOut, Exponent = 5 },
+            EnableDependentAnimation = true,
+        };
+        Storyboard.SetTarget(animation, ActionResultsTransform);
+        Storyboard.SetTargetProperty(animation, "X");
+
+        var storyboard = new Storyboard();
+        storyboard.Children.Add(animation);
+        storyboard.Completed += (_, _) =>
+        {
+            ActionResultsPanel.Visibility = Visibility.Collapsed;
+            ActionResultsOverlay.Visibility = Visibility.Collapsed;
+        };
+        storyboard.Begin();
     }
 
     private static List<TemplateFieldDefinition> ResolveDisplayFields(
@@ -346,6 +570,56 @@ public sealed partial class PartsPage : Page
         var package = new DataPackage();
         package.SetText(text);
         Clipboard.SetContent(package);
+    }
+
+    private void BuildSelectedRowActionsPanel(PartRecord? row)
+    {
+        RowActionsPanel.Children.Clear();
+        if (row is null)
+        {
+            RowActionsHintText.Text = "Select a row to see available actions.";
+            ClearSelectedRowButton.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        ClearSelectedRowButton.Visibility = Visibility.Visible;
+
+        var actions = new Dictionary<string, TemplateContextAction>(StringComparer.OrdinalIgnoreCase);
+        foreach (var col in ViewModel.DynamicColumns)
+        {
+            foreach (var action in ViewModel.GetContextActionsForField(col.Key))
+            {
+                if (!actions.ContainsKey(action.MenuLabel))
+                {
+                    actions[action.MenuLabel] = action;
+                }
+            }
+        }
+
+        if (actions.Count == 0)
+        {
+            RowActionsHintText.Text = "No configured actions for this row/template.";
+            return;
+        }
+
+        RowActionsHintText.Text = "Use these quick actions for the selected row.";
+        foreach (var action in actions.Values.OrderBy(a => a.MenuLabel, StringComparer.OrdinalIgnoreCase))
+        {
+            var btn = new Button
+            {
+                Content = action.MenuLabel,
+                Padding = new Thickness(10, 4, 10, 4),
+            };
+            var captured = action;
+            btn.Click += async (_, _) => await ShowContextActionResultsAsync(captured, row).ConfigureAwait(true);
+            RowActionsPanel.Children.Add(btn);
+        }
+    }
+
+    private void OnClearSelectedRowClick(object sender, RoutedEventArgs e)
+    {
+        PartsListView.SelectedItem = null;
+        BuildSelectedRowActionsPanel(null);
     }
 
     private void AttachScrollHandler()
@@ -393,4 +667,17 @@ public sealed partial class PartsPage : Page
 
         return null;
     }
+
+    private sealed class ActionResultDisplayItem
+    {
+        public ActionResultDisplayItem(string title, IReadOnlyList<string> lines)
+        {
+            Title = title;
+            Lines = lines;
+        }
+
+        public string Title { get; }
+        public IReadOnlyList<string> Lines { get; }
+    }
+
 }

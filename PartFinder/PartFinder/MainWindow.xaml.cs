@@ -1,7 +1,10 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.Extensions.DependencyInjection;
 using PartFinder.Services;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Text.Json;
 
 namespace PartFinder;
@@ -18,7 +21,12 @@ public sealed partial class MainWindow : Window
     private bool _isCustomDbConnectionSuccessful;
     private string _workingOrgCode = "";
     private string? _cachedOrgDatabaseUri;
+    private string? _resolvedSignedInEmail;
     private SetupStatusResult? _lastStatus;
+
+    private Microsoft.UI.Xaml.DispatcherTimer? _maintenanceTimer;
+    private DateTimeOffset? _maintenanceUntilUtc;
+    private string? _orgCodeForMaintenanceRetry;
 
     private readonly string _setupFilePath = SetupPaths.SetupStateFilePath;
 
@@ -47,6 +55,7 @@ public sealed partial class MainWindow : Window
         public string? databaseMode { get; set; }
         public string? adminName { get; set; }
         public string? adminEmail { get; set; }
+        public bool invitedUserLogin { get; set; }
     }
 
     private SetupState LoadSetupState()
@@ -87,6 +96,12 @@ public sealed partial class MainWindow : Window
     private async void OnRootGridLoadedResumeWizard(object sender, RoutedEventArgs e)
     {
         RootGrid.Loaded -= OnRootGridLoadedResumeWizard;
+
+        var saved = LoadSetupState();
+        if (saved.invitedUserLogin && !string.IsNullOrWhiteSpace(saved.adminEmail))
+        {
+            _resolvedSignedInEmail = saved.adminEmail.Trim();
+        }
 
         var code = TryReadOrgCodeFromSetup();
         if (string.IsNullOrWhiteSpace(code))
@@ -136,7 +151,7 @@ public sealed partial class MainWindow : Window
             var api = LicenseApiClient.GetBaseUrl();
             var detail = string.IsNullOrWhiteSpace(statusErr) ? "" : " " + statusErr.Trim();
             ShowSubscriptionBlocked(
-                $"Cannot reach the license server at {api}.{detail} Start PartFinder-Backend (npm run start:dev in PartFinder-Backend) and check LicenseApi:BaseUrl in appsettings.json next to the app.");
+                $"Active internet is required. Cannot reach the license server at {api}.{detail} Start PartFinder-Backend (npm run start in PartFinder-Backend) and check LicenseApi:BaseUrl in appsettings.json next to the app.");
             return;
         }
 
@@ -157,10 +172,26 @@ public sealed partial class MainWindow : Window
         }
 
         var verify = await LicenseApiClient.VerifyAsync(orgCode);
-        if (verify is null || !verify.Valid)
+        if (verify is null)
         {
             ShowSubscriptionBlocked(
-                verify?.Message ?? "License check failed. Is PartFinder-Backend running?");
+                "Active internet is required to verify your license. Connect to the internet, then restart the app or use \"Re-enter organization code\" to try again.");
+            return;
+        }
+
+        if (!verify.Valid)
+        {
+            if (string.Equals(verify.Reason, "PLATFORM_MAINTENANCE", StringComparison.OrdinalIgnoreCase) &&
+                !string.IsNullOrWhiteSpace(verify.MaintenanceUntil))
+            {
+                ShowMaintenanceBlocked(verify.MaintenanceUntil, orgCode);
+                return;
+            }
+
+            ShowSubscriptionBlocked(
+                string.IsNullOrWhiteSpace(verify.Message)
+                    ? "License check failed. Is PartFinder-Backend running?"
+                    : verify.Message);
             return;
         }
 
@@ -169,10 +200,176 @@ public sealed partial class MainWindow : Window
 
     private void ShowSubscriptionBlocked(string message)
     {
+        StopMaintenanceTimer();
+        MaintenanceBlockedRoot.Visibility = Visibility.Collapsed;
         SubscriptionBlockedMessage.Text = message;
         SubscriptionBlockedRoot.Visibility = Visibility.Visible;
         SetupRoot.Visibility = Visibility.Collapsed;
         ShellRoot.Visibility = Visibility.Collapsed;
+    }
+
+    private void ShowMaintenanceBlocked(string maintenanceUntilIso, string orgCode)
+    {
+        StopMaintenanceTimer();
+        SubscriptionBlockedRoot.Visibility = Visibility.Collapsed;
+        _orgCodeForMaintenanceRetry = orgCode.Trim();
+        if (!DateTimeOffset.TryParse(
+                maintenanceUntilIso,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.RoundtripKind,
+                out var end))
+        {
+            ShowSubscriptionBlocked(
+                "Maintenance is active but the end time could not be read. Try again later or contact your administrator.");
+            return;
+        }
+
+        _maintenanceUntilUtc = end;
+        MaintenanceBlockedRoot.Visibility = Visibility.Visible;
+        SetupRoot.Visibility = Visibility.Collapsed;
+        ShellRoot.Visibility = Visibility.Collapsed;
+        RefreshMaintenanceCountdownUi();
+        _maintenanceTimer ??= new Microsoft.UI.Xaml.DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(1),
+        };
+        _maintenanceTimer.Tick -= OnMaintenanceTimerTick;
+        _maintenanceTimer.Tick += OnMaintenanceTimerTick;
+        _maintenanceTimer.Start();
+    }
+
+    private void StopMaintenanceTimer()
+    {
+        if (_maintenanceTimer != null)
+        {
+            _maintenanceTimer.Tick -= OnMaintenanceTimerTick;
+            _maintenanceTimer.Stop();
+        }
+
+        _maintenanceUntilUtc = null;
+        _orgCodeForMaintenanceRetry = null;
+    }
+
+    private void OnMaintenanceTimerTick(object? sender, object e)
+    {
+        if (_maintenanceUntilUtc == null)
+        {
+            return;
+        }
+
+        if (DateTimeOffset.UtcNow >= _maintenanceUntilUtc.Value)
+        {
+            _maintenanceTimer?.Stop();
+            MaintenanceCountdownText.Text = "Checking…";
+            _ = ResumeAfterMaintenanceAsync();
+            return;
+        }
+
+        RefreshMaintenanceCountdownUi();
+    }
+
+    private void RefreshMaintenanceCountdownUi()
+    {
+        if (_maintenanceUntilUtc == null)
+        {
+            return;
+        }
+
+        var end = _maintenanceUntilUtc.Value;
+        var now = DateTimeOffset.UtcNow;
+        if (now >= end)
+        {
+            MaintenanceLiveByText.Text = "Maintenance window should have ended.";
+            MaintenanceCountdownText.Text = "Time remaining: —";
+            return;
+        }
+
+        var remaining = end - now;
+        var local = end.ToLocalTime();
+        MaintenanceLiveByText.Text =
+            $"Will be live by {local:yyyy-MM-dd HH:mm} (local time).";
+        MaintenanceCountdownText.Text = $"Time remaining: {FormatDuration(remaining)}";
+    }
+
+    private static string FormatDuration(TimeSpan t)
+    {
+        if (t.TotalSeconds <= 0)
+        {
+            return "0";
+        }
+
+        var days = (int)Math.Floor(t.TotalDays);
+        var hours = t.Hours;
+        var minutes = t.Minutes;
+        var parts = new List<string>();
+        if (days > 0)
+        {
+            parts.Add($"{days} day{(days == 1 ? "" : "s")}");
+        }
+
+        if (hours > 0)
+        {
+            parts.Add($"{hours} hr{(hours == 1 ? "" : "s")}");
+        }
+
+        if (days == 0 && hours == 0 && minutes > 0)
+        {
+            parts.Add($"{minutes} min");
+        }
+
+        return parts.Count > 0 ? string.Join(", ", parts) : "less than a minute";
+    }
+
+    private async Task ResumeAfterMaintenanceAsync()
+    {
+        var code = _orgCodeForMaintenanceRetry?.Trim();
+        if (string.IsNullOrEmpty(code))
+        {
+            return;
+        }
+
+        var verify = await LicenseApiClient.VerifyAsync(code);
+        if (verify is null)
+        {
+            ShowSubscriptionBlocked(
+                "Active internet is required to verify your license after maintenance. Connect to the internet and try again.");
+            return;
+        }
+
+        if (verify.Valid)
+        {
+            var dbUri = TryReadDbUriFromSetup();
+            if (string.IsNullOrWhiteSpace(dbUri))
+            {
+                ShowSubscriptionBlocked(
+                    "No database URI in local setup. Use \"Re-enter organization code\" to run setup again.");
+                return;
+            }
+
+            if (!await MongoConnectionTester.TryPingAsync(dbUri))
+            {
+                ShowSubscriptionBlocked(
+                    "Cannot reach your organization MongoDB from this PC. Check the network or MongoDB URI.");
+                return;
+            }
+
+            StopMaintenanceTimer();
+            MaintenanceBlockedRoot.Visibility = Visibility.Collapsed;
+            ShowShell();
+            return;
+        }
+
+        if (string.Equals(verify.Reason, "PLATFORM_MAINTENANCE", StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(verify.MaintenanceUntil))
+        {
+            ShowMaintenanceBlocked(verify.MaintenanceUntil, code);
+            return;
+        }
+
+        ShowSubscriptionBlocked(
+            string.IsNullOrWhiteSpace(verify.Message)
+                ? "License check failed after maintenance."
+                : verify.Message);
     }
 
     private void OnSubscriptionBlockedExitClicked(object sender, RoutedEventArgs e)
@@ -180,8 +377,17 @@ public sealed partial class MainWindow : Window
         Application.Current.Exit();
     }
 
+    private void OnMaintenanceBlockedResetSetupClicked(object sender, RoutedEventArgs e)
+    {
+        StopMaintenanceTimer();
+        MaintenanceBlockedRoot.Visibility = Visibility.Collapsed;
+        OnSubscriptionBlockedResetSetupClicked(sender, e);
+    }
+
     private void OnSubscriptionBlockedResetSetupClicked(object sender, RoutedEventArgs e)
     {
+        StopMaintenanceTimer();
+        MaintenanceBlockedRoot.Visibility = Visibility.Collapsed;
         try
         {
             if (File.Exists(_setupFilePath))
@@ -199,8 +405,11 @@ public sealed partial class MainWindow : Window
         _step = 1;
         _workingOrgCode = "";
         _cachedOrgDatabaseUri = null;
+        _resolvedSignedInEmail = null;
         _lastStatus = null;
         OrgCodeBox.Text = "";
+        InviteLoginEmailBox.Text = "";
+        InviteLoginPasswordBox.Password = "";
         ValidationText.Text = "";
         LicenseSummaryPanel.Visibility = Visibility.Collapsed;
         UpdateStepUi();
@@ -238,6 +447,16 @@ public sealed partial class MainWindow : Window
     {
         var st = LoadSetupState();
         st.orgCode = code;
+        if (!string.IsNullOrWhiteSpace(_resolvedSignedInEmail))
+        {
+            st.adminEmail = _resolvedSignedInEmail;
+            st.invitedUserLogin = true;
+        }
+        else
+        {
+            st.adminEmail = null;
+            st.invitedUserLogin = false;
+        }
         SaveSetupState(st);
     }
 
@@ -257,8 +476,11 @@ public sealed partial class MainWindow : Window
         st.orgCode = _workingOrgCode;
         st.dbUri = _cachedOrgDatabaseUri;
         st.databaseMode = mode;
-        st.adminName = AdminNameBox.Text.Trim();
-        st.adminEmail = AdminEmailBox.Text.Trim();
+        st.adminName = "Organization Admin";
+        st.adminEmail = string.IsNullOrWhiteSpace(_resolvedSignedInEmail)
+            ? InviteLoginEmailBox.Text.Trim()
+            : _resolvedSignedInEmail;
+        st.invitedUserLogin = !string.IsNullOrWhiteSpace(_resolvedSignedInEmail);
         SaveSetupState(st);
     }
 
@@ -283,6 +505,7 @@ public sealed partial class MainWindow : Window
 
         if (_step == 1)
         {
+            _resolvedSignedInEmail = null;
             if (string.IsNullOrWhiteSpace(OrgCodeBox.Text))
             {
                 ValidationText.Text = "Please enter organization code.";
@@ -305,7 +528,7 @@ public sealed partial class MainWindow : Window
                     var api = LicenseApiClient.GetBaseUrl();
                     var detail = string.IsNullOrWhiteSpace(statusErr) ? "" : " " + statusErr.Trim();
                     ValidationText.Text =
-                        $"Cannot reach {api}.{detail} Start PartFinder-Backend (port 3000 by default) and check LicenseApi:BaseUrl in appsettings.json.";
+                        $"Active internet is required. Cannot reach {api}.{detail} Start PartFinder-Backend (port 3000 by default) and check LicenseApi:BaseUrl in appsettings.json.";
                     return;
                 }
 
@@ -321,8 +544,49 @@ public sealed partial class MainWindow : Window
                 _lastStatus = status;
                 _cachedOrgDatabaseUri = status.OrgDatabaseUri;
                 UpdateLicenseSummary(status);
+                var needsInviteLogin =
+                    status.RequiresInviteLogin == true ||
+                    string.Equals(status.OrgAdminStatus, "yes", StringComparison.OrdinalIgnoreCase);
+                if (needsInviteLogin)
+                {
+                    var invitedEmail = InviteLoginEmailBox.Text.Trim();
+                    var tempPassword = InviteLoginPasswordBox.Password;
+                    if (string.IsNullOrWhiteSpace(invitedEmail) || string.IsNullOrWhiteSpace(tempPassword))
+                    {
+                        ValidationText.Text =
+                            "This organization is already configured. Enter invited Email ID and temporary password.";
+                        return;
+                    }
+
+                    if (!IsValidEmail(invitedEmail))
+                    {
+                        ValidationText.Text = "Please enter a valid invited Email ID.";
+                        return;
+                    }
+
+                    var (okInviteLogin, inviteErr, _) = await SetupApiClient
+                        .ValidateInviteLoginAsync(trimmed, invitedEmail, tempPassword)
+                        .ConfigureAwait(true);
+                    if (!okInviteLogin)
+                    {
+                        ValidationText.Text = inviteErr ?? "Invalid invited Email ID or temporary password.";
+                        return;
+                    }
+
+                    _resolvedSignedInEmail = invitedEmail;
+                }
+
                 SaveProgressOrgCodeOnly(trimmed);
                 _step = ResolveTargetStep(status);
+
+                // If we can jump straight to Step 4 (org already fully configured),
+                // persist completed setup so the shell can load orgCode/adminEmail/dbUri.
+                if (_step == 4 && !string.IsNullOrWhiteSpace(status.OrgDatabaseUri))
+                {
+                    _cachedOrgDatabaseUri = status.OrgDatabaseUri;
+                    SaveProgressAfterDatabase(trimmed, status.OrgDatabaseUri);
+                    SaveCompletedSetup();
+                }
             }
             finally
             {
@@ -443,23 +707,29 @@ public sealed partial class MainWindow : Window
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(AdminNameBox.Text) ||
-                string.IsNullOrWhiteSpace(AdminEmailBox.Text) ||
-                string.IsNullOrWhiteSpace(AdminPasswordBox.Password))
+            if (string.IsNullOrWhiteSpace(_resolvedSignedInEmail))
             {
-                ValidationText.Text = "Name, Email ID and Password are required.";
+                ValidationText.Text = "Invited admin email is missing. Go back to Step 1 and sign in.";
                 return;
             }
 
-            if (!IsValidEmail(AdminEmailBox.Text))
+            if (string.IsNullOrWhiteSpace(CurrentPasswordBox.Password) ||
+                string.IsNullOrWhiteSpace(NewPasswordBox.Password) ||
+                string.IsNullOrWhiteSpace(ConfirmPasswordBox.Password))
             {
-                ValidationText.Text = "Please enter a valid Email ID.";
+                ValidationText.Text = "Current temporary password, new password, and confirm password are required.";
                 return;
             }
 
-            if (!IsStrongPassword(AdminPasswordBox.Password))
+            if (NewPasswordBox.Password != ConfirmPasswordBox.Password)
             {
-                ValidationText.Text = "Password must be at least 8 chars with upper, lower, and number.";
+                ValidationText.Text = "New password and confirm password do not match.";
+                return;
+            }
+
+            if (!IsStrongPassword(NewPasswordBox.Password))
+            {
+                ValidationText.Text = "New password must be at least 8 chars with upper, lower, and number.";
                 return;
             }
 
@@ -468,12 +738,12 @@ public sealed partial class MainWindow : Window
             {
                 var (ok, err, body) = await SetupApiClient.CreateOrgAdminAsync(
                     _workingOrgCode,
-                    AdminNameBox.Text.Trim(),
-                    AdminEmailBox.Text.Trim(),
-                    AdminPasswordBox.Password);
+                    _resolvedSignedInEmail,
+                    CurrentPasswordBox.Password,
+                    NewPasswordBox.Password);
                 if (!ok)
                 {
-                    ValidationText.Text = err ?? "Could not create organization admin.";
+                    ValidationText.Text = err ?? "Could not change password.";
                     return;
                 }
 
@@ -559,10 +829,10 @@ public sealed partial class MainWindow : Window
 
     private void OnAdminPasswordChanged(object sender, RoutedEventArgs e)
     {
-        var isStrong = IsStrongPassword(AdminPasswordBox.Password);
+        var isStrong = IsStrongPassword(NewPasswordBox.Password);
         PasswordHintText.Text = isStrong
             ? "Password strength: strong"
-            : "Password must be at least 8 characters and include upper, lower, and a number.";
+            : "New password must be at least 8 characters and include upper, lower, and a number.";
         PasswordHintText.Foreground = isStrong
             ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 22, 163, 74))
             : (Brush)Application.Current.Resources["AppSubtleTextBrush"];
@@ -596,7 +866,7 @@ public sealed partial class MainWindow : Window
         {
             1 => "Step 1 of 4: Organization",
             2 => "Step 2 of 4: Database",
-            3 => "Step 3 of 4: Create Admin",
+            3 => "Step 3 of 4: Change Password",
             _ => "Step 4 of 4: Completed",
         };
         ProgressText.Text = _step switch
@@ -606,7 +876,14 @@ public sealed partial class MainWindow : Window
             3 => "● ● ● ○",
             _ => "● ● ● ●",
         };
-        NextButton.Content = _step == 3 ? "Create Admin User" : "Next";
+        if (_step == 3)
+        {
+            Step3EmailText.Text = string.IsNullOrWhiteSpace(_resolvedSignedInEmail)
+                ? "Invited Email: —"
+                : $"Invited Email: {_resolvedSignedInEmail}";
+        }
+
+        NextButton.Content = _step == 3 ? "Change Password" : "Next";
     }
 
     private static bool IsValidEmail(string email)

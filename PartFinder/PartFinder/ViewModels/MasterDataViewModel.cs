@@ -56,6 +56,11 @@ public sealed partial class MasterDataViewModel : ViewModelBase
 
     public string EditModeButtonText => IsEditMode ? "Stop Editing" : "Edit Data";
 
+    public IReadOnlyList<MasterDataRowViewModel> GetVisibleRows()
+    {
+        return Rows.ToList();
+    }
+
     partial void OnIsEditModeChanged(bool value)
     {
         OnPropertyChanged(nameof(EditModeButtonText));
@@ -276,6 +281,87 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         Rows.Add(CreateEmptyRow());
     }
 
+    public void InsertRowAt(int index)
+    {
+        if (!IsEditMode || Columns.Count == 0)
+        {
+            return;
+        }
+
+        var clamped = Math.Clamp(index, 0, Rows.Count);
+        Rows.Insert(clamped, CreateEmptyRow());
+    }
+
+    public async Task<bool> InsertColumnAtAsync(int index, string columnName, CancellationToken cancellationToken = default)
+    {
+        if (SelectedDataTemplate is null)
+        {
+            StatusMessage = "No template selected.";
+            return false;
+        }
+
+        var trimmed = (columnName ?? string.Empty).Trim();
+        if (trimmed.Length == 0)
+        {
+            StatusMessage = "Column name cannot be empty.";
+            return false;
+        }
+
+        var fields = SelectedDataTemplate.Fields.OrderBy(f => f.DisplayOrder).ToList();
+        var safeIndex = Math.Clamp(index, 0, fields.Count);
+        fields.Insert(
+            safeIndex,
+            new TemplateFieldDefinition
+            {
+                Key = BuildFieldKey(trimmed, safeIndex),
+                Label = trimmed,
+                Type = TemplateFieldType.Text,
+                IsRequired = false,
+                DisplayOrder = safeIndex,
+                ValidationPattern = null,
+                Options = null,
+                LinkedTemplateId = null,
+                LinkedDisplayFieldKey = null,
+            });
+
+        var remapped = fields
+            .Select((f, i) => new TemplateFieldDefinition
+            {
+                Key = string.IsNullOrWhiteSpace(f.Key) ? BuildFieldKey(f.Label, i) : f.Key,
+                Label = f.Label,
+                Type = f.Type,
+                IsRequired = f.IsRequired,
+                DisplayOrder = i,
+                ValidationPattern = f.ValidationPattern,
+                Options = f.Options,
+                LinkedTemplateId = f.LinkedTemplateId,
+                LinkedDisplayFieldKey = f.LinkedDisplayFieldKey,
+            })
+            .ToList();
+
+        var patched = new PartTemplateDefinition
+        {
+            Id = SelectedDataTemplate.Id,
+            Name = SelectedDataTemplate.Name,
+            Version = SelectedDataTemplate.Version + 1,
+            IsPublished = true,
+            Fields = remapped,
+        };
+
+        try
+        {
+            await _templateSchema.SaveTemplateAsync(patched, cancellationToken).ConfigureAwait(true);
+            await LoadForTemplateAsync(SelectedDataTemplate.Id, cancellationToken).ConfigureAwait(true);
+            StatusMessage = $"Column \"{trimmed}\" added.";
+            return true;
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Error: " + ex.Message;
+            return false;
+        }
+    }
+
     [RelayCommand]
     private async Task SaveGrid(CancellationToken cancellationToken = default)
     {
@@ -308,7 +394,8 @@ public sealed partial class MasterDataViewModel : ViewModelBase
             }
 
             await ResolveRecordLinkLabelsAsync(cancellationToken).ConfigureAwait(true);
-            StatusMessage = "Saved.";
+            IsEditMode = false;
+            StatusMessage = "Saved. You're back in view mode.";
         }
         catch (Exception ex)
         {
@@ -515,5 +602,18 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         }
 
         return true;
+    }
+
+    private static string BuildFieldKey(string label, int index)
+    {
+        var lowered = label.ToLowerInvariant();
+        var chars = lowered.Where(static c => char.IsLetterOrDigit(c) || c == '_').ToArray();
+        var baseKey = new string(chars);
+        if (string.IsNullOrEmpty(baseKey))
+        {
+            baseKey = "column";
+        }
+
+        return $"{baseKey}_{index}";
     }
 }

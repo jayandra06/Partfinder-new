@@ -5,20 +5,25 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Animation;
+using PartFinder.Helpers;
 using PartFinder.Models;
 using PartFinder.Services;
 using PartFinder.ViewModels;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage.Pickers;
-using Windows.UI;
 using WinRT.Interop;
 
 namespace PartFinder.Views.Pages;
 
 public sealed partial class MasterDataPage : Page
 {
+    private const double GridCellTextWidth = 160d;
+    private const double GridCellHorizontalPadding = 10d;
+    private const double ActionPanelWidth = 320;
     private MasterDataViewModel? _viewModel;
     private readonly IExcelTemplateService _excelTemplateService;
+    private readonly List<ActionResultDisplayItem> _actionResultRows = new();
 
     public MasterDataPage()
     {
@@ -123,6 +128,26 @@ public sealed partial class MasterDataPage : Page
             && _viewModel.SaveGridCommand.CanExecute(null))
         {
             _viewModel.SaveGridCommand.Execute(null);
+        }
+    }
+
+    private async void OnCancelEditClicked(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel is null)
+        {
+            return;
+        }
+
+        if (_viewModel.SelectedDataTemplate is null)
+        {
+            _viewModel.ToggleEditModeCommand.Execute(null);
+            return;
+        }
+
+        await _viewModel.LoadForTemplateAsync(_viewModel.SelectedDataTemplate.Id).ConfigureAwait(true);
+        if (_viewModel.IsEditMode)
+        {
+            _viewModel.ToggleEditModeCommand.Execute(null);
         }
     }
 
@@ -252,9 +277,11 @@ public sealed partial class MasterDataPage : Page
             return;
         }
 
-        const double minColWidth = 132d;
+        var visibleRows = _viewModel.GetVisibleRows();
+
+        const double minColWidth = GridCellTextWidth + (GridCellHorizontalPadding * 2);
         var colCount = _viewModel.Columns.Count;
-        var rowCount = _viewModel.Rows.Count;
+        var rowCount = visibleRows.Count;
 
         var scroll = new ScrollViewer
         {
@@ -267,7 +294,7 @@ public sealed partial class MasterDataPage : Page
         var grid = new Grid
         {
             MinWidth = colCount * minColWidth,
-            Background = (Brush)Application.Current.Resources["AppSurfaceBrush"],
+            Background = (Brush)Application.Current.Resources["CardBackgroundBrush"],
         };
 
         for (var c = 0; c < colCount; c++)
@@ -285,12 +312,9 @@ public sealed partial class MasterDataPage : Page
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         }
 
-        var headerBg = new SolidColorBrush(
-            ActualTheme == ElementTheme.Dark
-                ? Color.FromArgb(255, 42, 62, 92)
-                : Color.FromArgb(255, 208, 232, 252));
-        var borderBrush = (Brush)Application.Current.Resources["AppBorderBrush"];
-        var headerForeground = (Brush)Application.Current.Resources["TextFillColorPrimaryBrush"];
+        var headerBg = (Brush)Application.Current.Resources["GridHeaderBackgroundBrush"];
+        var borderBrush = (Brush)Application.Current.Resources["BorderDefaultBrush"];
+        var headerForeground = (Brush)Application.Current.Resources["TextSecondaryBrush"];
 
         for (var c = 0; c < colCount; c++)
         {
@@ -302,12 +326,16 @@ public sealed partial class MasterDataPage : Page
             {
                 Background = headerBg,
                 BorderBrush = borderBrush,
-                BorderThickness = new Thickness(1, 1, 1, 1),
+                BorderThickness = new Thickness(0, 0, 1, 1),
                 Padding = new Thickness(10, 10, 10, 10),
             };
             Grid.SetRow(headerBorder, 0);
             Grid.SetColumn(headerBorder, c);
-            headerBorder.Child = new TextBlock
+
+            var headerGrid = new Grid();
+            headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var title = new TextBlock
             {
                 Text = headerLabel,
                 FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
@@ -315,13 +343,61 @@ public sealed partial class MasterDataPage : Page
                 Foreground = headerForeground,
                 VerticalAlignment = VerticalAlignment.Center,
             };
+            Grid.SetColumn(title, 0);
+            headerGrid.Children.Add(title);
+
+            if (_viewModel.IsEditMode)
+            {
+                var addColumnBtn = new Button
+                {
+                    Content = "+",
+                    Width = 24,
+                    Height = 24,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Style = (Style)Application.Current.Resources["OutlinedButtonStyle"],
+                    Visibility = Visibility.Visible,
+                    Opacity = 0,
+                    IsHitTestVisible = false,
+                    Tag = c + 1,
+                };
+                ToolTipService.SetToolTip(addColumnBtn, "Insert column after this header");
+                addColumnBtn.Click += OnInsertColumnFromHeaderClick;
+                Grid.SetColumn(addColumnBtn, 1);
+                headerGrid.Children.Add(addColumnBtn);
+
+                headerBorder.PointerEntered += (_, _) => AffordanceAnimationHelper.Fade(addColumnBtn, show: true, shownOpacity: 1, hiddenOpacity: 0, disableHitTestingWhenHidden: true);
+                headerBorder.PointerExited += (_, _) => AffordanceAnimationHelper.Fade(addColumnBtn, show: false, shownOpacity: 1, hiddenOpacity: 0, disableHitTestingWhenHidden: true);
+            }
+
+            headerBorder.Child = headerGrid;
 
             grid.Children.Add(headerBorder);
         }
 
+        if (_viewModel.IsEditMode && colCount > 0)
+        {
+            var addFirstHeader = new Button
+            {
+                Content = "+",
+                Width = 24,
+                Height = 24,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(6, 0, 0, 0),
+                Style = (Style)Application.Current.Resources["OutlinedButtonStyle"],
+                Tag = 0,
+            };
+            ToolTipService.SetToolTip(addFirstHeader, "Insert column before the first header");
+            addFirstHeader.Click += OnInsertColumnFromHeaderClick;
+            Grid.SetRow(addFirstHeader, 0);
+            Grid.SetColumn(addFirstHeader, 0);
+            grid.Children.Add(addFirstHeader);
+        }
+
         for (var r = 0; r < rowCount; r++)
         {
-            var rowVm = _viewModel.Rows[r];
+            var rowVm = visibleRows[r];
             for (var c = 0; c < colCount; c++)
             {
                 var cellVm = rowVm.Cells[c];
@@ -337,8 +413,10 @@ public sealed partial class MasterDataPage : Page
 
                 var cellBorder = new Border
                 {
+                    Background = (Brush)Application.Current.Resources[
+                        r % 2 == 0 ? "CardBackgroundBrush" : "GridRowAltBackgroundBrush"],
                     BorderBrush = borderBrush,
-                    BorderThickness = new Thickness(1, 0, 1, 1),
+                    BorderThickness = new Thickness(0, 0, 1, 1),
                     Child = cellContent,
                 };
                 Grid.SetRow(cellBorder, r + 1);
@@ -347,8 +425,73 @@ public sealed partial class MasterDataPage : Page
             }
         }
 
+        if (_viewModel.IsEditMode)
+        {
+            // Canva-like affordance: insert points between rows (and at the end), pinned to last column.
+            for (var insertAfterRow = 0; insertAfterRow <= rowCount; insertAfterRow++)
+            {
+                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                var insertionIndex = insertAfterRow;
+                var addRowButton = new Button
+                {
+                    Content = "+",
+                    Width = 24,
+                    Height = 24,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    Margin = new Thickness(0, 2, 8, 2),
+                    Style = (Style)Application.Current.Resources["OutlinedButtonStyle"],
+                    Visibility = Visibility.Visible,
+                    Opacity = 0,
+                    IsHitTestVisible = false,
+                };
+                addRowButton.Click += (_, _) => _viewModel.InsertRowAt(insertionIndex);
+
+                var addRowHost = new Border
+                {
+                    BorderBrush = borderBrush,
+                    BorderThickness = new Thickness(0, 0, 1, 1),
+                    Background = (Brush)Application.Current.Resources["CardBackgroundBrush"],
+                    Child = addRowButton,
+                };
+
+                // Header is row 0; data rows are 1..rowCount. Insert strip after each data row.
+                Grid.SetRow(addRowHost, rowCount + 1 + insertAfterRow);
+                Grid.SetColumn(addRowHost, colCount - 1);
+                grid.Children.Add(addRowHost);
+
+                addRowHost.PointerEntered += (_, _) => AffordanceAnimationHelper.Fade(addRowButton, show: true, shownOpacity: 1, hiddenOpacity: 0, disableHitTestingWhenHidden: true);
+                addRowHost.PointerExited += (_, _) => AffordanceAnimationHelper.Fade(addRowButton, show: false, shownOpacity: 1, hiddenOpacity: 0, disableHitTestingWhenHidden: true);
+            }
+        }
+
         scroll.Content = grid;
         SpreadsheetHost.Content = scroll;
+    }
+
+    private async void OnInsertColumnFromHeaderClick(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel is null || XamlRoot is null || sender is not Button { Tag: int insertAt })
+        {
+            return;
+        }
+
+        var input = new TextBox { PlaceholderText = "Column name" };
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = "Add column",
+            Content = input,
+            PrimaryButtonText = "Add",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+        };
+        var result = await dialog.ShowAsync();
+        if (result != ContentDialogResult.Primary)
+        {
+            return;
+        }
+
+        _ = await _viewModel.InsertColumnAtAsync(insertAt, input.Text).ConfigureAwait(true);
     }
 
     private TextBox BuildTextCell(MasterDataCellViewModel cellVm, MasterDataRowViewModel rowVm)
@@ -356,9 +499,11 @@ public sealed partial class MasterDataPage : Page
         var box = new TextBox
         {
             MinHeight = 36,
-            Padding = new Thickness(8, 6, 8, 6),
+            Width = GridCellTextWidth,
+            Padding = new Thickness(GridCellHorizontalPadding, 6, GridCellHorizontalPadding, 6),
             BorderThickness = new Thickness(0),
             Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
+            Foreground = (Brush)Application.Current.Resources["TextPrimaryBrush"],
             TextWrapping = TextWrapping.Wrap,
         };
         box.SetBinding(
@@ -380,9 +525,11 @@ public sealed partial class MasterDataPage : Page
         var box = new TextBox
         {
             MinHeight = 36,
-            Padding = new Thickness(8, 6, 8, 6),
+            Width = GridCellTextWidth,
+            Padding = new Thickness(GridCellHorizontalPadding, 6, GridCellHorizontalPadding, 6),
             BorderThickness = new Thickness(0),
             Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
+            Foreground = (Brush)Application.Current.Resources["TextPrimaryBrush"],
             VerticalAlignment = VerticalAlignment.Center,
             TextWrapping = TextWrapping.WrapWholeWords,
             Margin = new Thickness(0),
@@ -411,6 +558,7 @@ public sealed partial class MasterDataPage : Page
         var pickBtn = new Button
         {
             Content = "Pick…",
+            Style = (Style)Application.Current.Resources["GhostButtonStyle"],
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(0, 4, 4, 4),
             MinWidth = 56,
@@ -487,7 +635,7 @@ public sealed partial class MasterDataPage : Page
         TemplateContextAction action,
         MasterDataRowViewModel rowVm)
     {
-        if (_viewModel is null || XamlRoot is null)
+        if (_viewModel is null || XamlRoot is null || ActionRowsListView is null)
         {
             return;
         }
@@ -499,70 +647,101 @@ public sealed partial class MasterDataPage : Page
             return;
         }
 
-        var stack = new StackPanel { Spacing = 10 };
-        stack.Children.Add(
-            new TextBlock
-            {
-                Text = $"{rows.Count} row(s) in {targetDef.Name}",
-                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                TextWrapping = TextWrapping.WrapWholeWords,
-            });
+        ActionTitleText.Text = action.MenuLabel;
+        ActionCountText.Text = $"{rows.Count} row(s) in {targetDef.Name}";
+        _actionResultRows.Clear();
 
         if (rows.Count == 0)
         {
-            stack.Children.Add(
-                new TextBlock
-                {
-                    Text = "No rows matched your rules for this line. Check values and Templates → cell actions.",
-                    TextWrapping = TextWrapping.WrapWholeWords,
-                    Foreground = (Brush)Application.Current.Resources["AppSubtleTextBrush"],
-                });
+            _actionResultRows.Add(
+                new ActionResultDisplayItem(
+                    "No matches",
+                    new[] { "No rows matched your rules for this line. Check values and Templates -> cell actions." }));
         }
         else
         {
             var fieldOrder = ResolveDisplayFields(targetDef, action.DisplayFieldKeys);
-            foreach (var row in rows)
+            var rowNumber = 1;
+            foreach (var resultRow in rows)
             {
-                var card = new Border
-                {
-                    BorderBrush = (Brush)Application.Current.Resources["AppBorderBrush"],
-                    BorderThickness = new Thickness(1),
-                    Padding = new Thickness(10, 8, 10, 8),
-                    Margin = new Thickness(0, 0, 0, 8),
-                };
-                var inner = new StackPanel { Spacing = 4 };
+                var lines = new List<string>(fieldOrder.Count);
                 foreach (var f in fieldOrder)
                 {
-                    var val = row.Values.TryGetValue(f.Key, out var v) ? v : string.Empty;
-                    inner.Children.Add(
-                        new TextBlock
-                        {
-                            Text = $"{f.Label}: {val}",
-                            TextWrapping = TextWrapping.WrapWholeWords,
-                        });
+                    var val = resultRow.Values.TryGetValue(f.Key, out var v) ? v : string.Empty;
+                    lines.Add($"{f.Label}: {val}");
                 }
 
-                card.Child = inner;
-                stack.Children.Add(card);
+                _actionResultRows.Add(new ActionResultDisplayItem($"Row {rowNumber}", lines));
+                rowNumber++;
             }
         }
 
-        var scroll = new ScrollViewer
-        {
-            MaxHeight = 440,
-            Content = stack,
-        };
+        ActionRowsListView.ItemsSource = _actionResultRows;
+        OpenActionPanel();
+    }
 
-        var dlg = new ContentDialog
-        {
-            Title = action.MenuLabel,
-            Content = scroll,
-            CloseButtonText = "Close",
-            DefaultButton = ContentDialogButton.Close,
-            XamlRoot = XamlRoot,
-        };
+    private void OnCloseActionPanelClick(object sender, RoutedEventArgs e)
+    {
+        CloseActionPanel();
+    }
 
-        _ = await dlg.ShowAsync();
+    private void OnActionOverlayTapped(object sender, TappedRoutedEventArgs e)
+    {
+        CloseActionPanel();
+    }
+
+    private void OpenActionPanel()
+    {
+        if (ActionResultsPanel is null || ActionResultsTransform is null || ActionResultsOverlay is null)
+        {
+            return;
+        }
+
+        ActionResultsPanel.Visibility = Visibility.Visible;
+        ActionResultsOverlay.Visibility = Visibility.Visible;
+
+        var animation = new DoubleAnimation
+        {
+            Duration = TimeSpan.FromMilliseconds(200),
+            From = ActionPanelWidth,
+            To = 0,
+            EasingFunction = new ExponentialEase { EasingMode = EasingMode.EaseOut, Exponent = 5 },
+            EnableDependentAnimation = true,
+        };
+        Storyboard.SetTarget(animation, ActionResultsTransform);
+        Storyboard.SetTargetProperty(animation, "X");
+
+        var storyboard = new Storyboard();
+        storyboard.Children.Add(animation);
+        storyboard.Begin();
+    }
+
+    private void CloseActionPanel()
+    {
+        if (ActionResultsPanel is null || ActionResultsTransform is null || ActionResultsOverlay is null)
+        {
+            return;
+        }
+
+        var animation = new DoubleAnimation
+        {
+            Duration = TimeSpan.FromMilliseconds(200),
+            From = 0,
+            To = ActionPanelWidth,
+            EasingFunction = new ExponentialEase { EasingMode = EasingMode.EaseOut, Exponent = 5 },
+            EnableDependentAnimation = true,
+        };
+        Storyboard.SetTarget(animation, ActionResultsTransform);
+        Storyboard.SetTargetProperty(animation, "X");
+
+        var storyboard = new Storyboard();
+        storyboard.Children.Add(animation);
+        storyboard.Completed += (_, _) =>
+        {
+            ActionResultsPanel.Visibility = Visibility.Collapsed;
+            ActionResultsOverlay.Visibility = Visibility.Collapsed;
+        };
+        storyboard.Begin();
     }
 
     private static List<TemplateFieldDefinition> ResolveDisplayFields(
@@ -785,5 +964,17 @@ public sealed partial class MasterDataPage : Page
 
         public string Id { get; }
         public string Display { get; }
+    }
+
+    private sealed class ActionResultDisplayItem
+    {
+        public ActionResultDisplayItem(string title, IReadOnlyList<string> lines)
+        {
+            Title = title;
+            Lines = lines;
+        }
+
+        public string Title { get; }
+        public IReadOnlyList<string> Lines { get; }
     }
 }

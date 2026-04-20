@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.UI.Xaml;
 using PartFinder.Services;
 using System.Collections.ObjectModel;
 
@@ -10,6 +11,9 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
     private readonly ILocalSetupContext _setupContext;
     private readonly ITemplateSchemaService _templateSchema;
     private readonly IAppStateStore _appState;
+    private readonly ICurrentUserAccessService _access;
+    private readonly AdminSessionStore _adminSession;
+    private readonly LocalProfileStore _profile;
 
     private bool _suppressNavigation;
     private AppPage _lastSelectedPage = AppPage.Templates;
@@ -18,12 +22,19 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
         INavigationService navigationService,
         ILocalSetupContext setupContext,
         ITemplateSchemaService templateSchema,
-        IAppStateStore appState)
+        IAppStateStore appState,
+        ICurrentUserAccessService access,
+        AdminSessionStore adminSession,
+        LocalProfileStore profile)
     {
         _navigationService = navigationService;
         _setupContext = setupContext;
         _templateSchema = templateSchema;
         _appState = appState;
+        _access = access;
+        _adminSession = adminSession;
+        _profile = profile;
+        _profile.ProfileChanged += OnProfileChanged;
         NavigationItems = new ObservableCollection<NavItemViewModel>();
     }
 
@@ -71,8 +82,18 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
     public string CurrentUserName
     {
         get => _currentUserName;
-        set => SetProperty(ref _currentUserName, value);
+        set
+        {
+            if (SetProperty(ref _currentUserName, value))
+            {
+                OnPropertyChanged(nameof(CurrentUserInitial));
+            }
+        }
     }
+
+    public string CurrentUserInitial => string.IsNullOrWhiteSpace(CurrentUserName)
+        ? "?"
+        : CurrentUserName.Trim()[0].ToString().ToUpperInvariant();
 
     private bool _isSidebarCollapsed;
     public bool IsSidebarCollapsed
@@ -108,18 +129,21 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
     public async Task InitializeAsync()
     {
         _setupContext.Refresh();
+        _adminSession.Load();
+        _profile.Load();
         if (!string.IsNullOrWhiteSpace(_setupContext.OrgCode))
         {
             _appState.CurrentTenant = $"Org {_setupContext.OrgCode}";
         }
 
         CurrentTenant = _appState.CurrentTenant;
-        CurrentUserName = _appState.CurrentUserName;
+        CurrentUserName = ResolveDisplayUser();
 
+        await _access.RefreshAsync().ConfigureAwait(true);
         var hasMaster = await HasMasterDataTemplateAsync().ConfigureAwait(true);
-        RebuildNavigationItems(hasMaster);
+        RebuildNavigationItems(hasMaster, _access.Capabilities);
 
-        var startPage = hasMaster ? AppPage.Dashboard : AppPage.Templates;
+        var startPage = ResolveStartPage(hasMaster, _access.Capabilities);
         var startItem = NavigationItems.First(i => i.Page == startPage);
         _lastSelectedPage = startPage;
 
@@ -129,13 +153,29 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
         _navigationService.Navigate(startPage);
     }
 
+    private static AppPage ResolveStartPage(bool hasMasterData, UserAccessCapabilities c)
+    {
+        if (!c.CanAccessUserManagement)
+        {
+            return AppPage.MasterData;
+        }
+
+        if (!hasMasterData)
+        {
+            return AppPage.Templates;
+        }
+
+        return AppPage.Dashboard;
+    }
+
     public async Task NotifyTemplatesChangedAsync(bool openMasterDataPage = false)
     {
+        await _access.RefreshAsync().ConfigureAwait(true);
         var hasMaster = await HasMasterDataTemplateAsync().ConfigureAwait(true);
-        RebuildNavigationItems(hasMaster);
+        RebuildNavigationItems(hasMaster, _access.Capabilities);
 
         NavItemViewModel? pick;
-        if (openMasterDataPage && hasMaster)
+        if (openMasterDataPage && hasMaster && _access.Capabilities.CanAccessMasterData)
         {
             pick = NavigationItems.FirstOrDefault(i => i.Page == AppPage.MasterData);
         }
@@ -157,21 +197,24 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
         _navigationService.Navigate(pick.Page);
     }
 
-    private void RebuildNavigationItems(bool hasMasterData)
+    private void RebuildNavigationItems(bool hasMasterData, UserAccessCapabilities c)
     {
         NavigationItems.Clear();
-        if (!hasMasterData)
+
+        if ((c.CanAccessMasterData || c.CanAccessParts) && hasMasterData)
         {
-            // Master Data template not created yet: still show main areas so Settings and navigation work.
-            // Templates remains the place to create the required "Master Data" template when DB is configured.
             NavigationItems.Add(
                 new NavItemViewModel
                 {
-                    Label = "Templates",
-                    IconGlyph = "\uE8A5",
-                    Page = AppPage.Templates,
+                    Label = "Master Data",
+                    IconGlyph = "\uE8F1",
+                    Page = AppPage.MasterData,
                     IsEnabled = true,
                 });
+        }
+
+        if (c.CanAccessDashboard)
+        {
             NavigationItems.Add(
                 new NavItemViewModel
                 {
@@ -180,14 +223,43 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
                     Page = AppPage.Dashboard,
                     IsEnabled = true,
                 });
+        }
+
+        if (c.CanAccessTemplates)
+        {
             NavigationItems.Add(
                 new NavItemViewModel
                 {
-                    Label = "Parts",
-                    IconGlyph = "\uE716",
-                    Page = AppPage.Parts,
+                    Label = "Templates",
+                    IconGlyph = "\uE8A5",
+                    Page = AppPage.Templates,
                     IsEnabled = true,
                 });
+
+            NavigationItems.Add(
+                new NavItemViewModel
+                {
+                    Label = "Worksheet Relations",
+                    IconGlyph = "\uE8EC",
+                    Page = AppPage.WorksheetRelations,
+                    IsEnabled = true,
+                });
+        }
+
+        if (c.CanAccessUserManagement)
+        {
+            NavigationItems.Add(
+                new NavItemViewModel
+                {
+                    Label = "User Management",
+                    IconGlyph = "\uE77B",
+                    Page = AppPage.UserManagement,
+                    IsEnabled = true,
+                });
+        }
+
+        if (c.CanAccessSettings)
+        {
             NavigationItems.Add(
                 new NavItemViewModel
                 {
@@ -196,50 +268,8 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
                     Page = AppPage.Settings,
                     IsEnabled = true,
                 });
-            SyncNavItemLabelsWithSidebar();
-            return;
         }
 
-        NavigationItems.Add(
-            new NavItemViewModel
-            {
-                Label = "Master Data",
-                IconGlyph = "\uE8F1",
-                Page = AppPage.MasterData,
-                IsEnabled = true,
-            });
-        NavigationItems.Add(
-            new NavItemViewModel
-            {
-                Label = "Dashboard",
-                IconGlyph = "\uE80F",
-                Page = AppPage.Dashboard,
-                IsEnabled = true,
-            });
-        NavigationItems.Add(
-            new NavItemViewModel
-            {
-                Label = "Parts",
-                IconGlyph = "\uE716",
-                Page = AppPage.Parts,
-                IsEnabled = true,
-            });
-        NavigationItems.Add(
-            new NavItemViewModel
-            {
-                Label = "Templates",
-                IconGlyph = "\uE8A5",
-                Page = AppPage.Templates,
-                IsEnabled = true,
-            });
-        NavigationItems.Add(
-            new NavItemViewModel
-            {
-                Label = "Settings",
-                IconGlyph = "\uE713",
-                Page = AppPage.Settings,
-                IsEnabled = true,
-            });
         SyncNavItemLabelsWithSidebar();
     }
 
@@ -262,4 +292,44 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
 
     [RelayCommand]
     private void GoBack() => _navigationService.GoBack();
+
+    [RelayCommand]
+    private void OpenAccountSettings() => _navigationService.Navigate(AppPage.Settings);
+
+    [RelayCommand]
+    private void SignOutSession()
+    {
+        _adminSession.Clear();
+        SetupPaths.ClearAllSetupStateFiles();
+        _setupContext.Refresh();
+        CurrentUserName = ResolveDisplayUser();
+        Application.Current.Exit();
+    }
+
+    private string ResolveDisplayUser()
+    {
+        var localName = _profile.DisplayName?.Trim();
+        if (!string.IsNullOrWhiteSpace(localName))
+        {
+            return localName;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_adminSession.Email))
+        {
+            return _adminSession.Email!;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_setupContext.AdminEmail))
+        {
+            return _setupContext.AdminEmail!;
+        }
+
+        return _appState.CurrentUserName;
+    }
+
+    private void OnProfileChanged()
+    {
+        _profile.Load();
+        CurrentUserName = ResolveDisplayUser();
+    }
 }

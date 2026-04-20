@@ -671,6 +671,18 @@ h3 {
   gap: 16px;
 }
 
+.settings-maintenance-card {
+  grid-column: 1 / -1;
+}
+
+.maint-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+
 .dark-card {
   background: #14161d;
   border-color: #232734;

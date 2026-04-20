@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using PartFinder.Services;
 using PartFinder.ViewModels;
@@ -34,7 +34,11 @@ namespace PartFinder
             services.AddSingleton<IAppStateStore, AppStateStore>();
             services.AddSingleton<LocalUserSecurityStore>();
             services.AddSingleton<AdminSessionStore>();
+            services.AddSingleton<LocalProfileStore>();
             services.AddSingleton<ILocalSetupContext, LocalSetupContext>();
+            services.AddSingleton<BackendApiClient>();
+            services.AddSingleton<IOrgUserDirectoryService, MongoOrgUserDirectoryService>();
+            services.AddSingleton<ICurrentUserAccessService, CurrentUserAccessService>();
             services.AddSingleton<ITemplateSchemaService, MongoTemplateSchemaService>();
             services.AddSingleton<IMasterDataRecordsService, MongoMasterDataRecordsService>();
             services.AddSingleton<IContextActionsService, MongoContextActionsService>();
@@ -46,14 +50,20 @@ namespace PartFinder
             services.AddTransient<DashboardViewModel>();
             services.AddTransient<PartsViewModel>();
             services.AddTransient<TemplatesViewModel>();
+            services.AddTransient<ViewDataViewModel>();
+            services.AddTransient<WorksheetRelationsViewModel>();
             services.AddTransient<MasterDataViewModel>();
             services.AddTransient<SettingsViewModel>();
+            services.AddTransient<UserManagementViewModel>();
 
             services.AddTransient<MasterDataPage>();
             services.AddTransient<DashboardPage>();
             services.AddTransient<PartsPage>();
             services.AddTransient<TemplatesPage>();
+            services.AddTransient<ViewDataPage>();
+            services.AddTransient<WorksheetRelationsPage>();
             services.AddTransient<SettingsPage>();
+            services.AddTransient<UserManagementPage>();
 
             return services.BuildServiceProvider();
         }

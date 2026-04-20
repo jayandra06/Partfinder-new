@@ -451,6 +451,7 @@ function OrganizationsSection({
   const [orgType, setOrgType] = useState('')
   const [orgPlan, setOrgPlan] = useState('')
   const [orgStatus, setOrgStatus] = useState('Active')
+  const [firstAdminEmail, setFirstAdminEmail] = useState('')
   const [generatedCode, setGeneratedCode] = useState('')
   const [search, setSearch] = useState('')
   const [rows, setRows] = useState<OrgRow[]>([])
@@ -512,10 +513,26 @@ function OrganizationsSection({
 
   const canSave = useMemo(() => {
     if (modalMode === 'create') {
-      return Boolean(orgName.trim() && orgType && orgPlan && generatedCode)
+      return Boolean(
+        orgName.trim() &&
+          orgType &&
+          orgPlan &&
+          generatedCode &&
+          firstAdminEmail.trim() &&
+          firstAdminEmail.includes('@'),
+      )
     }
     return Boolean(editingId && orgName.trim() && orgType && orgPlan && orgStatus)
-  }, [modalMode, editingId, orgName, orgType, orgPlan, orgStatus, generatedCode])
+  }, [
+    modalMode,
+    editingId,
+    orgName,
+    orgType,
+    orgPlan,
+    orgStatus,
+    generatedCode,
+    firstAdminEmail,
+  ])
 
   const generateCode = () => {
     const code = Math.floor(100000 + Math.random() * 900000).toString()
@@ -529,6 +546,7 @@ function OrganizationsSection({
     setOrgType('')
     setOrgPlan('')
     setOrgStatus('Active')
+    setFirstAdminEmail('')
     setGeneratedCode('')
     setModalError('')
     setIsModalOpen(true)
@@ -555,6 +573,7 @@ function OrganizationsSection({
     setOrgType('')
     setOrgPlan('')
     setOrgStatus('Active')
+    setFirstAdminEmail('')
     setGeneratedCode('')
   }
 
@@ -580,6 +599,7 @@ function OrganizationsSection({
                   type: orgType,
                   plan: orgPlan,
                   orgCode: generatedCode,
+                  firstAdminEmail: firstAdminEmail.trim(),
                 }
               : {
                   name: orgName.trim(),
@@ -901,6 +921,15 @@ function OrganizationsSection({
 
             {modalMode === 'create' ? (
               <>
+                <label>First Admin Email *</label>
+                <input
+                  value={firstAdminEmail}
+                  onChange={(event) => setFirstAdminEmail(event.target.value)}
+                  placeholder="first.admin@company.com"
+                  type="email"
+                  autoComplete="email"
+                />
+
                 <div className="generated-code-row">
                   <label>Organization Code</label>
                   <button type="button" className="btn-dark" onClick={generateCode}>
@@ -1451,6 +1480,14 @@ function UsersSection() {
   )
 }
 
+function isoToLocalDatetimeInputValue(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 function SettingsSection({
   onSessionExpired,
 }: {
@@ -1469,6 +1506,42 @@ function SettingsSection({
   const [createError, setCreateError] = useState('')
   const [createOk, setCreateOk] = useState('')
   const [createPending, setCreatePending] = useState(false)
+
+  const [maintEnabled, setMaintEnabled] = useState(false)
+  const [maintUntilLocal, setMaintUntilLocal] = useState('')
+  const [maintError, setMaintError] = useState('')
+  const [maintOk, setMaintOk] = useState('')
+  const [maintPending, setMaintPending] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        const response = await fetch(`${apiBase}/api/admin/platform/maintenance`, {
+          headers: authJsonHeaders(),
+        })
+        if (response.status === 401) {
+          onSessionExpired()
+          return
+        }
+        if (!response.ok) return
+        const data: unknown = await response.json().catch(() => null)
+        if (cancelled || !data || typeof data !== 'object') return
+        const enabled = Boolean((data as { maintenanceEnabled?: boolean }).maintenanceEnabled)
+        const until = (data as { maintenanceUntil?: string | null }).maintenanceUntil
+        setMaintEnabled(enabled)
+        setMaintUntilLocal(
+          until ? isoToLocalDatetimeInputValue(until) : '',
+        )
+      } catch {
+        // ignore
+      }
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [onSessionExpired])
 
   const submitChangePassword = async () => {
     setChangeError('')
@@ -1563,6 +1636,62 @@ function SettingsSection({
     }
   }
 
+  const saveMaintenance = async () => {
+    setMaintError('')
+    setMaintOk('')
+    if (maintEnabled) {
+      if (!maintUntilLocal.trim()) {
+        setMaintError('Set an end date and time for the maintenance window.')
+        return
+      }
+      const end = new Date(maintUntilLocal)
+      if (Number.isNaN(end.getTime())) {
+        setMaintError('Invalid date or time.')
+        return
+      }
+      if (end.getTime() <= Date.now()) {
+        setMaintError('End time must be in the future.')
+        return
+      }
+    }
+    setMaintPending(true)
+    try {
+      const body: { maintenanceEnabled: boolean; maintenanceUntil?: string } = {
+        maintenanceEnabled: maintEnabled,
+      }
+      if (maintEnabled) {
+        body.maintenanceUntil = new Date(maintUntilLocal).toISOString()
+      }
+      const response = await fetch(`${apiBase}/api/admin/platform/maintenance`, {
+        method: 'PATCH',
+        headers: authJsonHeaders(),
+        body: JSON.stringify(body),
+      })
+      if (response.status === 401) {
+        onSessionExpired()
+        return
+      }
+      const data: unknown = await response.json().catch(() => null)
+      if (!response.ok) {
+        setMaintError(parseApiErrorMessage(data))
+        return
+      }
+      setMaintOk('Maintenance settings saved.')
+      if (data && typeof data === 'object') {
+        const enabled = Boolean((data as { maintenanceEnabled?: boolean }).maintenanceEnabled)
+        const until = (data as { maintenanceUntil?: string | null }).maintenanceUntil
+        setMaintEnabled(enabled)
+        setMaintUntilLocal(
+          until ? isoToLocalDatetimeInputValue(until) : '',
+        )
+      }
+    } catch {
+      setMaintError('Cannot reach the server. Is the API running?')
+    } finally {
+      setMaintPending(false)
+    }
+  }
+
   return (
     <section className="settings-grid">
       <article className="card dark-card">
@@ -1646,6 +1775,50 @@ function SettingsSection({
           onClick={() => void submitCreateAdmin()}
         >
           {createPending ? 'Creating…' : 'Create Admin User'}
+        </button>
+      </article>
+
+      <article className="card dark-card settings-maintenance-card">
+        <h3>Maintenance window</h3>
+        <p>
+          When enabled, the PartFinder Windows app shows an under-maintenance screen with a
+          countdown until the end time. Turn off to end maintenance immediately.
+        </p>
+        <label className="maint-checkbox-row">
+          <input
+            type="checkbox"
+            checked={maintEnabled}
+            onChange={(e) => {
+              const next = e.target.checked
+              setMaintEnabled(next)
+              if (next && !maintUntilLocal.trim()) {
+                const d = new Date(Date.now() + 60 * 60 * 1000)
+                setMaintUntilLocal(isoToLocalDatetimeInputValue(d.toISOString()))
+              }
+            }}
+          />
+          <span>Maintenance window active</span>
+        </label>
+        {maintEnabled ? (
+          <>
+            <label htmlFor="maint-until">End date and time (local)</label>
+            <input
+              id="maint-until"
+              type="datetime-local"
+              value={maintUntilLocal}
+              onChange={(e) => setMaintUntilLocal(e.target.value)}
+            />
+          </>
+        ) : null}
+        {maintError ? <p className="form-error">{maintError}</p> : null}
+        {maintOk ? <p className="admin-muted">{maintOk}</p> : null}
+        <button
+          type="button"
+          className="btn-light full-width"
+          disabled={maintPending}
+          onClick={() => void saveMaintenance()}
+        >
+          {maintPending ? 'Saving…' : 'Save maintenance settings'}
         </button>
       </article>
     </section>

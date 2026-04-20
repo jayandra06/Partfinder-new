@@ -10,225 +10,327 @@
     <Page.Resources>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
     </Page.Resources>
-    <ScrollViewer>
-        <StackPanel Padding="20" Spacing="20" MaxWidth="860">
-            <components:PageHeader
-                Title="Settings"
-                Subtitle="Manage device security and admin account access in one place." />
+    <ScrollViewer Background="{StaticResource PageBackgroundBrush}">
+        <Grid Padding="20" ColumnSpacing="16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="220" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
 
-            <Border Style="{ThemeResource AppCardBorderStyle}">
-                <StackPanel Spacing="8">
-                    <TextBlock Text="Security overview" Style="{ThemeResource AppSectionTextStyle}" />
-                    <TextBlock Text="{Binding PasscodeStatusText}" Foreground="{ThemeResource AppSubtleTextBrush}" />
-                    <TextBlock Text="{Binding TwoFactorStatusDetail}" Foreground="{ThemeResource AppSubtleTextBrush}" />
-                    <TextBlock Text="{Binding AdminSessionStatusText}" Foreground="{ThemeResource AppSubtleTextBrush}" />
+            <Border Grid.Column="0" Style="{StaticResource CardStyle}" Background="{StaticResource NavBackgroundBrush}">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Profile Settings" Style="{StaticResource CardTitleStyle}" Margin="4,0,0,6" />
+                    <Border
+                        Padding="12"
+                        Margin="0,0,0,8"
+                        CornerRadius="12"
+                        Background="{StaticResource CardBackgroundBrush}"
+                        BorderBrush="{StaticResource BorderDefaultBrush}"
+                        BorderThickness="1">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Border Width="34" Height="34" CornerRadius="17" Background="{StaticResource AccentPrimaryBrush}">
+                                <TextBlock Text="JD" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold" />
+                            </Border>
+                            <StackPanel>
+                                <TextBlock Text="{Binding SessionEmailDisplay}" FontWeight="SemiBold" />
+                                <TextBlock Text="Enterprise Tier" Style="{StaticResource CaptionStyle}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                    <Border Padding="12,10" Background="{StaticResource NavItemSelectedBrush}" CornerRadius="10">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <FontIcon Glyph="&#xE713;" />
+                            <TextBlock Text="Security &amp; Authentication" Style="{StaticResource BodyStyle}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Padding="12,10">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <FontIcon Glyph="&#xE77B;" />
+                            <TextBlock Text="Profile" Style="{StaticResource CaptionStyle}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Padding="12,10">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <FontIcon Glyph="&#xE706;" />
+                            <TextBlock Text="Appearance" Style="{StaticResource CaptionStyle}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Padding="12,10">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <FontIcon Glyph="&#xE7F4;" />
+                            <TextBlock Text="Notifications" Style="{StaticResource CaptionStyle}" />
+                        </StackPanel>
+                    </Border>
+                    <Button Margin="0,12,0,0" Style="{StaticResource PrimaryButtonStyle}" Content="+ New Part" />
                 </StackPanel>
             </Border>
 
-            <Border Style="{ThemeResource AppCardBorderStyle}">
-                <StackPanel Spacing="12">
-                    <TextBlock Text="App lock" Style="{ThemeResource AppSectionTextStyle}" />
+            <StackPanel Grid.Column="1" Spacing="16" MaxWidth="960">
+                <StackPanel Spacing="4">
+                        <TextBlock Text="Settings / Security" Style="{StaticResource CaptionStyle}" Foreground="{StaticResource TextSecondaryBrush}" />
+                        <TextBlock Text="Profile Settings" Style="{StaticResource PageTitleStyle}" />
                     <TextBlock
-                        TextWrapping="Wrap"
-                        Foreground="{ThemeResource AppSubtleTextBrush}"
-                        Text="Set a 6-digit passcode for opening this app on this device." />
-                    <TextBlock Text="{Binding PasscodeStatusText}" Foreground="{ThemeResource AppSubtleTextBrush}" />
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <Button Content="{Binding PasscodePrimaryActionText}" Click="OnOpenAppLockEditorClick" />
-                    </StackPanel>
+                            Text="Manage personal information, security, and interface preferences."
+                        Foreground="{StaticResource TextSecondaryBrush}"
+                        TextWrapping="WrapWholeWords" />
+                </StackPanel>
 
-                    <Border
-                        Padding="12"
-                        Background="{ThemeResource AppSurfaceBrush}"
-                        BorderBrush="{ThemeResource AppBorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="8"
-                        Visibility="{Binding ShowAppLockEditor, Converter={StaticResource BoolToVisibilityConverter}}">
-                        <StackPanel Spacing="10">
-                            <StackPanel Visibility="{Binding ShowPasscodeCurrentField, Converter={StaticResource BoolToVisibilityConverter}}">
-                                <TextBlock Text="Current passcode" />
-                                <PasswordBox
-                                    x:Name="PasscodeCurrentBox"
-                                    MaxLength="6"
-                                    PasswordRevealMode="Hidden"
-                                    PasswordChanged="OnPasscodeFieldChanged" />
+                <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*" />
+                        <ColumnDefinition Width="1.35*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" Style="{StaticResource ElevatedCardStyle}" Padding="20">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="Change Password" Style="{StaticResource CardTitleStyle}" />
+
+                            <TextBlock Text="CURRENT PASSWORD" Style="{StaticResource CaptionStyle}" Foreground="{StaticResource TextSecondaryBrush}" />
+                            <TextBox
+                                PlaceholderText="Enter current password"
+                                Text="{Binding ChangeCurrentPassword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBlock Text="NEW PASSWORD" Style="{StaticResource CaptionStyle}" Foreground="{StaticResource TextSecondaryBrush}" />
+                            <TextBox
+                                PlaceholderText="Enter new password"
+                                Text="{Binding ChangeNewPassword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <StackPanel Spacing="6">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="SECURITY STRENGTH" Style="{StaticResource CaptionStyle}" Foreground="{StaticResource TextSecondaryBrush}" />
+                                    <TextBlock Grid.Column="1" Text="FAIR" Style="{StaticResource CaptionStyle}" Foreground="{StaticResource WarningBrush}" />
+                                </Grid>
+                                <Grid ColumnSpacing="6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0" Height="3" CornerRadius="3" Background="{StaticResource DangerBrush}" />
+                                    <Border Grid.Column="1" Height="3" CornerRadius="3" Background="{StaticResource WarningBrush}" />
+                                    <Border Grid.Column="2" Height="3" CornerRadius="3" Background="{StaticResource BorderDefaultBrush}" />
+                                </Grid>
                             </StackPanel>
-                            <TextBlock Text="New passcode (6 digits)" />
-                            <PasswordBox
-                                x:Name="PasscodeNewBox"
-                                MaxLength="6"
-                                PasswordRevealMode="Hidden"
-                                PasswordChanged="OnPasscodeFieldChanged" />
-                            <TextBlock Text="Confirm new passcode" />
-                            <PasswordBox
-                                x:Name="PasscodeConfirmBox"
-                                MaxLength="6"
-                                PasswordRevealMode="Hidden"
-                                PasswordChanged="OnPasscodeFieldChanged" />
-                            <StackPanel Visibility="{Binding ShowPasscodeRemoveTotpField, Converter={StaticResource BoolToVisibilityConverter}}">
-                                <TextBlock Text="Authenticator code (required to remove passcode while 2FA is enabled)" TextWrapping="Wrap" Foreground="{ThemeResource AppSubtleTextBrush}" />
-                                <TextBox Text="{Binding PasscodeRemoveTotpCode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="6" />
-                            </StackPanel>
-                            <TextBlock Text="{Binding PasscodeMessage}" Foreground="{ThemeResource AppSubtleTextBrush}" TextWrapping="Wrap" />
-                            <StackPanel Orientation="Horizontal" Spacing="10">
-                                <Button Content="{Binding PasscodePrimaryActionText}" Click="OnSavePasscodeClick" />
+
+                            <TextBlock Text="CONFIRM PASSWORD" Style="{StaticResource CaptionStyle}" Foreground="{StaticResource TextSecondaryBrush}" />
+                            <TextBox
+                                PlaceholderText="Repeat new password"
+                                Text="{Binding ChangeConfirmPassword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    Text="Last changed 30 days ago"
+                                    Foreground="{StaticResource TextSecondaryBrush}" />
                                 <Button
-                                    Content="Remove passcode"
-                                    Click="OnRemovePasscodeClick"
-                                    Visibility="{Binding ShowPasscodeRemoveAction, Converter={StaticResource BoolToVisibilityConverter}}" />
-                                <Button Content="Cancel" Click="OnCloseAppLockEditorClick" />
-                            </StackPanel>
+                                    Grid.Column="1"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Content="Save password"
+                                    Command="{Binding ChangePasswordCommand}" />
+                            </Grid>
+                            <TextBlock Text="{Binding ChangePasswordMessage}" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="WrapWholeWords" />
                         </StackPanel>
                     </Border>
-                </StackPanel>
-            </Border>
 
-            <Border Style="{ThemeResource AppCardBorderStyle}">
-                <StackPanel Spacing="12">
-                    <TextBlock Text="Two-factor authentication (2FA)" Style="{ThemeResource AppSectionTextStyle}" />
-                    <TextBlock
-                        TextWrapping="Wrap"
-                        Foreground="{ThemeResource AppSubtleTextBrush}"
-                        Text="Use an authenticator app (6-digit codes) for extra security and recovery." />
-                    <TextBlock Text="{Binding TwoFactorStatusDetail}" Foreground="{ThemeResource AppSubtleTextBrush}" />
-                    <Button Content="{Binding TwoFactorPrimaryActionText}" Click="OnOpenTwoFactorEditorClick" HorizontalAlignment="Left" />
+                    <StackPanel Grid.Column="1" Spacing="16">
+                        <Border Style="{StaticResource ElevatedCardStyle}" Padding="16">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="ARCHITECTURAL RULES" Style="{StaticResource CaptionStyle}" Foreground="{StaticResource AccentPrimaryBrush}" />
+                                <TextBlock
+                                    Text="To ensure industrial-grade security, your password must adhere to the following PartFinder precision standards."
+                                    Foreground="{StaticResource TextSecondaryBrush}"
+                                    TextWrapping="WrapWholeWords" />
 
-                    <Border
-                        Padding="12"
-                        Background="{ThemeResource AppSurfaceBrush}"
-                        BorderBrush="{ThemeResource AppBorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="8"
-                        Visibility="{Binding ShowTwoFactorEditor, Converter={StaticResource BoolToVisibilityConverter}}">
-                        <StackPanel Spacing="10">
-                            <StackPanel Spacing="10" Visibility="{Binding ShowTwoFactorOffPanel, Converter={StaticResource BoolToVisibilityConverter}}">
-                                <Button Content="Enable 2FA" Command="{Binding StartTwoFactorSetupCommand}" HorizontalAlignment="Left" />
-                            </StackPanel>
-
-                            <StackPanel Spacing="10" Visibility="{Binding ShowTwoFactorSetupPanel, Converter={StaticResource BoolToVisibilityConverter}}">
-                                <TextBlock Text="Scan with your authenticator app" Style="{ThemeResource AppSectionTextStyle}" />
-                                <Border
-                                    HorizontalAlignment="Left"
-                                    Padding="8"
-                                    Background="{ThemeResource AppSurfaceBrush}"
-                                    BorderBrush="{ThemeResource AppBorderBrush}"
-                                    BorderThickness="1"
-                                    CornerRadius="8">
-                                    <Image Width="220" Height="220" Source="{Binding TwoFactorQrImage, Mode=OneWay}" />
+                                <Border Style="{StaticResource CardStyle}" Padding="12">
+                                    <StackPanel Orientation="Horizontal" Spacing="10">
+                                        <TextBlock Text="✔" Foreground="{StaticResource SuccessBrush}" />
+                                        <TextBlock Text="Minimum 8 characters long" />
+                                    </StackPanel>
                                 </Border>
-                                <TextBlock Text="Or enter this setup key manually" Foreground="{ThemeResource AppSubtleTextBrush}" />
-                                <TextBox Text="{Binding TwoFactorSecretDisplay, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" />
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Button Content="Copy setup key" Click="OnCopyTwoFactorKeyClick" HorizontalAlignment="Left" />
-                                    <TextBlock
-                                        VerticalAlignment="Center"
-                                        Foreground="{ThemeResource AppSubtleTextBrush}"
-                                        Text="Copied"
-                                        Visibility="{Binding ShowTwoFactorKeyCopied, Converter={StaticResource BoolToVisibilityConverter}}" />
-                                </StackPanel>
-                                <TextBlock Text="Enter 6-digit code from app" />
-                                <TextBox Text="{Binding TwoFactorConfirmCode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="6" />
+                                <Border Style="{StaticResource CardStyle}" Padding="12">
+                                    <StackPanel Orientation="Horizontal" Spacing="10">
+                                        <TextBlock Text="✔" Foreground="{StaticResource SuccessBrush}" />
+                                        <TextBlock Text="At least one uppercase letter" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Style="{StaticResource CardStyle}" Padding="12">
+                                    <StackPanel Orientation="Horizontal" Spacing="10">
+                                        <TextBlock Text="✔" Foreground="{StaticResource SuccessBrush}" />
+                                        <TextBlock Text="At least one numerical digit" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Style="{StaticResource CardStyle}" Padding="12">
+                                    <StackPanel Orientation="Horizontal" Spacing="10">
+                                        <TextBlock Text="✖" Foreground="{StaticResource DangerBrush}" />
+                                        <TextBlock Text="Includes a special character (@$%+?)" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource ElevatedCardStyle}" Padding="16">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Architect's Tip" Style="{StaticResource CardTitleStyle}" />
+                                <TextBlock
+                                    Text="Use a unique phrase or sequence of words that is easy for you to remember but hard to predict."
+                                    Foreground="{StaticResource TextSecondaryBrush}"
+                                    TextWrapping="WrapWholeWords" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource ElevatedCardStyle}" Padding="16">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="Two-Factor Authentication" Style="{StaticResource CardTitleStyle}" />
+                                <TextBlock Text="{Binding TwoFactorStatusDetail}" Foreground="{StaticResource TextSecondaryBrush}" />
                                 <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <Button Content="Confirm and enable" Command="{Binding ConfirmTwoFactorSetupCommand}" />
-                                    <Button Content="Cancel setup" Command="{Binding CancelTwoFactorSetupCommand}" />
+                                    <Button Style="{StaticResource OutlinedButtonStyle}" Content="Enable 2FA" Command="{Binding StartTwoFactorSetupCommand}" />
+                                    <Button Style="{StaticResource OutlinedButtonStyle}" Content="Disable 2FA" Click="OnDisableTwoFactorClick" />
                                 </StackPanel>
+                                <TextBox
+                                    MaxLength="6"
+                                    PlaceholderText="Authenticator code to disable 2FA"
+                                    Text="{Binding TwoFactorDisableCode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Text="{Binding TwoFactorMessage}" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="WrapWholeWords" />
                             </StackPanel>
+                        </Border>
 
-                            <StackPanel Spacing="10" Visibility="{Binding ShowTwoFactorEnabledPanel, Converter={StaticResource BoolToVisibilityConverter}}">
-                                <TextBlock Text="Enter current authenticator code to disable 2FA" />
-                                <TextBox Text="{Binding TwoFactorDisableCode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="6" />
+                        <Border Style="{StaticResource ElevatedCardStyle}" Padding="16">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Profile" Style="{StaticResource CardTitleStyle}" />
+                                <TextBlock
+                                    Text="Set display name shown in the top-right profile menu."
+                                    Foreground="{StaticResource TextSecondaryBrush}"
+                                    TextWrapping="WrapWholeWords" />
+                                <TextBox
+                                    MaxLength="80"
+                                    PlaceholderText="Display name"
+                                    Text="{Binding ProfileName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <Button Content="Disable 2FA" Click="OnDisableTwoFactorClick" />
-                                    <Button Content="Enable account recovery" Command="{Binding SyncServerTotpCommand}" />
+                                    <Button Style="{StaticResource PrimaryButtonStyle}" Content="Save profile" Command="{Binding SaveProfileCommand}" />
+                                    <Button Style="{StaticResource OutlinedButtonStyle}" Content="Use email instead" Click="OnUseEmailProfileClick" />
                                 </StackPanel>
-                                <TextBlock Text="Verify current authenticator code" Margin="0,8,0,0" />
-                                <TextBox Text="{Binding TwoFactorVerifyCode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="6" />
-                                <Button Content="Verify code" Command="{Binding VerifyTwoFactorCodeCommand}" HorizontalAlignment="Left" />
+                                <TextBlock Text="{Binding ProfileMessage}" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="WrapWholeWords" />
                             </StackPanel>
-                            <TextBlock Text="{Binding TwoFactorMessage}" Foreground="{ThemeResource AppSubtleTextBrush}" TextWrapping="Wrap" />
-                            <Button Content="Close" Click="OnCloseTwoFactorEditorClick" HorizontalAlignment="Left" />
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-            </Border>
+                        </Border>
 
-            <Border Style="{ThemeResource AppCardBorderStyle}">
-                <StackPanel Spacing="12">
-                    <TextBlock Text="Server account" Style="{ThemeResource AppSectionTextStyle}" />
-                    <TextBlock
-                        TextWrapping="Wrap"
-                        Foreground="{ThemeResource AppSubtleTextBrush}"
-                        Text="Sign in to your backend admin account to manage server password and recovery." />
-                    <TextBlock Text="{Binding AdminSessionStatusText}" Foreground="{ThemeResource AppSubtleTextBrush}" />
-                    <Button Content="{Binding ServerAccountPrimaryActionText}" Click="OnOpenServerAccountEditorClick" HorizontalAlignment="Left" />
+                        <Border Style="{StaticResource ElevatedCardStyle}" Padding="16">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="App Lock" Style="{StaticResource CardTitleStyle}" />
+                                <TextBlock Text="{Binding PasscodeStatusText}" Foreground="{StaticResource TextSecondaryBrush}" />
+                                <Button
+                                    Style="{StaticResource OutlinedButtonStyle}"
+                                    Content="{Binding PasscodePrimaryActionText}"
+                                    Click="OnOpenAppLockEditorClick"
+                                    HorizontalAlignment="Left" />
 
-                    <Border
-                        Padding="12"
-                        Background="{ThemeResource AppSurfaceBrush}"
-                        BorderBrush="{ThemeResource AppBorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="8"
-                        Visibility="{Binding ShowServerAccountEditor, Converter={StaticResource BoolToVisibilityConverter}}">
-                        <StackPanel Spacing="10">
-                            <StackPanel Spacing="10" Visibility="{Binding ShowServerLoginPanel, Converter={StaticResource BoolToVisibilityConverter}}">
-                                <TextBlock Text="Email" />
-                                <TextBox Text="{Binding LoginEmail, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                <TextBlock Text="Password" />
-                                <PasswordBox x:Name="LoginPasswordBox" PasswordChanged="OnLoginPasswordChanged" />
-                                <Button Content="Sign in" Command="{Binding LoginCommand}" HorizontalAlignment="Left" />
-                                <TextBlock Text="{Binding LoginMessage}" Foreground="{ThemeResource AppSubtleTextBrush}" TextWrapping="Wrap" />
+                                <Border
+                                    Padding="12"
+                                    Background="{StaticResource ElevatedCardBackgroundBrush}"
+                                    BorderBrush="{StaticResource BorderDefaultBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Visibility="{Binding ShowAppLockEditor, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <StackPanel Spacing="10">
+                                        <StackPanel Visibility="{Binding ShowPasscodeCurrentField, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <TextBlock Text="Current passcode" />
+                                            <PasswordBox
+                                                x:Name="PasscodeCurrentBox"
+                                                MaxLength="6"
+                                                PasswordRevealMode="Hidden"
+                                                PasswordChanged="OnPasscodeFieldChanged" />
+                                        </StackPanel>
+                                        <TextBlock Text="New passcode (6 digits)" />
+                                        <PasswordBox
+                                            x:Name="PasscodeNewBox"
+                                            MaxLength="6"
+                                            PasswordRevealMode="Hidden"
+                                            PasswordChanged="OnPasscodeFieldChanged" />
+                                        <TextBlock Text="Confirm new passcode" />
+                                        <PasswordBox
+                                            x:Name="PasscodeConfirmBox"
+                                            MaxLength="6"
+                                            PasswordRevealMode="Hidden"
+                                            PasswordChanged="OnPasscodeFieldChanged" />
+                                        <StackPanel Visibility="{Binding ShowPasscodeRemoveTotpField, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <TextBlock Text="Authenticator code (required to remove passcode while 2FA is enabled)" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" />
+                                            <TextBox Text="{Binding PasscodeRemoveTotpCode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="6" />
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding PasscodeMessage}" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="WrapWholeWords" />
+                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                            <Button Style="{StaticResource PrimaryButtonStyle}" Content="{Binding PasscodePrimaryActionText}" Click="OnSavePasscodeClick" />
+                                            <Button
+                                                Style="{StaticResource OutlinedButtonStyle}"
+                                                Content="Remove passcode"
+                                                Click="OnRemovePasscodeClick"
+                                                Visibility="{Binding ShowPasscodeRemoveAction, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                            <Button Style="{StaticResource OutlinedButtonStyle}" Content="Cancel" Click="OnCloseAppLockEditorClick" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
                             </StackPanel>
+                        </Border>
 
-                            <StackPanel Spacing="10" Visibility="{Binding ShowServerManagePanel, Converter={StaticResource BoolToVisibilityConverter}}">
-                                <Button Content="Sign out" Click="OnSignOutClick" HorizontalAlignment="Left" />
-                                <TextBlock Text="Current password" Margin="0,8,0,0" />
-                                <PasswordBox x:Name="ChangeCurrentBox" PasswordChanged="OnChangePasswordChanged" />
-                                <TextBlock Text="New password" />
-                                <PasswordBox x:Name="ChangeNewBox" PasswordChanged="OnChangePasswordChanged" />
-                                <TextBlock Text="Confirm new password" />
-                                <PasswordBox x:Name="ChangeConfirmBox" PasswordChanged="OnChangePasswordChanged" />
-                                <Button Content="Change password" Command="{Binding ChangePasswordCommand}" HorizontalAlignment="Left" />
-                                <TextBlock Text="{Binding ChangePasswordMessage}" Foreground="{ThemeResource AppSubtleTextBrush}" TextWrapping="Wrap" />
+                        <Border Style="{StaticResource ElevatedCardStyle}" Padding="16">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="Recovery" Style="{StaticResource CardTitleStyle}" />
+                                <Expander Header="Recover app passcode (with authenticator)">
+                                    <StackPanel Spacing="8" Margin="0,10,0,0">
+                                        <TextBlock Text="Authenticator code" />
+                                        <TextBox Text="{Binding ResetPasscodeTotp, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="6" />
+                                        <TextBlock Text="New passcode" />
+                                        <TextBox Text="{Binding ResetPasscodeNew, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="6" />
+                                        <TextBlock Text="Confirm new passcode" />
+                                        <TextBox Text="{Binding ResetPasscodeConfirm, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="6" />
+                                        <Button Style="{StaticResource OutlinedButtonStyle}" Content="Reset passcode" Command="{Binding ResetPasscodeWithTwoFactorCommand}" HorizontalAlignment="Left" />
+                                        <TextBlock Text="{Binding PasscodeRecoveryMessage}" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="WrapWholeWords" />
+                                    </StackPanel>
+                                </Expander>
                             </StackPanel>
+                        </Border>
 
-                            <Button Content="Close" Click="OnCloseServerAccountEditorClick" HorizontalAlignment="Left" />
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-            </Border>
-
-            <Border Style="{ThemeResource AppCardBorderStyle}">
-                <StackPanel Spacing="12">
-                    <TextBlock Text="Need help recovering access?" Style="{ThemeResource AppSectionTextStyle}" />
-                    <TextBlock Text="Only use these options if you forgot passcode or server password." Foreground="{ThemeResource AppSubtleTextBrush}" />
-                    <Expander Header="Recover app passcode (with authenticator)">
-                        <StackPanel Spacing="8" Margin="0,10,0,0">
-                            <TextBlock Text="Authenticator code" />
-                            <TextBox Text="{Binding ResetPasscodeTotp, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="6" />
-                            <TextBlock Text="New passcode" />
-                            <TextBox Text="{Binding ResetPasscodeNew, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="6" />
-                            <TextBlock Text="Confirm new passcode" />
-                            <TextBox Text="{Binding ResetPasscodeConfirm, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="6" />
-                            <Button Content="Reset passcode" Command="{Binding ResetPasscodeWithTwoFactorCommand}" HorizontalAlignment="Left" />
-                            <TextBlock Text="{Binding PasscodeRecoveryMessage}" Foreground="{ThemeResource AppSubtleTextBrush}" TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Expander>
-                    <Expander Header="Recover server password (with authenticator)">
-                        <StackPanel Spacing="8" Margin="0,10,0,0">
-                            <TextBlock Text="Admin email" />
-                            <TextBox Text="{Binding ResetPasswordRecoveryEmail, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                            <TextBlock Text="Authenticator code" />
-                            <TextBox Text="{Binding ResetPasswordRecoveryTotp, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="6" />
-                            <TextBlock Text="New password" />
-                            <PasswordBox x:Name="RecoveryNewPasswordBox" PasswordChanged="OnRecoveryPasswordChanged" />
-                            <TextBlock Text="Confirm new password" />
-                            <PasswordBox x:Name="RecoveryConfirmPasswordBox" PasswordChanged="OnRecoveryPasswordChanged" />
-                            <Button Content="Reset server password" Command="{Binding ResetPasswordWithTwoFactorCommand}" HorizontalAlignment="Left" />
-                            <TextBlock Text="{Binding PasswordRecoveryMessage}" Foreground="{ThemeResource AppSubtleTextBrush}" TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Expander>
-                </StackPanel>
-            </Border>
-        </StackPanel>
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Style="{StaticResource CardStyle}" Padding="12">
+                                <StackPanel>
+                                    <TextBlock Text="Last Login" Style="{StaticResource CaptionStyle}" />
+                                    <TextBlock Text="2 hours ago" />
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="1" Style="{StaticResource CardStyle}" Padding="12">
+                                <StackPanel>
+                                    <TextBlock Text="Session ID" Style="{StaticResource CaptionStyle}" />
+                                    <TextBlock Text="PF-882" />
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="12">
+                                <StackPanel>
+                                    <TextBlock Text="Parts Managed" Style="{StaticResource CaptionStyle}" />
+                                    <TextBlock Text="1,402" />
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="3" Style="{StaticResource CardStyle}" Padding="12">
+                                <StackPanel>
+                                    <TextBlock Text="Active Status" Style="{StaticResource CaptionStyle}" />
+                                    <TextBlock Text="Online" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Grid>
     </ScrollViewer>
 </Page>

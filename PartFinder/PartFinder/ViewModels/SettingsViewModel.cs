@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using PartFinder.Services;
@@ -13,14 +14,25 @@ public partial class SettingsViewModel : ViewModelBase
 {
     private readonly LocalUserSecurityStore _security;
     private readonly AdminSessionStore _session;
+    private readonly LocalProfileStore _profile;
     private string? _pendingTwoFactorSecret;
 
-    public SettingsViewModel(LocalUserSecurityStore security, AdminSessionStore session)
+    public SettingsViewModel(
+        LocalUserSecurityStore security,
+        AdminSessionStore session,
+        LocalProfileStore profile)
     {
         _security = security;
         _session = session;
+        _profile = profile;
         RefreshAllState();
     }
+
+    [ObservableProperty]
+    private string _profileName = string.Empty;
+
+    [ObservableProperty]
+    private string _profileMessage = string.Empty;
 
     [ObservableProperty]
     private string _passcodeCurrent = string.Empty;
@@ -210,6 +222,7 @@ public partial class SettingsViewModel : ViewModelBase
     {
         _security.Load();
         _session.Load();
+        _profile.Load();
         PasscodeIsConfigured = _security.PasscodeIsSet;
         ShowAppLockEditor = false;
         TwoFactorEnabled = _security.TwoFactorEnabled;
@@ -223,6 +236,7 @@ public partial class SettingsViewModel : ViewModelBase
         AdminSessionActive = _session.HasSession;
         ShowServerAccountEditor = false;
         SessionEmailDisplay = string.IsNullOrWhiteSpace(_session.Email) ? "—" : _session.Email;
+        ProfileName = _profile.DisplayName ?? string.Empty;
         OnPropertyChanged(nameof(IsStartTwoFactorEnabled));
         OnPropertyChanged(nameof(TwoFactorStatusText));
     }
@@ -233,8 +247,27 @@ public partial class SettingsViewModel : ViewModelBase
         RefreshAllState();
         PasscodeMessage = string.Empty;
         TwoFactorMessage = string.Empty;
+        ProfileMessage = string.Empty;
         LoginMessage = string.Empty;
         ChangePasswordMessage = string.Empty;
+    }
+
+    [RelayCommand]
+    private void SaveProfile()
+    {
+        ProfileMessage = string.Empty;
+        var trimmed = ProfileName.Trim();
+        if (trimmed.Length > 80)
+        {
+            ProfileMessage = "Profile name must be 80 characters or fewer.";
+            return;
+        }
+
+        _profile.SaveDisplayName(trimmed);
+        ProfileName = _profile.DisplayName ?? string.Empty;
+        ProfileMessage = string.IsNullOrWhiteSpace(ProfileName)
+            ? "Profile name cleared. Email will be shown."
+            : "Profile name updated.";
     }
 
     [RelayCommand]
@@ -549,11 +582,13 @@ public partial class SettingsViewModel : ViewModelBase
     private void Logout()
     {
         _session.Clear();
+        SetupPaths.ClearAllSetupStateFiles();
         AdminSessionActive = false;
         SessionEmailDisplay = "—";
         LoginMessage = "Signed out.";
         ChangePasswordMessage = string.Empty;
         ShowServerAccountEditor = false;
+        Application.Current.Exit();
     }
 
     [RelayCommand]

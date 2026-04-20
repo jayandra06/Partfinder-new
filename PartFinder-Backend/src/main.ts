@@ -1,7 +1,8 @@
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { NestFactory } from '@nestjs/core';
+import { HttpAdapterHost, NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { MongoConnectivityExceptionFilter } from './common/filters/mongo-connectivity-exception.filter';
 import { AggregatingLogger } from './debug/aggregating-logger';
 import { DebugLogsService } from './debug/debug-logs.service';
 
@@ -20,6 +21,11 @@ async function bootstrap() {
   });
 
   app.setGlobalPrefix('api');
+
+  const httpAdapterHost = app.get(HttpAdapterHost);
+  app.useGlobalFilters(
+    new MongoConnectivityExceptionFilter(httpAdapterHost.httpAdapter),
+  );
 
   app.useGlobalPipes(
     new ValidationPipe({

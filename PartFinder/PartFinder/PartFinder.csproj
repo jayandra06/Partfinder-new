@@ -47,6 +47,11 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="LiveChartsCore.SkiaSharpView.WinUI" Version="2.0.0" />
+    <!--
+      SkiaSharp.Views.WinUI.Native.Projection is only under runtimes/... in the package. WinUI's XAML InputSerializer omits runtimes/
+      paths from ReferenceAssemblies in input.json, which breaks MarkupCompilePass2. Copy into lib\ TFM and reference by HintPath.
+    -->
+    <PackageReference Include="SkiaSharp.NativeAssets.WinUI" Version="3.119.0" GeneratePathProperty="true" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.1721" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260317003" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
@@ -74,4 +79,32 @@
     <PublishTrimmed Condition="'$(Configuration)' == 'Debug'">False</PublishTrimmed>
     <PublishTrimmed Condition="'$(Configuration)' != 'Debug'">True</PublishTrimmed>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="SkiaSharp.Views.WinUI.Native.Projection">
+      <HintPath>$(PkgSkiaSharp_NativeAssets_WinUI)\lib\net8.0-windows10.0.19041\SkiaSharp.Views.WinUI.Native.Projection.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <Target Name="PartFinderStageSkiaNativeProjection" BeforeTargets="ResolveAssemblyReferences">
+    <PropertyGroup Condition="'$(Platform)' == 'x64'">
+      <_SkiaNativeProjSrc>$(PkgSkiaSharp_NativeAssets_WinUI)\runtimes\win-x64\lib\net8.0-windows10.0.19041.0\SkiaSharp.Views.WinUI.Native.Projection.dll</_SkiaNativeProjSrc>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Platform)' == 'x86'">
+      <_SkiaNativeProjSrc>$(PkgSkiaSharp_NativeAssets_WinUI)\runtimes\win-x86\lib\net8.0-windows10.0.19041.0\SkiaSharp.Views.WinUI.Native.Projection.dll</_SkiaNativeProjSrc>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Platform)' == 'ARM64'">
+      <_SkiaNativeProjSrc>$(PkgSkiaSharp_NativeAssets_WinUI)\runtimes\win-arm64\lib\net8.0-windows10.0.19041.0\SkiaSharp.Views.WinUI.Native.Projection.dll</_SkiaNativeProjSrc>
+    </PropertyGroup>
+    <PropertyGroup>
+      <_SkiaNativeProjDst>$(PkgSkiaSharp_NativeAssets_WinUI)\lib\net8.0-windows10.0.19041\SkiaSharp.Views.WinUI.Native.Projection.dll</_SkiaNativeProjDst>
+    </PropertyGroup>
+    <MakeDir Directories="$(PkgSkiaSharp_NativeAssets_WinUI)\lib\net8.0-windows10.0.19041" />
+    <Copy
+      SourceFiles="$(_SkiaNativeProjSrc)"
+      DestinationFiles="$(_SkiaNativeProjDst)"
+      SkipUnchangedFiles="true"
+      Condition="'$(_SkiaNativeProjSrc)' != '' And Exists('$(_SkiaNativeProjSrc)')" />
+  </Target>
 </Project>

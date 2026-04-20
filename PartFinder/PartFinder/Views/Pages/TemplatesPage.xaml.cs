@@ -1,23 +1,58 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
+using PartFinder.Helpers;
 using PartFinder.Models;
+using PartFinder.Services;
 using PartFinder.ViewModels;
+using System.ComponentModel;
+using WinRT.Interop;
+using Windows.Storage.Pickers;
 
 namespace PartFinder.Views.Pages;
 
 public sealed partial class TemplatesPage : Page
 {
+    private readonly BackendApiClient _apiClient = App.Services.GetRequiredService<BackendApiClient>();
+    private TemplatesViewModel? _boundVm;
+
     public TemplatesPage()
     {
         InitializeComponent();
         DataContext = App.Services.GetRequiredService<TemplatesViewModel>();
         Loaded += OnLoaded;
+        DataContextChanged += OnDataContextChanged;
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         await ((TemplatesViewModel)DataContext).LoadAsync();
+        BuildTemplateChipRow();
+    }
+
+    private void OnDataContextChanged(FrameworkElement sender, DataContextChangedEventArgs args)
+    {
+        if (_boundVm is not null)
+        {
+            _boundVm.PropertyChanged -= OnTemplatesVmPropertyChanged;
+            _boundVm = null;
+        }
+
+        if (DataContext is TemplatesViewModel newVm)
+        {
+            _boundVm = newVm;
+            newVm.PropertyChanged += OnTemplatesVmPropertyChanged;
+        }
+    }
+
+    private void OnTemplatesVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(TemplatesViewModel.SelectedTemplate) ||
+            e.PropertyName == nameof(TemplatesViewModel.ShowTemplatePreviewPanel))
+        {
+            BuildTemplateChipRow();
+        }
     }
 
     private void OnRemoveColumnClick(object sender, RoutedEventArgs e)
@@ -30,6 +65,35 @@ public sealed partial class TemplatesPage : Page
         if (DataContext is TemplatesViewModel vm)
         {
             vm.RemoveColumnCommand.Execute(draft);
+        }
+    }
+
+    private void OnInsertDraftColumnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { DataContext: ColumnLabelDraft draft })
+        {
+            return;
+        }
+
+        if (DataContext is TemplatesViewModel vm)
+        {
+            vm.InsertColumnAfterCommand.Execute(draft);
+        }
+    }
+
+    private void OnAffordancePointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (sender is UIElement element)
+        {
+            AffordanceAnimationHelper.Fade(element, show: true, shownOpacity: 1, hiddenOpacity: 0.35);
+        }
+    }
+
+    private void OnAffordancePointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (sender is UIElement element)
+        {
+            AffordanceAnimationHelper.Fade(element, show: false, shownOpacity: 1, hiddenOpacity: 0.35);
         }
     }
 
@@ -322,5 +386,313 @@ public sealed partial class TemplatesPage : Page
         public ComboBox TargetField { get; }
         public ComboBox SourceField { get; }
         public TextBox Literal { get; }
+    }
+
+    private void BuildTemplateChipRow()
+    {
+        TemplateChipRowPanel.Children.Clear();
+        if (DataContext is not TemplatesViewModel vm || vm.SelectedTemplate is null || !vm.ShowTemplatePreviewPanel)
+        {
+            return;
+        }
+
+        var fields = vm.SelectedTemplate.Fields.OrderBy(f => f.DisplayOrder).ToList();
+        AddInsertButton(vm, 0);
+        for (var i = 0; i < fields.Count; i++)
+        {
+            var field = fields[i];
+            var card = new Border
+            {
+                MinWidth = 140,
+                Height = 40,
+                Margin = new Thickness(0, 0, 0, 0),
+                Padding = new Thickness(12, 0, 8, 0),
+                CornerRadius = new CornerRadius(10),
+                BorderThickness = new Thickness(1),
+                BorderBrush = (Brush)Application.Current.Resources["AppBorderBrush"],
+            };
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            row.Children.Add(new TextBlock { Text = field.Label, VerticalAlignment = VerticalAlignment.Center });
+            row.Children.Add(
+                new Border
+                {
+                    Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 230, 241, 251)),
+                    CornerRadius = new CornerRadius(9),
+                    Padding = new Thickness(6, 2, 6, 2),
+                    Child = new TextBlock
+                    {
+                        Text = field.Type.ToString(),
+                        FontSize = 10,
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 24, 95, 165)),
+                    },
+                });
+            row.Children.Add(
+                new Button
+                {
+                    Content = "×",
+                    Padding = new Thickness(6, 0, 6, 0),
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    Tag = i,
+                });
+            ((Button)row.Children[^1]).Click += OnTemplateChipRemoveClick;
+            card.Child = row;
+            TemplateChipRowPanel.Children.Add(card);
+            AddInsertButton(vm, i + 1);
+        }
+    }
+
+    private void AddInsertButton(TemplatesViewModel vm, int insertIndex)
+    {
+        var btn = new Button
+        {
+            Content = "+",
+            Width = 28,
+            Height = 28,
+            Margin = new Thickness(8, 6, 8, 6),
+            Tag = insertIndex,
+            Opacity = 0.35,
+        };
+        btn.PointerEntered += (_, _) => AffordanceAnimationHelper.Fade(btn, show: true, shownOpacity: 1, hiddenOpacity: 0.35);
+        btn.PointerExited += (_, _) => AffordanceAnimationHelper.Fade(btn, show: false, shownOpacity: 1, hiddenOpacity: 0.35);
+        btn.Click += async (_, _) =>
+        {
+            if (XamlRoot is null)
+            {
+                return;
+            }
+
+            var input = new TextBox { PlaceholderText = "Column name" };
+            var dialog = new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                Title = "Add column",
+                Content = input,
+                PrimaryButtonText = "Add",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Primary,
+            };
+            var result = await dialog.ShowAsync();
+            if (result != ContentDialogResult.Primary || btn.Tag is not int idx)
+            {
+                return;
+            }
+
+            await vm.InsertColumnIntoSelectedTemplateAsync(idx, input.Text).ConfigureAwait(true);
+            BuildTemplateChipRow();
+        };
+        TemplateChipRowPanel.Children.Add(btn);
+    }
+
+    private async void OnTemplateChipRemoveClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: int index } || DataContext is not TemplatesViewModel vm)
+        {
+            return;
+        }
+
+        await vm.RemoveColumnFromSelectedTemplateAsync(index).ConfigureAwait(true);
+        BuildTemplateChipRow();
+    }
+
+    private async void OnImportCsvClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not TemplatesViewModel vm || vm.SelectedTemplate is null || XamlRoot is null || App.MainAppWindow is null)
+        {
+            return;
+        }
+        SetImportStatus(null);
+
+        var picker = new FileOpenPicker();
+        picker.FileTypeFilter.Add(".csv");
+        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainAppWindow));
+        var file = await picker.PickSingleFileAsync();
+        if (file is null)
+        {
+            return;
+        }
+
+        var headers = await ReadCsvHeadersAsync(file.Path).ConfigureAwait(true);
+        if (headers.Count == 0)
+        {
+            await ShowSimpleDialogAsync("Could not detect CSV headers.", XamlRoot).ConfigureAwait(true);
+            return;
+        }
+
+        var headerMap = await ShowHeaderMappingDialogAsync(vm.SelectedTemplate, headers).ConfigureAwait(true);
+        if (headerMap is null)
+        {
+            return;
+        }
+
+        var (ok, error, jobId) = await _apiClient
+            .StartTemplateImportAsync(vm.SelectedTemplate.Id, file.Path, headerMap)
+            .ConfigureAwait(true);
+        if (!ok || string.IsNullOrWhiteSpace(jobId))
+        {
+            SetImportStatus("Import failed to start.", error ?? "Unknown startup error.", isActive: false);
+            await ShowSimpleDialogAsync(error ?? "Failed to start import.", XamlRoot).ConfigureAwait(true);
+            return;
+        }
+
+        SetImportStatus("Import started...", $"Job: {jobId}", isActive: true);
+        var status = await PollImportStatusAsync(vm.SelectedTemplate.Id).ConfigureAwait(true);
+        if (status is null)
+        {
+            SetImportStatus("Import status unavailable.", "The server did not return a final status in time.", isActive: false);
+            await ShowSimpleDialogAsync("Import started but status could not be read.", XamlRoot).ConfigureAwait(true);
+            return;
+        }
+
+        var summary = $"Status: {status.Status}\nProcessed: {status.ProcessedRows}/{status.TotalRows}\nFailed: {status.FailedRows}";
+        if (status.Errors.Count > 0)
+        {
+            summary += $"\nErrors:\n- {string.Join("\n- ", status.Errors)}";
+        }
+
+        var finalHeadline = string.Equals(status.Status, "completed", StringComparison.OrdinalIgnoreCase)
+            ? "Import completed."
+            : "Import finished with issues.";
+        SetImportStatus(finalHeadline, $"Processed {status.ProcessedRows}/{status.TotalRows}, failed {status.FailedRows}.", isActive: false);
+        await ShowSimpleDialogAsync(summary, XamlRoot).ConfigureAwait(true);
+    }
+
+    private static async Task<List<string>> ReadCsvHeadersAsync(string path)
+    {
+        string? firstLine;
+        using (var reader = new StreamReader(path))
+        {
+            firstLine = await reader.ReadLineAsync().ConfigureAwait(true);
+        }
+
+        firstLine ??= string.Empty;
+        if (string.IsNullOrWhiteSpace(firstLine))
+        {
+            return [];
+        }
+
+        return firstLine
+            .Split(',', StringSplitOptions.TrimEntries)
+            .Where(h => !string.IsNullOrWhiteSpace(h))
+            .ToList();
+    }
+
+    private async Task<Dictionary<string, string>?> ShowHeaderMappingDialogAsync(
+        PartTemplateDefinition selectedTemplate,
+        IReadOnlyList<string> headers)
+    {
+        if (XamlRoot is null)
+        {
+            return null;
+        }
+
+        var templateFields = selectedTemplate.Fields.OrderBy(f => f.DisplayOrder).ToList();
+        var rows = new List<(string Header, ComboBox Combo)>();
+        var panel = new StackPanel { Spacing = 8 };
+        foreach (var header in headers)
+        {
+            var combo = new ComboBox
+            {
+                Width = 260,
+                ItemsSource = templateFields,
+                DisplayMemberPath = "Label",
+                SelectedValuePath = "Label",
+                PlaceholderText = "Skip this header",
+            };
+
+            var auto = templateFields.FirstOrDefault(
+                f => string.Equals(f.Label, header, StringComparison.OrdinalIgnoreCase));
+            if (auto is not null)
+            {
+                combo.SelectedItem = auto;
+            }
+
+            rows.Add((header, combo));
+            panel.Children.Add(
+                new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Spacing = 10,
+                    Children =
+                    {
+                        new TextBlock { Width = 240, Text = header, VerticalAlignment = VerticalAlignment.Center },
+                        combo,
+                    },
+                });
+        }
+
+        var dialog = new ContentDialog
+        {
+            Title = "Map CSV headers",
+            Content = new ScrollViewer { MaxHeight = 420, Content = panel },
+            PrimaryButtonText = "Import",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = XamlRoot,
+        };
+
+        var result = await dialog.ShowAsync();
+        if (result != ContentDialogResult.Primary)
+        {
+            return null;
+        }
+
+        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var row in rows)
+        {
+            if (row.Combo.SelectedItem is TemplateFieldDefinition field)
+            {
+                map[row.Header] = field.Label;
+            }
+        }
+
+        return map;
+    }
+
+    private async Task<ImportStatusDto?> PollImportStatusAsync(string templateId)
+    {
+        for (var i = 0; i < 60; i++)
+        {
+            await Task.Delay(1000).ConfigureAwait(true);
+            var (ok, _, status) = await _apiClient.GetTemplateImportStatusAsync(templateId).ConfigureAwait(true);
+            if (!ok || status is null)
+            {
+                continue;
+            }
+
+            SetImportStatus(
+                $"Import {status.Status}...",
+                $"Processed {status.ProcessedRows}/{status.TotalRows}, failed {status.FailedRows}.",
+                isActive: true);
+
+            if (string.Equals(status.Status, "completed", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(status.Status, "failed", StringComparison.OrdinalIgnoreCase))
+            {
+                return status;
+            }
+        }
+
+        return null;
+    }
+
+    private void SetImportStatus(string? headline, string? detail = null, bool isActive = false)
+    {
+        if (ImportStatusPanel is null || ImportProgressRing is null || ImportStatusText is null || ImportStatusDetailText is null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(headline))
+        {
+            ImportStatusPanel.Visibility = Visibility.Collapsed;
+            ImportProgressRing.IsActive = false;
+            ImportStatusText.Text = string.Empty;
+            ImportStatusDetailText.Text = string.Empty;
+            return;
+        }
+
+        ImportStatusPanel.Visibility = Visibility.Visible;
+        ImportProgressRing.IsActive = isActive;
+        ImportStatusText.Text = headline;
+        ImportStatusDetailText.Text = detail ?? string.Empty;
     }
 }

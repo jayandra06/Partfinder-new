@@ -25,37 +25,6 @@ public sealed partial class SettingsPage : Page
         vm.PasscodeConfirm = PasscodeConfirmBox.Password;
     }
 
-    private void OnLoginPasswordChanged(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
-    {
-        if (DataContext is SettingsViewModel vm)
-        {
-            vm.LoginPassword = LoginPasswordBox.Password;
-        }
-    }
-
-    private void OnChangePasswordChanged(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
-    {
-        if (DataContext is not SettingsViewModel vm)
-        {
-            return;
-        }
-
-        vm.ChangeCurrentPassword = ChangeCurrentBox.Password;
-        vm.ChangeNewPassword = ChangeNewBox.Password;
-        vm.ChangeConfirmPassword = ChangeConfirmBox.Password;
-    }
-
-    private void OnRecoveryPasswordChanged(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
-    {
-        if (DataContext is not SettingsViewModel vm)
-        {
-            return;
-        }
-
-        vm.ResetPasswordRecoveryNew = RecoveryNewPasswordBox.Password;
-        vm.ResetPasswordRecoveryConfirm = RecoveryConfirmPasswordBox.Password;
-    }
-
     private void OnSavePasscodeClick(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
         if (DataContext is SettingsViewModel vm && vm.SavePasscodeCommand.CanExecute(null))
@@ -81,29 +50,25 @@ public sealed partial class SettingsPage : Page
         }
     }
 
-    private void OnOpenServerAccountEditorClick(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
-    {
-        if (DataContext is SettingsViewModel vm)
-        {
-            vm.ShowServerAccountEditor = true;
-        }
-    }
-
-    private void OnCloseServerAccountEditorClick(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
-    {
-        if (DataContext is SettingsViewModel vm)
-        {
-            vm.ShowServerAccountEditor = false;
-            vm.LoginMessage = string.Empty;
-            vm.ChangePasswordMessage = string.Empty;
-        }
-    }
-
     private void OnOpenTwoFactorEditorClick(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
         if (DataContext is SettingsViewModel vm)
         {
             vm.ShowTwoFactorEditor = true;
+        }
+    }
+
+    private void OnUseEmailProfileClick(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        if (DataContext is not SettingsViewModel vm)
+        {
+            return;
+        }
+
+        vm.ProfileName = string.Empty;
+        if (vm.SaveProfileCommand.CanExecute(null))
+        {
+            vm.SaveProfileCommand.Execute(null);
         }
     }
 
@@ -130,14 +95,6 @@ public sealed partial class SettingsPage : Page
             "Disable 2FA?",
             "This reduces account security and recovery protection. Continue?",
             vm => vm.DisableTwoFactorCommand);
-    }
-
-    private void OnSignOutClick(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
-    {
-        _ = ConfirmAndRunAsync(
-            "Sign out?",
-            "You will need to sign in again to manage server account settings.",
-            vm => vm.LogoutCommand);
     }
 
     private async Task ConfirmAndRunAsync(

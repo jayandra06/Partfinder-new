@@ -10,7 +10,8 @@ public sealed record LicenseVerifyResponse(
     string? Reason,
     string? Message,
     string? OrganizationName,
-    string? OrgCode);
+    string? OrgCode,
+    string? MaintenanceUntil = null);
 
 public static class LicenseApiClient
 {
@@ -91,11 +92,12 @@ public static class LicenseApiClient
         if (string.IsNullOrWhiteSpace(json))
         {
             return response.IsSuccessStatusCode
-                ? new LicenseVerifyResponse(false, "EMPTY_RESPONSE", "Empty response from license server.", null, null)
+                ? new LicenseVerifyResponse(false, "EMPTY_RESPONSE", "Empty response from license server.", null, null, null)
                 : new LicenseVerifyResponse(
                     false,
                     "HTTP_ERROR",
                     $"License server returned {(int)response.StatusCode} with an empty body.",
+                    null,
                     null,
                     null);
         }
@@ -108,12 +110,14 @@ public static class LicenseApiClient
             if (!response.IsSuccessStatusCode)
             {
                 var err = TryReadApiErrorMessage(root);
+                var maintUntilErr = ReadString(root, "maintenanceUntil");
                 return new LicenseVerifyResponse(
                     false,
                     "HTTP_ERROR",
                     err ?? $"License server error ({(int)response.StatusCode}).",
                     null,
-                    null);
+                    null,
+                    maintUntilErr);
             }
 
             var valid = root.TryGetProperty("valid", out var v) && v.ValueKind == JsonValueKind.True;
@@ -121,12 +125,13 @@ public static class LicenseApiClient
             var message = ReadString(root, "message");
             var orgName = ReadString(root, "organizationName");
             var code = ReadString(root, "orgCode");
+            var maintenanceUntil = ReadString(root, "maintenanceUntil");
 
-            return new LicenseVerifyResponse(valid, reason, message, orgName, code);
+            return new LicenseVerifyResponse(valid, reason, message, orgName, code, maintenanceUntil);
         }
         catch (JsonException)
         {
-            return new LicenseVerifyResponse(false, "INVALID_RESPONSE", "Invalid response from license server.", null, null);
+            return new LicenseVerifyResponse(false, "INVALID_RESPONSE", "Invalid response from license server.", null, null, null);
         }
     }
 

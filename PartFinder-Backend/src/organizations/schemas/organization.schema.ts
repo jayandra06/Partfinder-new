@@ -44,6 +44,18 @@ export class Organization {
 
   @Prop({ default: 100000 })
   maxParts: number;
+
+  @Prop({ type: String, default: null })
+  firstAdminEmail: string | null;
+
+  @Prop({ type: String, default: null })
+  firstAdminEmailNormalized: string | null;
+
+  @Prop({ type: String, default: null })
+  firstAdminTemporaryPasswordHash: string | null;
+
+  @Prop({ type: Date, default: null })
+  firstAdminInviteSentAtUtc: Date | null;
 }
 
 export const OrganizationSchema = SchemaFactory.createForClass(Organization);

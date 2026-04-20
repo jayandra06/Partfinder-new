@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import { createMongooseConnectionWithSrvDnsRetry } from '../mongo-srv-dns-retry';
 
 export const ORG_ADMIN_COLLECTION = 'org_admin_users';
+export const ORG_APP_USERS_COLLECTION = 'org_app_users';
 const SETUP_META_COLLECTION = '_partfinder_setup';
 
 function requireDb(conn: Connection) {
@@ -50,11 +51,17 @@ export class TenantMongoService implements OnModuleDestroy {
     return requireDb(conn).collection(ORG_ADMIN_COLLECTION);
   }
 
+  orgAppUsersCollection(conn: Connection) {
+    return requireDb(conn).collection(ORG_APP_USERS_COLLECTION);
+  }
+
   async initializeTenantDatabase(uri: string): Promise<void> {
     const c = await this.getConnection(uri);
     const db = requireDb(c);
     const admins = this.orgAdminCollection(c);
+    const appUsers = this.orgAppUsersCollection(c);
     await admins.createIndex({ email: 1 }, { unique: true });
+    await appUsers.createIndex({ emailNormalized: 1 }, { unique: true });
     const meta = db.collection<{ _id: string; bootstrappedAt?: Date; version?: number }>(
       SETUP_META_COLLECTION,
     );
@@ -107,5 +114,35 @@ export class TenantMongoService implements OnModuleDestroy {
       }
       throw e;
     }
+  }
+
+  async findOrgAppUserByEmail(uri: string, email: string) {
+    const c = await this.getConnection(uri);
+    const coll = this.orgAppUsersCollection(c);
+    return coll.findOne({ emailNormalized: email.trim().toLowerCase() });
+  }
+
+  async findOrgAdminByEmail(uri: string, email: string) {
+    const c = await this.getConnection(uri);
+    const coll = this.orgAdminCollection(c);
+    return coll.findOne({ email: email.trim().toLowerCase() });
+  }
+
+  async insertOrgAppUser(
+    uri: string,
+    user: {
+      name: string;
+      email: string;
+      emailNormalized: string;
+      role: string;
+      partsAllTemplates: boolean;
+      allowedTemplateIds: string[];
+      temporaryPasswordHash: string;
+      invitedAtUtc: Date;
+    },
+  ) {
+    const c = await this.getConnection(uri);
+    const coll = this.orgAppUsersCollection(c);
+    await coll.insertOne(user);
   }
 }

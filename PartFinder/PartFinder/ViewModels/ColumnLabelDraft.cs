@@ -22,6 +22,10 @@ public sealed class ColumnLabelDraft : ObservableObject
         {
             if (SetProperty(ref _fieldType, value))
             {
+                if (_fieldType != TemplateFieldType.RecordLink)
+                {
+                    LinkedTemplateId = null;
+                }
                 OnPropertyChanged(nameof(IsLinkColumn));
             }
         }

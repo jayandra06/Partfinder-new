@@ -17,7 +17,7 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="viewModels:KpiItem">
-                        <components:KpiCard Label="{x:Bind Label}" Value="{x:Bind Value}" Delta="{x:Bind Delta}" />
+                        <components:KpiCard Label="{x:Bind Label}" Value="{x:Bind Value, Mode=OneWay}" Delta="{x:Bind Delta, Mode=OneWay}" />
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>

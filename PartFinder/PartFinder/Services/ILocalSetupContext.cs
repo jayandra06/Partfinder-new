@@ -10,4 +10,7 @@ public interface ILocalSetupContext
     bool TryGetTenantMongoUri(out string? uri);
 
     string? OrgCode { get; }
+
+    /// <summary>Org admin email from setup-state.json (merged; last non-empty wins).</summary>
+    string? AdminEmail { get; }
 }

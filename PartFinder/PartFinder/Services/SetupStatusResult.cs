@@ -15,4 +15,9 @@ public sealed class SetupStatusResult
     public string? OrgDatabaseUri { get; set; }
     public string? OrgAdminStatus { get; set; }
     public bool? ServerReachedDatabase { get; set; }
+    public bool? RequiresInviteLogin { get; set; }
+    public string? FirstAdminEmail { get; set; }
+
+    /** When reason is PLATFORM_MAINTENANCE, ISO end of maintenance window. */
+    public string? MaintenanceUntil { get; set; }
 }

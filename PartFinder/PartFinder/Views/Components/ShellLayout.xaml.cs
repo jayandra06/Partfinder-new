@@ -19,6 +19,20 @@ public sealed partial class ShellLayout : UserControl
         ApplySidebarWidth();
     }
 
+    private void OnAccountSettingsMenuClicked(object sender, RoutedEventArgs e)
+    {
+        var navigation = App.Services.GetRequiredService<INavigationService>();
+        _ = navigation.Navigate(AppPage.Settings);
+    }
+
+    private void OnProfileLogoutMenuClicked(object sender, RoutedEventArgs e)
+    {
+        var adminSession = App.Services.GetRequiredService<AdminSessionStore>();
+        adminSession.Clear();
+        SetupPaths.ClearAllSetupStateFiles();
+        Application.Current.Exit();
+    }
+
     private void OnShellVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(ShellViewModel.IsSidebarCollapsed))

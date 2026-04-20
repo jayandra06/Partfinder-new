@@ -4,12 +4,16 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
+import * as nodemailer from 'nodemailer';
+import { pbkdf2Sync, randomBytes, timingSafeEqual } from 'crypto';
 import { Model, Types } from 'mongoose';
 import { BanLicenseDto } from './dto/ban-license.dto';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { computeValidity } from './org.constants';
+import { PlatformSettingsService } from '../platform/platform-settings.service';
 import { Organization, OrganizationDocument } from './schemas/organization.schema';
 
 @Injectable()
@@ -17,6 +21,8 @@ export class OrganizationsService {
   constructor(
     @InjectModel(Organization.name)
     private readonly orgModel: Model<OrganizationDocument>,
+    private readonly platformSettings: PlatformSettingsService,
+    private readonly config: ConfigService,
   ) {}
 
   async findAll() {
@@ -57,6 +63,17 @@ export class OrganizationsService {
    * subscription must be Active and validity (UTC end-of-day) must not be past.
    */
   async verifyLicense(rawCode: string) {
+    const maintenance = await this.platformSettings.getEffectiveMaintenance();
+    if (maintenance.active && maintenance.maintenanceUntil) {
+      return {
+        valid: false as const,
+        reason: 'PLATFORM_MAINTENANCE' as const,
+        message:
+          'PartFinder is under scheduled maintenance. The Windows app will be available again when the maintenance window ends.',
+        maintenanceUntil: maintenance.maintenanceUntil,
+      };
+    }
+
     const orgCode = rawCode.trim();
     if (!/^\d{6}$/.test(orgCode)) {
       return {
@@ -149,6 +166,8 @@ export class OrganizationsService {
     if (existing) {
       throw new ConflictException('Organization code already exists');
     }
+    const firstAdminEmail = dto.firstAdminEmail.trim().toLowerCase();
+    const temporaryPassword = this.generateTemporaryPassword();
     const created = new this.orgModel({
       orgCode: dto.orgCode,
       name: dto.name.trim(),
@@ -161,8 +180,18 @@ export class OrganizationsService {
       orgDatabaseUri: null,
       maxUsers: 50,
       maxParts: 100000,
+      firstAdminEmail,
+      firstAdminEmailNormalized: firstAdminEmail,
+      firstAdminTemporaryPasswordHash:
+        this.hashTemporaryPassword(temporaryPassword),
+      firstAdminInviteSentAtUtc: new Date(),
     });
     await created.save();
+    await this.sendFirstAdminInviteEmail({
+      email: firstAdminEmail,
+      orgCode: dto.orgCode.trim(),
+      temporaryPassword,
+    });
     return this.findAll();
   }
 
@@ -236,6 +265,106 @@ export class OrganizationsService {
 
   async findByOrgCode(orgCode: string): Promise<OrganizationDocument | null> {
     return this.orgModel.findOne({ orgCode: orgCode.trim() }).exec();
+  }
+
+  private generateTemporaryPassword() {
+    const alphabet =
+      'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
+    const bytes = randomBytes(12);
+    let out = '';
+    for (let i = 0; i < bytes.length; i++) {
+      out += alphabet[bytes[i] % alphabet.length];
+    }
+    return out;
+  }
+
+  private hashTemporaryPassword(password: string) {
+    const iterations = 120000;
+    const salt = randomBytes(16);
+    const hash = pbkdf2Sync(password, salt, iterations, 32, 'sha256');
+    return `pbkdf2$${iterations}$${salt.toString('base64')}$${hash.toString('base64')}`;
+  }
+
+  verifyTemporaryPassword(password: string, stored: string) {
+    if (!stored) {
+      return false;
+    }
+    const parts = stored.split('$');
+    if (parts.length !== 4 || parts[0] !== 'pbkdf2') {
+      return false;
+    }
+    const iterations = Number(parts[1]);
+    if (!Number.isFinite(iterations) || iterations < 10000) {
+      return false;
+    }
+    try {
+      const salt = Buffer.from(parts[2], 'base64');
+      const expected = Buffer.from(parts[3], 'base64');
+      const actual = pbkdf2Sync(password, salt, iterations, expected.length, 'sha256');
+      return timingSafeEqual(actual, expected);
+    } catch {
+      return false;
+    }
+  }
+
+  private async sendFirstAdminInviteEmail(input: {
+    email: string;
+    orgCode: string;
+    temporaryPassword: string;
+  }) {
+    const host = this.config.get<string>('INVITE_SMTP_HOST')?.trim() ?? '';
+    const port = Number(this.config.get<string>('INVITE_SMTP_PORT') ?? '587');
+    const user = this.config.get<string>('INVITE_SMTP_USER')?.trim() ?? '';
+    const pass = this.config.get<string>('INVITE_SMTP_PASS') ?? '';
+    const from = this.config.get<string>('INVITE_FROM_EMAIL')?.trim() ?? '';
+    const fromName =
+      this.config.get<string>('INVITE_FROM_NAME')?.trim() || 'PartFinder';
+    const downloadLink =
+      this.config.get<string>('INVITE_DOWNLOAD_LINK')?.trim() ||
+      'https://shipspan.com';
+    const secure =
+      (this.config.get<string>('INVITE_SMTP_SECURE') ?? 'false')
+        .toLowerCase()
+        .trim() === 'true';
+
+    if (!host || !user || !pass || !from) {
+      return;
+    }
+
+    const transporter = nodemailer.createTransport({
+      host,
+      port: Number.isFinite(port) && port > 0 ? port : 587,
+      secure,
+      auth: { user, pass },
+    });
+
+    const subject = `PartFinder admin invite - Org ${input.orgCode}`;
+    const text = [
+      'You have been invited as the first organization admin for PartFinder.',
+      '',
+      `Organization Code: ${input.orgCode}`,
+      `Email: ${input.email}`,
+      `Temporary Password: ${input.temporaryPassword}`,
+      '',
+      'Windows app download:',
+      downloadLink,
+      '',
+      'Setup flow:',
+      '1) Enter org code, invited email, and temporary password in Step 1.',
+      '2) Configure database in Step 2.',
+      '3) Change temporary password in Step 3.',
+    ].join('\n');
+
+    try {
+      await transporter.sendMail({
+        from: `"${fromName}" <${from}>`,
+        to: input.email,
+        subject,
+        text,
+      });
+    } catch {
+      // Keep organization creation successful even if SMTP fails.
+    }
   }
 
   async remove(id: string) {

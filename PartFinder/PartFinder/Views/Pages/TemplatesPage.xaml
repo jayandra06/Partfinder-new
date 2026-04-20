@@ -6,152 +6,291 @@
     xmlns:components="using:PartFinder.Views.Components"
     xmlns:converters="using:PartFinder.Converters"
     xmlns:viewmodels="using:PartFinder.ViewModels"
+    xmlns:models="using:PartFinder.Models"
     >
     <Page.Resources>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
         <converters:InvertedBoolToVisibilityConverter x:Key="InvertedBoolToVisibilityConverter" />
     </Page.Resources>
-    <Grid Padding="20" ColumnSpacing="14">
+    <Grid Padding="20" ColumnSpacing="16" Background="{StaticResource PageBackgroundBrush}">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="280" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <Border Style="{ThemeResource AppCardBorderStyle}">
-            <StackPanel Padding="4" Spacing="12">
-                <TextBlock Style="{ThemeResource AppSectionTextStyle}" Text="Templates" />
-                <TextBlock
-                    Foreground="{ThemeResource AppSubtleTextBrush}"
-                    Text="Create templates for your business data here. You can define your own column names and types, then use those templates in Data Entry and Parts."
-                    TextWrapping="WrapWholeWords"
-                    Visibility="{Binding CanAddAnotherTemplate, Converter={StaticResource InvertedBoolToVisibilityConverter}}" />
-                <ListView
-                    MinHeight="120"
-                    DisplayMemberPath="Name"
-                    ItemsSource="{Binding Templates}"
-                    SelectedItem="{Binding SelectedTemplate, Mode=TwoWay}"
-                    Visibility="{Binding ShowTemplateList, Converter={StaticResource BoolToVisibilityConverter}}" />
+        <Border Style="{StaticResource ElevatedCardStyle}" Padding="14" Background="{StaticResource NavBackgroundBrush}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Border
+                    Grid.Row="0"
+                    Margin="0,0,0,10"
+                    Padding="10"
+                    CornerRadius="10"
+                    Background="{StaticResource CardBackgroundBrush}"
+                    BorderBrush="{StaticResource BorderDefaultBrush}"
+                    BorderThickness="1">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Width="28" Height="28" CornerRadius="8" Background="{StaticResource AccentPrimaryBrush}">
+                            <FontIcon Glyph="&#xE8A5;" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel>
+                            <TextBlock Text="Template Manager" FontWeight="SemiBold" />
+                            <TextBlock Text="v2.4.0 High-density" Style="{StaticResource CaptionStyle}" Foreground="{StaticResource TextTertiaryBrush}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
                 <Button
+                    Grid.Row="0"
+                    Margin="0,58,0,0"
+                    Style="{StaticResource OutlinedButtonStyle}"
                     Command="{Binding StartNewCustomTemplateCommand}"
-                    Content="New template"
+                    Content="+  New Template"
                     IsEnabled="{Binding CanAddAnotherTemplate}"
                     Visibility="{Binding CanAddAnotherTemplate, Converter={StaticResource BoolToVisibilityConverter}}" />
-            </StackPanel>
+                <Button
+                    Grid.Row="1"
+                    Margin="0,8,0,12"
+                    Style="{StaticResource GhostButtonStyle}"
+                    Content="Import CSV"
+                    Click="OnImportCsvClick"
+                    IsEnabled="{Binding ShowTemplatePreviewPanel}" />
+
+                <StackPanel Grid.Row="2" Spacing="8" Margin="0,0,0,12">
+                    <TextBlock Text="MY TEMPLATES" Style="{StaticResource CaptionStyle}" Foreground="{StaticResource TextSecondaryBrush}" />
+                    <Border Style="{StaticResource CardStyle}" Padding="4">
+                        <ListView
+                            MinHeight="180"
+                            DisplayMemberPath="Name"
+                            ItemsSource="{Binding Templates}"
+                            SelectedItem="{Binding SelectedTemplate, Mode=TwoWay}"
+                            Visibility="{Binding ShowTemplateList, Converter={StaticResource BoolToVisibilityConverter}}" />
+                    </Border>
+                    <StackPanel Margin="0,10,0,0" Spacing="4">
+                        <TextBlock Text="Support" Style="{StaticResource CaptionStyle}" Foreground="{StaticResource TextTertiaryBrush}" />
+                        <TextBlock Text="Logs" Style="{StaticResource CaptionStyle}" Foreground="{StaticResource TextTertiaryBrush}" />
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel x:Name="ImportStatusPanel" Grid.Row="3" Spacing="6" Visibility="Collapsed" Margin="0,12,0,0">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ProgressRing x:Name="ImportProgressRing" Width="16" Height="16" IsActive="True" />
+                        <TextBlock x:Name="ImportStatusText" Text="Import in progress..." />
+                    </StackPanel>
+                    <TextBlock
+                        x:Name="ImportStatusDetailText"
+                        Foreground="{StaticResource TextSecondaryBrush}"
+                        TextWrapping="WrapWholeWords" />
+                </StackPanel>
+            </Grid>
         </Border>
 
         <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
             <StackPanel Spacing="16">
                 <TextBlock
-                    Foreground="IndianRed"
+                    Foreground="{StaticResource DangerBrush}"
                     Text="No tenant database is configured. Complete setup with a valid organization and database connection."
                     TextWrapping="WrapWholeWords"
                     Visibility="{Binding ShowDbMissingBanner, Converter={StaticResource BoolToVisibilityConverter}}" />
 
-                <StackPanel Visibility="{Binding ShowTemplateEditor, Converter={StaticResource BoolToVisibilityConverter}}">
-                    <components:PageHeader
-                        Subtitle="Name each column like a spreadsheet header. Turn on Link column only when this column should point at a row in another template (optional)."
-                        Title="{Binding EditorHeaderTitle}" />
-                    <TextBlock Margin="0,8,0,0" Text="Template name" />
-                    <TextBox IsReadOnly="{Binding IsTemplateNameReadOnly}" Text="{Binding NewTemplateName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                    <TextBlock
-                        Foreground="{ThemeResource AppSubtleTextBrush}"
-                        Text="When this is your first template, the name stays Master Data."
-                        TextWrapping="WrapWholeWords"
-                        Visibility="{Binding IsTemplateNameReadOnly, Converter={StaticResource BoolToVisibilityConverter}}" />
-                    <TextBlock Margin="0,12,0,0" Text="Columns" />
-                    <ItemsControl ItemsSource="{Binding ColumnLabels}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <StackPanel Padding="0,8" Spacing="8">
-                                    <Grid ColumnSpacing="8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox
-                                            Grid.Column="0"
-                                            PlaceholderText="Column name"
-                                            Text="{Binding Label, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                        <Button
-                                            Grid.Column="1"
-                                            VerticalAlignment="Center"
-                                            Click="OnRemoveColumnClick"
-                                            Content="Remove" />
-                                    </Grid>
-                                    <ToggleSwitch
-                                        OffContent="Plain text / number column"
-                                        OnContent="Link column (reference another template)"
-                                        IsOn="{Binding IsLinkColumn, Mode=TwoWay}" />
-                                    <ComboBox
-                                        MinWidth="240"
-                                        HorizontalAlignment="Left"
-                                        DisplayMemberPath="Name"
-                                        ItemsSource="{Binding DataContext.LinkTargetCandidates, ElementName=TemplatesPageRoot}"
-                                        PlaceholderText="Choose template to link to…"
-                                        SelectedValue="{Binding LinkedTemplateId, Mode=TwoWay}"
-                                        SelectedValuePath="Id"
-                                        Visibility="{Binding IsLinkColumn, Converter={StaticResource BoolToVisibilityConverter}}" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                    <Button
-                        Margin="0,8,0,0"
-                        HorizontalAlignment="Left"
-                        Command="{Binding AddColumnCommand}"
-                        Content="Add another label" />
-                    <StackPanel Margin="0,16,0,0" Orientation="Horizontal" Spacing="8">
-                        <Button Command="{Binding SaveTemplateCommand}" Content="Save template" />
-                        <Button Command="{Binding CancelCreateCommand}" Content="Cancel" />
-                    </StackPanel>
-                    <TextBlock
-                        Margin="0,8,0,0"
-                        Foreground="IndianRed"
-                        Text="{Binding FormError}"
-                        TextWrapping="WrapWholeWords" />
-                </StackPanel>
+                <Grid Visibility="{Binding ShowTemplateEditor, Converter={StaticResource BoolToVisibilityConverter}}" ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.2*" />
+                        <ColumnDefinition Width="1*" />
+                    </Grid.ColumnDefinitions>
 
-                <StackPanel Visibility="{Binding ShowTemplatePreviewPanel, Converter={StaticResource BoolToVisibilityConverter}}">
-                    <components:PageHeader Subtitle="Fields for the selected template" Title="Template preview" />
-                    <Button
-                        Margin="0,0,0,12"
-                        HorizontalAlignment="Left"
-                        Command="{Binding BeginEditSelectedTemplateCommand}"
-                        Content="Edit columns"
-                        IsEnabled="{Binding CanEditSelectedTemplate}" />
-                    <components:DynamicFormRenderer Fields="{Binding SelectedTemplate.Fields, Mode=OneWay}" />
-
-                    <StackPanel
-                        Margin="0,20,0,0"
-                        Spacing="10"
-                        Visibility="{Binding ShowContextActionsEditor, Converter={StaticResource BoolToVisibilityConverter}}">
-                        <TextBlock Style="{ThemeResource AppSectionTextStyle}" Text="Cell actions (data grid)" />
-                        <TextBlock
-                            Foreground="{ThemeResource AppSubtleTextBrush}"
-                            Text="Add right-click menu entries for this template. Each action opens rows from another template when all match rules succeed (AND). Use a literal to force a fixed value (e.g. filter Location = London)."
-                            TextWrapping="WrapWholeWords" />
-                        <ListView
-                            MaxHeight="220"
-                            SelectedItem="{Binding SelectedContextAction, Mode=TwoWay}"
-                            ItemsSource="{Binding ContextActionRows}">
-                            <ListView.ItemTemplate>
-                                <DataTemplate x:DataType="viewmodels:ContextActionListRow">
-                                    <StackPanel Padding="4">
-                                        <TextBlock FontWeight="SemiBold" Text="{x:Bind Action.MenuLabel}" />
-                                        <TextBlock
-                                            FontSize="12"
-                                            Foreground="{ThemeResource AppSubtleTextBrush}"
-                                            Text="{x:Bind SummaryLine}"
-                                            TextWrapping="WrapWholeWords" />
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ListView.ItemTemplate>
-                        </ListView>
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button Click="OnAddContextActionClick" Content="Add cell action…" />
-                            <Button Command="{Binding DeleteContextActionCommand}" Content="Remove selected" />
+                    <Border Grid.Column="0" Style="{StaticResource ElevatedCardStyle}" Padding="16">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="New Template Setup" Style="{StaticResource PageTitleStyle}" />
+                            <TextBox
+                                Style="{StaticResource StandardTextBoxStyle}"
+                                IsReadOnly="{Binding IsTemplateNameReadOnly}"
+                                PlaceholderText="Template name"
+                                Text="{Binding NewTemplateName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock Text="Schema Columns" Style="{StaticResource CaptionStyle}" Foreground="{StaticResource TextSecondaryBrush}" />
+                            <ItemsControl ItemsSource="{Binding ColumnLabels}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,2,0,2" ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1.7*" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox
+                                                Grid.Column="0"
+                                                PlaceholderText="Column name"
+                                                Text="{Binding Label, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                            <ComboBox
+                                                Grid.Column="1"
+                                                DisplayMemberPath="Label"
+                                                ItemsSource="{Binding DataContext.FieldTypeOptions, ElementName=TemplatesPageRoot}"
+                                                SelectedValue="{Binding FieldType, Mode=TwoWay}"
+                                                SelectedValuePath="Value" />
+                                            <Button
+                                                Grid.Column="2"
+                                                Style="{StaticResource GhostButtonStyle}"
+                                                Click="OnRemoveColumnClick"
+                                                Content="×" />
+                                            <Button
+                                                Grid.Column="3"
+                                                Style="{StaticResource OutlinedButtonStyle}"
+                                                Width="28"
+                                                Height="28"
+                                                Click="OnInsertDraftColumnClick"
+                                                Opacity="0.35"
+                                                PointerEntered="OnAffordancePointerEntered"
+                                                PointerExited="OnAffordancePointerExited"
+                                                Content="+"
+                                                ToolTipService.ToolTip="Insert a column below this one" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Button
+                                Style="{StaticResource OutlinedButtonStyle}"
+                                HorizontalAlignment="Left"
+                                Command="{Binding AddColumnCommand}"
+                                Content="+ Add column" />
+                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
+                                <Button Style="{StaticResource GhostButtonStyle}" Command="{Binding CancelCreateCommand}" Content="Cancel" />
+                                <Button Style="{StaticResource PrimaryButtonStyle}" Command="{Binding SaveTemplateCommand}" Content="Save Template" />
+                            </StackPanel>
+                            <TextBlock
+                                Foreground="{StaticResource DangerBrush}"
+                                Text="{Binding FormError}"
+                                TextWrapping="WrapWholeWords" />
                         </StackPanel>
+                    </Border>
+
+                    <StackPanel Grid.Column="1" Spacing="12">
+                        <Border Style="{StaticResource ElevatedCardStyle}" Padding="16">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Live Preview" Style="{StaticResource CardTitleStyle}" />
+                                <TextBlock Text="Real-time schema visualization for industrial parts." Foreground="{StaticResource TextSecondaryBrush}" />
+                                <Border Style="{StaticResource CardStyle}" Padding="10">
+                                    <StackPanel Spacing="8">
+                                        <ItemsControl ItemsSource="{Binding ColumnLabels}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Padding="8" CornerRadius="6" Background="{StaticResource GridHeaderBackgroundBrush}" Margin="0,0,0,6">
+                                                        <TextBlock Text="{Binding Label}" Foreground="{StaticResource TextSecondaryBrush}" />
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <TextBlock
+                                            Text="Schema Drafting Mode"
+                                            FontWeight="SemiBold"
+                                            Foreground="{StaticResource TextSecondaryBrush}" />
+                                        <TextBlock
+                                            Text="Fields defined on the left auto-populate this preview."
+                                            Style="{StaticResource CaptionStyle}"
+                                            Foreground="{StaticResource TextTertiaryBrush}" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource ElevatedCardStyle}" Padding="16">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Optimization Tip" Style="{StaticResource CardTitleStyle}" />
+                                <TextBlock
+                                    Text="Use Number type for quantities to support trend analysis in dashboard."
+                                    Foreground="{StaticResource TextSecondaryBrush}"
+                                    TextWrapping="WrapWholeWords" />
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
+                </Grid>
+
+                <StackPanel Visibility="{Binding ShowTemplatePreviewPanel, Converter={StaticResource BoolToVisibilityConverter}}" Spacing="14">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding SelectedTemplate.Name}" Style="{StaticResource PageTitleStyle}" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                            <Button Style="{StaticResource GhostButtonStyle}" Content="Discard" />
+                            <Button Style="{StaticResource PrimaryButtonStyle}" Command="{Binding BeginEditSelectedTemplateCommand}" Content="Save Changes" />
+                        </StackPanel>
+                    </Grid>
+
+                    <TextBlock Text="Schema columns" Style="{StaticResource CaptionStyle}" Foreground="{StaticResource TextSecondaryBrush}" />
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto" HorizontalScrollMode="Enabled">
+                        <StackPanel
+                            x:Name="TemplateChipRowPanel"
+                            Orientation="Horizontal"
+                            Spacing="0" />
+                    </ScrollViewer>
+
+                    <Border Style="{StaticResource ElevatedCardStyle}" Padding="14" Visibility="{Binding ShowContextActionsEditor, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Cell Actions" Style="{StaticResource CardTitleStyle}" />
+                            <TextBlock
+                                Foreground="{StaticResource TextSecondaryBrush}"
+                                Text="Define right-click actions for specific cell types in Explorer."
+                                TextWrapping="WrapWholeWords" />
+                            <ListView
+                                MaxHeight="220"
+                                SelectedItem="{Binding SelectedContextAction, Mode=TwoWay}"
+                                ItemsSource="{Binding ContextActionRows}">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate x:DataType="viewmodels:ContextActionListRow">
+                                        <Border Style="{StaticResource CardStyle}" Padding="10" Margin="0,0,0,8">
+                                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                                <TextBlock Text="{x:Bind Action.MenuLabel}" FontWeight="SemiBold" />
+                                                <TextBlock Text="→" Foreground="{StaticResource TextSecondaryBrush}" />
+                                                <TextBlock Text="{x:Bind TargetTemplateName}" Foreground="{StaticResource TextSecondaryBrush}" />
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Style="{StaticResource OutlinedButtonStyle}" Click="OnAddContextActionClick" Content="+ Add cell action" />
+                                <Button Style="{StaticResource GhostButtonStyle}" Command="{Binding DeleteContextActionCommand}" Content="Remove selected" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Grid ColumnSpacing="14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="2*" />
+                            <ColumnDefinition Width="1*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Style="{StaticResource ElevatedCardStyle}" Padding="14">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Template Usage Analysis" Style="{StaticResource CardTitleStyle}" />
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0" Style="{StaticResource CardStyle}" Padding="10"><StackPanel><TextBlock Text="ACTIVE PROJECTS" Style="{StaticResource CaptionStyle}" /><TextBlock Text="14" Style="{StaticResource CardTitleStyle}" /></StackPanel></Border>
+                                    <Border Grid.Column="1" Style="{StaticResource CardStyle}" Padding="10"><StackPanel><TextBlock Text="DATA DENSITY" Style="{StaticResource CaptionStyle}" /><TextBlock Text="82%" Style="{StaticResource CardTitleStyle}" /></StackPanel></Border>
+                                    <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="10"><StackPanel><TextBlock Text="INTEGRITY SCORE" Style="{StaticResource CaptionStyle}" /><TextBlock Text="9.8" Style="{StaticResource CardTitleStyle}" /></StackPanel></Border>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="1" Style="{StaticResource ElevatedCardStyle}" Padding="14">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Help &amp; Guidance" Style="{StaticResource CardTitleStyle}" />
+                                <TextBlock
+                                    Text="Templates define the structural DNA of your parts catalog."
+                                    Foreground="{StaticResource TextSecondaryBrush}"
+                                    TextWrapping="WrapWholeWords" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
                 </StackPanel>
 
                 <StackPanel Visibility="{Binding ShowSelectTemplatePromptPanel, Converter={StaticResource BoolToVisibilityConverter}}">
