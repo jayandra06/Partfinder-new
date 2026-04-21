@@ -20,10 +20,12 @@ public sealed partial class MasterDataPage : Page
 {
     private const double GridCellTextWidth = 160d;
     private const double GridCellHorizontalPadding = 10d;
+    private const double FilterColumnWidth = GridCellTextWidth + (GridCellHorizontalPadding * 2);
     private const double ActionPanelWidth = 320;
     private MasterDataViewModel? _viewModel;
     private readonly IExcelTemplateService _excelTemplateService;
     private readonly List<ActionResultDisplayItem> _actionResultRows = new();
+    private readonly Dictionary<string, string> _columnFilters = new(StringComparer.OrdinalIgnoreCase);
 
     public MasterDataPage()
     {
@@ -48,6 +50,7 @@ public sealed partial class MasterDataPage : Page
         vm.Columns.CollectionChanged += OnGridStructureChanged;
         vm.PropertyChanged += OnViewModelPropertyChanged;
         await vm.LoadAsync().ConfigureAwait(true);
+        BuildFilterColumns();
         RebuildSpreadsheet();
     }
 
@@ -73,6 +76,7 @@ public sealed partial class MasterDataPage : Page
 
     private void OnGridStructureChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        BuildFilterColumns();
         RebuildSpreadsheet();
     }
 
@@ -277,7 +281,9 @@ public sealed partial class MasterDataPage : Page
             return;
         }
 
-        var visibleRows = _viewModel.GetVisibleRows();
+        var visibleRows = ApplyColumnFilters(_viewModel.GetVisibleRows());
+        FilteredRowsText.Text = $"Showing {visibleRows.Count} rows";
+        LoadedRowsText.Text = $"of {_viewModel.Rows.Count} loaded";
 
         const double minColWidth = GridCellTextWidth + (GridCellHorizontalPadding * 2);
         var colCount = _viewModel.Columns.Count;
@@ -466,6 +472,88 @@ public sealed partial class MasterDataPage : Page
 
         scroll.Content = grid;
         SpreadsheetHost.Content = scroll;
+    }
+
+    private IReadOnlyList<MasterDataRowViewModel> ApplyColumnFilters(IReadOnlyList<MasterDataRowViewModel> sourceRows)
+    {
+        if (_viewModel is null || _columnFilters.Count == 0)
+        {
+            return sourceRows;
+        }
+
+        return sourceRows
+            .Where(
+                row => _columnFilters.All(
+                    f =>
+                    {
+                        var cell = row.Cells.FirstOrDefault(c => string.Equals(c.FieldKey, f.Key, StringComparison.OrdinalIgnoreCase));
+                        var text = cell?.Text ?? string.Empty;
+                        return text.Contains(f.Value, StringComparison.OrdinalIgnoreCase);
+                    }))
+            .ToList();
+    }
+
+    private void BuildFilterColumns()
+    {
+        if (_viewModel is null || ColumnFiltersPanel is null)
+        {
+            return;
+        }
+
+        ColumnFiltersPanel.Children.Clear();
+        foreach (var col in _viewModel.Columns)
+        {
+            var box = new TextBox
+            {
+                Width = FilterColumnWidth,
+                PlaceholderText = col.Label,
+                Tag = col.Key,
+                Style = (Style)Application.Current.Resources["GridFilterTextBoxStyle"],
+            };
+            if (_columnFilters.TryGetValue(col.Key, out var existing))
+            {
+                box.Text = existing;
+            }
+
+            box.TextChanged += OnFilterTextChanged;
+            ColumnFiltersPanel.Children.Add(box);
+        }
+
+        var spacer = new Border
+        {
+            Width = 72,
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            BorderBrush = (Brush)Application.Current.Resources["BorderDefaultBrush"],
+            Background = (Brush)Application.Current.Resources["GridHeaderBackgroundBrush"],
+        };
+        ColumnFiltersPanel.Children.Add(spacer);
+    }
+
+    private void OnFilterTextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (sender is not TextBox box || box.Tag is not string key)
+        {
+            return;
+        }
+
+        var text = box.Text.Trim();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            _columnFilters.Remove(key);
+        }
+        else
+        {
+            _columnFilters[key] = text;
+        }
+
+        RebuildSpreadsheet();
+    }
+
+    private void OnClearAllFiltersClick(object sender, RoutedEventArgs e)
+    {
+        _columnFilters.Clear();
+        BuildFilterColumns();
+        RebuildSpreadsheet();
     }
 
     private async void OnInsertColumnFromHeaderClick(object sender, RoutedEventArgs e)

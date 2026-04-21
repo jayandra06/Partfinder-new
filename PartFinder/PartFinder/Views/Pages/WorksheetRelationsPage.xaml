@@ -15,7 +15,7 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <components:PageHeader Title="Link Templates" Subtitle="Map match keys from primary template to lookup template display columns." />
+        <components:PageHeader Title="Link Templates" Subtitle="Step 1: pick match keys. Step 2: choose lookup columns to show in linked results." />
 
         <Grid Grid.Row="1" ColumnSpacing="14">
             <Grid.ColumnDefinitions>
@@ -27,6 +27,7 @@
             <Border Style="{StaticResource CardStyle}">
                 <StackPanel Spacing="10">
                     <TextBlock Text="Primary Template" Style="{StaticResource CardTitleStyle}" />
+                    <TextBlock Text="Choose columns that uniquely identify a row." Foreground="{StaticResource TextSecondaryBrush}" Style="{StaticResource CaptionStyle}" />
                     <ComboBox
                         Style="{StaticResource StandardTextBoxStyle}"
                         DisplayMemberPath="Name"
@@ -55,6 +56,7 @@
             <Border Grid.Column="2" Style="{StaticResource CardStyle}">
                 <StackPanel Spacing="10">
                     <TextBlock Text="Lookup Template" Style="{StaticResource CardTitleStyle}" />
+                    <TextBlock Text="Choose fields to display when a row matches." Foreground="{StaticResource TextSecondaryBrush}" Style="{StaticResource CaptionStyle}" />
                     <ComboBox
                         Style="{StaticResource StandardTextBoxStyle}"
                         DisplayMemberPath="Name"

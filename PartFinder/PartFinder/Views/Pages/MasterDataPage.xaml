@@ -97,9 +97,24 @@
                 TextWrapping="Wrap"
                 Visibility="{Binding ShowNoDatabaseHint, Converter={StaticResource BoolToVisibilityConverter}}" />
         </StackPanel>
+        <Border Grid.Row="3" Grid.Column="0" Style="{StaticResource CardStyle}">
+            <StackPanel Spacing="8">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button
+                        Style="{StaticResource OutlinedButtonStyle}"
+                        Content="Clear all filters"
+                        Click="OnClearAllFiltersClick" />
+                    <TextBlock x:Name="FilteredRowsText" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
+                    <TextBlock x:Name="LoadedRowsText" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
+                </StackPanel>
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                    <StackPanel x:Name="ColumnFiltersPanel" Orientation="Horizontal" Spacing="0" />
+                </ScrollViewer>
+            </StackPanel>
+        </Border>
         <ContentControl
             x:Name="SpreadsheetHost"
-            Grid.Row="3"
+            Grid.Row="4"
             Grid.Column="0"
             Margin="0,8,0,0"
             HorizontalContentAlignment="Stretch"

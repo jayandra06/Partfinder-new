@@ -114,51 +114,70 @@
                                 PlaceholderText="Template name"
                                 Text="{Binding NewTemplateName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                             <TextBlock Text="Schema Columns" Style="{StaticResource CaptionStyle}" Foreground="{StaticResource TextSecondaryBrush}" />
-                            <ItemsControl ItemsSource="{Binding ColumnLabels}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid Margin="0,2,0,2" ColumnSpacing="8">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="1.7*" />
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <TextBox
-                                                Grid.Column="0"
-                                                PlaceholderText="Column name"
-                                                Text="{Binding Label, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                            <ComboBox
-                                                Grid.Column="1"
-                                                DisplayMemberPath="Label"
-                                                ItemsSource="{Binding DataContext.FieldTypeOptions, ElementName=TemplatesPageRoot}"
-                                                SelectedValue="{Binding FieldType, Mode=TwoWay}"
-                                                SelectedValuePath="Value" />
-                                            <Button
-                                                Grid.Column="2"
-                                                Style="{StaticResource GhostButtonStyle}"
-                                                Click="OnRemoveColumnClick"
-                                                Content="×" />
-                                            <Button
-                                                Grid.Column="3"
-                                                Style="{StaticResource OutlinedButtonStyle}"
-                                                Width="28"
-                                                Height="28"
-                                                Click="OnInsertDraftColumnClick"
-                                                Opacity="0.35"
-                                                PointerEntered="OnAffordancePointerEntered"
-                                                PointerExited="OnAffordancePointerExited"
-                                                Content="+"
-                                                ToolTipService.ToolTip="Insert a column below this one" />
-                                        </Grid>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                            <Button
-                                Style="{StaticResource OutlinedButtonStyle}"
-                                HorizontalAlignment="Left"
-                                Command="{Binding AddColumnCommand}"
-                                Content="+ Add column" />
+                            <ScrollViewer
+                                HorizontalScrollMode="Enabled"
+                                HorizontalScrollBarVisibility="Auto"
+                                VerticalScrollBarVisibility="Disabled"
+                                VerticalScrollMode="Disabled">
+                                <ItemsControl ItemsSource="{Binding ColumnLabels}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border
+                                                Width="180"
+                                                Height="110"
+                                                Margin="0,0,10,0"
+                                                Style="{StaticResource CardStyle}"
+                                                Padding="10">
+                                                <Grid>
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="*" />
+                                                        <RowDefinition Height="Auto" />
+                                                    </Grid.RowDefinitions>
+                                                    <TextBox
+                                                        Grid.Row="0"
+                                                        PlaceholderText="Column header"
+                                                        Text="{Binding Label, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                    <Grid Grid.Row="1" Margin="0,8,0,0">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <Button
+                                                            Grid.Column="0"
+                                                            Style="{StaticResource GhostButtonStyle}"
+                                                            Width="24"
+                                                            Height="24"
+                                                            Click="OnRemoveColumnClick"
+                                                            Content="×"
+                                                            ToolTipService.ToolTip="Remove header" />
+                                                        <Button
+                                                            Grid.Column="2"
+                                                            Style="{StaticResource OutlinedButtonStyle}"
+                                                            Width="24"
+                                                            Height="24"
+                                                            Click="OnInsertDraftColumnClick"
+                                                            Opacity="0.2"
+                                                            PointerEntered="OnAffordancePointerEntered"
+                                                            PointerExited="OnAffordancePointerExited"
+                                                            Content="+"
+                                                            ToolTipService.ToolTip="Add header after this one" />
+                                                    </Grid>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                            <TextBlock
+                                Text="Headers are created side-by-side in one row. Hover a cell corner to reveal +."
+                                Foreground="{StaticResource TextSecondaryBrush}"
+                                TextWrapping="WrapWholeWords" />
                             <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
                                 <Button Style="{StaticResource GhostButtonStyle}" Command="{Binding CancelCreateCommand}" Content="Cancel" />
                                 <Button Style="{StaticResource PrimaryButtonStyle}" Command="{Binding SaveTemplateCommand}" Content="Save Template" />

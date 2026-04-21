@@ -9,7 +9,7 @@
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
     </Page.Resources>
 
-    <Grid Padding="20" ColumnSpacing="12">
+    <Grid Padding="20" ColumnSpacing="12" Background="{StaticResource PageBackgroundBrush}">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="280" />
@@ -28,17 +28,18 @@
             <StackPanel Spacing="12">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <ComboBox
+                        Style="{StaticResource StandardTextBoxStyle}"
                         Width="320"
                         DisplayMemberPath="Name"
                         ItemsSource="{Binding Templates}"
                         SelectedItem="{Binding SelectedTemplate, Mode=TwoWay}"
                         PlaceholderText="Select template to view" />
-                    <Button Command="{Binding LoadViewDataCommand}" Content="Refresh" />
+                    <Button Style="{StaticResource OutlinedButtonStyle}" Command="{Binding LoadViewDataCommand}" Content="Refresh" />
                 </StackPanel>
 
-                <TextBlock Foreground="IndianRed" Text="{Binding ErrorMessage}" TextWrapping="WrapWholeWords" />
+                <TextBlock Foreground="{StaticResource DangerBrush}" Text="{Binding ErrorMessage}" TextWrapping="WrapWholeWords" />
 
-                <Border Style="{ThemeResource AppCardBorderStyle}">
+                <Border Style="{StaticResource CardStyle}">
                     <Grid>
                         <ListView
                             x:Name="RowsListView"
@@ -101,8 +102,8 @@
             Grid.Column="1"
             PointerEntered="OnDetailsPanelPointerEntered"
             PointerExited="OnDetailsPanelPointerExited"
-            Background="White"
-            BorderBrush="{ThemeResource AppBorderBrush}"
+            Background="{StaticResource ElevatedCardBackgroundBrush}"
+            BorderBrush="{StaticResource BorderDefaultBrush}"
             BorderThickness="1,0,0,0"
             Padding="12"
             Visibility="{Binding IsFlyoutOpen, Converter={StaticResource BoolToVisibilityConverter}}">
@@ -112,8 +113,8 @@
             <ScrollViewer>
                 <StackPanel Spacing="10">
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Stretch">
-                        <TextBlock Text="PART DETAILS" Style="{ThemeResource AppSectionTextStyle}" />
-                        <Button Content="Close" HorizontalAlignment="Right" Command="{Binding CloseFlyoutCommand}" />
+                        <TextBlock Text="PART DETAILS" Style="{StaticResource CardTitleStyle}" />
+                        <Button Style="{StaticResource GhostButtonStyle}" Content="Close" HorizontalAlignment="Right" Command="{Binding CloseFlyoutCommand}" />
                     </StackPanel>
                     <ItemsControl ItemsSource="{Binding HoveredRowPrimaryDetails}">
                         <ItemsControl.ItemTemplate>
@@ -123,12 +124,12 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <TextBlock Text="VENDOR INFORMATION" Style="{ThemeResource AppSectionTextStyle}" Margin="0,8,0,0" />
+                    <TextBlock Text="VENDOR INFORMATION" Style="{StaticResource CardTitleStyle}" Margin="0,8,0,0" />
                     <Border
                         Background="{StaticResource GridHeaderBackgroundBrush}"
                         Padding="10"
                         CornerRadius="8"
-                        BorderBrush="{ThemeResource AppBorderBrush}"
+                        BorderBrush="{StaticResource BorderDefaultBrush}"
                         BorderThickness="1">
                         <ItemsControl ItemsSource="{Binding HoveredRowLinkedDetails}">
                             <ItemsControl.ItemTemplate>
@@ -139,7 +140,7 @@
                         </ItemsControl>
                     </Border>
 
-                    <TextBlock Text="All Relation Status" Style="{ThemeResource AppSectionTextStyle}" Margin="0,8,0,0" />
+                    <TextBlock Text="All Relation Status" Style="{StaticResource CardTitleStyle}" Margin="0,8,0,0" />
                     <ItemsControl ItemsSource="{Binding HoveredRelationSections}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="viewModels:RelationDetailSection">
