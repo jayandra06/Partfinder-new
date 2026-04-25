@@ -10,7 +10,7 @@
     <Page.Resources>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
     </Page.Resources>
-    <ScrollViewer Background="{StaticResource PageBackgroundBrush}">
+    <ScrollViewer x:Name="SettingsScrollViewer" Background="{StaticResource PageBackgroundBrush}">
         <Grid Padding="20" ColumnSpacing="16">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="220" />
@@ -37,30 +37,40 @@
                             </StackPanel>
                         </StackPanel>
                     </Border>
-                    <Border Padding="12,10" Background="{StaticResource NavItemSelectedBrush}" CornerRadius="10">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <FontIcon Glyph="&#xE713;" />
-                            <TextBlock Text="Security &amp; Authentication" Style="{StaticResource BodyStyle}" />
-                        </StackPanel>
-                    </Border>
-                    <Border Padding="12,10">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <FontIcon Glyph="&#xE77B;" />
-                            <TextBlock Text="Profile" Style="{StaticResource CaptionStyle}" />
-                        </StackPanel>
-                    </Border>
-                    <Border Padding="12,10">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <FontIcon Glyph="&#xE706;" />
-                            <TextBlock Text="Appearance" Style="{StaticResource CaptionStyle}" />
-                        </StackPanel>
-                    </Border>
-                    <Border Padding="12,10">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <FontIcon Glyph="&#xE7F4;" />
-                            <TextBlock Text="Notifications" Style="{StaticResource CaptionStyle}" />
-                        </StackPanel>
-                    </Border>
+                    <Button Padding="12,10" HorizontalContentAlignment="Stretch" Click="OnSecurityNavClick">
+                        <Button.Content>
+                            <Border Padding="10,8" Background="{StaticResource NavItemSelectedBrush}" CornerRadius="10">
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <FontIcon Glyph="&#xE713;" />
+                                    <TextBlock Text="Security &amp; Authentication" Style="{StaticResource BodyStyle}" />
+                                </StackPanel>
+                            </Border>
+                        </Button.Content>
+                    </Button>
+                    <Button Padding="12,10" HorizontalContentAlignment="Stretch" Click="OnProfileNavClick">
+                        <Button.Content>
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <FontIcon Glyph="&#xE77B;" />
+                                <TextBlock Text="Profile" Style="{StaticResource CaptionStyle}" />
+                            </StackPanel>
+                        </Button.Content>
+                    </Button>
+                    <Button Padding="12,10" HorizontalContentAlignment="Stretch" Click="OnAppearanceNavClick">
+                        <Button.Content>
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <FontIcon Glyph="&#xE706;" />
+                                <TextBlock Text="Appearance" Style="{StaticResource CaptionStyle}" />
+                            </StackPanel>
+                        </Button.Content>
+                    </Button>
+                    <Button Padding="12,10" HorizontalContentAlignment="Stretch" Click="OnNotificationsNavClick">
+                        <Button.Content>
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <FontIcon Glyph="&#xE7F4;" />
+                                <TextBlock Text="Notifications" Style="{StaticResource CaptionStyle}" />
+                            </StackPanel>
+                        </Button.Content>
+                    </Button>
                     <Button Margin="0,12,0,0" Style="{StaticResource PrimaryButtonStyle}" Content="+ New Part" />
                 </StackPanel>
             </Border>
@@ -81,7 +91,7 @@
                         <ColumnDefinition Width="1.35*" />
                     </Grid.ColumnDefinitions>
 
-                    <Border Grid.Column="0" Style="{StaticResource ElevatedCardStyle}" Padding="20">
+                    <Border x:Name="SecuritySectionCard" Grid.Column="0" Style="{StaticResource ElevatedCardStyle}" Padding="20">
                         <StackPanel Spacing="14">
                             <TextBlock Text="Change Password" Style="{StaticResource CardTitleStyle}" />
 
@@ -141,7 +151,7 @@
                     </Border>
 
                     <StackPanel Grid.Column="1" Spacing="16">
-                        <Border Style="{StaticResource ElevatedCardStyle}" Padding="16">
+                        <Border x:Name="ProfileSectionCard" Style="{StaticResource ElevatedCardStyle}" Padding="16">
                             <StackPanel Spacing="12">
                                 <TextBlock Text="ARCHITECTURAL RULES" Style="{StaticResource CaptionStyle}" Foreground="{StaticResource AccentPrimaryBrush}" />
                                 <TextBlock
@@ -293,6 +303,34 @@
                                         <TextBlock Text="{Binding PasscodeRecoveryMessage}" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="WrapWholeWords" />
                                     </StackPanel>
                                 </Expander>
+                            </StackPanel>
+                        </Border>
+
+                        <Border x:Name="AppearanceSectionCard" Style="{StaticResource ElevatedCardStyle}" Padding="16">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Appearance" Style="{StaticResource CardTitleStyle}" />
+                                <TextBlock
+                                    Text="Choose application theme behavior."
+                                    Foreground="{StaticResource TextSecondaryBrush}"
+                                    TextWrapping="WrapWholeWords" />
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <Button Style="{StaticResource OutlinedButtonStyle}" Content="System" Click="OnThemeSystemClick" />
+                                    <Button Style="{StaticResource OutlinedButtonStyle}" Content="Light" Click="OnThemeLightClick" />
+                                    <Button Style="{StaticResource OutlinedButtonStyle}" Content="Dark" Click="OnThemeDarkClick" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border x:Name="NotificationsSectionCard" Style="{StaticResource ElevatedCardStyle}" Padding="16">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Notifications" Style="{StaticResource CardTitleStyle}" />
+                                <TextBlock
+                                    Text="Manage local app notification preferences."
+                                    Foreground="{StaticResource TextSecondaryBrush}"
+                                    TextWrapping="WrapWholeWords" />
+                                <ToggleSwitch Header="Security alerts" IsOn="True" />
+                                <ToggleSwitch Header="Product updates" IsOn="False" />
+                                <ToggleSwitch Header="Sync status" IsOn="True" />
                             </StackPanel>
                         </Border>
 

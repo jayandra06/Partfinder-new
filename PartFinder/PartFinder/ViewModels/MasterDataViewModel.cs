@@ -108,8 +108,11 @@ public sealed partial class MasterDataViewModel : ViewModelBase
 
             ShowTemplatePicker = DataTemplates.Count > 1;
 
-            var master = _cachedTemplates.FirstOrDefault(
-                t => string.Equals(t.Name, MongoTemplateSchemaService.MasterDataTemplateName, StringComparison.OrdinalIgnoreCase));
+            var master = _cachedTemplates
+                .Where(t => string.Equals(t.Name, MongoTemplateSchemaService.MasterDataTemplateName, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(t => t.Version)
+                .ThenByDescending(t => t.Fields.Count)
+                .FirstOrDefault();
             var pick = master ?? DataTemplates[0];
 
             _suppressTemplateSelectionChange = true;

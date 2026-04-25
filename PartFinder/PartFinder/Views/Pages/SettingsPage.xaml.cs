@@ -1,5 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using PartFinder.ViewModels;
 using Windows.ApplicationModel.DataTransfer;
 
@@ -141,6 +143,50 @@ public sealed partial class SettingsPage : Page
         Clipboard.SetContent(data);
         vm.TwoFactorMessage = "Setup key copied to clipboard.";
         await vm.ShowTwoFactorKeyCopiedAsync();
+    }
+
+    private void OnSecurityNavClick(object sender, RoutedEventArgs e) => ScrollToSection(SecuritySectionCard);
+
+    private void OnProfileNavClick(object sender, RoutedEventArgs e) => ScrollToSection(ProfileSectionCard);
+
+    private void OnAppearanceNavClick(object sender, RoutedEventArgs e) => ScrollToSection(AppearanceSectionCard);
+
+    private void OnNotificationsNavClick(object sender, RoutedEventArgs e) => ScrollToSection(NotificationsSectionCard);
+
+    private void OnThemeSystemClick(object sender, RoutedEventArgs e)
+    {
+        if (App.MainAppWindow?.Content is FrameworkElement root)
+        {
+            root.RequestedTheme = ElementTheme.Default;
+        }
+    }
+
+    private void OnThemeLightClick(object sender, RoutedEventArgs e)
+    {
+        if (App.MainAppWindow?.Content is FrameworkElement root)
+        {
+            root.RequestedTheme = ElementTheme.Light;
+        }
+    }
+
+    private void OnThemeDarkClick(object sender, RoutedEventArgs e)
+    {
+        if (App.MainAppWindow?.Content is FrameworkElement root)
+        {
+            root.RequestedTheme = ElementTheme.Dark;
+        }
+    }
+
+    private void ScrollToSection(FrameworkElement target)
+    {
+        if (SettingsScrollViewer is null)
+        {
+            return;
+        }
+
+        var transform = target.TransformToVisual((UIElement)SettingsScrollViewer.Content);
+        var position = transform.TransformPoint(new Windows.Foundation.Point(0, 0));
+        SettingsScrollViewer.ChangeView(null, Math.Max(0, position.Y - 8), null, disableAnimation: false);
     }
 
 }

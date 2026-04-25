@@ -63,7 +63,9 @@
                 <ListView x:Name="NavListView" Margin="0,6,0,0"
                     ItemsSource="{Binding NavigationItems}"
                     SelectedItem="{Binding SelectedNavigationItem, Mode=TwoWay}"
-                    SelectionMode="Single">
+                    SelectionMode="Single"
+                    Background="Transparent"
+                    BorderThickness="0">
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="viewModels:NavItemViewModel">
                             <StackPanel
@@ -73,9 +75,14 @@
                                 Spacing="10"
                                 AutomationProperties.Name="{x:Bind Label}"
                                 ToolTipService.ToolTip="{x:Bind Label}">
-                                <FontIcon Glyph="{x:Bind IconGlyph}" />
+                                <FontIcon
+                                    Glyph="{x:Bind IconGlyph}"
+                                    Width="20"
+                                    FontSize="17"
+                                    Foreground="{StaticResource TextPrimaryBrush}" />
                                 <TextBlock
                                     VerticalAlignment="Center"
+                                    Foreground="{StaticResource TextPrimaryBrush}"
                                     Text="{x:Bind Label}"
                                     Visibility="{x:Bind ShowNavLabel, Converter={StaticResource BoolToVisibilityConverter}, Mode=OneWay}" />
                             </StackPanel>
@@ -94,49 +101,21 @@
         <Border Grid.Column="1" Background="{ThemeResource AppSurfaceBrush}" BorderBrush="{ThemeResource AppBorderBrush}" BorderThickness="0,0,0,1">
             <Grid Padding="16,10" ColumnSpacing="16">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <ListView
-                    Width="460"
-                    ItemsSource="{Binding NavigationItems}"
-                    SelectedItem="{Binding SelectedNavigationItem, Mode=TwoWay}"
-                    SelectionMode="Single"
-                    IsTabStop="False"
-                    HorizontalAlignment="Left"
-                    Margin="0,0,8,0">
-                    <ListView.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <ItemsStackPanel Orientation="Horizontal" />
-                        </ItemsPanelTemplate>
-                    </ListView.ItemsPanel>
-                    <ListView.ItemTemplate>
-                        <DataTemplate x:DataType="viewModels:NavItemViewModel">
-                            <Border Padding="10,6" Margin="0,0,8,0" CornerRadius="8">
-                                <TextBlock Text="{x:Bind Label}" FontWeight="SemiBold" />
-                            </Border>
-                        </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
-
-                <AutoSuggestBox
-                    Grid.Column="1"
-                    Width="420"
-                    PlaceholderText="Search templates, parts, reports..."
-                    Text="{Binding SearchText, Mode=TwoWay}" />
-                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                    <Button Padding="10,6" Style="{StaticResource GhostButtonStyle}" ToolTipService.ToolTip="Notifications">
-                        <FontIcon Glyph="&#xE7F4;" />
-                    </Button>
-                    <Button Padding="8,4" Style="{StaticResource GhostButtonStyle}" ToolTipService.ToolTip="Account settings">
-                        <FontIcon Glyph="&#xE713;" />
-                    </Button>
-                    <Button Padding="8,4" ToolTipService.ToolTip="Profile menu">
+                <Grid Grid.Column="1">
+                    <Button
+                        Padding="10,6"
+                        CornerRadius="10"
+                        Background="{StaticResource ElevatedCardBackgroundBrush}"
+                        BorderBrush="{StaticResource BorderDefaultBrush}"
+                        BorderThickness="1"
+                        ToolTipService.ToolTip="Profile menu">
                         <Button.Content>
-                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                <Grid Width="28" Height="28">
+                            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                <Grid Width="30" Height="30">
                                     <Ellipse Fill="{StaticResource AccentPrimaryBrush}" />
                                     <TextBlock
                                         HorizontalAlignment="Center"
@@ -144,7 +123,7 @@
                                         FontWeight="SemiBold"
                                         Text="{Binding CurrentUserInitial}" />
                                 </Grid>
-                                <TextBlock VerticalAlignment="Center" Text="{Binding CurrentUserName}" />
+                                <TextBlock VerticalAlignment="Center" Text="{Binding CurrentUserName}" FontWeight="SemiBold" />
                                 <FontIcon VerticalAlignment="Center" Glyph="&#xE70D;" />
                             </StackPanel>
                         </Button.Content>
@@ -160,7 +139,7 @@
                             </MenuFlyout>
                         </Button.Flyout>
                     </Button>
-                </StackPanel>
+                </Grid>
             </Grid>
         </Border>
 

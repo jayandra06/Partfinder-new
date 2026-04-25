@@ -58,6 +58,15 @@
                     </StackPanel>
                 </Button>
                 <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="10">
+                    <Border
+                        Padding="10,6"
+                        Background="{StaticResource NavItemSelectedBrush}"
+                        BorderBrush="{StaticResource AccentPrimaryBrush}"
+                        BorderThickness="1"
+                        CornerRadius="999"
+                        Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="EDIT MODE" Foreground="{StaticResource TextPrimaryBrush}" Style="{StaticResource CaptionStyle}" />
+                    </Border>
                     <Button
                         Click="OnSaveGridClicked"
                         Style="{StaticResource PrimaryButtonStyle}"

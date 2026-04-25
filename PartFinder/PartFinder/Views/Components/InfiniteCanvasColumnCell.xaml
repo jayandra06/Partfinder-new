@@ -1,0 +1,109 @@
+<UserControl
+    x:Class="PartFinder.Views.Components.InfiniteCanvasColumnCell"
+    x:Name="Self"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+    <Grid
+        x:Name="RootGrid"
+        RightTapped="OnCellRightTapped"
+        PointerEntered="OnRootPointerEntered"
+        PointerExited="OnRootPointerExited">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="28" />
+            <RowDefinition Height="80" />
+        </Grid.RowDefinitions>
+
+        <Border
+            x:Name="HeaderBorder"
+            Grid.Row="0"
+            BorderThickness="1,1,0,1"
+            PointerPressed="OnHeaderPointerPressed"
+            PointerMoved="OnHeaderPointerMoved"
+            PointerReleased="OnHeaderPointerReleased"
+            Tapped="OnHeaderTapped">
+            <Border.Background>
+                <SolidColorBrush x:Name="HeaderBackgroundBrush" Color="{StaticResource GridHeaderBackgroundColor}" />
+            </Border.Background>
+            <Border.BorderBrush>
+                <SolidColorBrush x:Name="CellBorderBrush" Color="{StaticResource BorderDefaultColor}" />
+            </Border.BorderBrush>
+            <TextBlock
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                FontSize="11"
+                FontWeight="SemiBold"
+                Foreground="{StaticResource TextSecondaryBrush}"
+                Text="{Binding HeaderText, ElementName=Self}" />
+        </Border>
+
+        <Border
+            x:Name="ContentBorder"
+            Grid.Row="1"
+            BorderThickness="1,1,0,1"
+            DoubleTapped="OnContentDoubleTapped">
+            <Border.Background>
+                <SolidColorBrush x:Name="ContentBackgroundBrush" Color="{StaticResource CardBackgroundColor}" />
+            </Border.Background>
+            <TextBox
+                x:Name="ContentEditor"
+                Margin="8,8,16,8"
+                BorderThickness="0"
+                DoubleTapped="OnContentDoubleTapped"
+                IsReadOnly="False"
+                LostFocus="OnContentLostFocus"
+                PlaceholderText="Type here"
+                Text="{Binding CellContent, ElementName=Self, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        </Border>
+
+        <Canvas Grid.RowSpan="2" IsHitTestVisible="False">
+            <Border
+                x:Name="PulseRing"
+                Width="30"
+                Height="30"
+                Canvas.Top="39"
+                CornerRadius="15"
+                Opacity="0"
+                Canvas.ZIndex="9"
+                RenderTransformOrigin="0.5,0.5">
+                <Border.BorderBrush>
+                    <SolidColorBrush Color="{StaticResource AccentPrimaryColor}" />
+                </Border.BorderBrush>
+                <Border.BorderThickness>1.5</Border.BorderThickness>
+                <Border.RenderTransform>
+                    <ScaleTransform x:Name="PulseRingScale" ScaleX="1" ScaleY="1" />
+                </Border.RenderTransform>
+            </Border>
+        </Canvas>
+
+        <Button
+            x:Name="InsertButton"
+            Width="26"
+            Height="26"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Center"
+            Margin="0,0,-13,0"
+            Background="{StaticResource CardBackgroundBrush}"
+            BorderBrush="{StaticResource BorderDefaultBrush}"
+            BorderThickness="1"
+            Click="OnInsertButtonClick"
+            CornerRadius="13"
+            Foreground="{StaticResource TextPrimaryBrush}"
+            Padding="0"
+            Opacity="0"
+            PointerEntered="OnInsertButtonPointerEntered"
+            PointerExited="OnInsertButtonPointerExited"
+            Visibility="Collapsed"
+            Canvas.ZIndex="10">
+            <Button.RenderTransform>
+                <ScaleTransform x:Name="InsertButtonScale" ScaleX="0.6" ScaleY="0.6" />
+            </Button.RenderTransform>
+            <Grid Width="12" Height="12">
+                <Rectangle Width="12" Height="2" RadiusX="1" RadiusY="1" Fill="{StaticResource TextOnAccentBrush}" />
+                <Rectangle Width="2" Height="12" RadiusX="1" RadiusY="1" Fill="{StaticResource TextOnAccentBrush}" />
+            </Grid>
+        </Button>
+    </Grid>
+</UserControl>

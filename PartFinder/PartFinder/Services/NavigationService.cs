@@ -11,6 +11,7 @@ public sealed class NavigationService : INavigationService
         [AppPage.Dashboard] = typeof(DashboardPage),
         [AppPage.Parts] = typeof(MasterDataPage),
         [AppPage.Templates] = typeof(TemplatesPage),
+        [AppPage.TemplatesCanvas] = typeof(InfiniteCanvasSpreadsheetPage),
         [AppPage.WorksheetRelations] = typeof(WorksheetRelationsPage),
         [AppPage.ViewData] = typeof(ViewDataPage),
         [AppPage.UserManagement] = typeof(UserManagementPage),

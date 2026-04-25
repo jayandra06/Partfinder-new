@@ -45,9 +45,9 @@ public sealed partial class ShellLayout : UserControl
     {
         if (DataContext is ShellViewModel vm)
         {
-            SidebarColumn.Width = new GridLength(vm.IsSidebarCollapsed ? 56 : 240);
+            SidebarColumn.Width = new GridLength(vm.IsSidebarCollapsed ? 64 : 220);
             SidebarRoot.Padding = vm.IsSidebarCollapsed
-                ? new Thickness(4, 8, 4, 16)
+                ? new Thickness(8, 10, 8, 16)
                 : new Thickness(16, 16, 16, 24);
             NavListView.Margin = vm.IsSidebarCollapsed
                 ? new Thickness(0, 4, 0, 0)

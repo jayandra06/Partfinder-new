@@ -406,6 +406,25 @@ public partial class TemplatesViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private void InsertColumnBefore(ColumnLabelDraft? draft)
+    {
+        if (draft is null)
+        {
+            ColumnLabels.Insert(0, new ColumnLabelDraft());
+            return;
+        }
+
+        var index = ColumnLabels.IndexOf(draft);
+        if (index < 0)
+        {
+            ColumnLabels.Insert(0, new ColumnLabelDraft());
+            return;
+        }
+
+        ColumnLabels.Insert(index, new ColumnLabelDraft());
+    }
+
+    [RelayCommand]
     private void RemoveColumn(ColumnLabelDraft? draft)
     {
         if (draft is null || ColumnLabels.Count <= 1)

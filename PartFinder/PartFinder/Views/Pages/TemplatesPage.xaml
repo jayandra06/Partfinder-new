@@ -13,85 +13,7 @@
         <converters:InvertedBoolToVisibilityConverter x:Key="InvertedBoolToVisibilityConverter" />
     </Page.Resources>
     <Grid Padding="20" ColumnSpacing="16" Background="{StaticResource PageBackgroundBrush}">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="280" />
-            <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
-
-        <Border Style="{StaticResource ElevatedCardStyle}" Padding="14" Background="{StaticResource NavBackgroundBrush}">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-
-                <Border
-                    Grid.Row="0"
-                    Margin="0,0,0,10"
-                    Padding="10"
-                    CornerRadius="10"
-                    Background="{StaticResource CardBackgroundBrush}"
-                    BorderBrush="{StaticResource BorderDefaultBrush}"
-                    BorderThickness="1">
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <Border Width="28" Height="28" CornerRadius="8" Background="{StaticResource AccentPrimaryBrush}">
-                            <FontIcon Glyph="&#xE8A5;" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <StackPanel>
-                            <TextBlock Text="Template Manager" FontWeight="SemiBold" />
-                            <TextBlock Text="v2.4.0 High-density" Style="{StaticResource CaptionStyle}" Foreground="{StaticResource TextTertiaryBrush}" />
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-
-                <Button
-                    Grid.Row="0"
-                    Margin="0,58,0,0"
-                    Style="{StaticResource OutlinedButtonStyle}"
-                    Command="{Binding StartNewCustomTemplateCommand}"
-                    Content="+  New Template"
-                    IsEnabled="{Binding CanAddAnotherTemplate}"
-                    Visibility="{Binding CanAddAnotherTemplate, Converter={StaticResource BoolToVisibilityConverter}}" />
-                <Button
-                    Grid.Row="1"
-                    Margin="0,8,0,12"
-                    Style="{StaticResource GhostButtonStyle}"
-                    Content="Import CSV"
-                    Click="OnImportCsvClick"
-                    IsEnabled="{Binding ShowTemplatePreviewPanel}" />
-
-                <StackPanel Grid.Row="2" Spacing="8" Margin="0,0,0,12">
-                    <TextBlock Text="MY TEMPLATES" Style="{StaticResource CaptionStyle}" Foreground="{StaticResource TextSecondaryBrush}" />
-                    <Border Style="{StaticResource CardStyle}" Padding="4">
-                        <ListView
-                            MinHeight="180"
-                            DisplayMemberPath="Name"
-                            ItemsSource="{Binding Templates}"
-                            SelectedItem="{Binding SelectedTemplate, Mode=TwoWay}"
-                            Visibility="{Binding ShowTemplateList, Converter={StaticResource BoolToVisibilityConverter}}" />
-                    </Border>
-                    <StackPanel Margin="0,10,0,0" Spacing="4">
-                        <TextBlock Text="Support" Style="{StaticResource CaptionStyle}" Foreground="{StaticResource TextTertiaryBrush}" />
-                        <TextBlock Text="Logs" Style="{StaticResource CaptionStyle}" Foreground="{StaticResource TextTertiaryBrush}" />
-                    </StackPanel>
-                </StackPanel>
-
-                <StackPanel x:Name="ImportStatusPanel" Grid.Row="3" Spacing="6" Visibility="Collapsed" Margin="0,12,0,0">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <ProgressRing x:Name="ImportProgressRing" Width="16" Height="16" IsActive="True" />
-                        <TextBlock x:Name="ImportStatusText" Text="Import in progress..." />
-                    </StackPanel>
-                    <TextBlock
-                        x:Name="ImportStatusDetailText"
-                        Foreground="{StaticResource TextSecondaryBrush}"
-                        TextWrapping="WrapWholeWords" />
-                </StackPanel>
-            </Grid>
-        </Border>
-
-        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
             <StackPanel Spacing="16">
                 <TextBlock
                     Foreground="{StaticResource DangerBrush}"
@@ -99,83 +21,152 @@
                     TextWrapping="WrapWholeWords"
                     Visibility="{Binding ShowDbMissingBanner, Converter={StaticResource BoolToVisibilityConverter}}" />
 
-                <Grid Visibility="{Binding ShowTemplateEditor, Converter={StaticResource BoolToVisibilityConverter}}" ColumnSpacing="16">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="1.2*" />
-                        <ColumnDefinition Width="1*" />
-                    </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource ElevatedCardStyle}" Padding="12">
+                    <StackPanel Spacing="10">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button
+                                Style="{StaticResource OutlinedButtonStyle}"
+                                Command="{Binding StartNewCustomTemplateCommand}"
+                                Content="+  New Template"
+                                IsEnabled="{Binding CanAddAnotherTemplate}"
+                                Visibility="{Binding CanAddAnotherTemplate, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            <Button
+                                Style="{StaticResource GhostButtonStyle}"
+                                Content="Import CSV"
+                                Click="OnImportCsvClick"
+                                IsEnabled="{Binding ShowTemplatePreviewPanel}" />
+                        </StackPanel>
+                        <TextBlock Text="MY TEMPLATES" Style="{StaticResource CaptionStyle}" Foreground="{StaticResource TextSecondaryBrush}" />
+                        <ListView
+                            MinHeight="96"
+                            MaxHeight="180"
+                            DisplayMemberPath="Name"
+                            ItemsSource="{Binding Templates}"
+                            SelectedItem="{Binding SelectedTemplate, Mode=TwoWay}"
+                            Visibility="{Binding ShowTemplateList, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        <StackPanel x:Name="ImportStatusPanel" Spacing="6" Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ProgressRing x:Name="ImportProgressRing" Width="16" Height="16" IsActive="True" />
+                                <TextBlock x:Name="ImportStatusText" Text="Import in progress..." />
+                            </StackPanel>
+                            <TextBlock
+                                x:Name="ImportStatusDetailText"
+                                Foreground="{StaticResource TextSecondaryBrush}"
+                                TextWrapping="WrapWholeWords" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
 
-                    <Border Grid.Column="0" Style="{StaticResource ElevatedCardStyle}" Padding="16">
-                        <StackPanel Spacing="12">
+                <Grid Visibility="{Binding ShowTemplateEditor, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <Border Style="{StaticResource ElevatedCardStyle}" Padding="20" MaxWidth="980" HorizontalAlignment="Center">
+                        <StackPanel Spacing="14">
                             <TextBlock Text="New Template Setup" Style="{StaticResource PageTitleStyle}" />
                             <TextBox
+                                Width="360"
                                 Style="{StaticResource StandardTextBoxStyle}"
                                 IsReadOnly="{Binding IsTemplateNameReadOnly}"
                                 PlaceholderText="Template name"
                                 Text="{Binding NewTemplateName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                             <TextBlock Text="Schema Columns" Style="{StaticResource CaptionStyle}" Foreground="{StaticResource TextSecondaryBrush}" />
-                            <ScrollViewer
-                                HorizontalScrollMode="Enabled"
-                                HorizontalScrollBarVisibility="Auto"
-                                VerticalScrollBarVisibility="Disabled"
-                                VerticalScrollMode="Disabled">
-                                <ItemsControl ItemsSource="{Binding ColumnLabels}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <StackPanel Orientation="Horizontal" />
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border
-                                                Width="180"
-                                                Height="110"
-                                                Margin="0,0,10,0"
-                                                Style="{StaticResource CardStyle}"
-                                                Padding="10">
-                                                <Grid>
-                                                    <Grid.RowDefinitions>
-                                                        <RowDefinition Height="*" />
-                                                        <RowDefinition Height="Auto" />
-                                                    </Grid.RowDefinitions>
-                                                    <TextBox
-                                                        Grid.Row="0"
-                                                        PlaceholderText="Column header"
-                                                        Text="{Binding Label, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                                    <Grid Grid.Row="1" Margin="0,8,0,0">
+
+                            <Border Style="{StaticResource CardStyle}" Padding="24" MinHeight="180">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+                                    <ScrollViewer
+                                        HorizontalAlignment="Center"
+                                        HorizontalScrollMode="Enabled"
+                                        HorizontalScrollBarVisibility="Auto"
+                                        VerticalScrollBarVisibility="Disabled"
+                                        VerticalScrollMode="Disabled">
+                                        <ItemsControl ItemsSource="{Binding ColumnLabels}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,0,10,0" VerticalAlignment="Center">
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="Auto" />
-                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
                                                             <ColumnDefinition Width="Auto" />
                                                         </Grid.ColumnDefinitions>
+
                                                         <Button
                                                             Grid.Column="0"
-                                                            Style="{StaticResource GhostButtonStyle}"
-                                                            Width="24"
-                                                            Height="24"
-                                                            Click="OnRemoveColumnClick"
-                                                            Content="×"
-                                                            ToolTipService.ToolTip="Remove header" />
-                                                        <Button
-                                                            Grid.Column="2"
+                                                            VerticalAlignment="Center"
+                                                            Margin="0,0,6,0"
                                                             Style="{StaticResource OutlinedButtonStyle}"
-                                                            Width="24"
-                                                            Height="24"
-                                                            Click="OnInsertDraftColumnClick"
-                                                            Opacity="0.2"
+                                                            Width="30"
+                                                            Height="30"
+                                                            CornerRadius="15"
+                                                            Click="OnInsertDraftColumnBeforeClick"
+                                                            Opacity="0"
                                                             PointerEntered="OnAffordancePointerEntered"
                                                             PointerExited="OnAffordancePointerExited"
+                                                            PointerPressed="OnAffordancePointerPressed"
+                                                            PointerReleased="OnAffordancePointerReleased"
                                                             Content="+"
-                                                            ToolTipService.ToolTip="Add header after this one" />
+                                                            ToolTipService.ToolTip="Add header to the left" />
+
+                                                        <Border
+                                                            Grid.Column="1"
+                                                            Width="220"
+                                                            Height="84"
+                                                            Style="{StaticResource CardStyle}"
+                                                            Padding="10">
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*" />
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                </Grid.ColumnDefinitions>
+                                                                <TextBox
+                                                                    Grid.Column="0"
+                                                                    PlaceholderText="Column header"
+                                                                    KeyDown="OnColumnHeaderKeyDown"
+                                                                    Text="{Binding Label, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                                <Button
+                                                                    Grid.Column="1"
+                                                                    Margin="8,0,0,0"
+                                                                    VerticalAlignment="Center"
+                                                                    Style="{StaticResource GhostButtonStyle}"
+                                                                    Width="24"
+                                                                    Height="24"
+                                                                    Click="OnRemoveColumnClick"
+                                                                    Content="×"
+                                                                    ToolTipService.ToolTip="Remove header" />
+                                                            </Grid>
+                                                        </Border>
+
+                                                        <Button
+                                                            Grid.Column="2"
+                                                            VerticalAlignment="Center"
+                                                            Margin="6,0,0,0"
+                                                            Style="{StaticResource OutlinedButtonStyle}"
+                                                            Width="30"
+                                                            Height="30"
+                                                            CornerRadius="15"
+                                                            Click="OnInsertDraftColumnClick"
+                                                            Opacity="0"
+                                                            PointerEntered="OnAffordancePointerEntered"
+                                                            PointerExited="OnAffordancePointerExited"
+                                                            PointerPressed="OnAffordancePointerPressed"
+                                                            PointerReleased="OnAffordancePointerReleased"
+                                                            Content="+"
+                                                            ToolTipService.ToolTip="Add header to the right" />
                                                     </Grid>
-                                                </Grid>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </ScrollViewer>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </Grid>
+                            </Border>
+
                             <TextBlock
-                                Text="Headers are created side-by-side in one row. Hover a cell corner to reveal +."
+                                Text="Start from the center cell. Use left/right bubble + buttons to add adjacent column headers."
                                 Foreground="{StaticResource TextSecondaryBrush}"
                                 TextWrapping="WrapWholeWords" />
                             <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
@@ -188,45 +179,6 @@
                                 TextWrapping="WrapWholeWords" />
                         </StackPanel>
                     </Border>
-
-                    <StackPanel Grid.Column="1" Spacing="12">
-                        <Border Style="{StaticResource ElevatedCardStyle}" Padding="16">
-                            <StackPanel Spacing="8">
-                                <TextBlock Text="Live Preview" Style="{StaticResource CardTitleStyle}" />
-                                <TextBlock Text="Real-time schema visualization for industrial parts." Foreground="{StaticResource TextSecondaryBrush}" />
-                                <Border Style="{StaticResource CardStyle}" Padding="10">
-                                    <StackPanel Spacing="8">
-                                        <ItemsControl ItemsSource="{Binding ColumnLabels}">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Border Padding="8" CornerRadius="6" Background="{StaticResource GridHeaderBackgroundBrush}" Margin="0,0,0,6">
-                                                        <TextBlock Text="{Binding Label}" Foreground="{StaticResource TextSecondaryBrush}" />
-                                                    </Border>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                        <TextBlock
-                                            Text="Schema Drafting Mode"
-                                            FontWeight="SemiBold"
-                                            Foreground="{StaticResource TextSecondaryBrush}" />
-                                        <TextBlock
-                                            Text="Fields defined on the left auto-populate this preview."
-                                            Style="{StaticResource CaptionStyle}"
-                                            Foreground="{StaticResource TextTertiaryBrush}" />
-                                    </StackPanel>
-                                </Border>
-                            </StackPanel>
-                        </Border>
-                        <Border Style="{StaticResource ElevatedCardStyle}" Padding="16">
-                            <StackPanel Spacing="8">
-                                <TextBlock Text="Optimization Tip" Style="{StaticResource CardTitleStyle}" />
-                                <TextBlock
-                                    Text="Use Number type for quantities to support trend analysis in dashboard."
-                                    Foreground="{StaticResource TextSecondaryBrush}"
-                                    TextWrapping="WrapWholeWords" />
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
                 </Grid>
 
                 <StackPanel Visibility="{Binding ShowTemplatePreviewPanel, Converter={StaticResource BoolToVisibilityConverter}}" Spacing="14">
@@ -238,6 +190,10 @@
                         <TextBlock Text="{Binding SelectedTemplate.Name}" Style="{StaticResource PageTitleStyle}" />
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
                             <Button Style="{StaticResource GhostButtonStyle}" Content="Discard" />
+                            <Button
+                                Style="{StaticResource OutlinedButtonStyle}"
+                                Content="Open In Canvas"
+                                Click="OnOpenInCanvasClick" />
                             <Button Style="{StaticResource PrimaryButtonStyle}" Command="{Binding BeginEditSelectedTemplateCommand}" Content="Save Changes" />
                         </StackPanel>
                     </Grid>
@@ -280,36 +236,38 @@
                         </StackPanel>
                     </Border>
 
-                    <Grid ColumnSpacing="14">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="2*" />
-                            <ColumnDefinition Width="1*" />
-                        </Grid.ColumnDefinitions>
-                        <Border Grid.Column="0" Style="{StaticResource ElevatedCardStyle}" Padding="14">
-                            <StackPanel Spacing="8">
-                                <TextBlock Text="Template Usage Analysis" Style="{StaticResource CardTitleStyle}" />
-                                <Grid ColumnSpacing="8">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Border Grid.Column="0" Style="{StaticResource CardStyle}" Padding="10"><StackPanel><TextBlock Text="ACTIVE PROJECTS" Style="{StaticResource CaptionStyle}" /><TextBlock Text="14" Style="{StaticResource CardTitleStyle}" /></StackPanel></Border>
-                                    <Border Grid.Column="1" Style="{StaticResource CardStyle}" Padding="10"><StackPanel><TextBlock Text="DATA DENSITY" Style="{StaticResource CaptionStyle}" /><TextBlock Text="82%" Style="{StaticResource CardTitleStyle}" /></StackPanel></Border>
-                                    <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="10"><StackPanel><TextBlock Text="INTEGRITY SCORE" Style="{StaticResource CaptionStyle}" /><TextBlock Text="9.8" Style="{StaticResource CardTitleStyle}" /></StackPanel></Border>
-                                </Grid>
-                            </StackPanel>
-                        </Border>
-                        <Border Grid.Column="1" Style="{StaticResource ElevatedCardStyle}" Padding="14">
-                            <StackPanel Spacing="8">
-                                <TextBlock Text="Help &amp; Guidance" Style="{StaticResource CardTitleStyle}" />
-                                <TextBlock
-                                    Text="Templates define the structural DNA of your parts catalog."
-                                    Foreground="{StaticResource TextSecondaryBrush}"
-                                    TextWrapping="WrapWholeWords" />
-                            </StackPanel>
-                        </Border>
-                    </Grid>
+                    <Expander Header="Insights" IsExpanded="False">
+                        <Grid ColumnSpacing="14" Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="2*" />
+                                <ColumnDefinition Width="1*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Style="{StaticResource ElevatedCardStyle}" Padding="14">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="Template Usage Analysis" Style="{StaticResource CardTitleStyle}" />
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Grid.Column="0" Style="{StaticResource CardStyle}" Padding="10"><StackPanel><TextBlock Text="ACTIVE PROJECTS" Style="{StaticResource CaptionStyle}" /><TextBlock Text="14" Style="{StaticResource CardTitleStyle}" /></StackPanel></Border>
+                                        <Border Grid.Column="1" Style="{StaticResource CardStyle}" Padding="10"><StackPanel><TextBlock Text="DATA DENSITY" Style="{StaticResource CaptionStyle}" /><TextBlock Text="82%" Style="{StaticResource CardTitleStyle}" /></StackPanel></Border>
+                                        <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="10"><StackPanel><TextBlock Text="INTEGRITY SCORE" Style="{StaticResource CaptionStyle}" /><TextBlock Text="9.8" Style="{StaticResource CardTitleStyle}" /></StackPanel></Border>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="1" Style="{StaticResource ElevatedCardStyle}" Padding="14">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="Help &amp; Guidance" Style="{StaticResource CardTitleStyle}" />
+                                    <TextBlock
+                                        Text="Templates define the structural DNA of your parts catalog."
+                                        Foreground="{StaticResource TextSecondaryBrush}"
+                                        TextWrapping="WrapWholeWords" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </Expander>
                 </StackPanel>
 
                 <StackPanel Visibility="{Binding ShowSelectTemplatePromptPanel, Converter={StaticResource BoolToVisibilityConverter}}">

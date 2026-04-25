@@ -131,6 +131,7 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
         _setupContext.Refresh();
         _adminSession.Load();
         _profile.Load();
+        IsSidebarCollapsed = true;
         if (!string.IsNullOrWhiteSpace(_setupContext.OrgCode))
         {
             _appState.CurrentTenant = $"Org {_setupContext.OrgCode}";

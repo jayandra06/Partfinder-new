@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using PartFinder.Helpers;
 using PartFinder.Models;
@@ -55,6 +56,17 @@ public sealed partial class TemplatesPage : Page
         }
     }
 
+    private void OnOpenInCanvasClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not TemplatesViewModel { SelectedTemplate: not null } vm)
+        {
+            return;
+        }
+
+        var nav = App.Services.GetRequiredService<INavigationService>();
+        _ = nav.Navigate(AppPage.TemplatesCanvas, vm.SelectedTemplate.Name);
+    }
+
     private void OnRemoveColumnClick(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { DataContext: ColumnLabelDraft draft })
@@ -81,11 +93,29 @@ public sealed partial class TemplatesPage : Page
         }
     }
 
+    private void OnInsertDraftColumnBeforeClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { DataContext: ColumnLabelDraft draft })
+        {
+            return;
+        }
+
+        if (DataContext is TemplatesViewModel vm)
+        {
+            vm.InsertColumnBeforeCommand.Execute(draft);
+        }
+    }
+
     private void OnAffordancePointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
     {
         if (sender is UIElement element)
         {
-            AffordanceAnimationHelper.Fade(element, show: true, shownOpacity: 1, hiddenOpacity: 0.35);
+            AffordanceAnimationHelper.FadeScaleIn(
+                element,
+                shownOpacity: 1,
+                fromScale: 0.9,
+                durationMs: AffordanceAnimationHelper.DurationFast,
+                disableHitTestingWhenHidden: true);
         }
     }
 
@@ -93,7 +123,88 @@ public sealed partial class TemplatesPage : Page
     {
         if (sender is UIElement element)
         {
-            AffordanceAnimationHelper.Fade(element, show: false, shownOpacity: 1, hiddenOpacity: 0.35);
+            AffordanceAnimationHelper.FadeScaleOut(
+                element,
+                hiddenOpacity: 0,
+                toScale: 0.9,
+                durationMs: AffordanceAnimationHelper.DurationFast,
+                disableHitTestingWhenHidden: true);
+        }
+    }
+
+    private void OnAffordancePointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is UIElement element)
+        {
+            AffordanceAnimationHelper.FadeScale(
+                element,
+                show: true,
+                shownOpacity: 1,
+                hiddenOpacity: 0,
+                shownScale: 0.94,
+                hiddenScale: 0.94,
+                durationMs: AffordanceAnimationHelper.DurationFast,
+                disableHitTestingWhenHidden: true);
+        }
+    }
+
+    private void OnAffordancePointerReleased(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is UIElement element)
+        {
+            AffordanceAnimationHelper.FadeScaleIn(
+                element,
+                shownOpacity: 1,
+                fromScale: 0.94,
+                durationMs: AffordanceAnimationHelper.DurationFast,
+                disableHitTestingWhenHidden: true);
+        }
+    }
+
+    private void OnColumnHeaderKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key != Windows.System.VirtualKey.Enter
+            || sender is not TextBox { DataContext: ColumnLabelDraft draft }
+            || DataContext is not TemplatesViewModel vm)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        var index = vm.ColumnLabels.IndexOf(draft);
+        vm.InsertColumnAfterCommand.Execute(draft);
+        if (index < 0 || index + 1 >= vm.ColumnLabels.Count)
+        {
+            return;
+        }
+
+        var insertedDraft = vm.ColumnLabels[index + 1];
+        DispatcherQueue.TryEnqueue(
+            () =>
+            {
+                var target = FindHeaderTextBox(insertedDraft);
+                _ = target?.Focus(FocusState.Programmatic);
+            });
+    }
+
+    private TextBox? FindHeaderTextBox(ColumnLabelDraft draft)
+    {
+        return FindVisualDescendants(TemplatesPageRoot)
+            .OfType<TextBox>()
+            .FirstOrDefault(tb => ReferenceEquals(tb.DataContext, draft));
+    }
+
+    private static IEnumerable<DependencyObject> FindVisualDescendants(DependencyObject root)
+    {
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            yield return child;
+            foreach (var nested in FindVisualDescendants(child))
+            {
+                yield return nested;
+            }
         }
     }
 
@@ -446,14 +557,17 @@ public sealed partial class TemplatesPage : Page
         var btn = new Button
         {
             Content = "+",
-            Width = 28,
-            Height = 28,
+            Width = 30,
+            Height = 30,
+            CornerRadius = new CornerRadius(15),
             Margin = new Thickness(8, 6, 8, 6),
             Tag = insertIndex,
-            Opacity = 0.35,
+            Opacity = 0,
         };
-        btn.PointerEntered += (_, _) => AffordanceAnimationHelper.Fade(btn, show: true, shownOpacity: 1, hiddenOpacity: 0.35);
-        btn.PointerExited += (_, _) => AffordanceAnimationHelper.Fade(btn, show: false, shownOpacity: 1, hiddenOpacity: 0.35);
+        btn.PointerEntered += (_, _) => AffordanceAnimationHelper.FadeScaleIn(btn, durationMs: AffordanceAnimationHelper.DurationFast);
+        btn.PointerExited += (_, _) => AffordanceAnimationHelper.FadeScaleOut(btn, durationMs: AffordanceAnimationHelper.DurationFast);
+        btn.PointerPressed += (_, _) => AffordanceAnimationHelper.FadeScale(btn, show: true, shownScale: 0.94, hiddenScale: 0.94, durationMs: AffordanceAnimationHelper.DurationFast);
+        btn.PointerReleased += (_, _) => AffordanceAnimationHelper.FadeScaleIn(btn, fromScale: 0.94, durationMs: AffordanceAnimationHelper.DurationFast);
         btn.Click += async (_, _) =>
         {
             if (XamlRoot is null)

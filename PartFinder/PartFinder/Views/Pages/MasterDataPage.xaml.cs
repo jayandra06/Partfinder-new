@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Collections.Specialized;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
@@ -26,6 +27,7 @@ public sealed partial class MasterDataPage : Page
     private readonly IExcelTemplateService _excelTemplateService;
     private readonly List<ActionResultDisplayItem> _actionResultRows = new();
     private readonly Dictionary<string, string> _columnFilters = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<GridCellPosition, TextBox> _editableTextCells = new();
 
     public MasterDataPage()
     {
@@ -284,6 +286,7 @@ public sealed partial class MasterDataPage : Page
         var visibleRows = ApplyColumnFilters(_viewModel.GetVisibleRows());
         FilteredRowsText.Text = $"Showing {visibleRows.Count} rows";
         LoadedRowsText.Text = $"of {_viewModel.Rows.Count} loaded";
+        _editableTextCells.Clear();
 
         const double minColWidth = GridCellTextWidth + (GridCellHorizontalPadding * 2);
         var colCount = _viewModel.Columns.Count;
@@ -372,8 +375,8 @@ public sealed partial class MasterDataPage : Page
                 Grid.SetColumn(addColumnBtn, 1);
                 headerGrid.Children.Add(addColumnBtn);
 
-                headerBorder.PointerEntered += (_, _) => AffordanceAnimationHelper.Fade(addColumnBtn, show: true, shownOpacity: 1, hiddenOpacity: 0, disableHitTestingWhenHidden: true);
-                headerBorder.PointerExited += (_, _) => AffordanceAnimationHelper.Fade(addColumnBtn, show: false, shownOpacity: 1, hiddenOpacity: 0, disableHitTestingWhenHidden: true);
+                headerBorder.PointerEntered += (_, _) => AffordanceAnimationHelper.FadeScaleIn(addColumnBtn, durationMs: AffordanceAnimationHelper.DurationFast);
+                headerBorder.PointerExited += (_, _) => AffordanceAnimationHelper.FadeScaleOut(addColumnBtn, durationMs: AffordanceAnimationHelper.DurationFast);
             }
 
             headerBorder.Child = headerGrid;
@@ -414,7 +417,7 @@ public sealed partial class MasterDataPage : Page
                 }
                 else
                 {
-                    cellContent = BuildTextCell(cellVm, rowVm);
+                    cellContent = BuildTextCell(cellVm, rowVm, r, c);
                 }
 
                 var cellBorder = new Border
@@ -465,8 +468,8 @@ public sealed partial class MasterDataPage : Page
                 Grid.SetColumn(addRowHost, colCount - 1);
                 grid.Children.Add(addRowHost);
 
-                addRowHost.PointerEntered += (_, _) => AffordanceAnimationHelper.Fade(addRowButton, show: true, shownOpacity: 1, hiddenOpacity: 0, disableHitTestingWhenHidden: true);
-                addRowHost.PointerExited += (_, _) => AffordanceAnimationHelper.Fade(addRowButton, show: false, shownOpacity: 1, hiddenOpacity: 0, disableHitTestingWhenHidden: true);
+                addRowHost.PointerEntered += (_, _) => AffordanceAnimationHelper.FadeScaleIn(addRowButton, durationMs: AffordanceAnimationHelper.DurationFast);
+                addRowHost.PointerExited += (_, _) => AffordanceAnimationHelper.FadeScaleOut(addRowButton, durationMs: AffordanceAnimationHelper.DurationFast);
             }
         }
 
@@ -582,7 +585,7 @@ public sealed partial class MasterDataPage : Page
         _ = await _viewModel.InsertColumnAtAsync(insertAt, input.Text).ConfigureAwait(true);
     }
 
-    private TextBox BuildTextCell(MasterDataCellViewModel cellVm, MasterDataRowViewModel rowVm)
+    private TextBox BuildTextCell(MasterDataCellViewModel cellVm, MasterDataRowViewModel rowVm, int rowIndex, int columnIndex)
     {
         var box = new TextBox
         {
@@ -605,7 +608,39 @@ public sealed partial class MasterDataPage : Page
             });
         box.IsReadOnly = _viewModel is null || !_viewModel.IsEditMode;
         box.ContextFlyout = BuildTextCellMenu(cellVm, rowVm);
+        box.Tag = new GridCellPosition(rowIndex, columnIndex);
+        box.KeyDown += OnGridCellKeyDown;
+        _editableTextCells[(GridCellPosition)box.Tag] = box;
         return box;
+    }
+
+    private void OnGridCellKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (_viewModel is null
+            || !_viewModel.IsEditMode
+            || sender is not TextBox { Tag: GridCellPosition pos })
+        {
+            return;
+        }
+
+        var target = e.Key switch
+        {
+            Windows.System.VirtualKey.Enter => new GridCellPosition(pos.Row + 1, pos.Column),
+            Windows.System.VirtualKey.Up => new GridCellPosition(pos.Row - 1, pos.Column),
+            Windows.System.VirtualKey.Down => new GridCellPosition(pos.Row + 1, pos.Column),
+            Windows.System.VirtualKey.Left => new GridCellPosition(pos.Row, pos.Column - 1),
+            Windows.System.VirtualKey.Right => new GridCellPosition(pos.Row, pos.Column + 1),
+            _ => (GridCellPosition?)null,
+        };
+
+        if (target is null || !_editableTextCells.TryGetValue(target.Value, out var next))
+        {
+            return;
+        }
+
+        e.Handled = true;
+        _ = next.Focus(FocusState.Programmatic);
+        next.SelectAll();
     }
 
     private UIElement BuildLinkCell(MasterDataCellViewModel cellVm, MasterDataRowViewModel rowVm)
@@ -1065,4 +1100,6 @@ public sealed partial class MasterDataPage : Page
         public string Title { get; }
         public IReadOnlyList<string> Lines { get; }
     }
+
+    private readonly record struct GridCellPosition(int Row, int Column);
 }
