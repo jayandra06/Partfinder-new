@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "PartFinder (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "PartFinder (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

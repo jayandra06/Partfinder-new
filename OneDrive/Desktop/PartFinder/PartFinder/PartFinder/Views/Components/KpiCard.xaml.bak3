@@ -1,0 +1,68 @@
+<UserControl
+    x:Class="PartFinder.Views.Components.KpiCard"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Border
+        Background="{StaticResource CardBackgroundBrush}"
+        BorderBrush="{StaticResource BorderDefaultBrush}"
+        BorderThickness="1"
+        CornerRadius="10"
+        Padding="14,12"
+        Margin="0,0,10,0">
+        <Grid RowSpacing="6">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Label -->
+            <TextBlock
+                Grid.Row="0"
+                Text="{x:Bind Label, Mode=OneWay}"
+                FontSize="10"
+                Foreground="{StaticResource TextTertiaryBrush}"
+                CharacterSpacing="60"
+                FontWeight="SemiBold" />
+
+            <!-- Glow icon -->
+            <Border
+                Grid.Row="0"
+                Grid.Column="1"
+                Width="28"
+                Height="28"
+                CornerRadius="14"
+                Grid.RowSpan="2"
+                VerticalAlignment="Top"
+                Background="#0A1F7AE0">
+                <FontIcon Glyph="&#xE9D9;" FontSize="12" Foreground="{StaticResource AccentPrimaryBrush}" />
+            </Border>
+
+            <!-- Value -->
+            <TextBlock
+                Grid.Row="1"
+                Text="{x:Bind Value, Mode=OneWay}"
+                FontSize="24"
+                FontWeight="Bold" />
+
+            <!-- Delta -->
+            <Border
+                Grid.Row="2"
+                HorizontalAlignment="Left"
+                CornerRadius="6"
+                Padding="6,2"
+                Background="#102ABD8F">
+                <TextBlock
+                    Text="{x:Bind Delta, Mode=OneWay}"
+                    FontSize="10"
+                    FontWeight="SemiBold"
+                    Foreground="{StaticResource SuccessBrush}" />
+            </Border>
+        </Grid>
+    </Border>
+</UserControl>

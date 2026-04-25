@@ -1,0 +1,465 @@
+﻿<Page
+    x:Class="PartFinder.Views.Pages.BranchesPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:components="using:PartFinder.Views.Components"
+    mc:Ignorable="d">
+
+    <Page.Resources>
+        <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+        </Style>
+    </Page.Resources>
+
+    <Grid Background="{StaticResource PageBackgroundBrush}">
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:Name="LayoutStates">
+                <VisualState x:Name="WideLayout">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="1100"/>
+                    </VisualState.StateTriggers>
+                </VisualState>
+                <VisualState x:Name="NarrowLayout">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="0"/>
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="MainGrid.ColumnDefinitions[0].Width" Value="*"/>
+                        <Setter Target="MainGrid.ColumnDefinitions[1].Width" Value="0"/>
+                        <Setter Target="MainGrid.RowDefinitions[1].Height" Value="Auto"/>
+                        <Setter Target="SidebarBorder.(Grid.Column)" Value="0"/>
+                        <Setter Target="ContentArea.(Grid.Column)" Value="0"/>
+                        <Setter Target="ContentArea.(Grid.Row)" Value="1"/>
+                        <Setter Target="SidebarBorder.Margin" Value="0,0,0,16"/>
+                        <Setter Target="KpiWrapGrid.ItemWidth" Value="240"/>
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
+
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <StackPanel Padding="24,20,24,36" Spacing="24" HorizontalAlignment="Stretch">
+                <StackPanel.ChildrenTransitions>
+                    <TransitionCollection>
+                        <EntranceThemeTransition IsStaggeringEnabled="True" FromVerticalOffset="50" />
+                    </TransitionCollection>
+                </StackPanel.ChildrenTransitions>
+
+                <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+                <!-- HEADER SECTION                                                 -->
+                <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+                <Grid x:Name="HeaderGrid">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="MULTI-LOCATION INFRASTRUCTURE" FontSize="10" Foreground="{StaticResource AccentPrimaryBrush}" CharacterSpacing="100" FontWeight="SemiBold"/>
+                        <TextBlock Text="Branches &amp; Logistics" FontSize="28" FontWeight="Bold"
+                                   Foreground="{StaticResource TextPrimaryBrush}"/>
+                        <TextBlock Text="Orchestrate inventory flow, monitor node health, and manage global branch synchronization from a single cockpit."
+                                   FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" MaxWidth="700" TextWrapping="Wrap" Opacity="0.8"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                        <Button Style="{StaticResource OutlinedButtonStyle}" Click="OnSyncAllClick" ToolTipService.ToolTip="Trigger global synchronization">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE72C;" FontSize="14"/>
+                                <TextBlock Text="Global Sync"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource PrimaryButtonStyle}" Click="OnAddBranchClick">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE710;" FontSize="14"/>
+                                <TextBlock Text="Add Branch"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+                <!-- KPI CARDS (Responsive Wrap)                                    -->
+                <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+                <ItemsControl x:Name="KpiItemsControl">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <ItemsWrapGrid x:Name="KpiWrapGrid" Orientation="Horizontal" MaximumRowsOrColumns="4" ItemWidth="280"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    
+                    <!-- Static KPI Cards for instant responsiveness & demo -->
+                    <components:KpiCard Label="TOTAL BRANCHES" Value="6" IconGlyph="&#xE8F4;" AccentHex="#1F7AE0" Delta="Global Coverage" Margin="0,0,14,14"/>
+                    <components:KpiCard Label="ACTIVE NODES" Value="5" IconGlyph="&#xE73E;" AccentHex="#2ABD8F" Delta="98.2% Uptime" Margin="0,0,14,14"/>
+                    <components:KpiCard Label="TOTAL STOCK" Value="8,420" IconGlyph="&#xE80A;" AccentHex="#1F7AE0" Delta="+420 this week" Margin="0,0,14,14"/>
+                    <components:KpiCard Label="AVG HEALTH" Value="84%" IconGlyph="&#xE8AB;" AccentHex="#8B5CF6" Delta="+2.4% trend" Margin="0,0,14,14"/>
+                </ItemsControl>
+
+                <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+                <!-- MAIN CONTENT AREA                                              -->
+                <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+                <Grid x:Name="MainGrid" ColumnSpacing="24">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="320"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- LEFT SIDEBAR: BRANCH SELECTOR -->
+                    <Border x:Name="SidebarBorder" Grid.Column="0" Background="{StaticResource NavBackgroundBrush}" 
+                            BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="16" Padding="16">
+                        <StackPanel Spacing="16">
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="BRANCH SELECTOR" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" FontWeight="SemiBold" CharacterSpacing="80"/>
+                                <Grid Margin="0,8,0,0">
+                                    <TextBox PlaceholderText="Search nodes..." Style="{StaticResource SearchTextBoxStyle}" Padding="34,8,12,8"/>
+                                    <FontIcon Glyph="&#xE721;" FontSize="12" HorizontalAlignment="Left" Margin="12,0,0,0" Foreground="{StaticResource TextTertiaryBrush}"/>
+                                </Grid>
+                            </StackPanel>
+
+                            <StackPanel Spacing="8">
+                                <Grid>
+                                    <TextBlock Text="NODE LIST" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="80" FontWeight="SemiBold"/>
+                                    <TextBlock Text="6 ACTIVE" FontSize="9" Foreground="{StaticResource SuccessBrush}" HorizontalAlignment="Right" FontWeight="Bold"/>
+                                </Grid>
+                                
+                                <StackPanel Spacing="4">
+                                    <!-- HQ -->
+                                    <Button HorizontalAlignment="Stretch" Padding="0" Background="Transparent" BorderThickness="0" Click="OnBranchSelectClick">
+                                        <Border Padding="12,10" CornerRadius="12" Background="{StaticResource ElevatedCardBackgroundBrush}" BorderBrush="{StaticResource AccentPrimaryBrush}" BorderThickness="1">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Border Width="34" Height="34" CornerRadius="8" Background="#151F7AE0" Margin="0,0,12,0">
+                                                    <FontIcon Glyph="&#xE8F4;" FontSize="14" Foreground="{StaticResource AccentPrimaryBrush}"/>
+                                                </Border>
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="HQ - Main Warehouse" FontSize="13" FontWeight="SemiBold"/>
+                                                    <TextBlock Text="Karachi, Pakistan" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                                    <TextBlock Text="2,450" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right"/>
+                                                    <TextBlock Text="parts" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" HorizontalAlignment="Right"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </Button>
+
+                                    <!-- Branch A -->
+                                    <Button HorizontalAlignment="Stretch" Padding="0" Background="Transparent" BorderThickness="0" Click="OnBranchSelectClick">
+                                        <Border Padding="12,10" CornerRadius="12">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Border Width="34" Height="34" CornerRadius="8" Background="#10FFFFFF" Margin="0,0,12,0">
+                                                    <FontIcon Glyph="&#xE8F4;" FontSize="14" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                                </Border>
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="Branch A - North" FontSize="13" FontWeight="SemiBold"/>
+                                                    <TextBlock Text="Lahore, PK" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                                    <TextBlock Text="1,820" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right"/>
+                                                    <TextBlock Text="parts" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" HorizontalAlignment="Right"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </Button>
+
+                                    <!-- Branch C -->
+                                    <Button HorizontalAlignment="Stretch" Padding="0" Background="Transparent" BorderThickness="0" Click="OnBranchSelectClick">
+                                        <Border Padding="12,10" CornerRadius="12">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Border Width="34" Height="34" CornerRadius="8" Background="#10FFFFFF" Margin="0,0,12,0">
+                                                    <FontIcon Glyph="&#xE8F4;" FontSize="14" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                                </Border>
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="Branch C - East" FontSize="13" FontWeight="SemiBold"/>
+                                                    <TextBlock Text="Islamabad, PK" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}"/>
+                                                </StackPanel>
+                                                <Border Grid.Column="2" Background="#20FEBC2E" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                                                    <TextBlock Text="LOW" FontSize="8" FontWeight="Bold" Foreground="{StaticResource WarningBrush}"/>
+                                                </Border>
+                                            </Grid>
+                                        </Border>
+                                    </Button>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <Border Background="{StaticResource ElevatedCardBackgroundBrush}" CornerRadius="14" Padding="14">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="LOGISTICS SUMMARY" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" FontWeight="SemiBold" CharacterSpacing="60"/>
+                                    <Grid>
+                                        <TextBlock Text="Active Transfers" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                        <TextBlock Text="14" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right"/>
+                                    </Grid>
+                                    <Grid>
+                                        <TextBlock Text="Critical Alerts" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                        <TextBlock Text="3" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right" Foreground="{StaticResource DangerBrush}"/>
+                                    </Grid>
+                                    <Button Style="{StaticResource OutlinedButtonStyle}" HorizontalAlignment="Stretch" Margin="0,4,0,0" Click="OnNewTransferClick">
+                                        <TextBlock Text="Dispatch Control" FontSize="11"/>
+                                    </Button>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- RIGHT CONTENT AREA -->
+                    <StackPanel x:Name="ContentArea" Grid.Column="1" Spacing="24">
+                        
+                        <!-- Selected Branch Header Card -->
+                        <Border Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" 
+                                BorderThickness="1" CornerRadius="20" Padding="24,22" Translation="0,0,32">
+                            <Border.Shadow><ThemeShadow/></Border.Shadow>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="10">
+                                    <StackPanel Orientation="Horizontal" Spacing="14">
+                                        <TextBlock Text="HQ - Main Warehouse" FontSize="26" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                        <Border Background="#202ABD8F" CornerRadius="12" Padding="12,4" VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <Ellipse Width="6" Height="6" Fill="{StaticResource SuccessBrush}"/>
+                                                <TextBlock Text="OPERATIONAL" FontSize="10" FontWeight="Bold" Foreground="{StaticResource SuccessBrush}"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="20">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <FontIcon Glyph="&#xE81D;" FontSize="14" Foreground="{StaticResource TextTertiaryBrush}"/>
+                                            <TextBlock Text="Industrial Zone, Sector 4, Karachi" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                        </StackPanel>
+                                        <Border Width="1" Height="14" Background="{StaticResource BorderDefaultBrush}"/>
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <FontIcon Glyph="&#xE716;" FontSize="14" Foreground="{StaticResource TextTertiaryBrush}"/>
+                                            <TextBlock Text="+92 21 3456789" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="36">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="AVAILABILITY" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" HorizontalAlignment="Right" FontWeight="SemiBold" CharacterSpacing="20"/>
+                                        <TextBlock Text="94.8%" FontSize="22" FontWeight="Bold" Foreground="{StaticResource SuccessBrush}" HorizontalAlignment="Right"/>
+                                    </StackPanel>
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="LATENCY" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" HorizontalAlignment="Right" FontWeight="SemiBold" CharacterSpacing="20"/>
+                                        <TextBlock Text="42ms" FontSize="22" FontWeight="Bold" Foreground="{StaticResource AccentPrimaryBrush}" HorizontalAlignment="Right"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- Stock Overview Table -->
+                        <Border Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" 
+                                BorderThickness="1" CornerRadius="20" Padding="24" Translation="0,0,32">
+                            <Border.Shadow><ThemeShadow/></Border.Shadow>
+                            <StackPanel Spacing="20">
+                                <Grid>
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="Inventory Distribution" Style="{StaticResource SectionHeaderStyle}"/>
+                                        <TextBlock Text="Real-time stock health across top categories at this node" FontSize="12" Foreground="{StaticResource TextTertiaryBrush}"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
+                                        <ComboBox PlaceholderText="Filter Category" Width="180" Style="{ThemeResource DefaultComboBoxStyle}"/>
+                                        <Button Style="{StaticResource OutlinedButtonStyle}" Width="40" Padding="0">
+                                            <FontIcon Glyph="&#xE71C;" FontSize="14"/>
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid Background="{StaticResource GridHeaderBackgroundBrush}" Padding="16,12" CornerRadius="4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="2.2*"/>
+                                        <ColumnDefinition Width="1*"/>
+                                        <ColumnDefinition Width="2.2*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="CATEGORY NAME" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60"/>
+                                    <TextBlock Grid.Column="1" Text="QTY" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60"/>
+                                    <TextBlock Grid.Column="2" Text="DISTRIBUTION HEALTH" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60"/>
+                                    <TextBlock Grid.Column="3" Text="OPERATIONS" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" Width="100" HorizontalAlignment="Right"/>
+                                </Grid>
+
+                                <ItemsControl>
+                                    <!-- Row 1 -->
+                                    <Grid Padding="16,14" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="0,0,0,1">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="2.2*"/>
+                                            <ColumnDefinition Width="1*"/>
+                                            <ColumnDefinition Width="2.2*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Orientation="Horizontal" Spacing="14">
+                                            <Border Width="36" Height="36" CornerRadius="8" Background="#101F7AE0">
+                                                <FontIcon Glyph="&#xE943;" FontSize="16" Foreground="{StaticResource AccentPrimaryBrush}"/>
+                                            </Border>
+                                            <TextBlock Text="Engine Components" FontSize="14" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="1" Text="1,240" FontSize="14" VerticalAlignment="Center"/>
+                                        <StackPanel Grid.Column="2" Spacing="8" VerticalAlignment="Center">
+                                            <Grid>
+                                                <TextBlock Text="Highly Stable" FontSize="11" Foreground="{StaticResource SuccessBrush}"/>
+                                                <TextBlock Text="88%" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}" HorizontalAlignment="Right"/>
+                                            </Grid>
+                                            <Border Height="6" CornerRadius="3" Background="{StaticResource GridHeaderBackgroundBrush}">
+                                                <Border HorizontalAlignment="Left" Width="180" Background="{StaticResource SuccessBrush}" CornerRadius="3"/>
+                                            </Border>
+                                        </StackPanel>
+                                        <Button Grid.Column="3" Content="Configure" Style="{StaticResource GhostButtonStyle}" FontSize="12" Width="100" HorizontalAlignment="Right"/>
+                                    </Grid>
+                                    
+                                    <!-- Row 2 -->
+                                    <Grid Padding="16,14" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="0,0,0,1">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="2.2*"/>
+                                            <ColumnDefinition Width="1*"/>
+                                            <ColumnDefinition Width="2.2*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Orientation="Horizontal" Spacing="14">
+                                            <Border Width="36" Height="36" CornerRadius="8" Background="#10FEBC2E">
+                                                <FontIcon Glyph="&#xE945;" FontSize="16" Foreground="{StaticResource WarningBrush}"/>
+                                            </Border>
+                                            <TextBlock Text="Hydraulic Systems" FontSize="14" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="1" Text="450" FontSize="14" VerticalAlignment="Center"/>
+                                        <StackPanel Grid.Column="2" Spacing="8" VerticalAlignment="Center">
+                                            <Grid>
+                                                <TextBlock Text="Depleting" FontSize="11" Foreground="{StaticResource WarningBrush}"/>
+                                                <TextBlock Text="32%" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}" HorizontalAlignment="Right"/>
+                                            </Grid>
+                                            <Border Height="6" CornerRadius="3" Background="{StaticResource GridHeaderBackgroundBrush}">
+                                                <Border HorizontalAlignment="Left" Width="60" Background="{StaticResource WarningBrush}" CornerRadius="3"/>
+                                            </Border>
+                                        </StackPanel>
+                                        <Button Grid.Column="3" Content="Restock" Style="{StaticResource GhostButtonStyle}" FontSize="12" Width="100" HorizontalAlignment="Right" Foreground="{StaticResource WarningBrush}"/>
+                                    </Grid>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Logistics & Transfers -->
+                        <Grid ColumnSpacing="24">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="1.2*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" 
+                                    BorderThickness="1" CornerRadius="20" Padding="20" Translation="0,0,32">
+                            <Border.Shadow><ThemeShadow/></Border.Shadow>
+                            <StackPanel Spacing="16">
+                                    <TextBlock Text="Recent Logistics" Style="{StaticResource SectionHeaderStyle}"/>
+                                    <ItemsControl>
+                                        <Grid Padding="12" Background="{StaticResource ElevatedCardBackgroundBrush}" CornerRadius="14" Margin="0,0,0,10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Width="42" Height="42" CornerRadius="21" Background="#152ABD8F" Margin="0,0,14,0">
+                                                <FontIcon Glyph="&#xE8AB;" FontSize="18" Foreground="{StaticResource SuccessBrush}"/>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                <TextBlock Text="TRF-8829 â€¢ Success" FontSize="13" FontWeight="SemiBold"/>
+                                                <TextBlock Text="HQ â†’ North â€¢ 50 units" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                            </StackPanel>
+                                        </Grid>
+                                        <Grid Padding="12" Background="{StaticResource ElevatedCardBackgroundBrush}" CornerRadius="14">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Width="42" Height="42" CornerRadius="21" Background="#151F7AE0" Margin="0,0,14,0">
+                                                <FontIcon Glyph="&#xE8AB;" FontSize="18" Foreground="{StaticResource AccentPrimaryBrush}"/>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                <TextBlock Text="TRF-8835 â€¢ In Transit" FontSize="13" FontWeight="SemiBold"/>
+                                                <TextBlock Text="HQ â†’ East â€¢ 120 units" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </ItemsControl>
+                                    <Button Style="{StaticResource GhostButtonStyle}" HorizontalAlignment="Stretch">
+                                        <TextBlock Text="View Detailed Logs" FontSize="12"/>
+                                    </Button>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="1" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" 
+                                    BorderThickness="1" CornerRadius="20" Padding="20" Translation="0,0,32">
+                            <Border.Shadow><ThemeShadow/></Border.Shadow>
+                            <StackPanel Spacing="16">
+                                    <TextBlock Text="Operational Performance" Style="{StaticResource SectionHeaderStyle}"/>
+                                    <StackPanel Spacing="12">
+                                        <StackPanel Spacing="6">
+                                            <Grid>
+                                                <TextBlock Text="Sync Reliability" FontSize="12"/>
+                                                <TextBlock Text="99.9%" FontSize="12" FontWeight="Bold" HorizontalAlignment="Right" Foreground="{StaticResource SuccessBrush}"/>
+                                            </Grid>
+                                            <Border Height="6" CornerRadius="3" Background="{StaticResource GridHeaderBackgroundBrush}">
+                                                <Border HorizontalAlignment="Left" Width="280" Background="{StaticResource SuccessBrush}" CornerRadius="3"/>
+                                            </Border>
+                                        </StackPanel>
+                                        <StackPanel Spacing="6">
+                                            <Grid>
+                                                <TextBlock Text="Resource Utilization" FontSize="12"/>
+                                                <TextBlock Text="74%" FontSize="12" FontWeight="Bold" HorizontalAlignment="Right" Foreground="{StaticResource AccentPrimaryBrush}"/>
+                                            </Grid>
+                                            <Border Height="6" CornerRadius="3" Background="{StaticResource GridHeaderBackgroundBrush}">
+                                                <Border HorizontalAlignment="Left" Width="220" Background="{StaticResource AccentPrimaryBrush}" CornerRadius="3"/>
+                                            </Border>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <Grid ColumnSpacing="10" Margin="0,8,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Button Style="{StaticResource OutlinedButtonStyle}" HorizontalAlignment="Stretch" Padding="0">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <FontIcon Glyph="&#xE8A5;" FontSize="12"/>
+                                                <TextBlock Text="Export" FontSize="11"/>
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Grid.Column="1" Style="{StaticResource OutlinedButtonStyle}" HorizontalAlignment="Stretch" Padding="0">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <FontIcon Glyph="&#xE713;" FontSize="12"/>
+                                                <TextBlock Text="Settings" FontSize="11"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                    </StackPanel>
+                </Grid>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>
+
+
+
