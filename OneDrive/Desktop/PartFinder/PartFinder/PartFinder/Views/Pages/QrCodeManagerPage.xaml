@@ -1,0 +1,332 @@
+﻿<Page
+    x:Class="PartFinder.Views.Pages.QrCodeManagerPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:converters="using:PartFinder.Converters">
+    <Page.Resources>
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+
+        <!-- Utilitarian Panel Style -->
+        <Style x:Key="TechPanelStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="2" /> <!-- Sharp corners -->
+            <Setter Property="Padding" Value="16" />
+        </Style>
+
+        <Style x:Key="TechValueStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Consolas" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="FontSize" Value="24" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        </Style>
+        
+        <Style x:Key="TechLabelStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Foreground" Value="{StaticResource TextTertiaryBrush}" />
+            <Setter Property="CharacterSpacing" Value="100" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+    </Page.Resources>
+
+    <Grid Background="{StaticResource PageBackgroundBrush}">
+        <Grid.Transitions>
+            <TransitionCollection>
+                <EntranceThemeTransition />
+            </TransitionCollection>
+        </Grid.Transitions>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Padding="32,24,32,40" Spacing="24" HorizontalAlignment="Stretch" MaxWidth="1400">
+
+                <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+                <!-- HEADER (Industrial style)                  -->
+                <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    
+                    <StackPanel Spacing="4">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Border Width="12" Height="12" Background="{StaticResource AccentPrimaryBrush}" CornerRadius="1"/>
+                            <TextBlock Text="MODULE // 04" Style="{StaticResource TechLabelStyle}" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock Text="QR ENCODER BAY" FontSize="28" FontWeight="Black" CharacterSpacing="20" />
+                        <TextBlock Text="Systematic generation and encoding of inventory tracking matrices." FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" FontFamily="Consolas" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Bottom">
+                        <Button Style="{StaticResource GhostButtonStyle}" Command="{Binding ClearAllCommand}" CornerRadius="2" FontFamily="Consolas">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE74D;" FontSize="14" />
+                                <TextBlock Text="PURGE_DATA" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource PrimaryButtonStyle}" Command="{Binding GenerateAllQrCommand}" CornerRadius="2" FontFamily="Consolas" Background="{StaticResource AccentPrimaryBrush}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xED14;" FontSize="14" />
+                                <TextBlock Text="ENCODE_ALL" FontWeight="Bold" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <Border Height="1" Background="{StaticResource BorderDefaultBrush}" Opacity="0.5" />
+
+                <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+                <!-- TELEMETRY / KPI ROW                        -->
+                <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+                <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.5*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" Style="{StaticResource TechPanelStyle}">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="ACTIVE_TEMPLATE" Style="{StaticResource TechLabelStyle}" />
+                            <TextBlock Text="{Binding SelectedTemplate.Name, FallbackValue='NO_TEMPLATE_SELECTED'}" Style="{StaticResource TechValueStyle}" FontSize="18" Foreground="{StaticResource AccentPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="1" Style="{StaticResource TechPanelStyle}">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="DATA_ROWS" Style="{StaticResource TechLabelStyle}" />
+                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+                                <TextBlock Text="{Binding Parts.Count}" Style="{StaticResource TechValueStyle}" Foreground="{StaticResource TextPrimaryBrush}" />
+                                <TextBlock Text="UNITS" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" VerticalAlignment="Bottom" Margin="0,0,0,4" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="2" Style="{StaticResource TechPanelStyle}">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="MATRICES_GENERATED" Style="{StaticResource TechLabelStyle}" />
+                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+                                <TextBlock Text="{Binding TotalGenerated}" Style="{StaticResource TechValueStyle}" Foreground="{StaticResource SuccessBrush}" />
+                                <TextBlock Text="CODES" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" VerticalAlignment="Bottom" Margin="0,0,0,4" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="3" Style="{StaticResource TechPanelStyle}">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="SYSTEM_STATE" Style="{StaticResource TechLabelStyle}" />
+                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="0,4,0,0">
+                                <Border Width="10" Height="10" CornerRadius="5" Background="{StaticResource SuccessBrush}">
+                                    <Border.Shadow><ThemeShadow/></Border.Shadow>
+                                </Border>
+                                <TextBlock Text="{Binding StatusMessage, FallbackValue='AWAITING_INPUT'}" FontSize="12" FontFamily="Consolas" Foreground="{StaticResource SuccessBrush}" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+                <!-- CONFIGURATION ROUTING                       -->
+                <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+                <Border Style="{StaticResource TechPanelStyle}" Padding="16,12">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="SCHEMA_SOURCE:" Style="{StaticResource TechLabelStyle}" VerticalAlignment="Center" Margin="0,0,16,0" Foreground="{StaticResource AccentPrimaryBrush}" />
+                        
+                        <ComboBox
+                            Grid.Column="1"
+                            HorizontalAlignment="Stretch"
+                            CornerRadius="2"
+                            FontFamily="Consolas"
+                            DisplayMemberPath="Name"
+                            ItemsSource="{Binding Templates}"
+                            SelectedItem="{Binding SelectedTemplate, Mode=TwoWay}"
+                            PlaceholderText="Select target schema..." />
+                            
+                        <ProgressRing Grid.Column="2" Width="20" Height="20" IsActive="{Binding IsLoading}" Margin="16,0,0,0" Foreground="{StaticResource AccentPrimaryBrush}" />
+                    </Grid>
+                </Border>
+
+                <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+                <!-- CORE WORKSPACE                              -->
+                <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+                <Grid ColumnSpacing="24">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.4*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- LEFT: Data Stream -->
+                    <Border Grid.Column="0" Style="{StaticResource TechPanelStyle}" Padding="0">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <Border Background="{StaticResource GridHeaderBackgroundBrush}" Padding="16,12" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="0,0,0,1">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="100" />
+                                        <ColumnDefinition Width="80" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="IDENTIFIER" Style="{StaticResource TechLabelStyle}" />
+                                    <TextBlock Grid.Column="1" Text="INDEX_REF" Style="{StaticResource TechLabelStyle}" />
+                                    <TextBlock Grid.Column="2" Text="EXECUTE" Style="{StaticResource TechLabelStyle}" HorizontalAlignment="Right" />
+                                </Grid>
+                            </Border>
+
+                            <ListView
+                                Grid.Row="1"
+                                x:Name="PartsListView"
+                                ItemsSource="{Binding Parts}"
+                                SelectionMode="None"
+                                MinHeight="400"
+                                MaxHeight="600"
+                                ShowsScrollingPlaceholders="False">
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        <Setter Property="Margin" Value="0" />
+                                        <Setter Property="Padding" Value="0" />
+                                    </Style>
+                                </ListView.ItemContainerStyle>
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="0,0,0,1" Padding="16,12">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="100" />
+                                                    <ColumnDefinition Width="80" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                                    <TextBlock Text="[ ]" FontFamily="Consolas" Foreground="{StaticResource TextTertiaryBrush}" VerticalAlignment="Center" />
+                                                    <TextBlock Text="{Binding Label}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+
+                                                <TextBlock Grid.Column="1" Text="{Binding RowId}" FontFamily="Consolas" FontSize="12" Foreground="{StaticResource AccentPrimaryBrush}" VerticalAlignment="Center" />
+
+                                                <Button Grid.Column="2" Click="OnGenerateSingleClick" CornerRadius="2" HorizontalAlignment="Right" Background="#151F7AE0" BorderBrush="#301F7AE0">
+                                                    <TextBlock Text="ENC_QR" FontFamily="Consolas" FontSize="10" Foreground="{StaticResource AccentPrimaryBrush}" />
+                                                </Button>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </Grid>
+                    </Border>
+
+                    <!-- RIGHT: Scanner Bay -->
+                    <StackPanel Grid.Column="1" Spacing="24">
+                        
+                        <!-- The Bay -->
+                        <Border Style="{StaticResource TechPanelStyle}">
+                            <StackPanel Spacing="16">
+                                <TextBlock Text="SCANNER_BAY_PREVIEW" Style="{StaticResource TechLabelStyle}" />
+                                
+                                <!-- Frame -->
+                                <Border Background="{StaticResource PageBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="32" HorizontalAlignment="Center">
+                                    <Grid Width="200" Height="200">
+                                        <!-- Crosshairs -->
+                                        <Border BorderBrush="{StaticResource AccentPrimaryBrush}" BorderThickness="2,2,0,0" Width="20" Height="20" HorizontalAlignment="Left" VerticalAlignment="Top" />
+                                        <Border BorderBrush="{StaticResource AccentPrimaryBrush}" BorderThickness="0,2,2,0" Width="20" Height="20" HorizontalAlignment="Right" VerticalAlignment="Top" />
+                                        <Border BorderBrush="{StaticResource AccentPrimaryBrush}" BorderThickness="2,0,0,2" Width="20" Height="20" HorizontalAlignment="Left" VerticalAlignment="Bottom" />
+                                        <Border BorderBrush="{StaticResource AccentPrimaryBrush}" BorderThickness="0,0,2,2" Width="20" Height="20" HorizontalAlignment="Right" VerticalAlignment="Bottom" />
+                                        
+                                        <!-- QR Image container -->
+                                        <Border x:Name="QrPreviewContainer" Background="White" Margin="10" Padding="8">
+                                            <Image x:Name="QrPreviewImage" Stretch="Uniform" />
+                                        </Border>
+                                        
+                                        <!-- Simulated Scanning Line -->
+                                        <Border Height="2" Background="{StaticResource AccentPrimaryBrush}" VerticalAlignment="Center" Opacity="0.5">
+                                            <Border.Shadow><ThemeShadow/></Border.Shadow>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="RAW_PAYLOAD_DATA" Style="{StaticResource TechLabelStyle}" />
+                                    <Border Background="{StaticResource InputBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" Padding="12" CornerRadius="2">
+                                        <TextBlock
+                                            x:Name="QrPayloadText"
+                                            Text="{Binding PreviewQrText, FallbackValue='> WAITING_FOR_INPUT...'}"
+                                            FontSize="12"
+                                            FontFamily="Consolas"
+                                            Foreground="{StaticResource SuccessBrush}"
+                                            TextWrapping="WrapWholeWords"
+                                            MaxLines="6" />
+                                    </Border>
+                                </StackPanel>
+
+                                <!-- Action Buttons -->
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" HorizontalAlignment="Stretch" Style="{StaticResource OutlinedButtonStyle}" CornerRadius="2" Click="OnCopyPayloadClick">
+                                        <TextBlock Text="COPY_BUFFER" FontFamily="Consolas" FontSize="11" />
+                                    </Button>
+                                    <Button Grid.Column="1" HorizontalAlignment="Stretch" Style="{StaticResource PrimaryButtonStyle}" CornerRadius="2" Click="OnSaveQrClick">
+                                        <TextBlock Text="EXPORT_PNG" FontFamily="Consolas" FontSize="11" />
+                                    </Button>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Log -->
+                        <Border Style="{StaticResource TechPanelStyle}">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="OUTPUT_LOG" Style="{StaticResource TechLabelStyle}" />
+                                <ListView
+                                    ItemsSource="{Binding GeneratedCodes}"
+                                    SelectionMode="None"
+                                    MaxHeight="180">
+                                    <ListView.ItemContainerStyle>
+                                        <Style TargetType="ListViewItem">
+                                            <Setter Property="Padding" Value="0" />
+                                            <Setter Property="Margin" Value="0,0,0,4" />
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        </Style>
+                                    </ListView.ItemContainerStyle>
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="{StaticResource GridHeaderBackgroundBrush}" BorderThickness="0,0,0,1" BorderBrush="{StaticResource BorderDefaultBrush}" Padding="8">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="[OK]" Foreground="{StaticResource SuccessBrush}" FontFamily="Consolas" FontSize="11" Margin="0,0,8,0" />
+                                                    <TextBlock Grid.Column="1" Text="{Binding Label}" FontSize="11" TextTrimming="CharacterEllipsis" FontFamily="Consolas" />
+                                                    <TextBlock Grid.Column="2" Text="{Binding RowId}" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}" FontFamily="Consolas" />
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                            </StackPanel>
+                        </Border>
+
+                    </StackPanel>
+                </Grid>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>
+
+
+

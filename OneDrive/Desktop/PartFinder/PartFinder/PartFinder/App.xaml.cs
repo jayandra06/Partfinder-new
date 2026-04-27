@@ -1,0 +1,87 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.UI.Xaml;
+using PartFinder.Services;
+using PartFinder.ViewModels;
+using PartFinder.Views.Pages;
+
+namespace PartFinder
+{
+    public partial class App : Application
+    {
+        public static IServiceProvider Services { get; private set; } = null!;
+        public static Window? MainAppWindow { get; private set; }
+        private Window? _window;
+
+        public App()
+        {
+            InitializeComponent();
+            Services = ConfigureServices();
+            AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            {
+                DebugLogClient.Post(
+                    "error",
+                    "UnhandledException",
+                    e.ExceptionObject?.ToString());
+            };
+            DebugLogClient.Post("info", "PartFinder WinUI started", null);
+        }
+
+        private static IServiceProvider ConfigureServices()
+        {
+            var services = new ServiceCollection();
+
+            services.AddSingleton<INavigationService, NavigationService>();
+            services.AddSingleton<IAppStateStore, AppStateStore>();
+            services.AddSingleton<LocalUserSecurityStore>();
+            services.AddSingleton<AdminSessionStore>();
+            services.AddSingleton<LocalProfileStore>();
+            services.AddSingleton<ILocalSetupContext, LocalSetupContext>();
+            services.AddSingleton<BackendApiClient>();
+            services.AddSingleton<IOrgUserDirectoryService, MongoOrgUserDirectoryService>();
+            services.AddSingleton<ICurrentUserAccessService, CurrentUserAccessService>();
+            services.AddSingleton<ITemplateSchemaService, MongoTemplateSchemaService>();
+            services.AddSingleton<IMasterDataRecordsService, MongoMasterDataRecordsService>();
+            services.AddSingleton<IContextActionsService, MongoContextActionsService>();
+            services.AddSingleton<IPartsDataService, MongoPartsDataService>();
+            services.AddSingleton<IExcelTemplateService, ClosedXmlExcelTemplateService>();
+
+            services.AddSingleton<ShellViewModel>();
+            services.AddSingleton<IShellNavCoordinator>(sp => sp.GetRequiredService<ShellViewModel>());
+            services.AddTransient<DashboardViewModel>();
+            services.AddTransient<PartsViewModel>();
+            services.AddTransient<TemplatesViewModel>();
+            services.AddTransient<ViewDataViewModel>();
+            services.AddTransient<WorksheetRelationsViewModel>();
+            services.AddTransient<MasterDataViewModel>();
+            services.AddTransient<SettingsViewModel>();
+            services.AddTransient<UserManagementViewModel>();
+            services.AddTransient<QrCodeManagerViewModel>();
+
+            services.AddTransient<MasterDataPage>();
+            services.AddTransient<DashboardPage>();
+            services.AddTransient<PartsPage>();
+            services.AddTransient<InventoryPage>();
+            services.AddTransient<AnalyticsPage>();
+            services.AddTransient<AlertsPage>();
+            services.AddTransient<SuppliersPage>();
+            services.AddTransient<CatalogPage>();
+            services.AddTransient<OrdersPage>();
+            services.AddTransient<AuditPage>();
+            services.AddTransient<TemplatesPage>();
+            services.AddTransient<ViewDataPage>();
+            services.AddTransient<WorksheetRelationsPage>();
+            services.AddTransient<SettingsPage>();
+            services.AddTransient<UserManagementPage>();
+            services.AddTransient<QrCodeManagerPage>();
+
+            return services.BuildServiceProvider();
+        }
+
+        protected override void OnLaunched(LaunchActivatedEventArgs args)
+        {
+            _window = new MainWindow();
+            MainAppWindow = _window;
+            _window.Activate();
+        }
+    }
+}
