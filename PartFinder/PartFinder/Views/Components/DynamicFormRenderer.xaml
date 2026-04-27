@@ -1,0 +1,25 @@
+<UserControl
+    x:Class="PartFinder.Views.Components.DynamicFormRenderer"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:PartFinder.Models">
+    <ItemsControl ItemsSource="{x:Bind Fields, Mode=OneWay}">
+        <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+                <ItemsWrapGrid Orientation="Horizontal" ItemWidth="380" ItemHeight="88" />
+            </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="models:TemplateFieldDefinition">
+                <StackPanel Margin="0,0,12,12" Spacing="4">
+                    <TextBlock FontWeight="SemiBold" Text="{x:Bind Label}" TextWrapping="WrapWholeWords" />
+                    <TextBlock
+                        FontSize="12"
+                        Foreground="{ThemeResource AppSubtleTextBrush}"
+                        Text="{x:Bind Type}"
+                        TextWrapping="WrapWholeWords" />
+                </StackPanel>
+            </DataTemplate>
+        </ItemsControl.ItemTemplate>
+    </ItemsControl>
+</UserControl>

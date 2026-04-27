@@ -1,0 +1,319 @@
+<UserControl
+    x:Class="PartFinder.Views.Components.FavouritesSubPage"
+    x:Name="FavouritesSubPageRoot"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:converters="using:PartFinder.Converters"
+    KeyDown="OnKeyDown">
+
+    <UserControl.Resources>
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+        <converters:InvertedBoolToVisibilityConverter x:Key="InvertedBoolToVisibilityConverter" />
+
+        <!-- Entrance animation -->
+        <Storyboard x:Key="EntranceSb">
+            <DoubleAnimation
+                Storyboard.TargetName="CarouselRoot"
+                Storyboard.TargetProperty="Opacity"
+                From="0" To="1" Duration="0:0:0.35">
+                <DoubleAnimation.EasingFunction>
+                    <ExponentialEase EasingMode="EaseOut" Exponent="4" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation
+                Storyboard.TargetName="EntranceTransform"
+                Storyboard.TargetProperty="Y"
+                From="32" To="0" Duration="0:0:0.4">
+                <DoubleAnimation.EasingFunction>
+                    <ExponentialEase EasingMode="EaseOut" Exponent="5" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+
+        <!-- Exit animation -->
+        <Storyboard x:Key="ExitSb">
+            <DoubleAnimation
+                Storyboard.TargetName="CarouselRoot"
+                Storyboard.TargetProperty="Opacity"
+                From="1" To="0" Duration="0:0:0.2">
+                <DoubleAnimation.EasingFunction>
+                    <ExponentialEase EasingMode="EaseOut" Exponent="4" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation
+                Storyboard.TargetName="EntranceTransform"
+                Storyboard.TargetProperty="Y"
+                From="0" To="16" Duration="0:0:0.2">
+                <DoubleAnimation.EasingFunction>
+                    <ExponentialEase EasingMode="EaseIn" Exponent="4" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+    </UserControl.Resources>
+
+    <Grid x:Name="CarouselRoot" Opacity="0">
+        <Grid.RenderTransform>
+            <TranslateTransform x:Name="EntranceTransform" Y="32" />
+        </Grid.RenderTransform>
+
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- ── Header Row: Back + Title ── -->
+        <Grid Grid.Row="0" Margin="0,0,0,28">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Back Button -->
+            <Button Grid.Column="0"
+                    Style="{StaticResource GhostButtonStyle}"
+                    Padding="10,8"
+                    CornerRadius="8"
+                    BorderBrush="#2A3D58"
+                    BorderThickness="1"
+                    Click="OnBackToTemplatesClick"
+                    AutomationProperties.Name="Back to Templates">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE76B;" FontSize="13" Foreground="#1F7AE0" />
+                    <TextBlock Text="Back to Templates" FontSize="13" Foreground="#AAB8CA" />
+                </StackPanel>
+            </Button>
+
+            <!-- Title -->
+            <StackPanel Grid.Column="1" Spacing="2" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock Text="MY FAVOURITES" FontSize="11" Foreground="#1F7AE0" FontWeight="Bold" CharacterSpacing="80" HorizontalAlignment="Center" />
+                <TextBlock Text="Starred Templates" FontSize="22" FontWeight="Light" HorizontalAlignment="Center" />
+            </StackPanel>
+        </Grid>
+
+        <!-- ── Empty State ── -->
+        <StackPanel
+            Grid.Row="2"
+            Spacing="16"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibilityConverter}}">
+            <Border Width="80" Height="80" CornerRadius="20"
+                    Background="#0D1E33" BorderBrush="#1F7AE0" BorderThickness="1"
+                    HorizontalAlignment="Center">
+                <FontIcon Glyph="&#xE735;" FontSize="32" Foreground="#1F7AE0" />
+            </Border>
+            <StackPanel Spacing="8" HorizontalAlignment="Center">
+                <TextBlock Text="No favourites yet" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                <TextBlock Text="Tap the star icon on any template to add it here."
+                           FontSize="13" Foreground="#AAB8CA"
+                           HorizontalAlignment="Center" TextAlignment="Center"
+                           MaxWidth="300" TextWrapping="WrapWholeWords" />
+            </StackPanel>
+        </StackPanel>
+
+        <!-- ── Slide Carousel ── -->
+        <Grid
+            x:Name="CarouselGrid"
+            Grid.Row="2"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Width="540"
+            Visibility="{Binding IsEmpty, Converter={StaticResource InvertedBoolToVisibilityConverter}}">
+
+            <!-- ── Active Card ── -->
+            <Border
+                x:Name="ActiveCard"
+                Width="520"
+                MinHeight="300"
+                CornerRadius="20"
+                Padding="0"
+                Background="#172334"
+                BorderBrush="#1F7AE0"
+                BorderThickness="1"
+                Translation="0,0,48">
+                <Border.Shadow><ThemeShadow /></Border.Shadow>
+                <Border.RenderTransform>
+                    <CompositeTransform x:Name="ActiveCardTransform" />
+                </Border.RenderTransform>
+
+                <StackPanel Spacing="0">
+                    <!-- Blue top accent bar -->
+                    <Border Height="4" CornerRadius="20,20,0,0" Background="#1F7AE0" />
+
+                    <StackPanel Spacing="0" Padding="28,22,28,24">
+
+                        <!-- Card Header: Name + Star -->
+                        <Grid Margin="0,0,0,16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Spacing="6">
+                                <TextBlock
+                                    x:Name="CardTitleText"
+                                    FontSize="20"
+                                    FontWeight="SemiBold"
+                                    TextTrimming="CharacterEllipsis" />
+                                <TextBlock
+                                    x:Name="CardFieldCountText"
+                                    FontSize="12"
+                                    Foreground="#AAB8CA" />
+                            </StackPanel>
+                            <!-- Star toggle -->
+                            <Button
+                                x:Name="CardStarButton"
+                                Grid.Column="1"
+                                Style="{StaticResource GhostButtonStyle}"
+                                Width="40" Height="40"
+                                Padding="0"
+                                VerticalAlignment="Top"
+                                Click="OnCardStarClick"
+                                AutomationProperties.Name="Toggle favourite">
+                                <FontIcon
+                                    x:Name="CardStarIcon"
+                                    Glyph="&#xE735;"
+                                    FontSize="18"
+                                    Foreground="#1F7AE0" />
+                            </Button>
+                        </Grid>
+
+                        <!-- Divider -->
+                        <Border Height="1" Background="#1A2A3E" Margin="0,0,0,18" />
+
+                        <!-- Schema Fields -->
+                        <StackPanel Spacing="10" Margin="0,0,0,20">
+                            <TextBlock Text="SCHEMA FIELDS"
+                                       FontSize="10" Foreground="#1F7AE0"
+                                       FontWeight="Bold" CharacterSpacing="60" />
+                            <ScrollViewer
+                                HorizontalScrollBarVisibility="Auto"
+                                HorizontalScrollMode="Enabled"
+                                VerticalScrollBarVisibility="Disabled"
+                                VerticalScrollMode="Disabled"
+                                MaxHeight="72">
+                                <StackPanel x:Name="FieldChipsPanel" Orientation="Horizontal" Spacing="6" />
+                            </ScrollViewer>
+                        </StackPanel>
+
+                        <!-- Divider -->
+                        <Border Height="1" Background="#1A2A3E" Margin="0,0,0,18" />
+
+                        <!-- Action Buttons -->
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Edit -->
+                            <Button x:Name="CardEditButton"
+                                    Grid.Column="0"
+                                    HorizontalAlignment="Stretch"
+                                    Height="40"
+                                    Background="#1F7AE0"
+                                    Foreground="White"
+                                    BorderThickness="0"
+                                    CornerRadius="10"
+                                    FontWeight="SemiBold"
+                                    Click="OnCardEditClick">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <FontIcon Glyph="&#xE70F;" FontSize="13" />
+                                    <TextBlock Text="Edit" FontSize="13" />
+                                </StackPanel>
+                            </Button>
+
+                            <!-- Add Column -->
+                            <Button x:Name="CardAddRowButton"
+                                    Grid.Column="1"
+                                    HorizontalAlignment="Stretch"
+                                    Height="40"
+                                    Background="Transparent"
+                                    Foreground="#AAB8CA"
+                                    BorderBrush="#2A3D58"
+                                    BorderThickness="1"
+                                    CornerRadius="10"
+                                    Click="OnCardAddRowClick">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <FontIcon Glyph="&#xE710;" FontSize="13" />
+                                    <TextBlock Text="Add Col" FontSize="13" />
+                                </StackPanel>
+                            </Button>
+
+                            <!-- Delete -->
+                            <Button x:Name="CardDeleteButton"
+                                    Grid.Column="2"
+                                    HorizontalAlignment="Stretch"
+                                    Height="40"
+                                    Background="Transparent"
+                                    Foreground="#FFB4AB"
+                                    BorderBrush="#4A2020"
+                                    BorderThickness="1"
+                                    CornerRadius="10"
+                                    Click="OnCardDeleteClick">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <FontIcon Glyph="&#xE74D;" FontSize="13" Foreground="#FFB4AB" />
+                                    <TextBlock Text="Delete" FontSize="13" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ── Bottom Nav: Index + Prev/Next ── -->
+        <Border Grid.Row="3"
+                Margin="0,28,0,0"
+                HorizontalAlignment="Center"
+                Visibility="{Binding IsEmpty, Converter={StaticResource InvertedBoolToVisibilityConverter}}">
+            <StackPanel Orientation="Horizontal" Spacing="0"
+                        Background="#0D1E33"
+                        CornerRadius="40"
+                        BorderBrush="#1A2A3E"
+                        BorderThickness="1"
+                        Padding="6">
+
+                <!-- Prev Button -->
+                <Button
+                    Width="44" Height="44"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    CornerRadius="22"
+                    IsEnabled="{Binding CanGoPrevious}"
+                    Click="OnPreviousClick"
+                    AutomationProperties.Name="Previous template">
+                    <FontIcon Glyph="&#xE76B;" FontSize="15" Foreground="#1F7AE0" />
+                </Button>
+
+                <!-- Index Label -->
+                <StackPanel Spacing="2" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="18,0">
+                    <TextBlock Text="{Binding IndexLabel}"
+                               FontSize="13" FontWeight="SemiBold"
+                               Foreground="#AAB8CA"
+                               HorizontalAlignment="Center" />
+                    <TextBlock Text="arrow keys to navigate"
+                               FontSize="9" Foreground="#4A5E78"
+                               HorizontalAlignment="Center" />
+                </StackPanel>
+
+                <!-- Next Button -->
+                <Button
+                    Width="44" Height="44"
+                    Background="#1F7AE0"
+                    BorderThickness="0"
+                    CornerRadius="22"
+                    IsEnabled="{Binding CanGoNext}"
+                    Click="OnNextClick"
+                    AutomationProperties.Name="Next template">
+                    <FontIcon Glyph="&#xE76C;" FontSize="15" Foreground="White" />
+                </Button>
+
+            </StackPanel>
+        </Border>
+
+    </Grid>
+</UserControl>

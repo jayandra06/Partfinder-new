@@ -1,0 +1,15 @@
+import { IsOptional, IsString, Matches, MinLength } from 'class-validator';
+import { Transform } from 'class-transformer';
+
+export class SetupTestDatabaseDto {
+  @IsString()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @Matches(/^\d{6}$/, { message: 'Organization code must be exactly 6 digits' })
+  orgCode: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  uri?: string;
+}

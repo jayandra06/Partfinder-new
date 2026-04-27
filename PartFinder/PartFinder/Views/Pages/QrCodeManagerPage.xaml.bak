@@ -1,0 +1,307 @@
+<Page
+    x:Class="PartFinder.Views.Pages.QrCodeManagerPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:converters="using:PartFinder.Converters">
+    <Page.Resources>
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+    </Page.Resources>
+
+    <Grid Background="{StaticResource PageBackgroundBrush}">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Padding="24,20,24,32" Spacing="18" MaxWidth="1400" HorizontalAlignment="Left">
+
+                <!-- ═══════════════════════════════════════════ -->
+                <!-- HEADER                                     -->
+                <!-- ═══════════════════════════════════════════ -->
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="QR CODES" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="80" FontWeight="SemiBold" />
+                        <TextBlock Text="QR Code Manager" FontSize="24" FontWeight="Bold" />
+                        <TextBlock Text="Generate, preview, and manage QR codes for parts inventory." FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <Button Style="{StaticResource OutlinedButtonStyle}" Command="{Binding GenerateAllQrCommand}" FontSize="12">
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <FontIcon Glyph="&#xED14;" FontSize="13" />
+                                <TextBlock Text="Generate All" FontSize="12" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource GhostButtonStyle}" Command="{Binding ClearAllCommand}" Content="Clear" FontSize="12" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- ═══════════════════════════════════════════ -->
+                <!-- KPI Row                                     -->
+                <!-- ═══════════════════════════════════════════ -->
+                <Grid ColumnSpacing="14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="10" Padding="14,12">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="TEMPLATE" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" />
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE8A5;" FontSize="16" Foreground="{StaticResource AccentPrimaryBrush}" />
+                                <TextBlock Text="{Binding SelectedTemplate.Name, FallbackValue='—'}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="1" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="10" Padding="14,12">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="PARTS LOADED" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" />
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE80A;" FontSize="16" Foreground="{StaticResource SuccessBrush}" />
+                                <TextBlock Text="{Binding Parts.Count}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource SuccessBrush}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="2" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="10" Padding="14,12">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="QR GENERATED" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" />
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xED14;" FontSize="16" Foreground="{StaticResource AccentPrimaryBrush}" />
+                                <TextBlock Text="{Binding TotalGenerated}" FontSize="20" FontWeight="SemiBold" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="3" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="10" Padding="14,12">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="STATUS" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" />
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Ellipse Width="8" Height="8" Fill="{StaticResource SuccessBrush}" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding StatusMessage, FallbackValue='Ready'}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- ═══════════════════════════════════════════ -->
+                <!-- Template Selection                          -->
+                <!-- ═══════════════════════════════════════════ -->
+                <Border Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="10" Padding="14,10">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <FontIcon Glyph="&#xE721;" FontSize="12" Foreground="{StaticResource TextTertiaryBrush}" VerticalAlignment="Center" />
+                        <ComboBox
+                            MinWidth="300"
+                            FontSize="12"
+                            DisplayMemberPath="Name"
+                            ItemsSource="{Binding Templates}"
+                            SelectedItem="{Binding SelectedTemplate, Mode=TwoWay}"
+                            PlaceholderText="Select a template to generate QR codes" />
+                        <ProgressRing Width="16" Height="16" IsActive="{Binding IsLoading}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- ═══════════════════════════════════════════ -->
+                <!-- Main Content: Parts List + QR Preview       -->
+                <!-- ═══════════════════════════════════════════ -->
+                <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.3*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Parts list -->
+                    <Border Grid.Column="0" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="10" Padding="0">
+                        <StackPanel>
+                            <!-- Table header -->
+                            <Grid Padding="14,8" Background="{StaticResource GridHeaderBackgroundBrush}" ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Border Width="28" />
+                                <TextBlock Grid.Column="1" Text="PART" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="2" Text="ROW ID" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" VerticalAlignment="Center" MinWidth="80" />
+                                <TextBlock Grid.Column="3" Text="ACTION" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" VerticalAlignment="Center" MinWidth="70" />
+                            </Grid>
+
+                            <ListView
+                                x:Name="PartsListView"
+                                ItemsSource="{Binding Parts}"
+                                SelectionMode="None"
+                                MinHeight="300"
+                                MaxHeight="500">
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
+                                        <Setter Property="Padding" Value="0" />
+                                        <Setter Property="Margin" Value="0" />
+                                        <Setter Property="MinHeight" Value="0" />
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    </Style>
+                                </ListView.ItemContainerStyle>
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Padding="14,8" ColumnSpacing="10" MinHeight="44" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="0,0,0,1">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Icon -->
+                                            <Border Width="28" Height="28" CornerRadius="6" Background="{StaticResource GridHeaderBackgroundBrush}" VerticalAlignment="Center">
+                                                <FontIcon Glyph="&#xE946;" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
+                                            </Border>
+
+                                            <!-- Part label (first field value) -->
+                                            <TextBlock Grid.Column="1" Text="{Binding RowId}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+
+                                            <!-- Row ID -->
+                                            <TextBlock Grid.Column="2" Text="{Binding RowId}" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" VerticalAlignment="Center" MinWidth="80" TextTrimming="CharacterEllipsis" />
+
+                                            <!-- Generate button -->
+                                            <Button
+                                                Grid.Column="3"
+                                                Style="{StaticResource OutlinedButtonStyle}"
+                                                FontSize="10"
+                                                Padding="8,3"
+                                                MinWidth="70"
+                                                Click="OnGenerateSingleClick">
+                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                    <FontIcon Glyph="&#xED14;" FontSize="10" />
+                                                    <TextBlock Text="QR" FontSize="10" />
+                                                </StackPanel>
+                                            </Button>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- QR Preview panel -->
+                    <StackPanel Grid.Column="1" Spacing="14">
+
+                        <!-- Live preview -->
+                        <Border Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="10" Padding="18,14">
+                            <StackPanel Spacing="12">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="Live Preview" FontSize="15" FontWeight="SemiBold" />
+                                        <TextBlock Text="Last generated QR code" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Top">
+                                        <Ellipse Width="8" Height="8" Fill="#FF5F57" />
+                                        <Ellipse Width="8" Height="8" Fill="#FEBC2E" />
+                                        <Ellipse Width="8" Height="8" Fill="#28C840" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- QR Image -->
+                                <Border
+                                    x:Name="QrPreviewContainer"
+                                    HorizontalAlignment="Center"
+                                    CornerRadius="10"
+                                    Background="White"
+                                    Padding="16"
+                                    MinWidth="200"
+                                    MinHeight="200">
+                                    <Image
+                                        x:Name="QrPreviewImage"
+                                        Width="180"
+                                        Height="180"
+                                        Stretch="Uniform" />
+                                </Border>
+
+                                <!-- Payload text -->
+                                <Border Background="{StaticResource GridHeaderBackgroundBrush}" CornerRadius="6" Padding="10">
+                                    <TextBlock
+                                        x:Name="QrPayloadText"
+                                        Text="{Binding PreviewQrText, FallbackValue='Select a part and click QR to preview'}"
+                                        FontSize="10"
+                                        FontFamily="Consolas"
+                                        Foreground="{StaticResource TextSecondaryBrush}"
+                                        TextWrapping="WrapWholeWords"
+                                        MaxLines="8" />
+                                </Border>
+
+                                <!-- Action buttons -->
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Style="{StaticResource PrimaryButtonStyle}" FontSize="12" Click="OnSaveQrClick">
+                                        <StackPanel Orientation="Horizontal" Spacing="5">
+                                            <FontIcon Glyph="&#xE74E;" FontSize="12" />
+                                            <TextBlock Text="Save PNG" FontSize="12" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Style="{StaticResource OutlinedButtonStyle}" FontSize="12" Click="OnCopyPayloadClick">
+                                        <StackPanel Orientation="Horizontal" Spacing="5">
+                                            <FontIcon Glyph="&#xE8C8;" FontSize="12" />
+                                            <TextBlock Text="Copy Data" FontSize="12" />
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Generated codes list -->
+                        <Border Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="10" Padding="14">
+                            <StackPanel Spacing="8">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Generated Codes" FontSize="14" FontWeight="SemiBold" />
+                                    <Border Grid.Column="1" CornerRadius="6" Padding="6,2" Background="#101F7AE0">
+                                        <TextBlock FontSize="9" Foreground="{StaticResource AccentPrimaryBrush}" CharacterSpacing="60" FontWeight="SemiBold">
+                                            <Run Text="{Binding TotalGenerated}" /><Run Text=" CODES" />
+                                        </TextBlock>
+                                    </Border>
+                                </Grid>
+                                <ListView
+                                    ItemsSource="{Binding GeneratedCodes}"
+                                    SelectionMode="None"
+                                    MaxHeight="200">
+                                    <ListView.ItemContainerStyle>
+                                        <Style TargetType="ListViewItem">
+                                            <Setter Property="Padding" Value="0" />
+                                            <Setter Property="Margin" Value="0,0,0,4" />
+                                            <Setter Property="MinHeight" Value="0" />
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        </Style>
+                                    </ListView.ItemContainerStyle>
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="{StaticResource ElevatedCardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="8,6">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <Border Width="24" Height="24" CornerRadius="4" Background="#101F7AE0">
+                                                        <FontIcon Glyph="&#xED14;" FontSize="10" Foreground="{StaticResource AccentPrimaryBrush}" />
+                                                    </Border>
+                                                    <StackPanel VerticalAlignment="Center" Spacing="0">
+                                                        <TextBlock Text="{Binding Label}" FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{Binding RowId}" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" />
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Grid>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>

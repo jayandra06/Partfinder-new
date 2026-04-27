@@ -1,0 +1,214 @@
+<Page
+    x:Class="PartFinder.Views.Pages.ViewDataPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:components="using:PartFinder.Views.Components"
+    xmlns:converters="using:PartFinder.Converters"
+    xmlns:viewModels="using:PartFinder.ViewModels">
+    <Page.Resources>
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+    </Page.Resources>
+
+    <Grid Padding="20" ColumnSpacing="14" Background="{StaticResource PageBackgroundBrush}">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="300" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.ColumnSpan="2" Spacing="2" Margin="0,0,0,12">
+            <TextBlock Text="VIEW DATA" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="80" FontWeight="SemiBold" />
+            <TextBlock Text="View Data" FontSize="22" FontWeight="SemiBold" />
+            <TextBlock Text="Enriched row view with linked vendor details." FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
+        </StackPanel>
+
+        <!-- Main content -->
+        <Grid Grid.Row="1" Grid.Column="0">
+            <StackPanel Spacing="12">
+
+                <!-- Template selector + refresh -->
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <ComboBox
+                        Width="300"
+                        FontSize="12"
+                        DisplayMemberPath="Name"
+                        ItemsSource="{Binding Templates}"
+                        SelectedItem="{Binding SelectedTemplate, Mode=TwoWay}"
+                        PlaceholderText="Select template to view" />
+                    <Button Style="{StaticResource OutlinedButtonStyle}" Command="{Binding LoadViewDataCommand}" Content="Refresh" FontSize="12" />
+                </StackPanel>
+
+                <TextBlock Foreground="{StaticResource DangerBrush}" Text="{Binding ErrorMessage}" FontSize="12" TextWrapping="WrapWholeWords" />
+
+                <!-- Rows list -->
+                <Border Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="10" Padding="0">
+                    <Grid>
+                        <ListView
+                            x:Name="RowsListView"
+                            MinHeight="420"
+                            ItemsSource="{Binding Rows}"
+                            SelectionMode="Single"
+                            SelectedItem="{Binding HoveredRow, Mode=TwoWay}">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="Padding" Value="0" />
+                                    <Setter Property="Margin" Value="0" />
+                                    <Setter Property="MinHeight" Value="0" />
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="viewModels:ViewDataRowItem">
+                                    <Border
+                                        Tag="{x:Bind}"
+                                        PointerEntered="OnRowPointerEntered"
+                                        PointerExited="OnRowPointerExited"
+                                        Margin="0"
+                                        Padding="12,10"
+                                        BorderThickness="0,0,0,1"
+                                        BorderBrush="{StaticResource BorderDefaultBrush}">
+                                        <Grid ColumnSpacing="10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Avatar -->
+                                            <Border Width="32" Height="32" CornerRadius="6" Background="{StaticResource GridHeaderBackgroundBrush}" VerticalAlignment="Center">
+                                                <FontIcon Glyph="&#xE8A5;" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" />
+                                            </Border>
+
+                                            <!-- Info -->
+                                            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                <TextBlock Text="{x:Bind Row.RowId}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock
+                                                    Foreground="{StaticResource TextSecondaryBrush}"
+                                                    FontSize="11"
+                                                    Text="{x:Bind PrimaryPreview, Mode=OneWay}"
+                                                    TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+
+                                            <!-- Status badges -->
+                                            <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="3">
+                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                    <Ellipse Width="6" Height="6" Fill="{StaticResource SuccessBrush}" VerticalAlignment="Center" />
+                                                    <TextBlock FontSize="10" Foreground="{StaticResource TextTertiaryBrush}">
+                                                        <Run Text="{x:Bind MatchedRelations, Mode=OneWay}" /><Run Text="/" /><Run Text="{x:Bind TotalRelations, Mode=OneWay}" />
+                                                    </TextBlock>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                    <Ellipse Width="6" Height="6" Fill="{StaticResource SuccessBrush}" VerticalAlignment="Center" />
+                                                    <TextBlock Text="Vendor" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                        <ProgressRing
+                            Width="28"
+                            Height="28"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            IsActive="{Binding IsLoading}" />
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </Grid>
+
+        <!-- Details flyout panel -->
+        <Border
+            x:Name="DetailsPanel"
+            Grid.Row="1"
+            Grid.Column="1"
+            PointerEntered="OnDetailsPanelPointerEntered"
+            PointerExited="OnDetailsPanelPointerExited"
+            Background="{StaticResource ElevatedCardBackgroundBrush}"
+            BorderBrush="{StaticResource BorderDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="10"
+            Padding="14"
+            Visibility="{Binding IsFlyoutOpen, Converter={StaticResource BoolToVisibilityConverter}}">
+            <Border.RenderTransform>
+                <TranslateTransform x:Name="DetailsPanelTransform" X="24" />
+            </Border.RenderTransform>
+            <ScrollViewer>
+                <StackPanel Spacing="10">
+
+                    <!-- Header -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="PART DETAILS" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="80" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Style="{StaticResource GhostButtonStyle}" Content="✕" FontSize="12" Command="{Binding CloseFlyoutCommand}" />
+                    </Grid>
+
+                    <!-- Primary details -->
+                    <ItemsControl ItemsSource="{Binding HoveredRowPrimaryDetails}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding DisplayText}" FontSize="12" TextWrapping="WrapWholeWords" Margin="0,0,0,2" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Vendor info -->
+                    <TextBlock Text="VENDOR INFORMATION" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="80" FontWeight="SemiBold" Margin="0,6,0,0" />
+                    <Border
+                        Background="{StaticResource CardBackgroundBrush}"
+                        Padding="10"
+                        CornerRadius="8"
+                        BorderBrush="{StaticResource BorderDefaultBrush}"
+                        BorderThickness="1">
+                        <ItemsControl ItemsSource="{Binding HoveredRowLinkedDetails}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding DisplayText}" FontSize="11" TextWrapping="WrapWholeWords" Margin="0,0,0,2" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Border>
+
+                    <!-- Relation status -->
+                    <TextBlock Text="RELATION STATUS" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="80" FontWeight="SemiBold" Margin="0,6,0,0" />
+                    <ItemsControl ItemsSource="{Binding HoveredRelationSections}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="viewModels:RelationDetailSection">
+                                <Border
+                                    Margin="0,0,0,6"
+                                    Padding="10"
+                                    Background="{StaticResource CardBackgroundBrush}"
+                                    BorderBrush="{StaticResource BorderDefaultBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="8">
+                                    <StackPanel Spacing="4">
+                                        <StackPanel Orientation="Horizontal" Spacing="5">
+                                            <Ellipse Width="6" Height="6" Fill="{StaticResource SuccessBrush}" VerticalAlignment="Center" />
+                                            <TextBlock Text="{x:Bind Title}" FontSize="12" FontWeight="SemiBold" />
+                                            <TextBlock FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" Text="{x:Bind MatchLabel, Mode=OneWay}" />
+                                        </StackPanel>
+                                        <ItemsControl ItemsSource="{x:Bind Details, Mode=OneWay}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding DisplayText}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="WrapWholeWords" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</Page>
