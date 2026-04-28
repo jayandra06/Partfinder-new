@@ -231,11 +231,13 @@ public sealed partial class TemplatesPage : Page
                     // Call the public method
                     await vm.ToggleFavouritePublicAsync(template.Id);
                     
+                    // Force immediate UI update
+                    var isFavorite = vm.IsFavouriteFor(template.Id);
+                    
                     // Update the star icon immediately after the method completes
                     var icon = FindChildOfType<FontIcon>(button);
                     if (icon != null)
                     {
-                        var isFavorite = vm.IsFavouriteFor(template.Id);
                         icon.Glyph = isFavorite ? "\uE735" : "\uE734"; // Filled vs outline star
                         
                         // Use theme colors
@@ -247,9 +249,11 @@ public sealed partial class TemplatesPage : Page
                         {
                             icon.Foreground = Application.Current.Resources["TextSecondaryBrush"] as SolidColorBrush;
                         }
+                        
+                        System.Diagnostics.Debug.WriteLine($"Star immediately updated for {template.Name}: {(isFavorite ? "Filled" : "Empty")}");
                     }
 
-                    // Also update all other stars to ensure consistency
+                    // Also update all other stars to ensure consistency (delayed)
                     DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
                     {
                         UpdateFavoriteStars();

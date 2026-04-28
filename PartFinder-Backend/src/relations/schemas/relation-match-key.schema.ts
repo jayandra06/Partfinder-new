@@ -16,4 +16,3 @@ export class RelationMatchKey {
 }
 
 export const RelationMatchKeySchema = SchemaFactory.createForClass(RelationMatchKey);
-RelationMatchKeySchema.index({ relationId: 1 });

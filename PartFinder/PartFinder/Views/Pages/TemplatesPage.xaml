@@ -1,4 +1,4 @@
-﻿<Page
+<Page
     x:Class="PartFinder.Views.Pages.TemplatesPage"
     x:Name="TemplatesPageRoot"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -513,7 +513,7 @@
                                                     </ItemsControl.ItemsPanel>
                                                     <ItemsControl.ItemTemplate>
                                                         <DataTemplate>
-                                                            <TextBlock Text="sample_01" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}" MinWidth="90" />
+                                                            <TextBlock Text="{Binding SampleValue1}" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}" MinWidth="90" />
                                                         </DataTemplate>
                                                     </ItemsControl.ItemTemplate>
                                                 </ItemsControl>
@@ -527,7 +527,7 @@
                                                     </ItemsControl.ItemsPanel>
                                                     <ItemsControl.ItemTemplate>
                                                         <DataTemplate>
-                                                            <TextBlock Text="sample_02" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}" MinWidth="90" />
+                                                            <TextBlock Text="{Binding SampleValue2}" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}" MinWidth="90" />
                                                         </DataTemplate>
                                                     </ItemsControl.ItemTemplate>
                                                 </ItemsControl>

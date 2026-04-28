@@ -15,6 +15,8 @@ public partial class TemplatesViewModel : ViewModelBase
     private readonly ActivityLogger _activityLogger;
     private readonly IFavouriteStore _favouriteStore;
 
+    private readonly Microsoft.UI.Dispatching.DispatcherQueue _dispatcherQueue;
+
     public TemplatesViewModel(
         ITemplateSchemaService templateSchema,
         IShellNavCoordinator shellNav,
@@ -29,9 +31,21 @@ public partial class TemplatesViewModel : ViewModelBase
         _contextActions = contextActions;
         _activityLogger = activityLogger;
         _favouriteStore = favouriteStore;
+        _dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+        
         ColumnLabels.Add(new ColumnLabelDraft());
         Templates.CollectionChanged += OnTemplatesCollectionChanged;
-        _favouriteStore.FavouritesChanged += (_, _) => OnPropertyChanged(nameof(FavouritesStoreVersion));
+        _favouriteStore.FavouritesChanged += (_, _) => 
+        {
+            if (_dispatcherQueue != null && !_dispatcherQueue.HasThreadAccess)
+            {
+                _dispatcherQueue.TryEnqueue(() => OnPropertyChanged(nameof(FavouritesStoreVersion)));
+            }
+            else
+            {
+                OnPropertyChanged(nameof(FavouritesStoreVersion));
+            }
+        };
     }
 
     private void OnTemplatesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)

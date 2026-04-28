@@ -13,4 +13,3 @@ export class RelationDisplayColumn {
 }
 
 export const RelationDisplayColumnSchema = SchemaFactory.createForClass(RelationDisplayColumn);
-RelationDisplayColumnSchema.index({ relationId: 1 });

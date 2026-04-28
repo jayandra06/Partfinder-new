@@ -10,11 +10,13 @@ public partial class FavouritesViewModel : ViewModelBase
 {
     private readonly IFavouriteStore _favouriteStore;
     private readonly ITemplateSchemaService _templateSchema;
+    private readonly Microsoft.UI.Dispatching.DispatcherQueue _dispatcherQueue;
 
     public FavouritesViewModel(IFavouriteStore favouriteStore, ITemplateSchemaService templateSchema)
     {
         _favouriteStore = favouriteStore;
         _templateSchema = templateSchema;
+        _dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
 
         FavouriteTemplates.CollectionChanged += OnFavouriteTemplatesCollectionChanged;
         _favouriteStore.FavouritesChanged += OnFavouritesChanged;
@@ -202,6 +204,12 @@ public partial class FavouritesViewModel : ViewModelBase
 
     private void OnFavouritesChanged(object? sender, EventArgs e)
     {
+        if (_dispatcherQueue != null && !_dispatcherQueue.HasThreadAccess)
+        {
+            _dispatcherQueue.TryEnqueue(() => OnFavouritesChanged(sender, e));
+            return;
+        }
+
         var favouriteIds = _favouriteStore.GetAll();
         foreach (var card in FavouriteTemplates)
         {

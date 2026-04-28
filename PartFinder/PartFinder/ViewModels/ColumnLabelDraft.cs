@@ -12,7 +12,14 @@ public sealed class ColumnLabelDraft : ObservableObject
     public string Label
     {
         get => _label;
-        set => SetProperty(ref _label, value);
+        set
+        {
+            if (SetProperty(ref _label, value))
+            {
+                OnPropertyChanged(nameof(SampleValue1));
+                OnPropertyChanged(nameof(SampleValue2));
+            }
+        }
     }
 
     public TemplateFieldType FieldType
@@ -27,6 +34,8 @@ public sealed class ColumnLabelDraft : ObservableObject
                     LinkedTemplateId = null;
                 }
                 OnPropertyChanged(nameof(IsLinkColumn));
+                OnPropertyChanged(nameof(SampleValue1));
+                OnPropertyChanged(nameof(SampleValue2));
             }
         }
     }
@@ -57,4 +66,40 @@ public sealed class ColumnLabelDraft : ObservableObject
 
     /// <summary>When editing an existing template, preserve the stored field key for this row.</summary>
     public string? StableKey { get; set; }
+
+    public string SampleValue1
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(Label)) return "---";
+            return FieldType switch
+            {
+                TemplateFieldType.Number => "42",
+                TemplateFieldType.Decimal => "12.50",
+                TemplateFieldType.Date => "2024-10-01",
+                TemplateFieldType.Boolean => "Yes",
+                TemplateFieldType.Dropdown => "Option A",
+                TemplateFieldType.RecordLink => "Linked Item",
+                _ => $"Sample {Label}"
+            };
+        }
+    }
+
+    public string SampleValue2
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(Label)) return "---";
+            return FieldType switch
+            {
+                TemplateFieldType.Number => "10",
+                TemplateFieldType.Decimal => "5.75",
+                TemplateFieldType.Date => "2024-11-15",
+                TemplateFieldType.Boolean => "No",
+                TemplateFieldType.Dropdown => "Option B",
+                TemplateFieldType.RecordLink => "Another Item",
+                _ => $"Another {Label}"
+            };
+        }
+    }
 }
