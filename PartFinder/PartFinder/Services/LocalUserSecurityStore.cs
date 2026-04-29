@@ -27,6 +27,23 @@ public sealed class LocalUserSecurityStore
         _filePath = Path.Combine(dir, "user-security.json");
     }
 
+    public bool AppLockEnabled
+    {
+        get
+        {
+            Load();
+            return Current?.AppLockEnabled == true;
+        }
+    }
+
+    public void SetAppLockEnabled(bool enabled)
+    {
+        Load();
+        Current ??= new SecurityFileDto();
+        Current.AppLockEnabled = enabled;
+        Persist();
+    }
+
     public bool PasscodeIsSet
     {
         get
@@ -202,5 +219,6 @@ public sealed class LocalUserSecurityStore
         public string? PasscodeHash { get; set; }
         public bool TwoFactorEnabled { get; set; }
         public string? TwoFactorSecretBase32 { get; set; }
+        public bool AppLockEnabled { get; set; }
     }
 }

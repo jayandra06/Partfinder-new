@@ -7,6 +7,7 @@ using PartFinder.Services;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Storage.Streams;
 using System.Threading;
+using Windows.Storage;
 
 namespace PartFinder.ViewModels;
 
@@ -16,20 +17,50 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly AdminSessionStore _session;
     private readonly LocalProfileStore _profile;
     private readonly ActivityLogger _activityLogger;
+    private readonly IAppStateStore _appState;
     private string? _pendingTwoFactorSecret;
 
     public SettingsViewModel(
         LocalUserSecurityStore security,
         AdminSessionStore session,
         LocalProfileStore profile,
-        ActivityLogger activityLogger)
+        ActivityLogger activityLogger,
+        IAppStateStore appState)
     {
         _security = security;
         _session = session;
         _profile = profile;
         _activityLogger = activityLogger;
+        _appState = appState;
         RefreshAllState();
     }
+
+    /// <summary>Real organization name from the license server.</summary>
+    public string OrgDisplayName => string.IsNullOrWhiteSpace(_appState.OrgDisplayName)
+        ? "—"
+        : _appState.OrgDisplayName;
+
+    /// <summary>Plan from the license server (e.g. "starter", "pro") — Title-cased for display.</summary>
+    public string OrgPlanDisplay
+    {
+        get
+        {
+            var plan = _appState.OrgPlan?.Trim();
+            var type = _appState.OrgType?.Trim();
+
+            // Build a combined display: "Starter · Standard" or just "Starter"
+            var parts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(plan))
+                parts.Add(ToTitleCase(plan));
+            if (!string.IsNullOrWhiteSpace(type))
+                parts.Add(ToTitleCase(type));
+
+            return parts.Count > 0 ? string.Join(" · ", parts) : string.Empty;
+        }
+    }
+
+    private static string ToTitleCase(string s) =>
+        string.IsNullOrWhiteSpace(s) ? s : char.ToUpperInvariant(s[0]) + s[1..].ToLowerInvariant();
 
     [ObservableProperty]
     private string _profileName = string.Empty;
@@ -54,6 +85,15 @@ public partial class SettingsViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _showAppLockEditor;
+
+    [ObservableProperty]
+    private bool _appLockEnabled;
+
+    partial void OnAppLockEnabledChanged(bool value)
+    {
+        _security.SetAppLockEnabled(value);
+        _activityLogger.LogUserAction("App Lock", value ? "Windows Hello lock enabled" : "Windows Hello lock disabled");
+    }
 
     [ObservableProperty]
     private string _twoFactorSecretDisplay = string.Empty;
@@ -98,6 +138,23 @@ public partial class SettingsViewModel : ViewModelBase
     private string _sessionEmailDisplay = string.Empty;
 
     [ObservableProperty]
+    private string _profileDepartment = string.Empty;
+
+    [ObservableProperty]
+    private ImageSource? _avatarImageSource;
+
+    /// <summary>Initials fallback when no avatar photo is set.</summary>
+    public string AvatarInitial =>
+        string.IsNullOrWhiteSpace(ProfileName)
+            ? (!string.IsNullOrWhiteSpace(SessionEmailDisplay) && SessionEmailDisplay != "—"
+                ? SessionEmailDisplay.Trim()[0].ToString().ToUpperInvariant()
+                : "?")
+            : ProfileName.Trim()[0].ToString().ToUpperInvariant();
+
+    /// <summary>True when a custom avatar photo has been loaded.</summary>
+    public bool HasAvatarPhoto => AvatarImageSource is not null;
+
+    [ObservableProperty]
     private string _changeCurrentPassword = string.Empty;
 
     [ObservableProperty]
@@ -108,6 +165,39 @@ public partial class SettingsViewModel : ViewModelBase
 
     [ObservableProperty]
     private string _changePasswordMessage = string.Empty;
+
+    partial void OnChangeNewPasswordChanged(string value)
+    {
+        OnPropertyChanged(nameof(PasswordStrengthScore));
+        OnPropertyChanged(nameof(PasswordStrengthLabel));
+        OnPropertyChanged(nameof(PasswordStrengthColor));
+        OnPropertyChanged(nameof(PasswordStrengthBar1));
+        OnPropertyChanged(nameof(PasswordStrengthBar2));
+        OnPropertyChanged(nameof(PasswordStrengthBar3));
+        OnPropertyChanged(nameof(PasswordStrengthBar4));
+    }
+
+    public int PasswordStrengthScore => GetPasswordStrengthScore(ChangeNewPassword);
+    public string PasswordStrengthLabel => GetPasswordStrengthLabel(PasswordStrengthScore);
+    public string PasswordStrengthColor => PasswordStrengthScore switch
+    {
+        1 => "#E05252",
+        2 => "#E8A040",
+        3 => "#4CAF50",
+        4 => "#2ABD8F",
+        _ => "Transparent",
+    };
+    public bool PasswordStrengthBar1 => PasswordStrengthScore >= 1;
+    public bool PasswordStrengthBar2 => PasswordStrengthScore >= 2;
+    public bool PasswordStrengthBar3 => PasswordStrengthScore >= 3;
+    public bool PasswordStrengthBar4 => PasswordStrengthScore >= 4;
+
+    [RelayCommand]
+    private void GeneratePassword()
+    {
+        ChangeNewPassword = GenerateStrongPassword();
+        ChangeConfirmPassword = ChangeNewPassword;
+    }
 
     [ObservableProperty]
     private string _resetPasscodeTotp = string.Empty;
@@ -145,8 +235,17 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     private bool _showTwoFactorEditor;
 
-    partial void OnTwoFactorEnabledChanged(bool value)
+    partial void OnProfileNameChanged(string value)
     {
+        OnPropertyChanged(nameof(AvatarInitial));
+    }
+
+    partial void OnAvatarImageSourceChanged(ImageSource? value)
+    {
+        OnPropertyChanged(nameof(HasAvatarPhoto));
+    }
+
+    partial void OnTwoFactorEnabledChanged(bool value)    {
         OnPropertyChanged(nameof(IsStartTwoFactorEnabled));
         OnPropertyChanged(nameof(TwoFactorStatusText));
         OnPropertyChanged(nameof(TwoFactorStatusDetail));
@@ -227,6 +326,7 @@ public partial class SettingsViewModel : ViewModelBase
         _session.Load();
         _profile.Load();
         PasscodeIsConfigured = _security.PasscodeIsSet;
+        AppLockEnabled = _security.AppLockEnabled;
         ShowAppLockEditor = false;
         TwoFactorEnabled = _security.TwoFactorEnabled;
         TwoFactorSetupVisible = false;
@@ -248,6 +348,8 @@ public partial class SettingsViewModel : ViewModelBase
         }
         SessionEmailDisplay = string.IsNullOrWhiteSpace(emailToShow) ? "—" : emailToShow;
         ProfileName = _profile.DisplayName ?? string.Empty;
+        ProfileDepartment = _profile.Department ?? string.Empty;
+        _ = LoadAvatarAsync(_profile.AvatarPath);
         OnPropertyChanged(nameof(IsStartTwoFactorEnabled));
         OnPropertyChanged(nameof(TwoFactorStatusText));
     }
@@ -274,12 +376,58 @@ public partial class SettingsViewModel : ViewModelBase
             return;
         }
 
-        _profile.SaveDisplayName(trimmed);
+        _profile.SaveProfile(trimmed, ProfileDepartment.Trim());
         ProfileName = _profile.DisplayName ?? string.Empty;
+        ProfileDepartment = _profile.Department ?? string.Empty;
         ProfileMessage = string.IsNullOrWhiteSpace(ProfileName)
             ? "Profile name cleared. Email will be shown."
             : "Profile name updated.";
         _activityLogger.LogUserAction("Profile Updated", $"Display name set to \"{ProfileName}\"");
+    }
+
+    [RelayCommand]
+    private async Task UploadAvatarAsync(StorageFile? file)
+    {
+        if (file is null) return;
+        var savedPath = _profile.SaveAvatar(file.Path);
+        if (savedPath is not null)
+        {
+            await LoadAvatarAsync(savedPath).ConfigureAwait(true);
+            _activityLogger.LogUserAction("Avatar Updated", "Profile photo was changed");
+        }
+    }
+
+    private async Task LoadAvatarAsync(string? path)
+    {
+        // If user has a custom saved photo, load that
+        if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+        {
+            try
+            {
+                var file = await StorageFile.GetFileFromPathAsync(path);
+                using var stream = await file.OpenReadAsync();
+                var bitmap = new BitmapImage();
+                await bitmap.SetSourceAsync(stream);
+                AvatarImageSource = bitmap;
+                return;
+            }
+            catch { /* fall through to default */ }
+        }
+
+        // No custom photo — load default Assets/profile.jpg via stream so it's fully loaded before binding
+        try
+        {
+            var defaultFile = await StorageFile.GetFileFromApplicationUriAsync(
+                new Uri("ms-appx:///Assets/profile.jpg"));
+            using var defaultStream = await defaultFile.OpenReadAsync();
+            var defaultBitmap = new BitmapImage();
+            await defaultBitmap.SetSourceAsync(defaultStream);
+            AvatarImageSource = defaultBitmap;
+        }
+        catch
+        {
+            AvatarImageSource = null;
+        }
     }
 
     [RelayCommand]
@@ -783,6 +931,62 @@ public partial class SettingsViewModel : ViewModelBase
         var hasLower = password.Any(char.IsLower);
         var hasDigit = password.Any(char.IsDigit);
         return hasUpper && hasLower && hasDigit;
+    }
+
+    // ── Password strength helpers ──────────────────────────────────────
+
+    /// <summary>0–4 score: 0=empty, 1=weak, 2=fair, 3=strong, 4=very strong</summary>
+    public static int GetPasswordStrengthScore(string password)
+    {
+        if (string.IsNullOrEmpty(password)) return 0;
+        int score = 0;
+        if (password.Length >= 8) score++;
+        if (password.Length >= 12) score++;
+        if (password.Any(char.IsUpper) && password.Any(char.IsLower)) score++;
+        if (password.Any(char.IsDigit)) score++;
+        if (password.Any(c => !char.IsLetterOrDigit(c))) score++;
+        return Math.Min(score, 4);
+    }
+
+    public static string GetPasswordStrengthLabel(int score) => score switch
+    {
+        0 => string.Empty,
+        1 => "Weak",
+        2 => "Fair",
+        3 => "Strong",
+        _ => "Very Strong",
+    };
+
+    /// <summary>Generates a cryptographically random strong password.</summary>
+    public static string GenerateStrongPassword(int length = 16)
+    {
+        const string upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+        const string lower = "abcdefghjkmnpqrstuvwxyz";
+        const string digits = "23456789";
+        const string special = "!@#$%^&*-_=+?";
+        var all = upper + lower + digits + special;
+
+        var bytes = new byte[length + 4];
+        System.Security.Cryptography.RandomNumberGenerator.Fill(bytes);
+
+        var chars = new char[length];
+        // Guarantee at least one of each category
+        chars[0] = upper[bytes[0] % upper.Length];
+        chars[1] = lower[bytes[1] % lower.Length];
+        chars[2] = digits[bytes[2] % digits.Length];
+        chars[3] = special[bytes[3] % special.Length];
+        for (int i = 4; i < length; i++)
+            chars[i] = all[bytes[i] % all.Length];
+
+        // Shuffle
+        var rng = new byte[length];
+        System.Security.Cryptography.RandomNumberGenerator.Fill(rng);
+        for (int i = length - 1; i > 0; i--)
+        {
+            int j = rng[i] % (i + 1);
+            (chars[i], chars[j]) = (chars[j], chars[i]);
+        }
+        return new string(chars);
     }
 
     private async Task RefreshTwoFactorQrAsync(string secretBase32)

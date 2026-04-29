@@ -115,6 +115,74 @@
         <components:ShellLayout x:Name="ShellRoot" Visibility="Collapsed" />
 
         <!-- ===================================================== -->
+        <!-- APP LOCK SCREEN                                       -->
+        <!-- ===================================================== -->
+        <Grid x:Name="AppLockRoot" Visibility="Collapsed" Background="#0A0E15">
+
+            <!-- Centered lock card -->
+            <Border
+                Width="380"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Background="#111A26"
+                BorderBrush="#2A3D58"
+                BorderThickness="1"
+                CornerRadius="20"
+                Padding="40,36">
+                <StackPanel Spacing="0">
+
+                    <!-- Lock icon -->
+                    <Border Width="72" Height="72" CornerRadius="36"
+                            HorizontalAlignment="Center" Margin="0,0,0,20">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Color="#1F7AE0" Offset="0" />
+                                <GradientStop Color="#155DAF" Offset="1" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <FontIcon Glyph="&#xE72E;" FontSize="32" Foreground="White"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+
+                    <TextBlock Text="PartFinder is Locked" FontSize="22" FontWeight="Bold"
+                               Foreground="#EAF2FF" HorizontalAlignment="Center"
+                               Margin="0,0,0,8" />
+                    <TextBlock Text="Verify your identity using Windows Hello to continue."
+                               FontSize="13" Foreground="#7B8DA8"
+                               HorizontalAlignment="Center" TextAlignment="Center"
+                               TextWrapping="WrapWholeWords" Margin="0,0,0,32" />
+
+                    <!-- Error message (shown on failed verify) -->
+                    <Border x:Name="AppLockErrorBorder" Visibility="Collapsed"
+                            Background="#1AE05252" BorderBrush="#30E05252"
+                            BorderThickness="1" CornerRadius="8" Padding="12,10"
+                            Margin="0,0,0,20">
+                        <TextBlock x:Name="AppLockErrorText"
+                                   Text="Verification failed. Try again."
+                                   FontSize="13" Foreground="#E05252"
+                                   HorizontalAlignment="Center" TextAlignment="Center" />
+                    </Border>
+
+                    <!-- Retry button -->
+                    <Button Content="Verify with Windows Hello"
+                            HorizontalAlignment="Stretch"
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            Click="OnAppLockRetryClick" />
+
+                    <Button Content="Exit App"
+                            HorizontalAlignment="Center"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Foreground="#7B8DA8"
+                            FontSize="13"
+                            Padding="0"
+                            Margin="0,16,0,0"
+                            Click="OnAppLockExitClick" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ===================================================== -->
         <!-- SUBSCRIPTION BLOCKED SCREEN                           -->
         <!-- ===================================================== -->
         <Border

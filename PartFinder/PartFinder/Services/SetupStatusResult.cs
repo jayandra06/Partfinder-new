@@ -8,6 +8,8 @@ public sealed class SetupStatusResult
     public string? OrganizationName { get; set; }
     public string? OrgCode { get; set; }
     public string? Status { get; set; }
+    public string? Plan { get; set; }
+    public string? OrgType { get; set; }
     public string? ValidUntil { get; set; }
     public int? MaxUsers { get; set; }
     public int? MaxParts { get; set; }

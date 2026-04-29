@@ -196,6 +196,14 @@ public sealed partial class MainWindow : Window
             return;
         }
 
+        // Store org display name and plan for use in Settings page
+        var appState = App.Services.GetRequiredService<IAppStateStore>();
+        appState.OrgDisplayName = !string.IsNullOrWhiteSpace(verify.OrganizationName)
+            ? verify.OrganizationName
+            : (!string.IsNullOrWhiteSpace(status.OrganizationName) ? status.OrganizationName : orgCode);
+        appState.OrgPlan = !string.IsNullOrWhiteSpace(status.Plan) ? status.Plan : string.Empty;
+        appState.OrgType = !string.IsNullOrWhiteSpace(status.OrgType) ? status.OrgType : string.Empty;
+
         ShowShell();
     }
 
@@ -485,10 +493,77 @@ public sealed partial class MainWindow : Window
         SaveSetupState(st);
     }
 
-    private void ShowShell()
+    private async void ShowShell()
     {
         SetupRoot.Visibility = Visibility.Collapsed;
+
+        // Check if Windows Hello app lock is enabled
+        var security = App.Services.GetRequiredService<LocalUserSecurityStore>();
+        security.Load();
+
+        if (security.AppLockEnabled)
+        {
+            // Check availability
+            var available = await Windows.Security.Credentials.UI.UserConsentVerifier
+                .CheckAvailabilityAsync();
+
+            if (available == Windows.Security.Credentials.UI.UserConsentVerifierAvailability.Available)
+            {
+                var result = await Windows.Security.Credentials.UI.UserConsentVerifier
+                    .RequestVerificationAsync("Verify your identity to open PartFinder.");
+
+                if (result == Windows.Security.Credentials.UI.UserConsentVerificationResult.Verified)
+                {
+                    AppLockRoot.Visibility = Visibility.Collapsed;
+                    ShellRoot.Visibility = Visibility.Visible;
+                    return;
+                }
+
+                // Not verified — show lock screen with retry
+                AppLockRoot.Visibility = Visibility.Visible;
+                ShellRoot.Visibility = Visibility.Collapsed;
+                AppLockErrorText.Text = "Verification failed. Try again.";
+                AppLockErrorBorder.Visibility = Visibility.Visible;
+                return;
+            }
+        }
+
+        // App lock off or Windows Hello not available — open directly
+        AppLockRoot.Visibility = Visibility.Collapsed;
         ShellRoot.Visibility = Visibility.Visible;
+    }
+
+    // ── App Lock handlers ─────────────────────────────────────────────
+
+    private async void OnAppLockRetryClick(object sender, RoutedEventArgs e)
+    {
+        AppLockErrorBorder.Visibility = Visibility.Collapsed;
+
+        var result = await Windows.Security.Credentials.UI.UserConsentVerifier
+            .RequestVerificationAsync("Verify your identity to open PartFinder.");
+
+        if (result == Windows.Security.Credentials.UI.UserConsentVerificationResult.Verified)
+        {
+            AppLockRoot.Visibility = Visibility.Collapsed;
+            ShellRoot.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            AppLockErrorText.Text = result switch
+            {
+                Windows.Security.Credentials.UI.UserConsentVerificationResult.Canceled
+                    => "Verification was cancelled.",
+                Windows.Security.Credentials.UI.UserConsentVerificationResult.DeviceNotPresent
+                    => "No biometric device found.",
+                _ => "Verification failed. Try again.",
+            };
+            AppLockErrorBorder.Visibility = Visibility.Visible;
+        }
+    }
+
+    private void OnAppLockExitClick(object sender, RoutedEventArgs e)
+    {
+        Application.Current.Exit();
     }
 
     private void OnBackClicked(object sender, RoutedEventArgs e)

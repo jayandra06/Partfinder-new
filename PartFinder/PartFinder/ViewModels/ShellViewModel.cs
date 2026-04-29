@@ -1,7 +1,10 @@
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Imaging;
 using PartFinder.Services;
 using System.Collections.ObjectModel;
+using Windows.Storage;
 
 namespace PartFinder.ViewModels;
 
@@ -95,6 +98,42 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
         ? "?"
         : CurrentUserName.Trim()[0].ToString().ToUpperInvariant();
 
+    private string _currentUserDepartment = string.Empty;
+    public string CurrentUserDepartment
+    {
+        get => _currentUserDepartment;
+        set => SetProperty(ref _currentUserDepartment, value);
+    }
+
+    private string _currentOrgName = string.Empty;
+    public string CurrentOrgName
+    {
+        get => _currentOrgName;
+        set => SetProperty(ref _currentOrgName, value);
+    }
+
+    private string _currentOrgPlan = string.Empty;
+    public string CurrentOrgPlan
+    {
+        get => _currentOrgPlan;
+        set => SetProperty(ref _currentOrgPlan, value);
+    }
+
+    private ImageSource? _currentUserAvatarSource;
+    public ImageSource? CurrentUserAvatarSource
+    {
+        get => _currentUserAvatarSource;
+        set
+        {
+            if (SetProperty(ref _currentUserAvatarSource, value))
+            {
+                OnPropertyChanged(nameof(HasUserAvatar));
+            }
+        }
+    }
+
+    public bool HasUserAvatar => CurrentUserAvatarSource is not null;
+
     private bool _isSidebarCollapsed;
     public bool IsSidebarCollapsed
     {
@@ -138,6 +177,10 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
 
         CurrentTenant = _appState.CurrentTenant;
         CurrentUserName = ResolveDisplayUser();
+        CurrentUserDepartment = _profile.Department ?? string.Empty;
+        CurrentOrgName = _appState.OrgDisplayName;
+        CurrentOrgPlan = _appState.OrgPlan;
+        await LoadAvatarAsync(_profile.AvatarPath).ConfigureAwait(true);
 
         await _access.RefreshAsync().ConfigureAwait(true);
         var hasMaster = await HasMasterDataTemplateAsync().ConfigureAwait(true);
@@ -367,5 +410,40 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
     {
         _profile.Load();
         CurrentUserName = ResolveDisplayUser();
+        CurrentUserDepartment = _profile.Department ?? string.Empty;
+        _ = LoadAvatarAsync(_profile.AvatarPath);
+    }
+
+    private async Task LoadAvatarAsync(string? path)
+    {
+        // If user has a custom saved photo, load that
+        if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+        {
+            try
+            {
+                var file = await StorageFile.GetFileFromPathAsync(path);
+                using var stream = await file.OpenReadAsync();
+                var bitmap = new BitmapImage();
+                await bitmap.SetSourceAsync(stream);
+                CurrentUserAvatarSource = bitmap;
+                return;
+            }
+            catch { /* fall through to default */ }
+        }
+
+        // No custom photo — load default Assets/profile.jpg via stream so it's fully loaded before binding
+        try
+        {
+            var defaultFile = await StorageFile.GetFileFromApplicationUriAsync(
+                new Uri("ms-appx:///Assets/profile.jpg"));
+            using var defaultStream = await defaultFile.OpenReadAsync();
+            var defaultBitmap = new BitmapImage();
+            await defaultBitmap.SetSourceAsync(defaultStream);
+            CurrentUserAvatarSource = defaultBitmap;
+        }
+        catch
+        {
+            CurrentUserAvatarSource = null;
+        }
     }
 }

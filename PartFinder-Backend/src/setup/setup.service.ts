@@ -92,6 +92,8 @@ export class SetupService {
       organizationName: org.name,
       orgCode: org.orgCode,
       status: org.status,
+      plan: org.plan,
+      orgType: org.type,
       validUntil: validity.toISOString(),
       maxUsers: org.maxUsers ?? 50,
       maxParts: org.maxParts ?? 100000,
