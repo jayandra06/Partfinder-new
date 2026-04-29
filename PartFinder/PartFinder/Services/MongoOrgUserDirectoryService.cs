@@ -190,21 +190,29 @@ public sealed class MongoOrgUserDirectoryService : IOrgUserDirectoryService
     {
         public ObjectId Id { get; set; }
 
+        [BsonElement("email")]
         public string Email { get; set; } = string.Empty;
 
+        [BsonElement("emailNormalized")]
         public string EmailNormalized { get; set; } = string.Empty;
 
+        [BsonElement("name")]
         public string Name { get; set; } = string.Empty;
 
         /// <summary>Admin or Employee</summary>
+        [BsonElement("role")]
         public string Role { get; set; } = "Employee";
 
+        [BsonElement("partsAllTemplates")]
         public bool PartsAllTemplates { get; set; }
 
+        [BsonElement("allowedTemplateIds")]
         public List<string> AllowedTemplateIds { get; set; } = [];
 
+        [BsonElement("temporaryPasswordHash")]
         public string TemporaryPasswordHash { get; set; } = string.Empty;
 
+        [BsonElement("invitedAtUtc")]
         public DateTime InvitedAtUtc { get; set; }
     }
 
