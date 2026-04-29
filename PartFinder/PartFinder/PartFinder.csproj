@@ -38,6 +38,12 @@
     <Manifest Include="$(ApplicationManifest)" />
   </ItemGroup>
 
+  <!-- Exclude accidental nested project copy to avoid duplicate type/member compile errors. -->
+  <ItemGroup>
+    <Compile Remove="PartFinder\**\*.cs" />
+    <Page Remove="PartFinder\**\*.xaml" />
+  </ItemGroup>
+
   <!--
     Defining the "Msix" ProjectCapability here allows the Single-project MSIX Packaging
     Tools extension to be activated for this project even if the Windows App SDK Nuget

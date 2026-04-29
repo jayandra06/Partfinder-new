@@ -129,7 +129,8 @@ public partial class FavouritesViewModel : ViewModelBase
     }
 
     // Manual command property for ToggleFavouriteAsync
-    public IAsyncRelayCommand<string?> ToggleFavouriteAsyncCommand => new AsyncRelayCommand<string?>(ToggleFavouriteAsync);
+    public IAsyncRelayCommand<string?> ToggleFavouriteAsyncCommand =>
+        new AsyncRelayCommand<string?>((templateId) => ToggleFavouriteAsync(templateId ?? string.Empty));
 
     [RelayCommand]
     private async Task DeleteTemplateAsync(string templateId)
@@ -159,7 +160,8 @@ public partial class FavouritesViewModel : ViewModelBase
     }
 
     // Manual command property for DeleteTemplateAsync
-    public IAsyncRelayCommand<string?> DeleteTemplateAsyncCommand => new AsyncRelayCommand<string?>(DeleteTemplateAsync);
+    public IAsyncRelayCommand<string?> DeleteTemplateAsyncCommand =>
+        new AsyncRelayCommand<string?>((templateId) => DeleteTemplateAsync(templateId ?? string.Empty));
 
     [RelayCommand]
     private void BeginEditTemplate(string templateId)

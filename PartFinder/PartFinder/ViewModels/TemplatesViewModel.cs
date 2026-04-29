@@ -539,6 +539,7 @@ public partial class TemplatesViewModel : ViewModelBase
                     FieldType = f.Type,
                     LinkedTemplateId = f.LinkedTemplateId,
                     StableKey = f.Key,
+                    DropdownOptionsText = f.Options is { Count: > 0 } ? string.Join(", ", f.Options) : string.Empty,
                 });
         }
 
@@ -683,7 +684,9 @@ public partial class TemplatesViewModel : ViewModelBase
                     IsRequired = false,
                     DisplayOrder = ord++,
                     ValidationPattern = null,
-                    Options = null,
+                    Options = draft.FieldType == TemplateFieldType.Dropdown
+                        ? draft.DropdownOptions.ToList()
+                        : null,
                     LinkedTemplateId = draft.FieldType == TemplateFieldType.RecordLink ? draft.LinkedTemplateId : null,
                     LinkedDisplayFieldKey = null,
                 });

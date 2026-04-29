@@ -19,6 +19,12 @@ public sealed partial class TemplatesPage : Page
     private readonly BackendApiClient _apiClient = App.Services.GetRequiredService<BackendApiClient>();
     private readonly ActivityLogger _activity = App.Services.GetRequiredService<ActivityLogger>();
     private TemplatesViewModel? _boundVm;
+    private double _canvasZoom = 1.0;
+    private bool _isCanvasPanning;
+    private bool _isSpacePanMode;
+    private Windows.Foundation.Point _canvasPanLastPoint;
+    private double _canvasBaseTranslateX;
+    private double _canvasBaseTranslateY;
 
     public TemplatesPage()
     {
@@ -26,6 +32,24 @@ public sealed partial class TemplatesPage : Page
         DataContext = App.Services.GetRequiredService<TemplatesViewModel>();
         Loaded += OnLoaded;
         DataContextChanged += OnDataContextChanged;
+
+        // Ensure drag-pan still works when child controls mark events handled.
+        TemplateCanvasScrollViewer.AddHandler(
+            UIElement.PointerPressedEvent,
+            new Microsoft.UI.Xaml.Input.PointerEventHandler(OnTemplateCanvasPointerPressed),
+            true);
+        TemplateCanvasScrollViewer.AddHandler(
+            UIElement.PointerMovedEvent,
+            new Microsoft.UI.Xaml.Input.PointerEventHandler(OnTemplateCanvasPointerMoved),
+            true);
+        TemplateCanvasScrollViewer.AddHandler(
+            UIElement.PointerReleasedEvent,
+            new Microsoft.UI.Xaml.Input.PointerEventHandler(OnTemplateCanvasPointerReleased),
+            true);
+        TemplateCanvasScrollViewer.AddHandler(
+            UIElement.PointerCanceledEvent,
+            new Microsoft.UI.Xaml.Input.PointerEventHandler(OnTemplateCanvasPointerCanceled),
+            true);
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
@@ -37,27 +61,16 @@ public sealed partial class TemplatesPage : Page
 
         // Then load templates
         await vm.LoadAsync().ConfigureAwait(true);
-        
-        BuildTemplateChipRow();
-
-        // Wire up FavouritesSubPage
-        FavouritesSubPageControl.BackRequested += OnFavouritesBackRequested;
+        await FavouritesSubPageControl.ShowAsync(vm).ConfigureAwait(true);
 
         // Hook template save to log activity
-        vm.PropertyChanged += async (_, args) =>
+        vm.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(TemplatesViewModel.IsCreatingTemplate) &&
                 !vm.IsCreatingTemplate &&
                 vm.SelectedTemplate is not null)
             {
                 _activity.LogTemplateChange("Template Saved", $"Template '{vm.SelectedTemplate.Name}' saved with {vm.SelectedTemplate.Fields.Count} fields");
-            }
-
-            // When ShowFavouritesSubPage becomes true, load the sub-page
-            if (args.PropertyName == nameof(TemplatesViewModel.ShowFavouritesSubPage) &&
-                vm.ShowFavouritesSubPage)
-            {
-                await FavouritesSubPageControl.ShowAsync(vm).ConfigureAwait(true);
             }
 
             // When FavouritesStoreVersion changes, update all star icons
@@ -86,6 +99,445 @@ public sealed partial class TemplatesPage : Page
                 UpdateFavoriteStars();
             });
         });
+    }
+
+    private void OnCreateNewTemplateClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not TemplatesViewModel vm)
+        {
+            return;
+        }
+        vm.StartNewCustomTemplateCommand.Execute(null);
+        vm.ColumnLabels.Clear();
+        vm.ColumnLabels.Add(new ColumnLabelDraft());
+        RefreshAllCanvasCellBorders();
+        CenterCanvasContent();
+    }
+
+    private async void OnShowFavouritesInlineClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is TemplatesViewModel vm)
+        {
+            await FavouritesSubPageControl.ShowAsync(vm).ConfigureAwait(true);
+        }
+    }
+
+    private void OnTemplateCanvasPointerWheelChanged(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        var point = e.GetCurrentPoint(TemplateCanvasScrollViewer);
+        var delta = point.Properties.MouseWheelDelta;
+        if (delta == 0)
+        {
+            return;
+        }
+
+        // Scroll up => zoom in, scroll down => zoom out
+        var step = delta > 0 ? 0.08 : -0.08;
+        SetCanvasZoom(_canvasZoom + step);
+        e.Handled = true;
+    }
+
+    private void OnTemplateCanvasPointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        // Never start panning from interactive controls; this keeps input and button clicks reliable.
+        if (!_isSpacePanMode && IsFromInteractiveEditor(e.OriginalSource as DependencyObject))
+        {
+            return;
+        }
+
+        var point = e.GetCurrentPoint(TemplateCanvasScrollViewer);
+        if (!point.Properties.IsLeftButtonPressed)
+        {
+            return;
+        }
+
+        _isCanvasPanning = true;
+        _canvasPanLastPoint = point.Position;
+        TemplateCanvasScrollViewer.CapturePointer(e.Pointer);
+        e.Handled = true;
+    }
+
+    private void OnTemplateCanvasPointerMoved(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (!_isCanvasPanning)
+        {
+            return;
+        }
+
+        var point = e.GetCurrentPoint(TemplateCanvasScrollViewer);
+        var dx = point.Position.X - _canvasPanLastPoint.X;
+        var dy = point.Position.Y - _canvasPanLastPoint.Y;
+        _canvasPanLastPoint = point.Position;
+
+        if (TemplateCanvasTranslateTransform is not null)
+        {
+            TemplateCanvasTranslateTransform.X += dx;
+            TemplateCanvasTranslateTransform.Y += dy;
+            ClampCanvasTranslation();
+        }
+        e.Handled = true;
+    }
+
+    private void OnTemplateCanvasPointerReleased(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (!_isCanvasPanning)
+        {
+            return;
+        }
+
+        _isCanvasPanning = false;
+        TemplateCanvasScrollViewer.ReleasePointerCapture(e.Pointer);
+        e.Handled = true;
+    }
+
+    private void OnTemplateCanvasPointerCanceled(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (!_isCanvasPanning)
+        {
+            return;
+        }
+
+        _isCanvasPanning = false;
+        TemplateCanvasScrollViewer.ReleasePointerCapture(e.Pointer);
+        e.Handled = true;
+    }
+
+    private static bool IsFromInteractiveEditor(DependencyObject? source)
+    {
+        var current = source;
+        while (current is not null)
+        {
+            if (current is TextBox || current is PasswordBox || current is ComboBox || current is Button || current is DatePicker)
+            {
+                return true;
+            }
+
+            current = VisualTreeHelper.GetParent(current);
+        }
+
+        return false;
+    }
+
+    private void SetCanvasZoom(double zoom)
+    {
+        var clamped = Math.Clamp(zoom, 0.6, 1.8);
+        _canvasZoom = Math.Round(clamped, 2);
+
+        if (TemplateCanvasScaleTransform is not null)
+        {
+            TemplateCanvasScaleTransform.ScaleX = _canvasZoom;
+            TemplateCanvasScaleTransform.ScaleY = _canvasZoom;
+        }
+
+        ClampCanvasTranslation();
+    }
+
+    private void OnTemplateCanvasDoubleTapped(object sender, Microsoft.UI.Xaml.Input.DoubleTappedRoutedEventArgs e)
+    {
+        ResetCanvasView();
+        e.Handled = true;
+    }
+
+    private void OnPageKeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
+    {
+        if (e.Key != Windows.System.VirtualKey.Space)
+        {
+            return;
+        }
+
+        _isSpacePanMode = true;
+        e.Handled = true;
+    }
+
+    private void OnPageKeyUp(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
+    {
+        if (e.Key != Windows.System.VirtualKey.Space)
+        {
+            return;
+        }
+
+        _isSpacePanMode = false;
+        e.Handled = true;
+    }
+
+    private void ResetCanvasView()
+    {
+        _canvasZoom = 1.0;
+        if (TemplateCanvasScaleTransform is not null)
+        {
+            TemplateCanvasScaleTransform.ScaleX = 1.0;
+            TemplateCanvasScaleTransform.ScaleY = 1.0;
+        }
+
+        if (TemplateCanvasTranslateTransform is not null)
+        {
+            TemplateCanvasTranslateTransform.X = 0;
+            TemplateCanvasTranslateTransform.Y = 0;
+        }
+        _canvasBaseTranslateX = 0;
+        _canvasBaseTranslateY = 0;
+    }
+
+    private void CenterCanvasContent()
+    {
+        // Run after layout pass so ActualWidth/ActualHeight are valid.
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            if (TemplateCanvasScrollViewer is null || TemplateCanvasItemsControl is null || TemplateCanvasTranslateTransform is null)
+            {
+                return;
+            }
+
+            var viewportWidth = TemplateCanvasScrollViewer.ActualWidth;
+            var viewportHeight = TemplateCanvasScrollViewer.ActualHeight;
+            var contentWidth = TemplateCanvasItemsControl.ActualWidth * _canvasZoom;
+            var contentHeight = TemplateCanvasItemsControl.ActualHeight * _canvasZoom;
+            if (viewportWidth <= 0 || viewportHeight <= 0 || contentWidth <= 0 || contentHeight <= 0)
+            {
+                return;
+            }
+
+            TemplateCanvasTranslateTransform.X = (viewportWidth - contentWidth) / 2.0;
+            TemplateCanvasTranslateTransform.Y = (viewportHeight - contentHeight) / 2.0;
+            _canvasBaseTranslateX = TemplateCanvasTranslateTransform.X;
+            _canvasBaseTranslateY = TemplateCanvasTranslateTransform.Y;
+        });
+    }
+
+    private void SyncCanvasBaseToCurrentTranslation()
+    {
+        if (TemplateCanvasTranslateTransform is null)
+        {
+            return;
+        }
+
+        _canvasBaseTranslateX = TemplateCanvasTranslateTransform.X;
+        _canvasBaseTranslateY = TemplateCanvasTranslateTransform.Y;
+    }
+
+    private void ClampCanvasTranslation()
+    {
+        if (TemplateCanvasTranslateTransform is null || TemplateCanvasItemsControl is null || TemplateCanvasScrollViewer is null)
+        {
+            return;
+        }
+
+        var viewportWidth = TemplateCanvasScrollViewer.ActualWidth;
+        var viewportHeight = TemplateCanvasScrollViewer.ActualHeight;
+        var contentWidth = TemplateCanvasItemsControl.ActualWidth * _canvasZoom;
+        var contentHeight = TemplateCanvasItemsControl.ActualHeight * _canvasZoom;
+
+        if (viewportWidth <= 0 || viewportHeight <= 0 || contentWidth <= 0 || contentHeight <= 0)
+        {
+            return;
+        }
+
+        const double padding = 80;
+        var xRange = Math.Max(0, (contentWidth - viewportWidth) / 2) + padding;
+        var yRange = Math.Max(0, (contentHeight - viewportHeight) / 2) + padding;
+
+        var minX = _canvasBaseTranslateX - xRange;
+        var maxX = _canvasBaseTranslateX + xRange;
+        var minY = _canvasBaseTranslateY - yRange;
+        var maxY = _canvasBaseTranslateY + yRange;
+
+        TemplateCanvasTranslateTransform.X = Math.Clamp(TemplateCanvasTranslateTransform.X, minX, maxX);
+        TemplateCanvasTranslateTransform.Y = Math.Clamp(TemplateCanvasTranslateTransform.Y, minY, maxY);
+    }
+
+    private static void SetEdgeButtonOpacity(Border edgeHost, string edgeTag, double opacity, bool enableHitTest)
+    {
+        if (edgeHost.Child is not Button edgeButton || !Equals(edgeButton.Tag, edgeTag))
+        {
+            return;
+        }
+        edgeButton.Opacity = opacity;
+        edgeButton.IsHitTestVisible = enableHitTest;
+    }
+
+    private void OnCanvasLeftEdgePointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (sender is Border host)
+        {
+            SetEdgeButtonOpacity(host, "edge-left", 1, true);
+        }
+    }
+
+    private void OnCanvasLeftEdgePointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (sender is Border host)
+        {
+            SetEdgeButtonOpacity(host, "edge-left", 0, false);
+        }
+    }
+
+    private void OnCanvasRightEdgePointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (sender is Border host)
+        {
+            SetEdgeButtonOpacity(host, "edge-right", 1, true);
+        }
+    }
+
+    private void OnCanvasRightEdgePointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (sender is Border host)
+        {
+            SetEdgeButtonOpacity(host, "edge-right", 0, false);
+        }
+    }
+
+    private void OnCanvasInsertLeftClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { DataContext: ColumnLabelDraft draft } || DataContext is not TemplatesViewModel vm)
+        {
+            return;
+        }
+
+        var index = vm.ColumnLabels.IndexOf(draft);
+        if (index < 0)
+        {
+            return;
+        }
+
+        vm.ColumnLabels.Insert(index, new ColumnLabelDraft());
+        RefreshAllCanvasCellBorders();
+        SyncCanvasBaseToCurrentTranslation();
+    }
+
+    private void OnCanvasInsertRightClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { DataContext: ColumnLabelDraft draft } || DataContext is not TemplatesViewModel vm)
+        {
+            return;
+        }
+
+        vm.InsertColumnAfterCommand.Execute(draft);
+        RefreshAllCanvasCellBorders();
+        SyncCanvasBaseToCurrentTranslation();
+    }
+
+    private void OnAddDropdownOptionClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: ColumnLabelDraft draft })
+        {
+            draft.TryAddPendingDropdownOption();
+        }
+    }
+
+    private void OnDropdownOptionInputKeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
+    {
+        if (e.Key != Windows.System.VirtualKey.Enter)
+        {
+            return;
+        }
+
+        if (sender is FrameworkElement { DataContext: ColumnLabelDraft draft })
+        {
+            draft.TryAddPendingDropdownOption();
+            e.Handled = true;
+        }
+    }
+
+    private void OnRemoveDropdownOptionClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement fe || fe.DataContext is not string option)
+        {
+            return;
+        }
+
+        var draft = FindAncestorDataContext<ColumnLabelDraft>(fe);
+        draft?.RemoveDropdownOption(option);
+    }
+
+    private void OnCanvasCellBorderLoaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is Border border)
+        {
+            ApplyCanvasCellEdgeStyling(border);
+        }
+    }
+
+    private void RefreshAllCanvasCellBorders()
+    {
+        foreach (var border in FindVisualChildren<Border>(this))
+        {
+            if (Equals(border.Tag, "canvas-cell-shell"))
+            {
+                ApplyCanvasCellEdgeStyling(border);
+            }
+        }
+    }
+
+    private void ApplyCanvasCellEdgeStyling(Border border)
+    {
+        if (DataContext is not TemplatesViewModel vm || border.DataContext is not ColumnLabelDraft draft)
+        {
+            return;
+        }
+
+        var index = vm.ColumnLabels.IndexOf(draft);
+        if (index < 0)
+        {
+            return;
+        }
+
+        var lastIndex = vm.ColumnLabels.Count - 1;
+        border.Margin = new Thickness(index == 0 ? 0 : -1, 0, 0, 0);
+
+        if (index == 0 && index == lastIndex)
+        {
+            border.CornerRadius = new CornerRadius(6);
+            return;
+        }
+
+        if (index == 0)
+        {
+            border.CornerRadius = new CornerRadius(6, 0, 0, 6);
+            return;
+        }
+
+        if (index == lastIndex)
+        {
+            border.CornerRadius = new CornerRadius(0, 6, 6, 0);
+            return;
+        }
+
+        border.CornerRadius = new CornerRadius(0);
+    }
+
+    private static IEnumerable<T> FindVisualChildren<T>(DependencyObject root) where T : DependencyObject
+    {
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T t)
+            {
+                yield return t;
+            }
+
+            foreach (var nested in FindVisualChildren<T>(child))
+            {
+                yield return nested;
+            }
+        }
+    }
+
+    private static T? FindAncestorDataContext<T>(DependencyObject? element) where T : class
+    {
+        var current = element;
+        while (current is not null)
+        {
+            if (current is FrameworkElement fe && fe.DataContext is T match)
+            {
+                return match;
+            }
+
+            current = VisualTreeHelper.GetParent(current);
+        }
+
+        return null;
     }
 
     private async void OnFavouritesBackRequested(object? sender, EventArgs e)
