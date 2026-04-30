@@ -57,46 +57,7 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- ── Header: Buttons ── -->
-        <Grid Grid.Row="0" Margin="24,20,24,0" Visibility="Collapsed">
-            <!-- Back to Templates Button -->
-            <Button HorizontalAlignment="Left"
-                    Padding="16,10"
-                    CornerRadius="10"
-                    BorderBrush="{StaticResource BorderDefaultBrush}"
-                    BorderThickness="1"
-                    Background="{StaticResource CardBackgroundBrush}"
-                    Click="OnBackToTemplatesClick"
-                    AutomationProperties.Name="Back to Templates">
-                <Button.Resources>
-                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="{StaticResource ElevatedCardBackgroundColor}" />
-                    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="{StaticResource TextPrimaryColor}" />
-                </Button.Resources>
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <FontIcon Glyph="&#xE72B;" FontSize="14" Foreground="{StaticResource TextSecondaryBrush}" />
-                    <TextBlock Text="Back to Templates" FontSize="14" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="Medium" />
-                </StackPanel>
-            </Button>
-            
-            <!-- New Template Button -->
-            <Button HorizontalAlignment="Right"
-                    Padding="16,10"
-                    CornerRadius="10"
-                    BorderBrush="{StaticResource BorderDefaultBrush}"
-                    BorderThickness="1"
-                    Background="{StaticResource CardBackgroundBrush}"
-                    Click="OnNewTemplateClick"
-                    AutomationProperties.Name="New Template">
-                <Button.Resources>
-                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="{StaticResource ElevatedCardBackgroundColor}" />
-                    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="{StaticResource AccentPrimaryColor}" />
-                </Button.Resources>
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <FontIcon Glyph="&#xE710;" FontSize="14" Foreground="{StaticResource AccentPrimaryBrush}" />
-                    <TextBlock Text="New Template" FontSize="14" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="Medium" />
-                </StackPanel>
-            </Button>
-        </Grid>
+        <!-- ── Header: Page Title ── -->
 
         <!-- ── Empty State ── -->
         <StackPanel

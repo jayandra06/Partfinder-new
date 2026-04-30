@@ -103,15 +103,13 @@ public sealed partial class TemplatesPage : Page
 
     private void OnCreateNewTemplateClick(object sender, RoutedEventArgs e)
     {
-        if (DataContext is not TemplatesViewModel vm)
-        {
-            return;
-        }
+        if (DataContext is not TemplatesViewModel vm) return;
         vm.StartNewCustomTemplateCommand.Execute(null);
         vm.ColumnLabels.Clear();
         vm.ColumnLabels.Add(new ColumnLabelDraft());
         RefreshAllCanvasCellBorders();
         CenterCanvasContent();
+        RefreshCanvasUiState(vm);
     }
 
     private async void OnShowFavouritesInlineClick(object sender, RoutedEventArgs e)
@@ -120,6 +118,224 @@ public sealed partial class TemplatesPage : Page
         {
             await FavouritesSubPageControl.ShowAsync(vm).ConfigureAwait(true);
         }
+    }
+
+    private void OnShowAllTemplatesClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not TemplatesViewModel vm) return;
+
+        // Hide favourites, show all templates panel
+        FavouritesSubPageControl.Visibility = Visibility.Collapsed;
+        AllTemplatesPanel.Visibility = Visibility.Visible;
+        BuildAllTemplatesList(vm);
+    }
+
+    private void OnCloseAllTemplatesClick(object sender, RoutedEventArgs e)
+    {
+        AllTemplatesPanel.Visibility = Visibility.Collapsed;
+        FavouritesSubPageControl.Visibility = Visibility.Visible;
+    }
+
+    private void BuildAllTemplatesList(TemplatesViewModel vm)
+    {
+        AllTemplatesList.Children.Clear();
+
+        foreach (var template in vm.Templates)
+        {
+            var row = BuildTemplateRow(template, vm);
+            AllTemplatesList.Children.Add(row);
+        }
+    }
+
+    private Border BuildTemplateRow(PartTemplateDefinition template, TemplatesViewModel vm)
+    {
+        var isFav = vm.IsFavouriteFor(template.Id);
+
+        var row = new Border
+        {
+            Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["CardBackgroundBrush"],
+            BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["BorderDefaultBrush"],
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(16, 14, 16, 14),
+        };
+
+        // ── outer grid: [icon | info | actions] ──────────────────────────────
+        var grid = new Grid { ColumnSpacing = 14 };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });   // col 0: template icon
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); // col 1: name + meta
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });   // col 2: actions
+
+        // ── col 0: coloured icon badge ────────────────────────────────────────
+        var iconBadge = new Border
+        {
+            Width = 40, Height = 40,
+            CornerRadius = new CornerRadius(10),
+            Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                Microsoft.UI.ColorHelper.FromArgb(30, 31, 122, 224)),
+            VerticalAlignment = VerticalAlignment.Center,
+            Child = new FontIcon
+            {
+                Glyph = "\uE9D5",   // template / layout icon
+                FontSize = 18,
+                Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                    Microsoft.UI.ColorHelper.FromArgb(255, 31, 122, 224)),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+            },
+        };
+        Grid.SetColumn(iconBadge, 0);
+        grid.Children.Add(iconBadge);
+
+        // ── col 1: name + field-count badge ──────────────────────────────────
+        var info = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
+
+        info.Children.Add(new TextBlock
+        {
+            Text = template.Name,
+            FontSize = 14,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextPrimaryBrush"],
+        });
+
+        // field-count pill
+        var fieldCount = template.Fields.Count;
+        var pill = new Border
+        {
+            Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                Microsoft.UI.ColorHelper.FromArgb(20, 255, 255, 255)),
+            BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["BorderDefaultBrush"],
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(8, 2, 8, 2),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Child = new TextBlock
+            {
+                Text = $"{fieldCount} field{(fieldCount == 1 ? "" : "s")}",
+                FontSize = 11,
+                Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextSecondaryBrush"],
+            },
+        };
+        info.Children.Add(pill);
+
+        Grid.SetColumn(info, 1);
+        grid.Children.Add(info);
+
+        // ── col 2: star | edit | delete ───────────────────────────────────────
+        var actions = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 4,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+
+        // Star / favourite button
+        var starIcon = new FontIcon
+        {
+            Glyph = isFav ? "\uE735" : "\uE734",
+            FontSize = 16,
+            Foreground = isFav
+                ? new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                    Microsoft.UI.ColorHelper.FromArgb(255, 31, 122, 224))
+                : Application.Current.Resources["TextSecondaryBrush"] as Microsoft.UI.Xaml.Media.Brush,
+        };
+
+        var starBtn = new Button
+        {
+            Content = starIcon,
+            Width = 36, Height = 36,
+            Padding = new Thickness(0),
+            Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent),
+            BorderThickness = new Thickness(0),
+        };
+        ToolTipService.SetToolTip(starBtn, isFav ? "Remove from favourites" : "Add to favourites");
+
+        starBtn.Click += async (_, _) =>
+        {
+            await vm.ToggleFavouritePublicAsync(template.Id);
+            var nowFav = vm.IsFavouriteFor(template.Id);
+            starIcon.Glyph = nowFav ? "\uE735" : "\uE734";
+            starIcon.Foreground = nowFav
+                ? new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                    Microsoft.UI.ColorHelper.FromArgb(255, 31, 122, 224))
+                : Application.Current.Resources["TextSecondaryBrush"] as Microsoft.UI.Xaml.Media.Brush;
+            ToolTipService.SetToolTip(starBtn, nowFav ? "Remove from favourites" : "Add to favourites");
+        };
+
+        // Edit button
+        var editBtn = new Button
+        {
+            Content = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 6,
+                Children =
+                {
+                    new FontIcon { Glyph = "\uE70F", FontSize = 13 },
+                    new TextBlock { Text = "Edit", FontSize = 13 },
+                },
+            },
+            Padding = new Thickness(14, 6, 14, 6),
+            Style = (Style)Application.Current.Resources["GhostButtonStyle"],
+        };
+        editBtn.Click += (_, _) =>
+        {
+            vm.SelectedTemplate = template;
+            vm.BeginEditSelectedTemplateCommand.Execute(null);
+            OnCloseAllTemplatesClick(editBtn, new RoutedEventArgs());
+        };
+
+        // Delete button
+        var deleteBtn = new Button
+        {
+            Content = new FontIcon
+            {
+                Glyph = "\uE74D",
+                FontSize = 14,
+                Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                    Microsoft.UI.ColorHelper.FromArgb(255, 224, 82, 82)),
+            },
+            Width = 36, Height = 36,
+            Padding = new Thickness(0),
+            Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent),
+            BorderThickness = new Thickness(0),
+        };
+        ToolTipService.SetToolTip(deleteBtn, "Delete template");
+
+        deleteBtn.Click += async (_, _) =>
+        {
+            if (XamlRoot is null) return;
+
+            var dlg = new ContentDialog
+            {
+                Title = "Delete Template",
+                Content = $"Are you sure you want to delete \"{template.Name}\"? This cannot be undone.",
+                PrimaryButtonText = "Delete",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Close,
+                XamlRoot = XamlRoot,
+            };
+
+            var result = await dlg.ShowAsync();
+            if (result != ContentDialogResult.Primary) return;
+
+            try
+            {
+                await vm.DeleteTemplateCommand.ExecuteAsync(template.Id);
+                _activity.LogTemplateChange("Template Deleted", $"Deleted template \"{template.Name}\"");
+                BuildAllTemplatesList(vm);
+            }
+            catch { /* ignore */ }
+        };
+
+        actions.Children.Add(starBtn);
+        actions.Children.Add(editBtn);
+        actions.Children.Add(deleteBtn);
+        Grid.SetColumn(actions, 2);
+        grid.Children.Add(actions);
+
+        row.Child = grid;
+        return row;
     }
 
     private void OnTemplateCanvasPointerWheelChanged(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
@@ -229,6 +445,9 @@ public sealed partial class TemplatesPage : Page
             TemplateCanvasScaleTransform.ScaleY = _canvasZoom;
         }
 
+        if (ZoomLevelText is not null)
+            ZoomLevelText.Text = $"{(int)Math.Round(_canvasZoom * 100)}%";
+
         ClampCanvasTranslation();
     }
 
@@ -240,13 +459,25 @@ public sealed partial class TemplatesPage : Page
 
     private void OnPageKeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
     {
-        if (e.Key != Windows.System.VirtualKey.Space)
+        if (e.Key == Windows.System.VirtualKey.Space)
         {
+            _isSpacePanMode = true;
+            e.Handled = true;
             return;
         }
-
-        _isSpacePanMode = true;
-        e.Handled = true;
+        if (e.Key == Windows.System.VirtualKey.Delete
+            && DataContext is TemplatesViewModel vm
+            && vm.IsCreatingTemplate)
+        {
+            var focused = Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(XamlRoot) as DependencyObject;
+            var draft = FindAncestorDataContext<ColumnLabelDraft>(focused);
+            if (draft is not null && vm.ColumnLabels.Count > 1)
+            {
+                vm.ColumnLabels.Remove(draft);
+                RefreshCanvasUiState(vm);
+                e.Handled = true;
+            }
+        }
     }
 
     private void OnPageKeyUp(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
@@ -276,28 +507,21 @@ public sealed partial class TemplatesPage : Page
         }
         _canvasBaseTranslateX = 0;
         _canvasBaseTranslateY = 0;
+        if (ZoomLevelText is not null)
+            ZoomLevelText.Text = "100%";
     }
 
     private void CenterCanvasContent()
     {
-        // Run after layout pass so ActualWidth/ActualHeight are valid.
         DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
         {
             if (TemplateCanvasScrollViewer is null || TemplateCanvasItemsControl is null || TemplateCanvasTranslateTransform is null)
-            {
                 return;
-            }
-
-            var viewportWidth = TemplateCanvasScrollViewer.ActualWidth;
             var viewportHeight = TemplateCanvasScrollViewer.ActualHeight;
-            var contentWidth = TemplateCanvasItemsControl.ActualWidth * _canvasZoom;
             var contentHeight = TemplateCanvasItemsControl.ActualHeight * _canvasZoom;
-            if (viewportWidth <= 0 || viewportHeight <= 0 || contentWidth <= 0 || contentHeight <= 0)
-            {
+            if (viewportHeight <= 0 || contentHeight <= 0)
                 return;
-            }
-
-            TemplateCanvasTranslateTransform.X = (viewportWidth - contentWidth) / 2.0;
+            TemplateCanvasTranslateTransform.X = 24;
             TemplateCanvasTranslateTransform.Y = (viewportHeight - contentHeight) / 2.0;
             _canvasBaseTranslateX = TemplateCanvasTranslateTransform.X;
             _canvasBaseTranslateY = TemplateCanvasTranslateTransform.Y;
@@ -318,30 +542,19 @@ public sealed partial class TemplatesPage : Page
     private void ClampCanvasTranslation()
     {
         if (TemplateCanvasTranslateTransform is null || TemplateCanvasItemsControl is null || TemplateCanvasScrollViewer is null)
-        {
             return;
-        }
-
-        var viewportWidth = TemplateCanvasScrollViewer.ActualWidth;
         var viewportHeight = TemplateCanvasScrollViewer.ActualHeight;
-        var contentWidth = TemplateCanvasItemsControl.ActualWidth * _canvasZoom;
         var contentHeight = TemplateCanvasItemsControl.ActualHeight * _canvasZoom;
-
-        if (viewportWidth <= 0 || viewportHeight <= 0 || contentWidth <= 0 || contentHeight <= 0)
-        {
+        if (viewportHeight <= 0 || contentHeight <= 0)
             return;
+        const double verticalPadding = 24;
+        var minY = -(contentHeight - verticalPadding);
+        var maxY = viewportHeight - verticalPadding;
+        if (contentHeight <= viewportHeight)
+        {
+            minY = 0;
+            maxY = viewportHeight - contentHeight;
         }
-
-        const double padding = 80;
-        var xRange = Math.Max(0, (contentWidth - viewportWidth) / 2) + padding;
-        var yRange = Math.Max(0, (contentHeight - viewportHeight) / 2) + padding;
-
-        var minX = _canvasBaseTranslateX - xRange;
-        var maxX = _canvasBaseTranslateX + xRange;
-        var minY = _canvasBaseTranslateY - yRange;
-        var maxY = _canvasBaseTranslateY + yRange;
-
-        TemplateCanvasTranslateTransform.X = Math.Clamp(TemplateCanvasTranslateTransform.X, minX, maxX);
         TemplateCanvasTranslateTransform.Y = Math.Clamp(TemplateCanvasTranslateTransform.Y, minY, maxY);
     }
 
@@ -389,32 +602,60 @@ public sealed partial class TemplatesPage : Page
 
     private void OnCanvasInsertLeftClick(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button { DataContext: ColumnLabelDraft draft } || DataContext is not TemplatesViewModel vm)
-        {
-            return;
-        }
-
+        if (DataContext is not TemplatesViewModel vm) return;
+        var draft = (sender as FrameworkElement)?.DataContext as ColumnLabelDraft;
+        if (draft is null) return;
         var index = vm.ColumnLabels.IndexOf(draft);
-        if (index < 0)
-        {
-            return;
-        }
-
+        if (index < 0) return;
         vm.ColumnLabels.Insert(index, new ColumnLabelDraft());
         RefreshAllCanvasCellBorders();
         SyncCanvasBaseToCurrentTranslation();
+        RefreshCanvasUiState(vm);
     }
 
     private void OnCanvasInsertRightClick(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button { DataContext: ColumnLabelDraft draft } || DataContext is not TemplatesViewModel vm)
-        {
-            return;
-        }
-
-        vm.InsertColumnAfterCommand.Execute(draft);
+        if (DataContext is not TemplatesViewModel vm) return;
+        var draft = (sender as FrameworkElement)?.DataContext as ColumnLabelDraft;
+        if (draft is null) return;
+        var index = vm.ColumnLabels.IndexOf(draft);
+        if (index < 0) return;
+        vm.ColumnLabels.Insert(index + 1, new ColumnLabelDraft());
         RefreshAllCanvasCellBorders();
         SyncCanvasBaseToCurrentTranslation();
+        RefreshCanvasUiState(vm);
+    }
+
+    private void OnCanvasDeleteColumnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not TemplatesViewModel vm) return;
+        if (vm.ColumnLabels.Count <= 1) return;
+        var draft = (sender as FrameworkElement)?.DataContext as ColumnLabelDraft;
+        if (draft is null) return;
+        vm.ColumnLabels.Remove(draft);
+        RefreshCanvasUiState(vm);
+    }
+
+    private void OnAddFieldRowClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not TemplatesViewModel vm) return;
+        vm.ColumnLabels.Add(new ColumnLabelDraft());
+        RefreshCanvasUiState(vm);
+    }
+
+    private void RefreshCanvasUiState(TemplatesViewModel vm)
+    {
+        var count = vm.ColumnLabels.Count;
+        if (FieldCountText is not null)
+            FieldCountText.Text = count == 1 ? "1 field" : $"{count} fields";
+        if (CanvasEmptyState is not null)
+            CanvasEmptyState.Visibility = count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void OnZoomResetClick(object sender, RoutedEventArgs e)
+    {
+        ResetCanvasView();
+        CenterCanvasContent();
     }
 
     private void OnAddDropdownOptionClick(object sender, RoutedEventArgs e)
@@ -453,9 +694,9 @@ public sealed partial class TemplatesPage : Page
     private void OnCanvasCellBorderLoaded(object sender, RoutedEventArgs e)
     {
         if (sender is Border border)
-        {
             ApplyCanvasCellEdgeStyling(border);
-        }
+        if (DataContext is TemplatesViewModel vm)
+            RefreshCanvasUiState(vm);
     }
 
     private void RefreshAllCanvasCellBorders()
@@ -577,6 +818,12 @@ public sealed partial class TemplatesPage : Page
         if (e.PropertyName == nameof(TemplatesViewModel.FavouritesStoreVersion))
         {
             UpdateFavoriteStars();
+
+            // If the All Templates panel is open, rebuild it so star states stay in sync
+            if (AllTemplatesPanel.Visibility == Visibility.Visible && DataContext is TemplatesViewModel vm)
+            {
+                BuildAllTemplatesList(vm);
+            }
         }
     }
 

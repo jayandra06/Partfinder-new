@@ -77,6 +77,14 @@ public sealed class ColumnLabelDraft : ObservableObject
     /// <summary>When editing an existing template, preserve the stored field key for this row.</summary>
     public string? StableKey { get; set; }
 
+    /// <summary>Whether this field is required when entering data.</summary>
+    public bool IsRequired
+    {
+        get => _isRequired;
+        set => SetProperty(ref _isRequired, value);
+    }
+    private bool _isRequired;
+
     /// <summary>Comma-separated options used when <see cref="FieldType"/> is Dropdown.</summary>
     public string DropdownOptionsText
     {

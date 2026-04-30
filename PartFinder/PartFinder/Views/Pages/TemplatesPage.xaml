@@ -63,19 +63,15 @@
                 </StackPanel>
             </Button>
             <Button
-                x:Name="ViewFavouritesButton"
+                x:Name="ViewAllTemplatesButton"
                 Style="{StaticResource ModernOutlineButtonStyle}"
                 Height="40"
                 Padding="14,0"
-                Click="OnShowFavouritesInlineClick"
-                PointerEntered="OnFavouritesButtonPointerEntered"
-                PointerExited="OnFavouritesButtonPointerExited">
+                Click="OnShowAllTemplatesClick"
+                Visibility="{Binding IsCreatingTemplate, Converter={StaticResource InvertedBoolToVisibilityConverter}}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                    <FontIcon Glyph="&#xE735;" FontSize="12" />
-                    <TextBlock
-                        Text="Favorites"
-                        FontSize="12"
-                        Visibility="{Binding IsCreatingTemplate, Converter={StaticResource InvertedBoolToVisibilityConverter}}" />
+                    <FontIcon Glyph="&#xE8A5;" FontSize="12" />
+                    <TextBlock Text="All Templates" FontSize="12" />
                 </StackPanel>
             </Button>
         </StackPanel>
@@ -86,8 +82,68 @@
             Padding="0"
             Visibility="{Binding ElementName=TemplatesPageRoot, Path=DataContext.IsCreatingTemplate, Converter={StaticResource InvertedBoolToVisibilityConverter}}" />
 
+        <!-- ── All Templates Panel ── -->
+        <Grid x:Name="AllTemplatesPanel"
+              Grid.Row="1"
+              Visibility="Collapsed">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <Border Grid.Row="0"
+                    Background="{StaticResource CardBackgroundBrush}"
+                    BorderBrush="{StaticResource BorderDefaultBrush}"
+                    BorderThickness="1" CornerRadius="12" Padding="16,12"
+                    Margin="0,0,0,16">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Icon -->
+                    <Border Grid.Column="0"
+                            Width="40" Height="40" CornerRadius="10"
+                            Background="#181F7AE0"
+                            Margin="0,0,12,0" VerticalAlignment="Center">
+                        <FontIcon Glyph="&#xE8A5;" FontSize="18"
+                                  Foreground="{StaticResource AccentPrimaryBrush}"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+
+                    <!-- Title + subtitle -->
+                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                        <TextBlock Text="All Templates" FontSize="16" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimaryBrush}" />
+                        <TextBlock Text="Star to favourite · Edit or delete from here"
+                                   FontSize="12"
+                                   Foreground="{StaticResource TextSecondaryBrush}" />
+                    </StackPanel>
+
+                    <!-- Back button -->
+                    <Button Grid.Column="2" Style="{StaticResource GhostButtonStyle}"
+                            Padding="12,6" VerticalAlignment="Center"
+                            Click="OnCloseAllTemplatesClick">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE72B;" FontSize="12" />
+                            <TextBlock Text="Back" FontSize="12" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- Template list -->
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                <StackPanel x:Name="AllTemplatesList" Spacing="8" />
+            </ScrollViewer>
+        </Grid>
+
         <Grid
             Grid.Row="1"
+            Background="{StaticResource PageBackgroundBrush}"
             Visibility="{Binding IsCreatingTemplate, Converter={StaticResource BoolToVisibilityConverter}}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -96,35 +152,97 @@
             </Grid.RowDefinitions>
 
             <StackPanel Spacing="6" Margin="0,8,0,12">
-                <TextBlock Text="Template Canvas" FontSize="22" FontWeight="SemiBold" />
-                <TextBlock Text="Hover left/right edge of a cell and click + to add adjacent cells." FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
-                <Grid ColumnSpacing="10">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="320" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBox
-                        Grid.Column="0"
-                        PlaceholderText="Template name"
-                        Text="{Binding NewTemplateName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                        <Button
-                            Style="{StaticResource GhostButtonStyle}"
-                            Content="Discard"
-                            Command="{Binding CancelCreateCommand}" />
-                        <Button
-                            Style="{StaticResource PrimaryButtonStyle}"
-                            Content="Save Template"
-                            Command="{Binding SaveTemplateCommand}" />
+                <!-- Back button -->
+                <Button
+                    Style="{StaticResource GhostButtonStyle}"
+                    Padding="8,4"
+                    HorizontalAlignment="Left"
+                    Command="{Binding CancelCreateCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE72B;" FontSize="12" />
+                        <TextBlock Text="Back" FontSize="12" />
                     </StackPanel>
-                </Grid>
+                </Button>
+                <!-- Row 1: Title + hint -->
+                <TextBlock Text="Template Canvas" FontSize="22" FontWeight="SemiBold" />
+                <TextBlock FontSize="12" Foreground="{StaticResource TextSecondaryBrush}">
+                    <Run Text="Hover left/right edge of a cell and click + to add. Click trash to remove. " />
+                    <Run Text="Delete" FontWeight="SemiBold" />
+                    <Run Text=" key removes selected cell. Double-click canvas to reset zoom." />
+                </TextBlock>
+                <!-- Row 2: Template name + field count + zoom + actions in one clean bar -->
+                <Border Background="{StaticResource CardBackgroundBrush}"
+                        BorderBrush="{StaticResource BorderDefaultBrush}"
+                        BorderThickness="1" CornerRadius="8" Padding="12,8">
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox
+                            Grid.Column="0"
+                            BorderThickness="0"
+                            Background="Transparent"
+                            PlaceholderText="Template name (e.g. Spare Parts)"
+                            FontSize="14" FontWeight="SemiBold"
+                            Text="{Binding NewTemplateName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <!-- Field count badge -->
+                        <Border Grid.Column="1" VerticalAlignment="Center"
+                                Background="#181F7AE0" BorderBrush="#301F7AE0"
+                                BorderThickness="1" CornerRadius="12" Padding="12,5">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE8EC;" FontSize="11"
+                                          Foreground="{StaticResource AccentPrimaryBrush}" />
+                                <TextBlock x:Name="FieldCountText"
+                                           FontSize="12" FontWeight="SemiBold"
+                                           Foreground="{StaticResource AccentPrimaryBrush}" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Zoom indicator + reset -->
+                        <Border Grid.Column="2" VerticalAlignment="Center"
+                                Background="{StaticResource ElevatedCardBackgroundBrush}"
+                                BorderBrush="{StaticResource BorderDefaultBrush}"
+                                BorderThickness="1" CornerRadius="12" Padding="10,5">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE71E;" FontSize="11"
+                                          Foreground="{StaticResource TextTertiaryBrush}" />
+                                <TextBlock x:Name="ZoomLevelText"
+                                           Text="100%"
+                                           FontSize="12" FontFamily="Consolas"
+                                           Foreground="{StaticResource TextSecondaryBrush}" />
+                                <Button Width="20" Height="20" Padding="0"
+                                        Background="Transparent" BorderThickness="0"
+                                        ToolTipService.ToolTip="Reset zoom (double-click canvas)"
+                                        Click="OnZoomResetClick">
+                                    <FontIcon Glyph="&#xE72C;" FontSize="10"
+                                              Foreground="{StaticResource TextTertiaryBrush}" />
+                                </Button>
+                            </StackPanel>
+                        </Border>
+
+                        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <Button
+                                Style="{StaticResource GhostButtonStyle}"
+                                Content="Discard" Padding="16,6"
+                                Command="{Binding CancelCreateCommand}" />
+                            <Button
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Content="Save Template" Padding="20,6"
+                                Command="{Binding SaveTemplateCommand}" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
             </StackPanel>
 
             <ScrollViewer
                 x:Name="TemplateCanvasScrollViewer"
                 Grid.Row="1"
                 Background="Transparent"
-                HorizontalScrollBarVisibility="Disabled"
+                HorizontalScrollBarVisibility="Hidden"
                 VerticalScrollBarVisibility="Disabled"
                 HorizontalContentAlignment="Left"
                 PointerWheelChanged="OnTemplateCanvasPointerWheelChanged"
@@ -138,49 +256,54 @@
                     </ItemsControl.RenderTransform>
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <StackPanel Orientation="Horizontal" Spacing="0" />
+                            <StackPanel Orientation="Horizontal" Spacing="12" />
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="viewmodels:ColumnLabelDraft">
-                            <Grid MinWidth="126" MinHeight="92" VerticalAlignment="Center">
+                            <Grid MinWidth="210" VerticalAlignment="Center">
                                 <Border
                                     Tag="canvas-cell-shell"
                                     Loaded="OnCanvasCellBorderLoaded"
-                                    CornerRadius="0"
+                                    CornerRadius="10"
                                     BorderBrush="{StaticResource BorderDefaultBrush}"
                                     BorderThickness="1"
                                     Background="{StaticResource CardBackgroundBrush}"
-                                    MinHeight="92"
                                     VerticalAlignment="Center">
                                     <Grid>
                                         <Grid.RowDefinitions>
-                                            <RowDefinition Height="30" />
+                                            <RowDefinition Height="36" />
                                             <RowDefinition Height="*" />
+                                            <RowDefinition Height="Auto" />
                                         </Grid.RowDefinitions>
+
+                                        <!-- Header: Type label + ComboBox + trash -->
                                         <Border
                                             Grid.Row="0"
                                             Background="{StaticResource GridHeaderBackgroundBrush}"
                                             BorderBrush="{StaticResource BorderDefaultBrush}"
                                             BorderThickness="0,0,0,1"
-                                            Padding="4,2">
+                                            CornerRadius="10,10,0,0"
+                                            Padding="8,4">
                                             <Grid ColumnSpacing="6">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto" />
                                                     <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
                                                 <TextBlock
                                                     Text="Type"
                                                     FontSize="10"
-                                                    Foreground="{StaticResource TextSecondaryBrush}"
+                                                    FontWeight="SemiBold"
+                                                    Foreground="{StaticResource TextTertiaryBrush}"
                                                     VerticalAlignment="Center"
+                                                    CharacterSpacing="30"
                                                     Margin="2,0,0,0" />
                                                 <ComboBox
                                                     Grid.Column="1"
-                                                    Height="22"
-                                                    MinWidth="72"
-                                                    FontSize="10"
-                                                    Padding="4,0,20,0"
+                                                    Height="26"
+                                                    FontSize="11"
+                                                    Padding="6,0,20,0"
                                                     Background="#0D1E33"
                                                     BorderBrush="#2A3D58"
                                                     BorderThickness="1"
@@ -189,48 +312,65 @@
                                                     ItemsSource="{Binding DataContext.FieldTypeOptions, ElementName=TemplatesPageRoot}"
                                                     SelectedValue="{Binding FieldType, Mode=TwoWay}"
                                                     SelectedValuePath="Value" />
+                                                <!-- Trash button -->
+                                                <Button
+                                                    Grid.Column="2"
+                                                    Width="24" Height="24"
+                                                    Padding="0"
+                                                    Background="Transparent"
+                                                    BorderThickness="0"
+                                                    VerticalAlignment="Center"
+                                                    ToolTipService.ToolTip="Remove field (Delete)"
+                                                    Click="OnCanvasDeleteColumnClick">
+                                                    <FontIcon Glyph="&#xE74D;" FontSize="11"
+                                                              Foreground="{StaticResource DangerBrush}" />
+                                                </Button>
                                             </Grid>
                                         </Border>
-                                        <Grid Grid.Row="1" Margin="6,4,6,4">
+
+                                        <!-- Body: label input per type -->
+                                        <Grid Grid.Row="1" Margin="8,6,8,6">
                                             <TextBox
-                                                Height="30"
+                                                Height="34"
                                                 VerticalAlignment="Center"
-                                                FontSize="12"
+                                                FontSize="13"
                                                 BorderThickness="1"
                                                 Background="#0D1E33"
                                                 BorderBrush="#2A3D58"
+                                                PlaceholderText="Field name..."
                                                 Text="{Binding Label, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                 Visibility="{Binding FieldType, Converter={StaticResource TemplateFieldTypeEqualsToVisibilityConverter}, ConverterParameter=Text}" />
 
                                             <TextBox
-                                                Height="30"
+                                                Height="34"
                                                 VerticalAlignment="Center"
-                                                FontSize="12"
+                                                FontSize="13"
                                                 BorderThickness="1"
                                                 Background="#0D1E33"
                                                 BorderBrush="#2A3D58"
-                                                PlaceholderText="e.g. 100"
+                                                PlaceholderText="Field name..."
                                                 Text="{Binding Label, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                 Visibility="{Binding FieldType, Converter={StaticResource TemplateFieldTypeEqualsToVisibilityConverter}, ConverterParameter=Number}" />
 
                                             <TextBox
-                                                Height="30"
+                                                Height="34"
                                                 VerticalAlignment="Center"
-                                                FontSize="12"
+                                                FontSize="13"
                                                 BorderThickness="1"
                                                 Background="#0D1E33"
                                                 BorderBrush="#2A3D58"
-                                                PlaceholderText="e.g. 99.95"
+                                                PlaceholderText="Field name..."
                                                 Text="{Binding Label, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                 Visibility="{Binding FieldType, Converter={StaticResource TemplateFieldTypeEqualsToVisibilityConverter}, ConverterParameter=Decimal}" />
 
                                             <DatePicker
-                                                Height="30"
+                                                Height="34"
                                                 VerticalAlignment="Center"
                                                 Visibility="{Binding FieldType, Converter={StaticResource TemplateFieldTypeEqualsToVisibilityConverter}, ConverterParameter=Date}" />
 
                                             <ComboBox
-                                                Height="30"
+                                                Height="34"
+                                                HorizontalAlignment="Stretch"
                                                 VerticalAlignment="Center"
                                                 SelectedIndex="0"
                                                 Visibility="{Binding FieldType, Converter={StaticResource TemplateFieldTypeEqualsToVisibilityConverter}, ConverterParameter=Boolean}">
@@ -244,7 +384,6 @@
                                                     <RowDefinition Height="Auto" />
                                                     <RowDefinition Height="Auto" />
                                                 </Grid.RowDefinitions>
-
                                                 <Grid ColumnSpacing="6">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="*" />
@@ -252,7 +391,7 @@
                                                     </Grid.ColumnDefinitions>
                                                     <TextBox
                                                         Grid.Column="0"
-                                                        Height="24"
+                                                        Height="28"
                                                         VerticalAlignment="Center"
                                                         FontSize="12"
                                                         BorderThickness="1"
@@ -263,13 +402,12 @@
                                                         KeyDown="OnDropdownOptionInputKeyDown" />
                                                     <Button
                                                         Grid.Column="1"
-                                                        Height="24"
+                                                        Height="28"
                                                         MinWidth="48"
                                                         Content="+ Add"
                                                         Click="OnAddDropdownOptionClick"
                                                         Style="{StaticResource GhostButtonStyle}" />
                                                 </Grid>
-
                                                 <ItemsControl
                                                     Grid.Row="1"
                                                     Margin="0,6,0,0"
@@ -290,8 +428,7 @@
                                                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                                                     <TextBlock Text="{Binding}" FontSize="11" />
                                                                     <Button
-                                                                        Width="16"
-                                                                        Height="16"
+                                                                        Width="16" Height="16"
                                                                         Padding="0"
                                                                         Content="×"
                                                                         Background="Transparent"
@@ -305,73 +442,106 @@
                                             </Grid>
 
                                             <TextBox
-                                                Height="30"
+                                                Height="34"
                                                 VerticalAlignment="Center"
-                                                FontSize="12"
+                                                FontSize="13"
                                                 BorderThickness="1"
                                                 Background="#0D1E33"
                                                 BorderBrush="#2A3D58"
-                                                PlaceholderText="Linked record"
+                                                PlaceholderText="Field name..."
                                                 Text="{Binding Label, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                 Visibility="{Binding FieldType, Converter={StaticResource TemplateFieldTypeEqualsToVisibilityConverter}, ConverterParameter=RecordLink}" />
                                         </Grid>
+
+                                        <!-- Required toggle footer -->
+                                        <Border Grid.Row="2"
+                                                BorderBrush="{StaticResource BorderDefaultBrush}"
+                                                BorderThickness="0,1,0,0"
+                                                Padding="8,6">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <CheckBox IsChecked="{Binding IsRequired, Mode=TwoWay}"
+                                                          MinWidth="0" Padding="4,0,0,0"
+                                                          VerticalAlignment="Center" />
+                                                <TextBlock Text="Required" FontSize="11"
+                                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                                           VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Border>
                                     </Grid>
                                 </Border>
 
-                                    <Border
-                                        Background="Transparent"
+                                <!-- Left + button -->
+                                <Border
+                                    Background="Transparent"
                                     Width="18"
-                                        HorizontalAlignment="Left"
+                                    HorizontalAlignment="Left"
                                     VerticalAlignment="Stretch">
-                                        <Button
-                                            Tag="edge-left"
-                                        Width="18"
-                                        Height="18"
+                                    <Button
+                                        Width="18" Height="18"
                                         Padding="0"
-                                            Opacity="1"
-                                            VerticalAlignment="Center"
-                                            Margin="0,8,0,0"
-                                            HorizontalAlignment="Center"
+                                        Opacity="1"
+                                        VerticalAlignment="Center"
+                                        Margin="0,8,0,0"
+                                        HorizontalAlignment="Center"
                                         Background="Transparent"
                                         BorderThickness="0"
-                                            Click="OnCanvasInsertLeftClick"
+                                        Click="OnCanvasInsertLeftClick"
                                         IsHitTestVisible="True">
                                         <Border Width="18" Height="18" CornerRadius="9" BorderBrush="#355983" BorderThickness="1" Background="#18283C">
                                             <FontIcon Glyph="&#xE710;" FontSize="9" Foreground="#A4C9FF" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                            </Border>
-                                        </Button>
-                                    </Border>
+                                        </Border>
+                                    </Button>
+                                </Border>
 
-                                    <Border
-                                        Background="Transparent"
+                                <!-- Right + button -->
+                                <Border
+                                    Background="Transparent"
                                     Width="18"
-                                        HorizontalAlignment="Right"
+                                    HorizontalAlignment="Right"
                                     VerticalAlignment="Stretch">
-                                        <Button
-                                            Tag="edge-right"
-                                            Width="18"
-                                            Height="18"
-                                            Padding="0"
-                                            Opacity="1"
-                                            VerticalAlignment="Center"
-                                            Margin="0,8,0,0"
-                                            HorizontalAlignment="Center"
-                                            Background="Transparent"
-                                            BorderThickness="0"
-                                            Click="OnCanvasInsertRightClick"
-                                            IsHitTestVisible="True">
+                                    <Button
+                                        Width="18" Height="18"
+                                        Padding="0"
+                                        Opacity="1"
+                                        VerticalAlignment="Center"
+                                        Margin="0,8,0,0"
+                                        HorizontalAlignment="Center"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Click="OnCanvasInsertRightClick"
+                                        IsHitTestVisible="True">
                                         <Border Width="18" Height="18" CornerRadius="9" BorderBrush="#355983" BorderThickness="1" Background="#18283C">
                                             <FontIcon Glyph="&#xE710;" FontSize="9" Foreground="#A4C9FF" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                            </Border>
-                                        </Button>
-                                    </Border>
+                                        </Border>
+                                    </Button>
+                                </Border>
                             </Grid>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
             </ScrollViewer>
 
-            <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="10" Margin="0,12,0,0" Visibility="Collapsed" />
+            <!-- Empty state — shown when no columns -->
+            <Border Grid.Row="1"
+                    x:Name="CanvasEmptyState"
+                    Visibility="Collapsed"
+                    IsHitTestVisible="False"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+                <StackPanel Spacing="12" HorizontalAlignment="Center">
+                    <FontIcon Glyph="&#xE8EC;" FontSize="36"
+                              Foreground="{StaticResource TextTertiaryBrush}"
+                              HorizontalAlignment="Center" />
+                    <TextBlock Text="No fields yet" FontSize="16" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               HorizontalAlignment="Center" />
+                    <TextBlock Text="Click + on any cell edge to add your first field"
+                               FontSize="13" Foreground="{StaticResource TextTertiaryBrush}"
+                               HorizontalAlignment="Center" />
+                </StackPanel>
+            </Border>
+
+            <StackPanel Grid.Row="2" Margin="0,8,0,0" Visibility="Collapsed" />
         </Grid>
 
         <!-- Hidden hosts kept for existing code-behind compatibility -->

@@ -80,6 +80,20 @@ public partial class TemplatesViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private async Task DeleteTemplateAsync(string templateId)
+    {
+        if (string.IsNullOrWhiteSpace(templateId)) return;
+        try
+        {
+            await _templateSchema.DeleteTemplateAsync(templateId).ConfigureAwait(true);
+            _activityLogger.LogTemplateChange("Template Deleted", $"Template {templateId} deleted");
+            await LoadAsync().ConfigureAwait(true);
+            await _shellNav.NotifyTemplatesChangedAsync().ConfigureAwait(true);
+        }
+        catch { /* ignore */ }
+    }
+
+    [RelayCommand]
     private async Task ToggleFavouriteAsync(string templateId)
     {
         await _favouriteStore.ToggleAsync(templateId).ConfigureAwait(true);
@@ -540,6 +554,7 @@ public partial class TemplatesViewModel : ViewModelBase
                     LinkedTemplateId = f.LinkedTemplateId,
                     StableKey = f.Key,
                     DropdownOptionsText = f.Options is { Count: > 0 } ? string.Join(", ", f.Options) : string.Empty,
+                    IsRequired = f.IsRequired,
                 });
         }
 
@@ -681,7 +696,7 @@ public partial class TemplatesViewModel : ViewModelBase
                     Key = key,
                     Label = label,
                     Type = draft.FieldType,
-                    IsRequired = false,
+                    IsRequired = draft.IsRequired,
                     DisplayOrder = ord++,
                     ValidationPattern = null,
                     Options = draft.FieldType == TemplateFieldType.Dropdown
