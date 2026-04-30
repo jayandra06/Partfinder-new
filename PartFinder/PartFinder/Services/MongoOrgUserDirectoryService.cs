@@ -171,6 +171,53 @@ public sealed class MongoOrgUserDirectoryService : IOrgUserDirectoryService
         return VerifyPassword(temporaryPassword, doc.TemporaryPasswordHash);
     }
 
+    public async Task<bool> UpdateUserAsync(
+        string id,
+        string name,
+        string role,
+        bool partsAllTemplates,
+        IReadOnlyList<string> allowedTemplateIds,
+        CancellationToken cancellationToken = default)
+    {
+        var coll = TryGetCollection();
+        if (coll is null || !ObjectId.TryParse(id, out var objectId))
+        {
+            return false;
+        }
+
+        var update = Builders<OrgAppUserDoc>.Update
+            .Set(x => x.Name, name.Trim())
+            .Set(x => x.Role, role.Trim())
+            .Set(x => x.PartsAllTemplates, partsAllTemplates)
+            .Set(x => x.AllowedTemplateIds, allowedTemplateIds
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Select(s => s.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList());
+
+        var result = await coll.UpdateOneAsync(
+            x => x.Id == objectId,
+            update,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        return result.ModifiedCount > 0;
+    }
+
+    public async Task<bool> DeleteUserAsync(string id, CancellationToken cancellationToken = default)
+    {
+        var coll = TryGetCollection();
+        if (coll is null || !ObjectId.TryParse(id, out var objectId))
+        {
+            return false;
+        }
+
+        var result = await coll.DeleteOneAsync(
+            x => x.Id == objectId,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        return result.DeletedCount > 0;
+    }
+
     private static OrgAppUserSummary Map(OrgAppUserDoc d) =>
         new()
         {

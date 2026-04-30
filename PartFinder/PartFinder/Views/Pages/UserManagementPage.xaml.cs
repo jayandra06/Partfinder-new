@@ -77,6 +77,78 @@ public sealed partial class UserManagementPage : Page
         ShowToast("User Invited", msg);
     }
 
+    private async void OnEditUserClicked(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        if (DataContext is not UserManagementViewModel vm) return;
+        if (sender is not Button btn || btn.DataContext is not Models.OrgAppUserSummary user) return;
+
+        await vm.PrepareEditDialogAsync(user).ConfigureAwait(true);
+        var content = new InviteUserControl { DataContext = vm };
+        var dialog = new ContentDialog
+        {
+            Title = "Edit User",
+            PrimaryButtonText = "Save Changes",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = XamlRoot,
+            Content = content,
+        };
+
+        var result = await dialog.ShowAsync();
+        if (result != ContentDialogResult.Primary) return;
+
+        var err = await vm.SaveEditAsync().ConfigureAwait(true);
+        if (!string.IsNullOrEmpty(err))
+        {
+            var errDialog = new ContentDialog
+            {
+                Title = "Could not update",
+                Content = err,
+                CloseButtonText = "OK",
+                XamlRoot = XamlRoot,
+            };
+            await errDialog.ShowAsync();
+            return;
+        }
+
+        ShowToast("User Updated", "User details updated successfully.");
+    }
+
+    private async void OnDeleteUserClicked(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        if (DataContext is not UserManagementViewModel vm) return;
+        if (sender is not Button btn || btn.DataContext is not Models.OrgAppUserSummary user) return;
+
+        var dialog = new ContentDialog
+        {
+            Title = "Delete User",
+            Content = $"Are you sure you want to delete user {user.Name}?",
+            PrimaryButtonText = "Delete",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = XamlRoot,
+        };
+
+        var result = await dialog.ShowAsync();
+        if (result != ContentDialogResult.Primary) return;
+
+        var err = await vm.DeleteUserAsync(user).ConfigureAwait(true);
+        if (!string.IsNullOrEmpty(err))
+        {
+            var errDialog = new ContentDialog
+            {
+                Title = "Could not delete",
+                Content = err,
+                CloseButtonText = "OK",
+                XamlRoot = XamlRoot,
+            };
+            await errDialog.ShowAsync();
+            return;
+        }
+
+        ShowToast("User Deleted", "User deleted successfully.");
+    }
+
     // ── Toast with slide-up + fade animation ────────────────
     private async void ShowToast(string title = "Done", string message = "Changes saved.")
     {

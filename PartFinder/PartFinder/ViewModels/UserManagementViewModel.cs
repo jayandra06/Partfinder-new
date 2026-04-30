@@ -36,6 +36,11 @@ public partial class UserManagementViewModel : ViewModelBase
     [ObservableProperty]
     private bool isBusy;
 
+    [ObservableProperty]
+    private bool isEditMode;
+
+    private string? _editUserId;
+
     public bool IsEmployeeRole =>
         string.Equals(InviteRole, "Employee", StringComparison.OrdinalIgnoreCase);
 
@@ -108,6 +113,8 @@ public partial class UserManagementViewModel : ViewModelBase
 
     public async Task PrepareInviteDialogAsync(CancellationToken cancellationToken = default)
     {
+        IsEditMode = false;
+        _editUserId = null;
         InviteName = string.Empty;
         InviteEmail = string.Empty;
         InviteRole = "Employee";
@@ -130,6 +137,39 @@ public partial class UserManagementViewModel : ViewModelBase
                 {
                     TemplateId = t.Id,
                     Name = t.Name,
+                });
+        }
+
+        OnPropertyChanged(nameof(HasTemplateChoices));
+    }
+
+    public async Task PrepareEditDialogAsync(OrgAppUserSummary user, CancellationToken cancellationToken = default)
+    {
+        IsEditMode = true;
+        _editUserId = user.Id;
+        InviteName = user.Name;
+        InviteEmail = user.Email;
+        InviteRole = user.Role;
+        InvitePartsAllTemplates = user.PartsAllTemplates;
+        TemplateChoices.Clear();
+
+        var all = await _templates.GetTemplatesAsync(cancellationToken).ConfigureAwait(true);
+        foreach (var t in all.OrderBy(x => x.Name))
+        {
+            if (string.Equals(
+                    t.Id,
+                    MongoTemplateSchemaService.MasterDataTemplateId,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            TemplateChoices.Add(
+                new TemplatePickItemViewModel
+                {
+                    TemplateId = t.Id,
+                    Name = t.Name,
+                    IsSelected = user.AllowedTemplateIds.Contains(t.Id, StringComparer.OrdinalIgnoreCase)
                 });
         }
 
@@ -188,5 +228,65 @@ public partial class UserManagementViewModel : ViewModelBase
         await LoadUsersAsync().ConfigureAwait(true);
         _activityLogger.LogUserAction("User Invited", $"Invited \"{name}\" ({email}) as {role}");
         return (null, result);
+    }
+
+    public async Task<string?> SaveEditAsync()
+    {
+        if (string.IsNullOrEmpty(_editUserId))
+        {
+            return "No user selected for editing.";
+        }
+
+        var name = InviteName.Trim();
+        if (string.IsNullOrEmpty(name))
+        {
+            return "Enter a name.";
+        }
+
+        var role = InviteRole.Trim();
+        if (!string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(role, "Employee", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Select a role.";
+        }
+
+        var partsAll = InvitePartsAllTemplates;
+        var allowed = TemplateChoices
+            .Where(x => x.IsSelected)
+            .Select(x => x.TemplateId)
+            .ToList();
+        if (!partsAll && allowed.Count == 0 && string.Equals(role, "Employee", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Select at least one part template, or enable \"All part templates\".";
+        }
+
+        var ok = await _users.UpdateUserAsync(
+            _editUserId,
+            name,
+            role,
+            partsAll,
+            allowed).ConfigureAwait(true);
+            
+        if (!ok)
+        {
+            return "Could not update user.";
+        }
+
+        await LoadUsersAsync().ConfigureAwait(true);
+        _activityLogger.LogUserAction("User Updated", $"Updated user \"{name}\" ({InviteEmail})");
+        return null;
+    }
+
+    public async Task<string?> DeleteUserAsync(OrgAppUserSummary user)
+    {
+        var ok = await _users.DeleteUserAsync(user.Id).ConfigureAwait(true);
+        if (!ok)
+        {
+            return "Could not delete user.";
+        }
+
+        await LoadUsersAsync().ConfigureAwait(true);
+        _activityLogger.LogUserAction("User Deleted", $"Deleted user \"{user.Name}\" ({user.Email})");
+        return null;
     }
 }

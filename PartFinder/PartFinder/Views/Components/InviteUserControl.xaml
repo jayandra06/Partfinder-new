@@ -28,6 +28,7 @@
                 PlaceholderText="name@company.com"
                 FontSize="13"
                 Padding="12,10"
+                IsReadOnly="{Binding IsEditMode}"
                 Text="{Binding InviteEmail, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
         </StackPanel>
 
