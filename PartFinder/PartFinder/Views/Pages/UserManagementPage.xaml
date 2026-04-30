@@ -1,4 +1,4 @@
-﻿<Page
+<Page
     x:Class="PartFinder.Views.Pages.UserManagementPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -249,6 +249,7 @@
                             <TextBlock Grid.Column="3" Text="ROLE" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" VerticalAlignment="Center" />
                             <TextBlock Grid.Column="4" Text="ACCESS" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" VerticalAlignment="Center" />
                             <TextBlock Grid.Column="5" Text="INVITED" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" VerticalAlignment="Center" MinWidth="70" />
+                            <TextBlock Grid.Column="6" Text="ACTIONS" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" VerticalAlignment="Center" Margin="10,0,0,0" />
                         </Grid>
 
                         <!-- Table Rows -->
@@ -270,6 +271,7 @@
                                             <ColumnDefinition Width="2.5*" />
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="2*" />
+                                            <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
 
@@ -340,6 +342,16 @@
                                             Foreground="{StaticResource TextTertiaryBrush}"
                                             VerticalAlignment="Center"
                                             MinWidth="70" />
+
+                                        <!-- Actions -->
+                                        <StackPanel Grid.Column="6" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="10,0,0,0">
+                                            <Button Style="{StaticResource GhostButtonStyle}" Padding="6" CornerRadius="4" Click="OnEditUserClicked" ToolTipService.ToolTip="Edit User">
+                                                <FontIcon Glyph="&#xE70F;" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
+                                            </Button>
+                                            <Button Style="{StaticResource GhostButtonStyle}" Padding="6" CornerRadius="4" Click="OnDeleteUserClicked" ToolTipService.ToolTip="Delete User">
+                                                <FontIcon Glyph="&#xE74D;" FontSize="12" Foreground="{StaticResource DangerBrush}" />
+                                            </Button>
+                                        </StackPanel>
                                     </Grid>
                                 </DataTemplate>
                             </ListView.ItemTemplate>

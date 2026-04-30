@@ -29,4 +29,14 @@ public interface IOrgUserDirectoryService
         string email,
         string temporaryPassword,
         CancellationToken cancellationToken = default);
+
+    Task<bool> UpdateUserAsync(
+        string id,
+        string name,
+        string role,
+        bool partsAllTemplates,
+        IReadOnlyList<string> allowedTemplateIds,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> DeleteUserAsync(string id, CancellationToken cancellationToken = default);
 }
