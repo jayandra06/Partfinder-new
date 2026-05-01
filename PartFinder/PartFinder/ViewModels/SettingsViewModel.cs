@@ -18,6 +18,7 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly LocalProfileStore _profile;
     private readonly ActivityLogger _activityLogger;
     private readonly IAppStateStore _appState;
+    private readonly ILocalSetupContext _setupContext;
     private string? _pendingTwoFactorSecret;
 
     public SettingsViewModel(
@@ -25,20 +26,32 @@ public partial class SettingsViewModel : ViewModelBase
         AdminSessionStore session,
         LocalProfileStore profile,
         ActivityLogger activityLogger,
-        IAppStateStore appState)
+        IAppStateStore appState,
+        ILocalSetupContext setupContext)
     {
         _security = security;
         _session = session;
         _profile = profile;
         _activityLogger = activityLogger;
         _appState = appState;
+        _setupContext = setupContext;
+        _setupContext.Refresh();
         RefreshAllState();
     }
 
     /// <summary>Real organization name from the license server.</summary>
-    public string OrgDisplayName => string.IsNullOrWhiteSpace(_appState.OrgDisplayName)
-        ? "—"
-        : _appState.OrgDisplayName;
+    public string OrgDisplayName
+    {
+        get
+        {
+            if (!string.IsNullOrWhiteSpace(_appState.OrgDisplayName))
+                return _appState.OrgDisplayName;
+            // Fallback: use OrgCode from local setup state (available after logout+restart)
+            if (!string.IsNullOrWhiteSpace(_setupContext.OrgCode))
+                return _setupContext.OrgCode!;
+            return "—";
+        }
+    }
 
     /// <summary>Plan from the license server (e.g. "starter", "pro") — Title-cased for display.</summary>
     public string OrgPlanDisplay
