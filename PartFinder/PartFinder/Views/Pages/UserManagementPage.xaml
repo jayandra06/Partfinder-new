@@ -129,7 +129,7 @@
                             <TextBlock Text="TOTAL USERS" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" />
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <FontIcon Glyph="&#xE77B;" FontSize="16" Foreground="{StaticResource AccentPrimaryBrush}" />
-                                <TextBlock Text="{Binding Users.Count}" FontSize="20" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding TotalUsersCount}" FontSize="20" FontWeight="SemiBold" />
                             </StackPanel>
                         </StackPanel>
                     </Border>
@@ -141,7 +141,7 @@
                             <TextBlock Text="ACTIVE" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" />
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <Ellipse Width="8" Height="8" Fill="{StaticResource SuccessBrush}" VerticalAlignment="Center" />
-                                <TextBlock Text="{Binding Users.Count}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource SuccessBrush}" />
+                                <TextBlock Text="{Binding ActiveUsersCount}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource SuccessBrush}" />
                             </StackPanel>
                         </StackPanel>
                     </Border>
@@ -153,7 +153,7 @@
                             <TextBlock Text="ADMINS" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" />
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <FontIcon Glyph="&#xE7EF;" FontSize="16" Foreground="{StaticResource WarningBrush}" />
-                                <TextBlock Text="-" FontSize="20" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding AdminUsersCount}" FontSize="20" FontWeight="SemiBold" />
                             </StackPanel>
                         </StackPanel>
                     </Border>
@@ -165,7 +165,7 @@
                             <TextBlock Text="PENDING" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" />
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <FontIcon Glyph="&#xE823;" FontSize="16" Foreground="{StaticResource InfoBrush}" />
-                                <TextBlock Text="-" FontSize="20" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding PendingUsersCount}" FontSize="20" FontWeight="SemiBold" />
                             </StackPanel>
                         </StackPanel>
                     </Border>
@@ -210,10 +210,9 @@
                               ItemsSource="{Binding RoleFilters}"
                               SelectedItem="{Binding SelectedRoleFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <ComboBox Grid.Column="2" PlaceholderText="All Status" HorizontalAlignment="Stretch" FontSize="12">
-                        <ComboBoxItem Content="Active" />
-                        <ComboBoxItem Content="Pending" />
-                    </ComboBox>
+                    <ComboBox Grid.Column="2" HorizontalAlignment="Stretch" FontSize="12"
+                              ItemsSource="{Binding StatusFilters}"
+                              SelectedItem="{Binding SelectedStatusFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                 </Grid>
 
                 <!-- â”€â”€ Status + Loading â”€â”€ -->

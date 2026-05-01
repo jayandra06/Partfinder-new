@@ -56,6 +56,29 @@ public partial class UserManagementViewModel : ViewModelBase
         ApplyFilter();
     }
 
+    public string[] StatusFilters { get; } = ["All Status", "Active", "Pending"];
+
+    [ObservableProperty]
+    private string selectedStatusFilter = "All Status";
+
+    partial void OnSelectedStatusFilterChanged(string value)
+    {
+        ApplyFilter();
+    }
+
+    public int TotalUsersCount => _allUsers.Count;
+    public int ActiveUsersCount => _allUsers.Count(u => u.Status == "Active");
+    public int AdminUsersCount => _allUsers.Count(u => u.Role == "Admin");
+    public int PendingUsersCount => _allUsers.Count(u => u.Status == "Pending");
+
+    private void NotifyKpiChanges()
+    {
+        OnPropertyChanged(nameof(TotalUsersCount));
+        OnPropertyChanged(nameof(ActiveUsersCount));
+        OnPropertyChanged(nameof(AdminUsersCount));
+        OnPropertyChanged(nameof(PendingUsersCount));
+    }
+
     partial void OnSearchQueryChanged(string value)
     {
         ApplyFilter();
@@ -66,6 +89,7 @@ public partial class UserManagementViewModel : ViewModelBase
         Users.Clear();
         var query = SearchQuery?.Trim() ?? string.Empty;
         var roleFilter = SelectedRoleFilter ?? "All";
+        var statusFilter = SelectedStatusFilter ?? "All Status";
 
         foreach (var u in _allUsers)
         {
@@ -76,7 +100,10 @@ public partial class UserManagementViewModel : ViewModelBase
             bool matchesRole = string.Equals(roleFilter, "All", StringComparison.OrdinalIgnoreCase) ||
                                string.Equals(u.Role, roleFilter, StringComparison.OrdinalIgnoreCase);
 
-            if (matchesQuery && matchesRole)
+            bool matchesStatus = string.Equals(statusFilter, "All Status", StringComparison.OrdinalIgnoreCase) ||
+                                 string.Equals(u.Status, statusFilter, StringComparison.OrdinalIgnoreCase);
+
+            if (matchesQuery && matchesRole && matchesStatus)
             {
                 Users.Add(u);
             }
@@ -138,6 +165,7 @@ public partial class UserManagementViewModel : ViewModelBase
         {
             var list = await _users.ListUsersAsync().ConfigureAwait(true);
             _allUsers = list.ToList();
+            NotifyKpiChanges();
             ApplyFilter();
         }
         catch (Exception ex)
