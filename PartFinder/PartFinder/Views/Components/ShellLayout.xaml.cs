@@ -25,9 +25,14 @@ public sealed partial class ShellLayout : UserControl
         _ = navigation.Navigate(AppPage.Settings);
     }
 
-    private void OnProfileLogoutMenuClicked(object sender, RoutedEventArgs e)
+    private async void OnProfileLogoutMenuClicked(object sender, RoutedEventArgs e)
     {
         var adminSession = App.Services.GetRequiredService<AdminSessionStore>();
+        var activityLogger = App.Services.GetRequiredService<ActivityLogger>();
+        
+        activityLogger.LogLogout(adminSession.Email ?? "unknown");
+        await activityLogger.FlushAsync().ConfigureAwait(true);
+        
         adminSession.Clear();
         SetupPaths.ClearAllSetupStateFiles();
         Application.Current.Exit();

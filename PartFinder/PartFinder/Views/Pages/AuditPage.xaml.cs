@@ -32,7 +32,8 @@ public sealed partial class AuditPage : Page
         typeCombo.Items.Add("Stock Changes");
         typeCombo.Items.Add("User Actions");
         typeCombo.Items.Add("System Events");
-        typeCombo.SelectedIndex = 0;
+        typeCombo.Items.Add("Alerts");
+        typeCombo.SelectedItem = ViewModel.SelectedEventType;
         typePanel.Children.Add(typeCombo);
         content.Children.Add(typePanel);
 
@@ -45,7 +46,14 @@ public sealed partial class AuditPage : Page
             DefaultButton = ContentDialogButton.Primary,
             XamlRoot = XamlRoot,
         };
-        await dialog.ShowAsync();
+        var result = await dialog.ShowAsync();
+        if (result == ContentDialogResult.Primary)
+        {
+            if (typeCombo.SelectedItem is string selectedType)
+            {
+                ViewModel.SelectedEventType = selectedType;
+            }
+        }
     }
 
     private async void OnExportAuditClick(object sender, RoutedEventArgs e)
