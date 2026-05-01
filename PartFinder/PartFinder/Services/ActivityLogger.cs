@@ -52,6 +52,15 @@ public class ActivityLogger
     public void LogLogin(string userEmail)                      => Log("User Action",   "Login", $"User '{userEmail}' signed in");
     public void LogLogout(string userEmail)                     => Log("User Action",   "Logout", $"User '{userEmail}' signed out");
 
+    /// <summary>Flushes the log queue immediately. Useful before application exit.</summary>
+    public async Task FlushAsync()
+    {
+        while (_queue.TryDequeue(out var doc))
+        {
+            await _auditService.LogAsync(doc).ConfigureAwait(false);
+        }
+    }
+
     // ── Background writer ─────────────────────────────────────────────────────
 
     private async Task ProcessQueueAsync()

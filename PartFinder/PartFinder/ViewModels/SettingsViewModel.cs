@@ -743,9 +743,10 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void Logout()
+    private async Task LogoutAsync()
     {
         _activityLogger.LogLogout(SessionEmailDisplay != "—" ? SessionEmailDisplay : "unknown");
+        await _activityLogger.FlushAsync().ConfigureAwait(true);
         _session.Clear();
         SetupPaths.ClearAllSetupStateFiles();
         AdminSessionActive = false;
