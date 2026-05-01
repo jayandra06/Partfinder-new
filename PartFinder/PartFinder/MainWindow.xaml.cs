@@ -395,6 +395,11 @@ public sealed partial class MainWindow : Window
 
     private void OnSubscriptionBlockedResetSetupClicked(object sender, RoutedEventArgs e)
     {
+        ResetToSetup();
+    }
+
+    public void ResetToSetup()
+    {
         StopMaintenanceTimer();
         MaintenanceBlockedRoot.Visibility = Visibility.Collapsed;
         try
@@ -411,6 +416,7 @@ public sealed partial class MainWindow : Window
         SubscriptionBlockedRoot.Visibility = Visibility.Collapsed;
         SetupRoot.Visibility = Visibility.Visible;
         ShellRoot.Visibility = Visibility.Collapsed;
+        AppLockRoot.Visibility = Visibility.Collapsed;
         _step = 1;
         _workingOrgCode = "";
         _cachedOrgDatabaseUri = null;
@@ -516,6 +522,7 @@ public sealed partial class MainWindow : Window
                 {
                     AppLockRoot.Visibility = Visibility.Collapsed;
                     ShellRoot.Visibility = Visibility.Visible;
+                    LogAutoLoginIfSessionActive();
                     return;
                 }
 
@@ -531,6 +538,22 @@ public sealed partial class MainWindow : Window
         // App lock off or Windows Hello not available — open directly
         AppLockRoot.Visibility = Visibility.Collapsed;
         ShellRoot.Visibility = Visibility.Visible;
+        LogAutoLoginIfSessionActive();
+    }
+
+    private void LogAutoLoginIfSessionActive()
+    {
+        try
+        {
+            var session = App.Services.GetRequiredService<AdminSessionStore>();
+            session.Load();
+            if (session.HasSession)
+            {
+                var logger = App.Services.GetRequiredService<ActivityLogger>();
+                logger.Log("User Action", "Login", $"User '{session.Email ?? "Unknown"}' resumed session on startup");
+            }
+        }
+        catch { /* ignore */ }
     }
 
     // ── App Lock handlers ─────────────────────────────────────────────
@@ -546,6 +569,7 @@ public sealed partial class MainWindow : Window
         {
             AppLockRoot.Visibility = Visibility.Collapsed;
             ShellRoot.Visibility = Visibility.Visible;
+            LogAutoLoginIfSessionActive();
         }
         else
         {

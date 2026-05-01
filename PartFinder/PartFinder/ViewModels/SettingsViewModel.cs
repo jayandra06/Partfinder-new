@@ -743,9 +743,10 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void Logout()
+    private async Task LogoutAsync()
     {
         _activityLogger.LogLogout(SessionEmailDisplay != "—" ? SessionEmailDisplay : "unknown");
+        await _activityLogger.FlushAsync().ConfigureAwait(true);
         _session.Clear();
         SetupPaths.ClearAllSetupStateFiles();
         AdminSessionActive = false;
@@ -753,7 +754,15 @@ public partial class SettingsViewModel : ViewModelBase
         LoginMessage = "Signed out.";
         ChangePasswordMessage = string.Empty;
         ShowServerAccountEditor = false;
-        Application.Current.Exit();
+        
+        if (Application.Current is App app && App.MainAppWindow is MainWindow main)
+        {
+            main.ResetToSetup();
+        }
+        else
+        {
+            Application.Current.Exit();
+        }
     }
 
     [RelayCommand]

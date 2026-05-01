@@ -23,6 +23,72 @@ public partial class AuditViewModel : ViewModelBase
     [ObservableProperty] private int _userActionCount;
     [ObservableProperty] private int _systemEventCount;
 
+    private readonly List<AuditLogEntry> _allLogs = new();
+
+    [ObservableProperty] private string _searchText = string.Empty;
+    [ObservableProperty] private string _selectedEventType = "All Events";
+    [ObservableProperty] private string _selectedUser = "All Users";
+    [ObservableProperty] private string _selectedDateRange = "All time";
+
+    public ObservableCollection<string> AvailableUsers { get; } = new() { "All Users" };
+
+    partial void OnSearchTextChanged(string value) => ApplyFilters();
+    partial void OnSelectedEventTypeChanged(string value) => ApplyFilters();
+    partial void OnSelectedUserChanged(string value) => ApplyFilters();
+    partial void OnSelectedDateRangeChanged(string value) => ApplyFilters();
+
+    private void ApplyFilters()
+    {
+        var filtered = _allLogs.AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(SearchText))
+        {
+            var lowerSearch = SearchText.ToLowerInvariant();
+            filtered = filtered.Where(x => 
+                x.Action.ToLowerInvariant().Contains(lowerSearch) ||
+                x.Details.ToLowerInvariant().Contains(lowerSearch) ||
+                x.User.ToLowerInvariant().Contains(lowerSearch));
+        }
+
+        if (SelectedEventType != "All Events" && !string.IsNullOrWhiteSpace(SelectedEventType))
+        {
+            var matchType = SelectedEventType switch
+            {
+                "Stock Changes" => "Stock Change",
+                "User Actions" => "User Action",
+                "System Events" => "System Event",
+                "Templates" => "Template",
+                "Alerts" => "Alert",
+                _ => SelectedEventType
+            };
+            filtered = filtered.Where(x => x.EventType == matchType);
+        }
+
+        if (SelectedUser != "All Users" && !string.IsNullOrWhiteSpace(SelectedUser))
+        {
+            filtered = filtered.Where(x => x.User == SelectedUser);
+        }
+
+        if (SelectedDateRange != "All time" && !string.IsNullOrWhiteSpace(SelectedDateRange))
+        {
+            var cutoff = DateTime.UtcNow;
+            if (SelectedDateRange == "Today") cutoff = cutoff.Date;
+            else if (SelectedDateRange == "Last 7 days") cutoff = cutoff.AddDays(-7);
+            else if (SelectedDateRange == "Last 30 days") cutoff = cutoff.AddDays(-30);
+            
+            if (SelectedDateRange != "All time")
+            {
+                filtered = filtered.Where(x => x.Timestamp >= cutoff);
+            }
+        }
+
+        AuditLogs.Clear();
+        foreach (var item in filtered)
+        {
+            AuditLogs.Add(item);
+        }
+    }
+
     public async Task LoadAuditLogsAsync(CancellationToken cancellationToken = default)
     {
         IsLoading = true;
@@ -31,10 +97,11 @@ public partial class AuditViewModel : ViewModelBase
         {
             var docs = await _auditService.GetRecentAsync(200, cancellationToken).ConfigureAwait(true);
 
-            AuditLogs.Clear();
+            _allLogs.Clear();
             StockChangeCount = 0;
             UserActionCount = 0;
             SystemEventCount = 0;
+            var users = new HashSet<string>();
 
             foreach (var doc in docs)
             {
@@ -42,7 +109,7 @@ public partial class AuditViewModel : ViewModelBase
                 else if (doc.EventType == "User Action") UserActionCount++;
                 else SystemEventCount++;
 
-                AuditLogs.Add(new AuditLogEntry
+                var entry = new AuditLogEntry
                 {
                     EventId = doc.MongoId.ToString(),
                     EventType = string.IsNullOrWhiteSpace(doc.EventType) ? "System Event" : doc.EventType,
@@ -54,13 +121,24 @@ public partial class AuditViewModel : ViewModelBase
                     SessionId = doc.SessionId,
                     FormattedDate = doc.Timestamp.ToLocalTime().ToString("dd MMM yyyy"),
                     FormattedTime = doc.Timestamp.ToLocalTime().ToString("HH:mm:ss"),
-                });
+                };
+                _allLogs.Add(entry);
+                users.Add(entry.User);
             }
 
-            TotalEvents = AuditLogs.Count;
+            AvailableUsers.Clear();
+            AvailableUsers.Add("All Users");
+            foreach (var u in users.OrderBy(x => x))
+            {
+                AvailableUsers.Add(u);
+            }
+
+            TotalEvents = _allLogs.Count;
             StatusMessage = TotalEvents == 0
                 ? "No audit events yet. Events will appear here as users interact with the system."
                 : $"{TotalEvents} events loaded";
+                
+            ApplyFilters();
         }
         catch (Exception ex)
         {
