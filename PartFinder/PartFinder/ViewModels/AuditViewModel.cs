@@ -57,6 +57,7 @@ public partial class AuditViewModel : ViewModelBase
                 "Stock Changes" => "Stock Change",
                 "User Actions" => "User Action",
                 "System Events" => "System Event",
+                "Templates" => "Template",
                 "Alerts" => "Alert",
                 _ => SelectedEventType
             };

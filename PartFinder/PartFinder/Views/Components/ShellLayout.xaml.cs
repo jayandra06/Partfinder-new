@@ -35,7 +35,14 @@ public sealed partial class ShellLayout : UserControl
         
         adminSession.Clear();
         SetupPaths.ClearAllSetupStateFiles();
-        Application.Current.Exit();
+        if (App.MainAppWindow is MainWindow main)
+        {
+            main.ResetToSetup();
+        }
+        else
+        {
+            Application.Current.Exit();
+        }
     }
 
     private void OnShellVmPropertyChanged(object? sender, PropertyChangedEventArgs e)

@@ -754,7 +754,15 @@ public partial class SettingsViewModel : ViewModelBase
         LoginMessage = "Signed out.";
         ChangePasswordMessage = string.Empty;
         ShowServerAccountEditor = false;
-        Application.Current.Exit();
+        
+        if (Application.Current is App app && App.MainAppWindow is MainWindow main)
+        {
+            main.ResetToSetup();
+        }
+        else
+        {
+            Application.Current.Exit();
+        }
     }
 
     [RelayCommand]

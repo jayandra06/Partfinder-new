@@ -140,6 +140,7 @@
                             <ComboBoxItem Content="Stock Changes" />
                             <ComboBoxItem Content="User Actions" />
                             <ComboBoxItem Content="System Events" />
+                            <ComboBoxItem Content="Templates" />
                             <ComboBoxItem Content="Alerts" />
                         </ComboBox>
                         <ComboBox Grid.Column="2" MinWidth="130" FontSize="11" PlaceholderText="User" HorizontalAlignment="Stretch" ItemsSource="{x:Bind ViewModel.AvailableUsers, Mode=OneWay}" SelectedItem="{x:Bind ViewModel.SelectedUser, Mode=TwoWay}">
