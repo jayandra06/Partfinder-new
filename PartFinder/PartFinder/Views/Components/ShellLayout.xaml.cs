@@ -35,12 +35,22 @@ public sealed partial class ShellLayout : UserControl
         
         adminSession.Clear();
         SetupPaths.ClearAllSetupStateFiles();
+
         if (App.MainAppWindow is MainWindow main)
         {
             main.ResetToSetup();
         }
         else
         {
+            var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+            if (!string.IsNullOrWhiteSpace(exePath))
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = exePath,
+                    UseShellExecute = true
+                });
+            }
             Application.Current.Exit();
         }
     }

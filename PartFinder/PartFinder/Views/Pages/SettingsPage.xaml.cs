@@ -59,6 +59,38 @@ public sealed partial class SettingsPage : Page
     private void OnNavAppLockClick(object sender, RoutedEventArgs e) =>
         ShowSection(profile: false, security: false, password: false, appLock: true);
 
+    private async void OnLogoutClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new ContentDialog
+        {
+            Title = "Logout",
+            Content = "Are you sure you want to logout? You will need to login again to access PartFinder.",
+            PrimaryButtonText = "Logout",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = XamlRoot
+        };
+
+        var result = await dialog.ShowAsync();
+        if (result != ContentDialogResult.Primary)
+            return;
+
+        var adminSession = App.Services.GetRequiredService<AdminSessionStore>();
+        adminSession.Clear();
+        SetupPaths.ClearAllSetupStateFiles();
+
+        var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+        if (!string.IsNullOrWhiteSpace(exePath))
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = exePath,
+                UseShellExecute = true
+            });
+        }
+        Application.Current.Exit();
+    }
+
     private void ShowSection(bool profile, bool security, bool password, bool appLock)
     {
         // Sections
@@ -142,6 +174,17 @@ public sealed partial class SettingsPage : Page
         StrengthLabel.Foreground = score > 0 ? activeBrush : dimBrush;
     }
 
+    private void OnGeneratePasswordClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not SettingsViewModel vm) return;
+        var generated = SettingsViewModel.GenerateStrongPassword();
+        vm.ChangeNewPassword = generated;
+        vm.ChangeConfirmPassword = generated;
+        NewPasswordBox.Password = generated;
+        ConfirmPasswordBox.Password = generated;
+        UpdateStrengthBar(vm);
+    }
+
     private void OnCopyGeneratedPasswordClick(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
         if (DataContext is not SettingsViewModel vm || string.IsNullOrWhiteSpace(vm.ChangeNewPassword)) return;
@@ -187,8 +230,25 @@ public sealed partial class SettingsPage : Page
 
     private void OnSettingsVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName != nameof(SettingsViewModel.ChangePasswordMessage)) return;
         if (DataContext is not SettingsViewModel vm) return;
+
+        // Auto-fill password boxes when Generate button sets ChangeNewPassword
+        if (e.PropertyName == nameof(SettingsViewModel.ChangeNewPassword))
+        {
+            if (NewPasswordBox.Password != vm.ChangeNewPassword)
+            {
+                NewPasswordBox.Password = vm.ChangeNewPassword;
+                UpdateStrengthBar(vm);
+            }
+        }
+
+        if (e.PropertyName == nameof(SettingsViewModel.ChangeConfirmPassword))
+        {
+            if (ConfirmPasswordBox.Password != vm.ChangeConfirmPassword)
+                ConfirmPasswordBox.Password = vm.ChangeConfirmPassword;
+        }
+
+        if (e.PropertyName != nameof(SettingsViewModel.ChangePasswordMessage)) return;
 
         var msg = vm.ChangePasswordMessage;
         if (string.IsNullOrWhiteSpace(msg))

@@ -148,14 +148,6 @@
                     </ListView.ItemTemplate>
                 </ListView>
 
-                <!-- New Part button — hidden when collapsed -->
-                <Button
-                    Margin="0,8,0,0"
-                    HorizontalAlignment="Stretch"
-                    Style="{StaticResource PrimaryButtonStyle}"
-                    Content="+ New Part"
-                    FontSize="13"
-                    Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InvertedBoolToVisibilityConverter}}" />
 
             </StackPanel>
         </Border>

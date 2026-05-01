@@ -178,6 +178,15 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
         CurrentTenant = _appState.CurrentTenant;
         CurrentUserName = ResolveDisplayUser();
         CurrentUserDepartment = _profile.Department ?? string.Empty;
+
+        // If OrgDisplayName was not set by MainWindow (e.g. after logout+restart),
+        // fall back to OrgCode so sidebar and settings always show something meaningful.
+        if (string.IsNullOrWhiteSpace(_appState.OrgDisplayName) &&
+            !string.IsNullOrWhiteSpace(_setupContext.OrgCode))
+        {
+            _appState.OrgDisplayName = _setupContext.OrgCode!;
+        }
+
         CurrentOrgName = _appState.OrgDisplayName;
         CurrentOrgPlan = _appState.OrgPlan;
         await LoadAvatarAsync(_profile.AvatarPath).ConfigureAwait(true);

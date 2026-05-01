@@ -60,9 +60,12 @@
             <Setter Property="BorderBrush" Value="#2A3D58" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="8" />
-            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="Padding" Value="12,10,44,10" />
             <Setter Property="FontSize" Value="14" />
             <Setter Property="MinHeight" Value="44" />
+            <Setter Property="PasswordRevealMode" Value="Peek" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="FlowDirection" Value="LeftToRight" />
         </Style>
 
         <!-- ===== PRIMARY BUTTON STYLE ===== -->
@@ -426,24 +429,17 @@
 
                         <!-- Logo + Brand -->
                         <StackPanel Grid.Row="0" Spacing="0">
-                            <!-- Logo circle -->
+                            <!-- Logo above PartFinder text -->
                             <Border
-                                Width="56" Height="56"
-                                CornerRadius="16"
+                                Width="66" Height="66"
+                                CornerRadius="8"
+                                Background="Transparent"
                                 HorizontalAlignment="Left"
                                 Margin="0,0,0,20">
-                                <Border.Background>
-                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                        <GradientStop Color="#1F7AE0" Offset="0" />
-                                        <GradientStop Color="#155DAF" Offset="1" />
-                                    </LinearGradientBrush>
-                                </Border.Background>
-                                <FontIcon
-                                    Glyph="&#xE946;"
-                                    FontSize="26"
-                                    Foreground="#FFFFFF"
-                                    HorizontalAlignment="Center"
-                                    VerticalAlignment="Center" />
+                                <Image
+                                    Source="Assets/logo.png"
+                                    Width="66" Height="66"
+                                    Stretch="Uniform" />
                             </Border>
 
                             <TextBlock
