@@ -187,22 +187,28 @@
                         BorderThickness="1"
                         Padding="8,0" Translation="0,0,32">
                             <Border.Shadow><ThemeShadow/></Border.Shadow>
-                            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                            <FontIcon Glyph="&#xE721;" FontSize="12" Foreground="{StaticResource TextTertiaryBrush}" VerticalAlignment="Center" />
-                            <TextBox
-                                BorderThickness="0"
-                                Background="Transparent"
-                                PlaceholderText="Search users..."
-                                FontSize="12"
-                                VerticalAlignment="Center"
-                                HorizontalAlignment="Stretch" />
-                        </StackPanel>
+                            <Grid ColumnSpacing="6" VerticalAlignment="Stretch">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Grid.Column="0" Glyph="&#xE721;" FontSize="12" Foreground="{StaticResource TextTertiaryBrush}" VerticalAlignment="Center" />
+                                <TextBox
+                                    Grid.Column="1"
+                                    BorderThickness="0"
+                                    Background="Transparent"
+                                    PlaceholderText="Search users..."
+                                    FontSize="12"
+                                    VerticalAlignment="Stretch"
+                                    VerticalContentAlignment="Center"
+                                    HorizontalAlignment="Stretch"
+                                    Text="{Binding SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            </Grid>
                     </Border>
 
-                    <ComboBox Grid.Column="1" PlaceholderText="All Roles" HorizontalAlignment="Stretch" FontSize="12">
-                        <ComboBoxItem Content="Admin" />
-                        <ComboBoxItem Content="Employee" />
-                    </ComboBox>
+                    <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" FontSize="12"
+                              ItemsSource="{Binding RoleFilters}"
+                              SelectedItem="{Binding SelectedRoleFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
                     <ComboBox Grid.Column="2" PlaceholderText="All Status" HorizontalAlignment="Stretch" FontSize="12">
                         <ComboBoxItem Content="Active" />
@@ -241,14 +247,15 @@
                                 <ColumnDefinition Width="2.5*" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="2*" />
-                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="1.5*" />
+                                <ColumnDefinition Width="100" />
                             </Grid.ColumnDefinitions>
                             <Border Grid.Column="0" Width="28" />
                             <TextBlock Grid.Column="1" Text="NAME" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" VerticalAlignment="Center" />
                             <TextBlock Grid.Column="2" Text="EMAIL" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" VerticalAlignment="Center" />
                             <TextBlock Grid.Column="3" Text="ROLE" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" VerticalAlignment="Center" />
                             <TextBlock Grid.Column="4" Text="ACCESS" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="5" Text="INVITED" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" VerticalAlignment="Center" MinWidth="70" />
+                            <TextBlock Grid.Column="5" Text="INVITATIONS" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" VerticalAlignment="Center" MinWidth="70" />
                             <TextBlock Grid.Column="6" Text="ACTIONS" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" VerticalAlignment="Center" Margin="10,0,0,0" />
                         </Grid>
 
@@ -271,8 +278,8 @@
                                             <ColumnDefinition Width="2.5*" />
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="2*" />
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="1.5*" />
+                                            <ColumnDefinition Width="100" />
                                         </Grid.ColumnDefinitions>
 
                                         <!-- Avatar -->

@@ -41,6 +41,48 @@ public partial class UserManagementViewModel : ViewModelBase
 
     private string? _editUserId;
 
+    private List<OrgAppUserSummary> _allUsers = [];
+
+    [ObservableProperty]
+    private string searchQuery = string.Empty;
+
+    public string[] RoleFilters { get; } = ["All", "Admin", "Employee"];
+
+    [ObservableProperty]
+    private string selectedRoleFilter = "All";
+
+    partial void OnSelectedRoleFilterChanged(string value)
+    {
+        ApplyFilter();
+    }
+
+    partial void OnSearchQueryChanged(string value)
+    {
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        Users.Clear();
+        var query = SearchQuery?.Trim() ?? string.Empty;
+        var roleFilter = SelectedRoleFilter ?? "All";
+
+        foreach (var u in _allUsers)
+        {
+            bool matchesQuery = string.IsNullOrEmpty(query) || 
+                (u.Name != null && u.Name.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
+                (u.Email != null && u.Email.Contains(query, StringComparison.OrdinalIgnoreCase));
+
+            bool matchesRole = string.Equals(roleFilter, "All", StringComparison.OrdinalIgnoreCase) ||
+                               string.Equals(u.Role, roleFilter, StringComparison.OrdinalIgnoreCase);
+
+            if (matchesQuery && matchesRole)
+            {
+                Users.Add(u);
+            }
+        }
+    }
+
     public bool IsEmployeeRole =>
         string.Equals(InviteRole, "Employee", StringComparison.OrdinalIgnoreCase);
 
@@ -95,11 +137,8 @@ public partial class UserManagementViewModel : ViewModelBase
         try
         {
             var list = await _users.ListUsersAsync().ConfigureAwait(true);
-            Users.Clear();
-            foreach (var u in list)
-            {
-                Users.Add(u);
-            }
+            _allUsers = list.ToList();
+            ApplyFilter();
         }
         catch (Exception ex)
         {
