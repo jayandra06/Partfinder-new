@@ -17,6 +17,7 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
     private readonly ICurrentUserAccessService _access;
     private readonly AdminSessionStore _adminSession;
     private readonly LocalProfileStore _profile;
+    private readonly MongoAlertsService _alertsService;
 
     private bool _suppressNavigation;
     private AppPage _lastSelectedPage = AppPage.Templates;
@@ -28,7 +29,8 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
         IAppStateStore appState,
         ICurrentUserAccessService access,
         AdminSessionStore adminSession,
-        LocalProfileStore profile)
+        LocalProfileStore profile,
+        MongoAlertsService alertsService)
     {
         _navigationService = navigationService;
         _setupContext = setupContext;
@@ -37,6 +39,7 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
         _access = access;
         _adminSession = adminSession;
         _profile = profile;
+        _alertsService = alertsService;
         _profile.ProfileChanged += OnProfileChanged;
         NavigationItems = new ObservableCollection<NavItemViewModel>();
     }
@@ -143,6 +146,26 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
 
     public bool HasUserAvatar => CurrentUserAvatarSource is not null;
 
+    private bool _hasUnreadAlerts;
+    public bool HasUnreadAlerts
+    {
+        get => _hasUnreadAlerts;
+        set => SetProperty(ref _hasUnreadAlerts, value);
+    }
+
+    public async Task RefreshAlertBadgeAsync()
+    {
+        try
+        {
+            var (critical, warning, info) = await _alertsService.GetCountsAsync().ConfigureAwait(true);
+            HasUnreadAlerts = (critical + warning + info) > 0;
+        }
+        catch
+        {
+            HasUnreadAlerts = false;
+        }
+    }
+
     private bool _isSidebarCollapsed;
     public bool IsSidebarCollapsed
     {
@@ -201,6 +224,7 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
         CurrentOrgName = _appState.OrgDisplayName;
         CurrentOrgPlan = _appState.OrgPlan;
         await LoadAvatarAsync(_profile.AvatarPath).ConfigureAwait(true);
+        await RefreshAlertBadgeAsync().ConfigureAwait(true);
 
         await _access.RefreshAsync().ConfigureAwait(true);
         var hasMaster = await HasMasterDataTemplateAsync().ConfigureAwait(true);
@@ -282,7 +306,7 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
                 new NavItemViewModel
                 {
                     Label = "Inventory",
-                    IconGlyph = "\uE80A",
+                    IconGlyph = "\uE7B8",
                     Page = AppPage.Inventory,
                     IsEnabled = true,
                 });
@@ -294,7 +318,7 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
                 new NavItemViewModel
                 {
                     Label = "Master Data",
-                    IconGlyph = "\uE8F1",
+                    IconGlyph = "\uECC8",
                     Page = AppPage.MasterData,
                     IsEnabled = true,
                 });
@@ -306,7 +330,7 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
                 new NavItemViewModel
                 {
                     Label = "Templates",
-                    IconGlyph = "\uE8A5",
+                    IconGlyph = "\uE9D5",
                     Page = AppPage.Templates,
                     IsEnabled = true,
                 });
@@ -315,7 +339,7 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
                 new NavItemViewModel
                 {
                     Label = "Worksheet Relations",
-                    IconGlyph = "\uE8EC",
+                    IconGlyph = "\uE71B",
                     Page = AppPage.WorksheetRelations,
                     IsEnabled = true,
                 });
@@ -333,7 +357,7 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
                 new NavItemViewModel
                 {
                     Label = "Alerts",
-                    IconGlyph = "\uE7E7",
+                    IconGlyph = "\uEA8F",
                     Page = AppPage.Alerts,
                     IsEnabled = true,
                 });
@@ -342,7 +366,7 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
                 new NavItemViewModel
                 {
                     Label = "Activities",
-                    IconGlyph = "\uE823",
+                    IconGlyph = "\uE81C",
                     Page = AppPage.Audit,
                     IsEnabled = true,
                 });
@@ -354,7 +378,7 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
                 new NavItemViewModel
                 {
                     Label = "User Management",
-                    IconGlyph = "\uE77B",
+                    IconGlyph = "\uE716",
                     Page = AppPage.UserManagement,
                     IsEnabled = true,
                 });

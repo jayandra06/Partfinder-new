@@ -25,6 +25,15 @@ public sealed partial class ShellLayout : UserControl
         _ = navigation.Navigate(AppPage.Settings);
     }
 
+    private void OnBellClicked(object sender, RoutedEventArgs e)
+    {
+        var navigation = App.Services.GetRequiredService<INavigationService>();
+        navigation.Navigate(AppPage.Alerts);
+        // Clear badge after opening alerts
+        if (DataContext is ShellViewModel vm)
+            vm.HasUnreadAlerts = false;
+    }
+
     private async void OnProfileLogoutMenuClicked(object sender, RoutedEventArgs e)
     {
         var adminSession = App.Services.GetRequiredService<AdminSessionStore>();
