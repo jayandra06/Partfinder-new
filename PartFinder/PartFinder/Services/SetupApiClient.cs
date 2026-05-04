@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using PartFinder.Models;
 
 namespace PartFinder.Services;
 
@@ -230,6 +231,8 @@ public static class SetupApiClient
         string role,
         bool partsAllTemplates,
         IReadOnlyList<string> allowedTemplateIds,
+        TemplatePermissionsDto? templatePermissions = null,
+        MasterDataPermissionsDto? masterDataPermissions = null,
         CancellationToken ct = default)
     {
         // Security: validate inputs before sending to server
@@ -251,6 +254,8 @@ public static class SetupApiClient
                 role,
                 partsAllTemplates,
                 allowedTemplateIds,
+                templatePermissions,
+                masterDataPermissions,
             },
             ct).ConfigureAwait(true);
 

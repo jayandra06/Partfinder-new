@@ -1,13 +1,55 @@
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
   IsEmail,
   IsIn,
   IsOptional,
+  IsObject,
   IsString,
   Matches,
+  ValidateNested,
 } from 'class-validator';
+
+export class TemplatePermissionsDto {
+  @IsBoolean()
+  @IsOptional()
+  add?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  view?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  edit?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  delete?: boolean;
+}
+
+export class MasterDataPermissionsDto {
+  @IsBoolean()
+  @IsOptional()
+  copy?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  view?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  edit?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  add?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  delete?: boolean;
+}
 
 export class SetupInviteUserDto {
   @IsString()
@@ -36,5 +78,16 @@ export class SetupInviteUserDto {
   @IsString({ each: true })
   @IsOptional()
   allowedTemplateIds?: string[];
-}
 
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => TemplatePermissionsDto)
+  templatePermissions?: TemplatePermissionsDto;
+
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => MasterDataPermissionsDto)
+  masterDataPermissions?: MasterDataPermissionsDto;
+}

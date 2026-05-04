@@ -137,6 +137,8 @@ export class TenantMongoService implements OnModuleDestroy {
       role: string;
       partsAllTemplates: boolean;
       allowedTemplateIds: string[];
+      templatePermissions?: any;
+      masterDataPermissions?: any;
       temporaryPasswordHash: string;
       invitedAtUtc: Date;
     },

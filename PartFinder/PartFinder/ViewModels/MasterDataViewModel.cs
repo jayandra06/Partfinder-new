@@ -18,16 +18,20 @@ public sealed partial class MasterDataViewModel : ViewModelBase
     private IReadOnlyList<PartTemplateDefinition> _cachedTemplates = Array.Empty<PartTemplateDefinition>();
     private IReadOnlyList<TemplateContextAction> _loadedContextActions = Array.Empty<TemplateContextAction>();
 
+    private readonly ICurrentUserAccessService _access;
+
     public MasterDataViewModel(
         ITemplateSchemaService templateSchema,
         IMasterDataRecordsService records,
         IContextActionsService contextActions,
-        ActivityLogger activityLogger)
+        ActivityLogger activityLogger,
+        ICurrentUserAccessService access)
     {
         _templateSchema = templateSchema;
         _records = records;
         _contextActions = contextActions;
         _activityLogger = activityLogger;
+        _access = access;
     }
 
     public ObservableCollection<PartTemplateDefinition> DataTemplates { get; } = new();
@@ -59,6 +63,11 @@ public sealed partial class MasterDataViewModel : ViewModelBase
 
     public string EditModeButtonText => IsEditMode ? "Stop Editing" : "Edit Data";
 
+    public bool CanEditMasterData => _access.Capabilities.CanEditMasterData;
+    public bool CanAddMasterData => _access.Capabilities.CanAddMasterData;
+    public bool CanCopyMasterData => _access.Capabilities.CanCopyMasterData;
+    public bool CanDeleteMasterData => _access.Capabilities.CanDeleteMasterData;
+
     public IReadOnlyList<MasterDataRowViewModel> GetVisibleRows()
     {
         return Rows.ToList();
@@ -84,6 +93,13 @@ public sealed partial class MasterDataViewModel : ViewModelBase
     {
         IsLoading = true;
         StatusMessage = null;
+        if (!_access.Capabilities.CanViewMasterData)
+        {
+            StatusMessage = "You do not have permission to view master data.";
+            IsLoading = false;
+            DataTemplates.Clear();
+            return;
+        }
         ShowNoTemplateHint = false;
         ShowNoDatabaseHint = false;
         ShowTemplatePicker = false;
@@ -417,6 +433,12 @@ public sealed partial class MasterDataViewModel : ViewModelBase
     [RelayCommand]
     private void ToggleEditMode()
     {
+        if (!IsEditMode && !_access.Capabilities.CanEditMasterData && !_access.Capabilities.CanAddMasterData)
+        {
+            StatusMessage = "You do not have permission to edit or add master data.";
+            return;
+        }
+
         IsEditMode = !IsEditMode;
         StatusMessage = IsEditMode
             ? "Edit mode enabled. Make changes, then click Save."
