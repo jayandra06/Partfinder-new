@@ -55,12 +55,24 @@ public sealed class CurrentUserAccessService : ICurrentUserAccessService
         {
             _capabilities = new UserAccessCapabilities
             {
-                CanAccessMasterData = false,
+                CanAccessMasterData = record.MasterDataPermissions?.View ?? false,
                 CanAccessDashboard = false,
                 CanAccessParts = true,
-                CanAccessTemplates = false,
+                CanAccessTemplates = record.TemplatePermissions?.View ?? false,
                 CanAccessSettings = true,
                 CanAccessUserManagement = false,
+
+                CanAddTemplate = record.TemplatePermissions?.Add ?? false,
+                CanViewTemplate = record.TemplatePermissions?.View ?? false,
+                CanEditTemplate = record.TemplatePermissions?.Edit ?? false,
+                CanDeleteTemplate = record.TemplatePermissions?.Delete ?? false,
+
+                CanCopyMasterData = record.MasterDataPermissions?.Copy ?? false,
+                CanViewMasterData = record.MasterDataPermissions?.View ?? false,
+                CanEditMasterData = record.MasterDataPermissions?.Edit ?? false,
+                CanAddMasterData = record.MasterDataPermissions?.Add ?? false,
+                CanDeleteMasterData = record.MasterDataPermissions?.Delete ?? false,
+
                 PartsAllTemplates = record.PartsAllTemplates,
                 AllowedTemplateIds = record.AllowedTemplateIds,
             };

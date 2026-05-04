@@ -17,13 +17,16 @@ public partial class TemplatesViewModel : ViewModelBase
 
     private readonly Microsoft.UI.Dispatching.DispatcherQueue _dispatcherQueue;
 
+    private readonly ICurrentUserAccessService _access;
+
     public TemplatesViewModel(
         ITemplateSchemaService templateSchema,
         IShellNavCoordinator shellNav,
         ILocalSetupContext setupContext,
         IContextActionsService contextActions,
         ActivityLogger activityLogger,
-        IFavouriteStore favouriteStore)
+        IFavouriteStore favouriteStore,
+        ICurrentUserAccessService access)
     {
         _templateSchema = templateSchema;
         _shellNav = shellNav;
@@ -31,6 +34,7 @@ public partial class TemplatesViewModel : ViewModelBase
         _contextActions = contextActions;
         _activityLogger = activityLogger;
         _favouriteStore = favouriteStore;
+        _access = access;
         _dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
         
         ColumnLabels.Add(new ColumnLabelDraft());
@@ -82,7 +86,7 @@ public partial class TemplatesViewModel : ViewModelBase
     [RelayCommand]
     private async Task DeleteTemplateAsync(string templateId)
     {
-        if (string.IsNullOrWhiteSpace(templateId)) return;
+        if (string.IsNullOrWhiteSpace(templateId) || !_access.Capabilities.CanDeleteTemplate) return;
         try
         {
             await _templateSchema.DeleteTemplateAsync(templateId).ConfigureAwait(true);
@@ -205,7 +209,11 @@ public partial class TemplatesViewModel : ViewModelBase
         new(TemplateFieldType.RecordLink, "Link to another template"),
     ];
 
-    public bool CanEditSelectedTemplate => !IsCreatingTemplate && SelectedTemplate is not null;
+    public bool CanEditSelectedTemplate => !IsCreatingTemplate && SelectedTemplate is not null && _access.Capabilities.CanEditTemplate;
+
+    public bool CanDeleteSelectedTemplate => !IsCreatingTemplate && SelectedTemplate is not null && _access.Capabilities.CanDeleteTemplate;
+
+    public bool CanAddTemplate => _access.Capabilities.CanAddTemplate;
 
     public string EditorHeaderTitle => IsEditingExisting ? "Edit template" : "New template";
 
@@ -270,6 +278,8 @@ public partial class TemplatesViewModel : ViewModelBase
         OnPropertyChanged(nameof(ShowSelectTemplatePromptPanel));
         OnPropertyChanged(nameof(ShowContextActionsEditor));
         OnPropertyChanged(nameof(CanEditSelectedTemplate));
+        OnPropertyChanged(nameof(CanDeleteSelectedTemplate));
+        OnPropertyChanged(nameof(CanAddTemplate));
         OnPropertyChanged(nameof(LinkTargetCandidates));
         OnPropertyChanged(nameof(EditorHeaderTitle));
         OnPropertyChanged(nameof(ShowFavouritesSubPage));
@@ -416,6 +426,12 @@ public partial class TemplatesViewModel : ViewModelBase
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
         FormError = string.Empty;
+        if (!_access.Capabilities.CanViewTemplate)
+        {
+            FormError = "You do not have permission to view templates.";
+            Templates.Clear();
+            return;
+        }
         _setupContext.Refresh();
         _hasTenantDb = _setupContext.TryGetTenantMongoUri(out _);
 
@@ -438,7 +454,7 @@ public partial class TemplatesViewModel : ViewModelBase
 
         var hasMaster = templates.Any(
             t => string.Equals(t.Name, MongoTemplateSchemaService.MasterDataTemplateName, StringComparison.OrdinalIgnoreCase));
-        CanAddAnotherTemplate = hasMaster;
+        CanAddAnotherTemplate = hasMaster && _access.Capabilities.CanAddTemplate;
 
         SelectedTemplate = Templates.FirstOrDefault();
 

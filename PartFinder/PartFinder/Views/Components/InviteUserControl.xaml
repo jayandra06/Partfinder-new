@@ -19,96 +19,128 @@
         </Style>
     </UserControl.Resources>
 
-    <StackPanel MinWidth="420" Spacing="16">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="600">
+        <StackPanel Spacing="16" Padding="0,0,12,0">
 
-        <!-- Email field -->
-        <StackPanel Spacing="6">
-            <TextBlock Text="EMAIL ADDRESS" Style="{StaticResource InviteFieldLabelStyle}" />
-            <TextBox
-                PlaceholderText="name@company.com"
-                FontSize="13"
-                Padding="12,10"
-                IsReadOnly="{Binding IsEditMode}"
-                Text="{Binding InviteEmail, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-        </StackPanel>
-
-        <!-- Full Name field -->
-        <StackPanel Spacing="6">
-            <TextBlock Text="FULL NAME" Style="{StaticResource InviteFieldLabelStyle}" />
-            <TextBox
-                PlaceholderText="John Doe"
-                FontSize="13"
-                Padding="12,10"
-                Text="{Binding InviteName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-        </StackPanel>
-
-        <!-- Role selector -->
-        <StackPanel Spacing="6">
-            <TextBlock Text="ROLE" Style="{StaticResource InviteFieldLabelStyle}" />
-            <ComboBox
-                ItemsSource="{Binding RoleOptions}"
-                PlaceholderText="Select role"
-                FontSize="13"
-                Padding="12,10"
-                HorizontalAlignment="Stretch"
-                SelectedItem="{Binding InviteRole, Mode=TwoWay}" />
-        </StackPanel>
-
-        <!-- Role info tip -->
-        <Border Background="{StaticResource CardBackgroundBrush}" CornerRadius="8" Padding="12" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1">
+            <!-- Email field -->
             <StackPanel Spacing="6">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <FontIcon Glyph="&#xE946;" FontSize="14" Foreground="{StaticResource AccentPrimaryBrush}" VerticalAlignment="Top" />
-                    <TextBlock
-                        Text="Admin: Full access to all features. Employee: Parts inventory only."
-                        FontSize="11"
-                        Foreground="{StaticResource TextSecondaryBrush}"
-                        TextWrapping="WrapWholeWords" />
-                </StackPanel>
+                <TextBlock Text="EMAIL ADDRESS" Style="{StaticResource InviteFieldLabelStyle}" />
+                <TextBox
+                    PlaceholderText="name@company.com"
+                    FontSize="13"
+                    Padding="12,10"
+                    IsReadOnly="{Binding IsEditMode}"
+                    Text="{Binding InviteEmail, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
             </StackPanel>
-        </Border>
 
-        <!-- Template access (Employee only) -->
-        <StackPanel Visibility="{Binding IsEmployeeRole, Converter={StaticResource BoolToVisibilityConverter}}" Spacing="8">
-            <Border Background="{StaticResource ElevatedCardBackgroundBrush}" CornerRadius="8" Padding="12" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1">
-                <StackPanel Spacing="8">
-                    <CheckBox Content="Grant access to all templates" IsChecked="{Binding InvitePartsAllTemplates, Mode=TwoWay}" FontSize="12" />
-                    <TextBlock
-                        Foreground="{StaticResource TextTertiaryBrush}"
-                        FontSize="10"
-                        Text="Uncheck to select specific templates" />
+            <!-- Full Name field -->
+            <StackPanel Spacing="6">
+                <TextBlock Text="FULL NAME" Style="{StaticResource InviteFieldLabelStyle}" />
+                <TextBox
+                    PlaceholderText="John Doe"
+                    FontSize="13"
+                    Padding="12,10"
+                    Text="{Binding InviteName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+            </StackPanel>
 
-                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
-                        <Button
-                            Content="Select All"
+            <!-- Role selector -->
+            <StackPanel Spacing="6">
+                <TextBlock Text="ROLE" Style="{StaticResource InviteFieldLabelStyle}" />
+                <ComboBox
+                    ItemsSource="{Binding RoleOptions}"
+                    PlaceholderText="Select role"
+                    FontSize="13"
+                    Padding="12,10"
+                    HorizontalAlignment="Stretch"
+                    SelectedItem="{Binding InviteRole, Mode=TwoWay}" />
+            </StackPanel>
+
+            <!-- Role info tip -->
+            <Border Background="{StaticResource CardBackgroundBrush}" CornerRadius="8" Padding="12" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1">
+                <StackPanel Spacing="6">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE946;" FontSize="14" Foreground="{StaticResource AccentPrimaryBrush}" VerticalAlignment="Top" />
+                        <TextBlock
+                            Text="Admin: Full access to all features. Employee: Parts inventory only."
                             FontSize="11"
-                            Style="{StaticResource GhostButtonStyle}"
-                            Command="{Binding SelectAllTemplatesCommand}"
-                            IsEnabled="{Binding CanPickSpecificTemplates}" />
-                        <Button
-                            Content="Clear All"
-                            FontSize="11"
-                            Style="{StaticResource GhostButtonStyle}"
-                            Command="{Binding ClearTemplateSelectionCommand}"
-                            IsEnabled="{Binding CanPickSpecificTemplates}" />
+                            Foreground="{StaticResource TextSecondaryBrush}"
+                            TextWrapping="WrapWholeWords" />
                     </StackPanel>
                 </StackPanel>
             </Border>
 
-            <ScrollViewer
-                MaxHeight="160"
-                VerticalScrollBarVisibility="Auto">
-                <ItemsControl ItemsSource="{Binding TemplateChoices}" IsEnabled="{Binding CanPickSpecificTemplates}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <CheckBox
-                                Margin="0,4,0,4"
-                                Content="{Binding Name}"
-                                FontSize="12" />
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
+            <!-- Granular Permissions (Employee only) -->
+            <StackPanel Visibility="{Binding IsEmployeeRole, Converter={StaticResource BoolToVisibilityConverter}}" Spacing="12">
+                <TextBlock Text="TEMPLATE PERMISSIONS" Style="{StaticResource InviteFieldLabelStyle}" />
+                <ItemsControl>
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <VariableSizedWrapGrid Orientation="Horizontal" MaximumRowsOrColumns="4" ItemWidth="90" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <CheckBox Content="Add" IsChecked="{Binding InviteCanAddTemplate, Mode=TwoWay}" FontSize="12" />
+                    <CheckBox Content="View" IsChecked="{Binding InviteCanViewTemplate, Mode=TwoWay}" FontSize="12" />
+                    <CheckBox Content="Edit" IsChecked="{Binding InviteCanEditTemplate, Mode=TwoWay}" FontSize="12" />
+                    <CheckBox Content="Delete" IsChecked="{Binding InviteCanDeleteTemplate, Mode=TwoWay}" FontSize="12" />
                 </ItemsControl>
-            </ScrollViewer>
+
+                <TextBlock Text="MASTER DATA PERMISSIONS" Style="{StaticResource InviteFieldLabelStyle}" Margin="0,4,0,0" />
+                <ItemsControl>
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <VariableSizedWrapGrid Orientation="Horizontal" MaximumRowsOrColumns="3" ItemWidth="110" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <CheckBox Content="View" IsChecked="{Binding InviteCanViewMasterData, Mode=TwoWay}" FontSize="12" />
+                    <CheckBox Content="Edit" IsChecked="{Binding InviteCanEditMasterData, Mode=TwoWay}" FontSize="12" />
+                    <CheckBox Content="Add" IsChecked="{Binding InviteCanAddMasterData, Mode=TwoWay}" FontSize="12" />
+                    <CheckBox Content="Delete" IsChecked="{Binding InviteCanDeleteMasterData, Mode=TwoWay}" FontSize="12" />
+                    <CheckBox Content="Copy" IsChecked="{Binding InviteCanCopyMasterData, Mode=TwoWay}" FontSize="12" />
+                </ItemsControl>
+            </StackPanel>
+
+            <!-- Template access (Employee only) -->
+            <StackPanel Visibility="{Binding IsEmployeeRole, Converter={StaticResource BoolToVisibilityConverter}}" Spacing="8">
+                <Border Background="{StaticResource ElevatedCardBackgroundBrush}" CornerRadius="8" Padding="12" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1">
+                    <StackPanel Spacing="8">
+                        <CheckBox Content="Grant access to all templates" IsChecked="{Binding InvitePartsAllTemplates, Mode=TwoWay}" FontSize="12" />
+                        <TextBlock
+                            Foreground="{StaticResource TextTertiaryBrush}"
+                            FontSize="10"
+                            Text="Uncheck to select specific templates" />
+
+                        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
+                            <Button
+                                Content="Select All"
+                                FontSize="11"
+                                Style="{StaticResource GhostButtonStyle}"
+                                Command="{Binding SelectAllTemplatesCommand}"
+                                IsEnabled="{Binding CanPickSpecificTemplates}" />
+                            <Button
+                                Content="Clear All"
+                                FontSize="11"
+                                Style="{StaticResource GhostButtonStyle}"
+                                Command="{Binding ClearTemplateSelectionCommand}"
+                                IsEnabled="{Binding CanPickSpecificTemplates}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <ScrollViewer
+                    MaxHeight="160"
+                    VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding TemplateChoices}" IsEnabled="{Binding CanPickSpecificTemplates}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox
+                                    Margin="0,4,0,4"
+                                    Content="{Binding Name}"
+                                    FontSize="12" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </StackPanel>
         </StackPanel>
-    </StackPanel>
+    </ScrollViewer>
 </UserControl>

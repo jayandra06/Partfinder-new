@@ -23,6 +23,8 @@ public interface IOrgUserDirectoryService
         string role,
         bool partsAllTemplates,
         IReadOnlyList<string> allowedTemplateIds,
+        TemplatePermissionsDto? templatePermissions = null,
+        MasterDataPermissionsDto? masterDataPermissions = null,
         CancellationToken cancellationToken = default);
 
     Task<bool> ValidateInviteCredentialsAsync(
@@ -36,6 +38,8 @@ public interface IOrgUserDirectoryService
         string role,
         bool partsAllTemplates,
         IReadOnlyList<string> allowedTemplateIds,
+        TemplatePermissionsDto? templatePermissions = null,
+        MasterDataPermissionsDto? masterDataPermissions = null,
         CancellationToken cancellationToken = default);
 
     Task<bool> DeleteUserAsync(string id, CancellationToken cancellationToken = default);

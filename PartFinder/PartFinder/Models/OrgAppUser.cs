@@ -1,5 +1,22 @@
 namespace PartFinder.Models;
 
+public sealed class TemplatePermissionsDto
+{
+    public bool Add { get; set; }
+    public bool View { get; set; }
+    public bool Edit { get; set; }
+    public bool Delete { get; set; }
+}
+
+public sealed class MasterDataPermissionsDto
+{
+    public bool Copy { get; set; }
+    public bool View { get; set; }
+    public bool Edit { get; set; }
+    public bool Add { get; set; }
+    public bool Delete { get; set; }
+}
+
 public sealed class OrgAppUserSummary
 {
     public required string Id { get; init; }
@@ -9,6 +26,9 @@ public sealed class OrgAppUserSummary
     public required bool PartsAllTemplates { get; init; }
     public IReadOnlyList<string> AllowedTemplateIds { get; init; } = Array.Empty<string>();
     public DateTime InvitedAtUtc { get; init; }
+
+    public TemplatePermissionsDto? TemplatePermissions { get; init; }
+    public MasterDataPermissionsDto? MasterDataPermissions { get; init; }
 
     public string PartsScopeDisplay =>
         string.Equals(Role, "Admin", StringComparison.OrdinalIgnoreCase)

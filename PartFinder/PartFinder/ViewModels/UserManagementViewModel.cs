@@ -28,13 +28,25 @@ public partial class UserManagementViewModel : ViewModelBase
     private string inviteRole = "Employee";
 
     [ObservableProperty]
-    private bool invitePartsAllTemplates = true;
+    private bool invitePartsAllTemplates = false;
 
     [ObservableProperty]
     private string statusMessage = string.Empty;
 
     [ObservableProperty]
     private bool isBusy;
+
+    // Granular Permissions (for Invite/Edit)
+    [ObservableProperty] private bool inviteCanAddTemplate = false;
+    [ObservableProperty] private bool inviteCanViewTemplate = false;
+    [ObservableProperty] private bool inviteCanEditTemplate = false;
+    [ObservableProperty] private bool inviteCanDeleteTemplate = false;
+
+    [ObservableProperty] private bool inviteCanCopyMasterData = false;
+    [ObservableProperty] private bool inviteCanViewMasterData = false;
+    [ObservableProperty] private bool inviteCanEditMasterData = false;
+    [ObservableProperty] private bool inviteCanAddMasterData = false;
+    [ObservableProperty] private bool inviteCanDeleteMasterData = false;
 
     [ObservableProperty]
     private bool isEditMode;
@@ -86,6 +98,12 @@ public partial class UserManagementViewModel : ViewModelBase
     public bool IsEmployeeRole =>
         string.Equals(InviteRole, "Employee", StringComparison.OrdinalIgnoreCase);
 
+    partial void OnInviteRoleChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsEmployeeRole));
+        OnPropertyChanged(nameof(CanPickSpecificTemplates));
+    }
+
     public bool CanPickSpecificTemplates => IsEmployeeRole && !InvitePartsAllTemplates;
     public bool HasTemplateChoices => TemplateChoices.Count > 0;
 
@@ -101,11 +119,7 @@ public partial class UserManagementViewModel : ViewModelBase
         _activityLogger = activityLogger;
     }
 
-    partial void OnInviteRoleChanged(string value)
-    {
-        OnPropertyChanged(nameof(IsEmployeeRole));
-        OnPropertyChanged(nameof(CanPickSpecificTemplates));
-    }
+
 
     partial void OnInvitePartsAllTemplatesChanged(bool value)
     {
@@ -160,6 +174,18 @@ public partial class UserManagementViewModel : ViewModelBase
         InvitePartsAllTemplates = true;
         TemplateChoices.Clear();
 
+        // Default permissions for new invite
+        InviteCanAddTemplate = false;
+        InviteCanViewTemplate = false;
+        InviteCanEditTemplate = false;
+        InviteCanDeleteTemplate = false;
+        InviteCanCopyMasterData = false;
+        InviteCanViewMasterData = false;
+        InviteCanEditMasterData = false;
+        InviteCanAddMasterData = false;
+        InviteCanDeleteMasterData = false;
+        InvitePartsAllTemplates = false;
+
         var all = await _templates.GetTemplatesAsync(cancellationToken).ConfigureAwait(true);
         foreach (var t in all.OrderBy(x => x.Name))
         {
@@ -191,6 +217,18 @@ public partial class UserManagementViewModel : ViewModelBase
         InviteRole = user.Role;
         InvitePartsAllTemplates = user.PartsAllTemplates;
         TemplateChoices.Clear();
+
+        // Load permissions
+        InviteCanAddTemplate = user.TemplatePermissions?.Add ?? true;
+        InviteCanViewTemplate = user.TemplatePermissions?.View ?? true;
+        InviteCanEditTemplate = user.TemplatePermissions?.Edit ?? true;
+        InviteCanDeleteTemplate = user.TemplatePermissions?.Delete ?? true;
+
+        InviteCanCopyMasterData = user.MasterDataPermissions?.Copy ?? true;
+        InviteCanViewMasterData = user.MasterDataPermissions?.View ?? true;
+        InviteCanEditMasterData = user.MasterDataPermissions?.Edit ?? true;
+        InviteCanAddMasterData = user.MasterDataPermissions?.Add ?? true;
+        InviteCanDeleteMasterData = user.MasterDataPermissions?.Delete ?? true;
 
         var all = await _templates.GetTemplatesAsync(cancellationToken).ConfigureAwait(true);
         foreach (var t in all.OrderBy(x => x.Name))
@@ -252,13 +290,32 @@ public partial class UserManagementViewModel : ViewModelBase
             return ("Select at least one part template, or enable \"All part templates\".", null);
         }
 
+        var templatePerms = new TemplatePermissionsDto
+        {
+            Add = InviteCanAddTemplate,
+            View = InviteCanViewTemplate,
+            Edit = InviteCanEditTemplate,
+            Delete = InviteCanDeleteTemplate
+        };
+
+        var masterPerms = new MasterDataPermissionsDto
+        {
+            Copy = InviteCanCopyMasterData,
+            View = InviteCanViewMasterData,
+            Edit = InviteCanEditMasterData,
+            Add = InviteCanAddMasterData,
+            Delete = InviteCanDeleteMasterData
+        };
+
         var (ok, err, result) = await SetupApiClient.InviteUserAsync(
             _setupContext.OrgCode!,
             name,
             email,
             role,
             partsAll,
-            allowed).ConfigureAwait(true);
+            allowed,
+            templatePerms,
+            masterPerms).ConfigureAwait(true);
         if (!ok || result is null)
         {
             return (err ?? "Could not invite user.", null);
@@ -299,12 +356,31 @@ public partial class UserManagementViewModel : ViewModelBase
             return "Select at least one part template, or enable \"All part templates\".";
         }
 
+        var templatePerms = new TemplatePermissionsDto
+        {
+            Add = InviteCanAddTemplate,
+            View = InviteCanViewTemplate,
+            Edit = InviteCanEditTemplate,
+            Delete = InviteCanDeleteTemplate
+        };
+
+        var masterPerms = new MasterDataPermissionsDto
+        {
+            Copy = InviteCanCopyMasterData,
+            View = InviteCanViewMasterData,
+            Edit = InviteCanEditMasterData,
+            Add = InviteCanAddMasterData,
+            Delete = InviteCanDeleteMasterData
+        };
+
         var ok = await _users.UpdateUserAsync(
             _editUserId,
             name,
             role,
             partsAll,
-            allowed).ConfigureAwait(true);
+            allowed,
+            templatePerms,
+            masterPerms).ConfigureAwait(true);
             
         if (!ok)
         {

@@ -249,6 +249,8 @@ export class SetupService {
       role,
       partsAllTemplates,
       allowedTemplateIds,
+      templatePermissions: dto.templatePermissions,
+      masterDataPermissions: dto.masterDataPermissions,
       temporaryPasswordHash: this.hashTemporaryPassword(temporaryPassword),
       invitedAtUtc: new Date(),
     });

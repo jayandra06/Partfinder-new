@@ -1,4 +1,5 @@
 using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
 using PartFinder.Models;
@@ -74,6 +75,8 @@ public sealed class MongoOrgUserDirectoryService : IOrgUserDirectoryService
         string role,
         bool partsAllTemplates,
         IReadOnlyList<string> allowedTemplateIds,
+        TemplatePermissionsDto? templatePermissions = null,
+        MasterDataPermissionsDto? masterDataPermissions = null,
         CancellationToken cancellationToken = default)
     {
         var coll = TryGetCollection()
@@ -109,6 +112,8 @@ public sealed class MongoOrgUserDirectoryService : IOrgUserDirectoryService
                 .Select(s => s.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList(),
+            TemplatePermissions = templatePermissions,
+            MasterDataPermissions = masterDataPermissions,
             TemporaryPasswordHash = passwordHash,
             InvitedAtUtc = DateTime.UtcNow,
         };
@@ -177,6 +182,8 @@ public sealed class MongoOrgUserDirectoryService : IOrgUserDirectoryService
         string role,
         bool partsAllTemplates,
         IReadOnlyList<string> allowedTemplateIds,
+        TemplatePermissionsDto? templatePermissions = null,
+        MasterDataPermissionsDto? masterDataPermissions = null,
         CancellationToken cancellationToken = default)
     {
         var coll = TryGetCollection();
@@ -193,7 +200,9 @@ public sealed class MongoOrgUserDirectoryService : IOrgUserDirectoryService
                 .Where(s => !string.IsNullOrWhiteSpace(s))
                 .Select(s => s.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList());
+                .ToList())
+            .Set(x => x.TemplatePermissions, templatePermissions)
+            .Set(x => x.MasterDataPermissions, masterDataPermissions);
 
         var result = await coll.UpdateOneAsync(
             x => x.Id == objectId,
@@ -228,6 +237,8 @@ public sealed class MongoOrgUserDirectoryService : IOrgUserDirectoryService
             PartsAllTemplates = d.PartsAllTemplates,
             AllowedTemplateIds = d.AllowedTemplateIds,
             InvitedAtUtc = d.InvitedAtUtc,
+            TemplatePermissions = d.TemplatePermissions,
+            MasterDataPermissions = d.MasterDataPermissions,
         };
 
     private static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();
@@ -261,6 +272,36 @@ public sealed class MongoOrgUserDirectoryService : IOrgUserDirectoryService
 
         [BsonElement("invitedAtUtc")]
         public DateTime InvitedAtUtc { get; set; }
+
+        [BsonElement("templatePermissions")]
+        public BsonValue? TemplatePermissionsRaw { get; set; }
+
+        [BsonIgnore]
+        public TemplatePermissionsDto? TemplatePermissions
+        {
+            get
+            {
+                if (TemplatePermissionsRaw == null || !TemplatePermissionsRaw.IsBsonDocument) return null;
+                try { return BsonSerializer.Deserialize<TemplatePermissionsDto>(TemplatePermissionsRaw.AsBsonDocument); }
+                catch { return null; }
+            }
+            set => TemplatePermissionsRaw = value == null ? BsonNull.Value : value.ToBsonDocument();
+        }
+
+        [BsonElement("masterDataPermissions")]
+        public BsonValue? MasterDataPermissionsRaw { get; set; }
+
+        [BsonIgnore]
+        public MasterDataPermissionsDto? MasterDataPermissions
+        {
+            get
+            {
+                if (MasterDataPermissionsRaw == null || !MasterDataPermissionsRaw.IsBsonDocument) return null;
+                try { return BsonSerializer.Deserialize<MasterDataPermissionsDto>(MasterDataPermissionsRaw.AsBsonDocument); }
+                catch { return null; }
+            }
+            set => MasterDataPermissionsRaw = value == null ? BsonNull.Value : value.ToBsonDocument();
+        }
     }
 
     private static string GenerateTemporaryPassword()
