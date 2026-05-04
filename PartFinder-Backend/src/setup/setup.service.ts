@@ -21,6 +21,7 @@ import { SetupInviteUserDto } from './dto/setup-invite-user.dto';
 import { SetupOrgAdminDto } from './dto/setup-org-admin.dto';
 import { replaceMongoDatabasePath } from './org-database-uri.util';
 import { TenantMongoService } from './tenant-mongo.service';
+import { CasbinService } from '../casbin/casbin.service';
 
 const BCRYPT_ROUNDS = 10;
 
@@ -31,6 +32,7 @@ export class SetupService {
     private readonly tenant: TenantMongoService,
     private readonly dbClusters: DbClustersService,
     private readonly config: ConfigService,
+    private readonly casbin: CasbinService,
   ) {}
 
   private async loadLicensedOrg(orgCode: string) {
@@ -254,6 +256,21 @@ export class SetupService {
       temporaryPasswordHash: this.hashTemporaryPassword(temporaryPassword),
       invitedAtUtc: new Date(),
     });
+
+    // Sync granular permissions to Casbin
+    try {
+      await this.casbin.syncUserPermissions(
+        uri,
+        email,
+        role,
+        dto.templatePermissions,
+        dto.masterDataPermissions
+      );
+    } catch (e) {
+      console.error('Failed to sync Casbin policy:', e);
+      // We don't throw here to avoid failing the whole invite, 
+      // but in production you might want more robust handling.
+    }
 
     const emailResult = await this.sendInviteEmail(
       email,
