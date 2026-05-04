@@ -77,18 +77,16 @@ public sealed partial class SettingsPage : Page
 
         var adminSession = App.Services.GetRequiredService<AdminSessionStore>();
         adminSession.Clear();
-        SetupPaths.ClearAllSetupStateFiles();
+        // Do NOT delete setup-state.json — it holds orgCode/dbUri needed after re-login
 
-        var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
-        if (!string.IsNullOrWhiteSpace(exePath))
+        if (App.MainAppWindow is MainWindow main)
         {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = exePath,
-                UseShellExecute = true
-            });
+            main.ResetToSetup();
         }
-        Application.Current.Exit();
+        else
+        {
+            Application.Current.Exit();
+        }
     }
 
     private void ShowSection(bool profile, bool security, bool password, bool appLock)
@@ -216,6 +214,9 @@ public sealed partial class SettingsPage : Page
         if (DataContext is SettingsViewModel vm)
         {
             vm.PropertyChanged += OnSettingsVmPropertyChanged;
+            // Refresh org info every time the page is opened so ORGANIZATION section
+            // always shows the latest data fetched at login (never shows stale/empty values).
+            vm.RefreshOrgInfo();
         }
     }
 

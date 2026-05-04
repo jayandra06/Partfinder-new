@@ -34,7 +34,7 @@ public sealed partial class ShellLayout : UserControl
         await activityLogger.FlushAsync().ConfigureAwait(true);
         
         adminSession.Clear();
-        SetupPaths.ClearAllSetupStateFiles();
+        // Do NOT delete setup-state.json — it holds orgCode/dbUri needed after re-login
 
         if (App.MainAppWindow is MainWindow main)
         {
@@ -42,15 +42,6 @@ public sealed partial class ShellLayout : UserControl
         }
         else
         {
-            var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
-            if (!string.IsNullOrWhiteSpace(exePath))
-            {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = exePath,
-                    UseShellExecute = true
-                });
-            }
             Application.Current.Exit();
         }
     }

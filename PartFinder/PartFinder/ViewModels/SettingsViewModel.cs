@@ -39,6 +39,10 @@ public partial class SettingsViewModel : ViewModelBase
         RefreshAllState();
     }
 
+    /// <summary>Org code from local setup state.</summary>
+    public string OrgCode =>
+        !string.IsNullOrWhiteSpace(_setupContext.OrgCode) ? _setupContext.OrgCode! : "—";
+
     /// <summary>Real organization name from the license server.</summary>
     public string OrgDisplayName
     {
@@ -70,6 +74,18 @@ public partial class SettingsViewModel : ViewModelBase
 
             return parts.Count > 0 ? string.Join(" · ", parts) : string.Empty;
         }
+    }
+
+    /// <summary>
+    /// Called when the Settings page is navigated to — refreshes org info from AppStateStore
+    /// so the ORGANIZATION section always shows the latest data fetched at login.
+    /// </summary>
+    public void RefreshOrgInfo()
+    {
+        _setupContext.Refresh();
+        OnPropertyChanged(nameof(OrgCode));
+        OnPropertyChanged(nameof(OrgDisplayName));
+        OnPropertyChanged(nameof(OrgPlanDisplay));
     }
 
     private static string ToTitleCase(string s) =>
@@ -761,14 +777,14 @@ public partial class SettingsViewModel : ViewModelBase
         _activityLogger.LogLogout(SessionEmailDisplay != "—" ? SessionEmailDisplay : "unknown");
         await _activityLogger.FlushAsync().ConfigureAwait(true);
         _session.Clear();
-        SetupPaths.ClearAllSetupStateFiles();
+        // Do NOT delete setup-state.json — it holds orgCode/dbUri needed after re-login
         AdminSessionActive = false;
         SessionEmailDisplay = "—";
         LoginMessage = "Signed out.";
         ChangePasswordMessage = string.Empty;
         ShowServerAccountEditor = false;
-        
-        if (Application.Current is App app && App.MainAppWindow is MainWindow main)
+
+        if (Application.Current is App && App.MainAppWindow is MainWindow main)
         {
             main.ResetToSetup();
         }

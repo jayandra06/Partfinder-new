@@ -129,7 +129,11 @@ public sealed partial class MainWindow : Window
     private async void OnRootGridLoadedPostSetupValidate(object sender, RoutedEventArgs e)
     {
         RootGrid.Loaded -= OnRootGridLoadedPostSetupValidate;
+        await ValidateAndShowShellAsync().ConfigureAwait(true);
+    }
 
+    private async Task ValidateAndShowShellAsync()
+    {
         var orgCode = TryReadOrgCodeFromSetup();
         if (string.IsNullOrWhiteSpace(orgCode))
         {
@@ -196,7 +200,6 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        // Store org display name and plan for use in Settings page
         var appState = App.Services.GetRequiredService<IAppStateStore>();
         appState.OrgDisplayName = !string.IsNullOrWhiteSpace(verify.OrganizationName)
             ? verify.OrganizationName
@@ -871,8 +874,41 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void OnLetsGoClicked(object sender, RoutedEventArgs e)
+    private async void OnLetsGoClicked(object sender, RoutedEventArgs e)
     {
+        // Fetch and store org display name + plan before showing shell
+        // so Settings page ORGANIZATION section is never blank after login.
+        var orgCode = TryReadOrgCodeFromSetup();
+        if (!string.IsNullOrWhiteSpace(orgCode))
+        {
+            try
+            {
+                var appState = App.Services.GetRequiredService<IAppStateStore>();
+                var (status, _) = await SetupApiClient.StatusAsync(orgCode);
+                var verify = await LicenseApiClient.VerifyAsync(orgCode);
+
+                if (verify is not null && verify.Valid)
+                {
+                    appState.OrgDisplayName = !string.IsNullOrWhiteSpace(verify.OrganizationName)
+                        ? verify.OrganizationName
+                        : (!string.IsNullOrWhiteSpace(status?.OrganizationName) ? status.OrganizationName : orgCode);
+                }
+                else if (status is not null)
+                {
+                    appState.OrgDisplayName = !string.IsNullOrWhiteSpace(status.OrganizationName)
+                        ? status.OrganizationName : orgCode;
+                }
+                else
+                {
+                    appState.OrgDisplayName = orgCode;
+                }
+
+                appState.OrgPlan = !string.IsNullOrWhiteSpace(status?.Plan) ? status.Plan : string.Empty;
+                appState.OrgType = !string.IsNullOrWhiteSpace(status?.OrgType) ? status.OrgType : string.Empty;
+            }
+            catch { /* best effort — shell will show with whatever is available */ }
+        }
+
         ShowShell();
     }
 
