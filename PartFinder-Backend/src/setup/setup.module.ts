@@ -6,8 +6,10 @@ import { SetupController } from './setup.controller';
 import { SetupService } from './setup.service';
 import { TenantMongoService } from './tenant-mongo.service';
 
+import { CasbinModule } from '../casbin/casbin.module';
+
 @Module({
-  imports: [ConfigModule, OrganizationsModule, DbClustersModule],
+  imports: [ConfigModule, OrganizationsModule, DbClustersModule, CasbinModule],
   controllers: [SetupController],
   providers: [SetupService, TenantMongoService],
   exports: [SetupService, TenantMongoService],
