@@ -162,10 +162,26 @@
 
                 <!-- Org info Minimal -->
                 <Border Grid.Row="2" Background="Transparent" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="0,1,0,0" Padding="0,24,0,0">
-                    <StackPanel Spacing="4">
+                    <StackPanel Spacing="10">
                         <TextBlock Text="ORGANIZATION" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="50" FontWeight="SemiBold" />
-                        <TextBlock Text="{Binding OrgDisplayName}" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
-                        <TextBlock Text="{Binding OrgPlanDisplay}" FontSize="11" Foreground="{StaticResource AccentPrimaryBrush}" />
+
+                        <!-- Org Code -->
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="Org Code" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" />
+                            <TextBlock Text="{Binding OrgCode}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                        </StackPanel>
+
+                        <!-- Org Name -->
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="Org Name" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" />
+                            <TextBlock Text="{Binding OrgDisplayName}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+
+                        <!-- Org Plan -->
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="Plan" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" />
+                            <TextBlock Text="{Binding OrgPlanDisplay}" FontSize="12" Foreground="{StaticResource AccentPrimaryBrush}" />
+                        </StackPanel>
                     </StackPanel>
                 </Border>
             </Grid>

@@ -78,8 +78,17 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
     public string CurrentTenant
     {
         get => _currentTenant;
-        set => SetProperty(ref _currentTenant, value);
+        set
+        {
+            if (SetProperty(ref _currentTenant, value))
+            {
+                OnPropertyChanged(nameof(CurrentTenantDisplay));
+            }
+        }
     }
+
+    public string CurrentTenantDisplay =>
+        string.IsNullOrWhiteSpace(_currentTenant) ? string.Empty : $"Org - {_currentTenant}";
 
     private string _currentUserName = string.Empty;
     public string CurrentUserName
@@ -170,9 +179,11 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
         _setupContext.Refresh();
         _adminSession.Load();
         _profile.Load();
+
+        // Set CurrentTenant: always show org code in top-left sidebar
         if (!string.IsNullOrWhiteSpace(_setupContext.OrgCode))
         {
-            _appState.CurrentTenant = $"Org {_setupContext.OrgCode}";
+            _appState.CurrentTenant = _setupContext.OrgCode!;
         }
 
         CurrentTenant = _appState.CurrentTenant;
@@ -253,18 +264,6 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
     {
         NavigationItems.Clear();
 
-        if ((c.CanAccessMasterData || c.CanAccessParts) && hasMasterData)
-        {
-            NavigationItems.Add(
-                new NavItemViewModel
-                {
-                    Label = "Master Data",
-                    IconGlyph = "\uE8F1",
-                    Page = AppPage.MasterData,
-                    IsEnabled = true,
-                });
-        }
-
         if (c.CanAccessDashboard)
         {
             NavigationItems.Add(
@@ -287,7 +286,22 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
                     Page = AppPage.Inventory,
                     IsEnabled = true,
                 });
+        }
 
+        if ((c.CanAccessMasterData || c.CanAccessParts) && hasMasterData)
+        {
+            NavigationItems.Add(
+                new NavItemViewModel
+                {
+                    Label = "Master Data",
+                    IconGlyph = "\uE8F1",
+                    Page = AppPage.MasterData,
+                    IsEnabled = true,
+                });
+        }
+
+        if (c.CanAccessTemplates)
+        {
             NavigationItems.Add(
                 new NavItemViewModel
                 {
@@ -388,10 +402,17 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
     private void SignOutSession()
     {
         _adminSession.Clear();
-        SetupPaths.ClearAllSetupStateFiles();
+        // Do NOT delete setup-state.json — it holds orgCode/dbUri needed after re-login
         _setupContext.Refresh();
         CurrentUserName = ResolveDisplayUser();
-        Application.Current.Exit();
+        if (App.MainAppWindow is MainWindow main)
+        {
+            main.ResetToSetup();
+        }
+        else
+        {
+            Application.Current.Exit();
+        }
     }
 
     private string ResolveDisplayUser()
