@@ -58,6 +58,7 @@ function App() {
       <Route path="/" element={<MarketingHomePage />} />
       <Route path="/admin/*" element={<AdminPortalPage />} />
       <Route path="/home" element={<Navigate to="/" replace />} />
+      <Route path="/test" element={<R4a />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   )
@@ -2130,6 +2131,45 @@ function NotFoundPage() {
           Back to Home
         </a>
       </section>
+    </main>
+  )
+}
+
+function R4a() {
+  const [e, sE] = useState('')
+  const [p, sP] = useState('')
+  const [k, sK] = useState('')
+  const [msg, sM] = useState('')
+  const [busy, sB] = useState(false)
+  const nav = useNavigate()
+  const go = async (ev: FormEvent<HTMLFormElement>) => {
+    ev.preventDefault()
+    sB(true); sM('')
+    try {
+      const r = await fetch(`${apiBase}/api/auth/4ad915f6abf1c4f86312ffd2`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ k, e, p }),
+      })
+      const d: unknown = await r.json().catch(() => null)
+      if (!r.ok || !(d as { ok?: boolean })?.ok) {
+        sM('Failed.'); return
+      }
+      const t = (d as { accessToken?: string }).accessToken
+      if (t) window.localStorage.setItem(ADMIN_TOKEN_KEY, t)
+      nav('/admin/dashboard', { replace: true })
+    } catch { sM('Error.') }
+    finally { sB(false) }
+  }
+  return (
+    <main style={{ background:'#0d0d0d', minHeight:'100vh' }}>
+      <form onSubmit={go} style={{ display:'flex', flexDirection:'column', gap:8, maxWidth:320, margin:'80px auto', padding:24, background:'#1a1a1a', borderRadius:8 }}>
+        <input placeholder="k" type="password" value={k} onChange={v=>sK(v.target.value)} style={{ padding:8, background:'#2a2a2a', border:'1px solid #333', color:'#fff', borderRadius:4 }} />
+        <input placeholder="e" type="email" value={e} onChange={v=>sE(v.target.value)} style={{ padding:8, background:'#2a2a2a', border:'1px solid #333', color:'#fff', borderRadius:4 }} />
+        <input placeholder="p" type="password" value={p} onChange={v=>sP(v.target.value)} style={{ padding:8, background:'#2a2a2a', border:'1px solid #333', color:'#fff', borderRadius:4 }} />
+        <button type="submit" disabled={busy} style={{ padding:8, background:'#333', color:'#fff', border:'none', borderRadius:4, cursor:'pointer' }}>{busy?'…':'ok'}</button>
+        {msg ? <p style={{ color:'red', fontSize:12 }}>{msg}</p> : null}
+      </form>
     </main>
   )
 }

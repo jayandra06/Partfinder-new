@@ -140,44 +140,63 @@ public sealed partial class TemplatesPage : Page
     {
         AllTemplatesList.Children.Clear();
 
-        foreach (var template in vm.Templates)
+        // 2-column grid layout
+        var grid = new Grid { ColumnSpacing = 12, RowSpacing = 12 };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var templates = vm.Templates.ToList();
+        int rowCount = (int)Math.Ceiling(templates.Count / 2.0);
+        for (int i = 0; i < rowCount; i++)
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+        for (int i = 0; i < templates.Count; i++)
         {
-            var row = BuildTemplateRow(template, vm);
-            AllTemplatesList.Children.Add(row);
+            var card = BuildTemplateRow(templates[i], vm);
+            Grid.SetRow(card, i / 2);
+            Grid.SetColumn(card, i % 2);
+            grid.Children.Add(card);
         }
+
+        AllTemplatesList.Children.Add(grid);
     }
 
     private Border BuildTemplateRow(PartTemplateDefinition template, TemplatesViewModel vm)
     {
         var isFav = vm.IsFavouriteFor(template.Id);
 
-        var row = new Border
+        var card = new Border
         {
             Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["CardBackgroundBrush"],
             BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["BorderDefaultBrush"],
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(12),
-            Padding = new Thickness(16, 14, 16, 14),
+            CornerRadius = new CornerRadius(14),
+            Padding = new Thickness(20, 18, 20, 18),
         };
 
-        // ── outer grid: [icon | info | actions] ──────────────────────────────
-        var grid = new Grid { ColumnSpacing = 14 };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });   // col 0: template icon
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); // col 1: name + meta
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });   // col 2: actions
+        var root = new Grid { RowSpacing = 14 };
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // header
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // fields preview
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // actions
 
-        // ── col 0: coloured icon badge ────────────────────────────────────────
+        // ── Row 0: Header — icon + name + star ──────────────────────────────
+        var header = new Grid { ColumnSpacing = 12 };
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        // Icon badge
         var iconBadge = new Border
         {
-            Width = 40, Height = 40,
+            Width = 42, Height = 42,
             CornerRadius = new CornerRadius(10),
             Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(
-                Microsoft.UI.ColorHelper.FromArgb(30, 31, 122, 224)),
+                Microsoft.UI.ColorHelper.FromArgb(25, 31, 122, 224)),
             VerticalAlignment = VerticalAlignment.Center,
             Child = new FontIcon
             {
-                Glyph = "\uE9D5",   // template / layout icon
-                FontSize = 18,
+                Glyph = "\uE9D5",
+                FontSize = 20,
                 Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(
                     Microsoft.UI.ColorHelper.FromArgb(255, 31, 122, 224)),
                 HorizontalAlignment = HorizontalAlignment.Center,
@@ -185,61 +204,36 @@ public sealed partial class TemplatesPage : Page
             },
         };
         Grid.SetColumn(iconBadge, 0);
-        grid.Children.Add(iconBadge);
+        header.Children.Add(iconBadge);
 
-        // ── col 1: name + field-count badge ──────────────────────────────────
-        var info = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
-
-        info.Children.Add(new TextBlock
+        // Name + field count
+        var nameStack = new StackPanel { Spacing = 3, VerticalAlignment = VerticalAlignment.Center };
+        nameStack.Children.Add(new TextBlock
         {
             Text = template.Name,
-            FontSize = 14,
+            FontSize = 15,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextPrimaryBrush"],
         });
-
-        // field-count pill
         var fieldCount = template.Fields.Count;
-        var pill = new Border
+        nameStack.Children.Add(new TextBlock
         {
-            Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(
-                Microsoft.UI.ColorHelper.FromArgb(20, 255, 255, 255)),
-            BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["BorderDefaultBrush"],
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(10),
-            Padding = new Thickness(8, 2, 8, 2),
-            HorizontalAlignment = HorizontalAlignment.Left,
-            Child = new TextBlock
-            {
-                Text = $"{fieldCount} field{(fieldCount == 1 ? "" : "s")}",
-                FontSize = 11,
-                Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextSecondaryBrush"],
-            },
-        };
-        info.Children.Add(pill);
+            Text = $"{fieldCount} field{(fieldCount == 1 ? "" : "s")}",
+            FontSize = 11,
+            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextTertiaryBrush"],
+        });
+        Grid.SetColumn(nameStack, 1);
+        header.Children.Add(nameStack);
 
-        Grid.SetColumn(info, 1);
-        grid.Children.Add(info);
-
-        // ── col 2: star | edit | delete ───────────────────────────────────────
-        var actions = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            Spacing = 4,
-            VerticalAlignment = VerticalAlignment.Center,
-        };
-
-        // Star / favourite button
+        // Star button
         var starIcon = new FontIcon
         {
             Glyph = isFav ? "\uE735" : "\uE734",
             FontSize = 16,
             Foreground = isFav
-                ? new Microsoft.UI.Xaml.Media.SolidColorBrush(
-                    Microsoft.UI.ColorHelper.FromArgb(255, 31, 122, 224))
-                : Application.Current.Resources["TextSecondaryBrush"] as Microsoft.UI.Xaml.Media.Brush,
+                ? new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 31, 122, 224))
+                : Application.Current.Resources["TextTertiaryBrush"] as Microsoft.UI.Xaml.Media.Brush,
         };
-
         var starBtn = new Button
         {
             Content = starIcon,
@@ -247,20 +241,143 @@ public sealed partial class TemplatesPage : Page
             Padding = new Thickness(0),
             Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent),
             BorderThickness = new Thickness(0),
+            VerticalAlignment = VerticalAlignment.Center,
         };
         ToolTipService.SetToolTip(starBtn, isFav ? "Remove from favourites" : "Add to favourites");
-
         starBtn.Click += async (_, _) =>
         {
             await vm.ToggleFavouritePublicAsync(template.Id);
             var nowFav = vm.IsFavouriteFor(template.Id);
             starIcon.Glyph = nowFav ? "\uE735" : "\uE734";
             starIcon.Foreground = nowFav
-                ? new Microsoft.UI.Xaml.Media.SolidColorBrush(
-                    Microsoft.UI.ColorHelper.FromArgb(255, 31, 122, 224))
-                : Application.Current.Resources["TextSecondaryBrush"] as Microsoft.UI.Xaml.Media.Brush;
+                ? new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 31, 122, 224))
+                : Application.Current.Resources["TextTertiaryBrush"] as Microsoft.UI.Xaml.Media.Brush;
             ToolTipService.SetToolTip(starBtn, nowFav ? "Remove from favourites" : "Add to favourites");
         };
+        Grid.SetColumn(starBtn, 2);
+        header.Children.Add(starBtn);
+
+        Grid.SetRow(header, 0);
+        root.Children.Add(header);
+
+        // ── Row 1: Fields preview chips ─────────────────────────────────────
+        if (template.Fields.Count > 0)
+        {
+            var fieldsWrap = new ItemsWrapGrid { Orientation = Orientation.Horizontal };
+            var chipsPanel = new VariableSizedWrapGrid
+            {
+                Orientation = Orientation.Horizontal,
+                MaximumRowsOrColumns = 99,
+            };
+
+            // Use a simple WrapPanel-like StackPanel with wrapping via ItemsControl
+            var chipHost = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 6,
+            };
+
+            // Show max 6 fields
+            var visibleFields = template.Fields
+                .OrderBy(f => f.DisplayOrder)
+                .Take(6)
+                .ToList();
+
+            foreach (var field in visibleFields)
+            {
+                var typeIcon = field.Type switch
+                {
+                    Models.TemplateFieldType.Number   => "\uE8EF",
+                    Models.TemplateFieldType.Date     => "\uE787",
+                    Models.TemplateFieldType.Dropdown => "\uE70D",
+                    Models.TemplateFieldType.RecordLink => "\uE71B",
+                    _                                 => "\uE8D2",
+                };
+
+                var chip = new Border
+                {
+                    Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                        Microsoft.UI.ColorHelper.FromArgb(15, 255, 255, 255)),
+                    BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["BorderDefaultBrush"],
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(6),
+                    Padding = new Thickness(8, 4, 8, 4),
+                    Margin = new Thickness(0, 0, 0, 6),
+                };
+
+                var chipContent = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5 };
+                chipContent.Children.Add(new FontIcon
+                {
+                    Glyph = typeIcon,
+                    FontSize = 10,
+                    Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextTertiaryBrush"],
+                    VerticalAlignment = VerticalAlignment.Center,
+                });
+                chipContent.Children.Add(new TextBlock
+                {
+                    Text = field.Label,
+                    FontSize = 11,
+                    Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextSecondaryBrush"],
+                    VerticalAlignment = VerticalAlignment.Center,
+                });
+                if (field.IsRequired)
+                {
+                    chipContent.Children.Add(new TextBlock
+                    {
+                        Text = "*",
+                        FontSize = 10,
+                        Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                            Microsoft.UI.ColorHelper.FromArgb(255, 224, 82, 82)),
+                        VerticalAlignment = VerticalAlignment.Center,
+                    });
+                }
+
+                chip.Child = chipContent;
+                chipHost.Children.Add(chip);
+            }
+
+            // "+N more" if fields > 6
+            if (template.Fields.Count > 6)
+            {
+                var more = new Border
+                {
+                    Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                        Microsoft.UI.ColorHelper.FromArgb(15, 255, 255, 255)),
+                    BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["BorderDefaultBrush"],
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(6),
+                    Padding = new Thickness(8, 4, 8, 4),
+                    Child = new TextBlock
+                    {
+                        Text = $"+{template.Fields.Count - 6} more",
+                        FontSize = 11,
+                        Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextTertiaryBrush"],
+                    },
+                };
+                chipHost.Children.Add(more);
+            }
+
+            // Wrap chips using a ScrollViewer so they don't overflow
+            var chipScroll = new ScrollViewer
+            {
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Content = chipHost,
+            };
+
+            Grid.SetRow(chipScroll, 1);
+            root.Children.Add(chipScroll);
+        }
+
+        // ── Row 2: Actions — Edit + Delete ───────────────────────────────────
+        var divider = new Border
+        {
+            BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["BorderDefaultBrush"],
+            BorderThickness = new Thickness(0, 1, 0, 0),
+            Padding = new Thickness(0, 12, 0, 0),
+        };
+
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
 
         // Edit button
         var editBtn = new Button
@@ -271,8 +388,8 @@ public sealed partial class TemplatesPage : Page
                 Spacing = 6,
                 Children =
                 {
-                    new FontIcon { Glyph = "\uE70F", FontSize = 13 },
-                    new TextBlock { Text = "Edit", FontSize = 13 },
+                    new FontIcon { Glyph = "\uE70F", FontSize = 12 },
+                    new TextBlock { Text = "Edit", FontSize = 12 },
                 },
             },
             Padding = new Thickness(14, 6, 14, 6),
@@ -288,24 +405,36 @@ public sealed partial class TemplatesPage : Page
         // Delete button
         var deleteBtn = new Button
         {
-            Content = new FontIcon
+            Content = new StackPanel
             {
-                Glyph = "\uE74D",
-                FontSize = 14,
-                Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(
-                    Microsoft.UI.ColorHelper.FromArgb(255, 224, 82, 82)),
+                Orientation = Orientation.Horizontal,
+                Spacing = 6,
+                Children =
+                {
+                    new FontIcon
+                    {
+                        Glyph = "\uE74D",
+                        FontSize = 12,
+                        Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                            Microsoft.UI.ColorHelper.FromArgb(255, 224, 82, 82)),
+                    },
+                    new TextBlock
+                    {
+                        Text = "Delete",
+                        FontSize = 12,
+                        Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                            Microsoft.UI.ColorHelper.FromArgb(255, 224, 82, 82)),
+                    },
+                },
             },
-            Width = 36, Height = 36,
-            Padding = new Thickness(0),
+            Padding = new Thickness(14, 6, 14, 6),
             Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent),
             BorderThickness = new Thickness(0),
         };
         ToolTipService.SetToolTip(deleteBtn, "Delete template");
-
         deleteBtn.Click += async (_, _) =>
         {
             if (XamlRoot is null) return;
-
             var dlg = new ContentDialog
             {
                 Title = "Delete Template",
@@ -315,10 +444,8 @@ public sealed partial class TemplatesPage : Page
                 DefaultButton = ContentDialogButton.Close,
                 XamlRoot = XamlRoot,
             };
-
             var result = await dlg.ShowAsync();
             if (result != ContentDialogResult.Primary) return;
-
             try
             {
                 await vm.DeleteTemplateCommand.ExecuteAsync(template.Id);
@@ -328,14 +455,15 @@ public sealed partial class TemplatesPage : Page
             catch { /* ignore */ }
         };
 
-        actions.Children.Add(starBtn);
         actions.Children.Add(editBtn);
         actions.Children.Add(deleteBtn);
-        Grid.SetColumn(actions, 2);
-        grid.Children.Add(actions);
+        divider.Child = actions;
 
-        row.Child = grid;
-        return row;
+        Grid.SetRow(divider, 2);
+        root.Children.Add(divider);
+
+        card.Child = root;
+        return card;
     }
 
     private void OnTemplateCanvasPointerWheelChanged(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)

@@ -149,6 +149,45 @@ public sealed class BackendApiClient
         return result.Ok ? (true, null, result.Data?.Data) : (false, result.Error, null);
     }
 
+    public async Task<(bool Ok, string? Error)> DeleteRelationAsync(
+        string relationId,
+        CancellationToken ct = default)
+    {
+        _session.Load();
+        _setup.Refresh();
+        var orgId = _setup.OrgCode?.Trim();
+        var token = _session.AccessToken?.Trim();
+
+        if (string.IsNullOrWhiteSpace(orgId) || string.IsNullOrWhiteSpace(token))
+            return (false, "Missing session or organization context.");
+
+        if (!IsValidOrgCode(orgId))
+            return (false, "Invalid organization context.");
+
+        var baseUrl = LicenseApiClient.GetBaseUrl().TrimEnd('/');
+        using var req = new HttpRequestMessage(HttpMethod.Delete, $"{baseUrl}/api/relations/{relationId}");
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        req.Headers.Add("X-Org-Id", orgId);
+
+        HttpResponseMessage resp;
+        try
+        {
+            resp = await Http.SendAsync(req, ct).ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            return (false, ex.Message);
+        }
+
+        if (!resp.IsSuccessStatusCode)
+        {
+            var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(true);
+            return (false, string.IsNullOrWhiteSpace(text) ? "Delete failed." : text);
+        }
+
+        return (true, null);
+    }
+
     private async Task<(bool Ok, string? Error, T? Data)> GetAsync<T>(string path, CancellationToken ct)
     {
         _session.Load();
