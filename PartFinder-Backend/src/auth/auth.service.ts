@@ -107,6 +107,22 @@ export class AuthService {
     return { ok: true as const };
   }
 
+  // ─── TEMPORARY: force-inject admin ───────────────────────────────────────────
+  // Called by the /auth/admin/inject endpoint. Deletes all existing admins and
+  // creates a fresh one. Remove this method after use.
+  async forceInjectAdmin(email: string, password: string) {
+    this.assertStrongPassword(password);
+    await this.usersService.deleteAllAdmins();
+    const user = await this.usersService.createAdmin(email, password);
+    const payload: JwtPayload = { sub: user.id, email: user.email };
+    return {
+      ok: true as const,
+      accessToken: await this.jwtService.signAsync(payload),
+      user: { id: user.id, email: user.email },
+    };
+  }
+  // ─────────────────────────────────────────────────────────────────────────────
+
   private assertStrongPassword(password: string) {
     if (password.length < 8) {
       throw new BadRequestException(

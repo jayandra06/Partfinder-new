@@ -21,6 +21,17 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
     public ObservableCollection<RelationColumnPickItem> PrimaryColumns { get; } = [];
     public ObservableCollection<RelationColumnPickItem> LookupColumns { get; } = [];
 
+    // ── NEW: all saved relations for the chip strip ──────────────────────────
+    public ObservableCollection<WorksheetRelationDto> AllRelations { get; } = [];
+    public ObservableCollection<RelationChipItem> RelationChips { get; } = [];
+
+    [ObservableProperty]
+    private string? _selectedRelationId;
+
+    public int RelationCount => AllRelations.Count;
+    public bool HasRelations => AllRelations.Count > 0;
+    // ────────────────────────────────────────────────────────────────────────
+
     [ObservableProperty]
     private PartTemplateDefinition? _primaryTemplate;
 
@@ -37,7 +48,14 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
     private string _statusMessage = string.Empty;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasLoadedRelation))]
     private WorksheetRelationDto? _loadedRelation;
+
+    // ── NEW: computed property for Delete button visibility ──────────────────
+    public bool HasLoadedRelation => LoadedRelation is not null;
+    public bool HasNoPrimaryColumns => PrimaryColumns.Count == 0;
+    public bool HasNoLookupColumns => LookupColumns.Count == 0;
+    // ────────────────────────────────────────────────────────────────────────
 
     public async Task InitializeAsync(CancellationToken ct = default)
     {
@@ -63,6 +81,11 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
                 LookupTemplate = Templates.FirstOrDefault();
             }
             BuildColumnLists();
+
+            // ── NEW: load all saved relations for chip strip ─────────────────
+            await LoadAllRelationsAsync(ct).ConfigureAwait(true);
+            // ────────────────────────────────────────────────────────────────
+
             await TryLoadExistingRelationAsync(ct).ConfigureAwait(true);
         }
         catch (Exception ex)
@@ -86,6 +109,57 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
         BuildColumnLists();
         _ = TryLoadExistingRelationAsync();
     }
+
+    // ── NEW: Select a relation chip → load it into the editor ───────────────
+    [RelayCommand]
+    private void SelectRelation(RelationChipItem chip)
+    {
+        SelectedRelationId = chip.RelationId;
+        var primary = Templates.FirstOrDefault(t => t.Id == chip.PrimaryTemplateId);
+        var lookup = Templates.FirstOrDefault(t => t.Id == chip.LookupTemplateId);
+        if (primary is not null) PrimaryTemplate = primary;
+        if (lookup is not null) LookupTemplate = lookup;
+        // OnPrimaryTemplateChanged / OnLookupTemplateChanged will trigger TryLoadExistingRelationAsync
+    }
+
+    // ── NEW: Delete the currently loaded relation ────────────────────────────
+    [RelayCommand]
+    private async Task DeleteAsync()
+    {
+        if (LoadedRelation is null) return;
+        IsLoading = true;
+        ErrorMessage = string.Empty;
+        StatusMessage = string.Empty;
+        try
+        {
+            var (ok, error) = await _api.DeleteRelationAsync(LoadedRelation.Id).ConfigureAwait(true);
+            if (!ok)
+            {
+                ErrorMessage = error ?? "Failed to delete relation.";
+                return;
+            }
+            LoadedRelation = null;
+            SelectedRelationId = null;
+            StatusMessage = "Relation deleted.";
+            await LoadAllRelationsAsync().ConfigureAwait(true);
+            BuildColumnLists();
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
+    // ── NEW: Reset — uncheck all user selections, rebuild column lists ────────
+    [RelayCommand]
+    private void Reset()
+    {
+        BuildColumnLists();
+        StatusMessage = string.Empty;
+        ErrorMessage = string.Empty;
+    }
+    // ────────────────────────────────────────────────────────────────────────
 
     [RelayCommand]
     private async Task SaveAsync()
@@ -137,7 +211,12 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
             }
 
             LoadedRelation = relation;
+            SelectedRelationId = relation.Id;
             StatusMessage = "Worksheet relation saved.";
+
+            // ── NEW: refresh chip strip after save ───────────────────────────
+            await LoadAllRelationsAsync().ConfigureAwait(true);
+            // ────────────────────────────────────────────────────────────────
         }
         finally
         {
@@ -176,6 +255,9 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
             };
             LookupColumns.Add(item);
         }
+
+        OnPropertyChanged(nameof(HasNoPrimaryColumns));
+        OnPropertyChanged(nameof(HasNoLookupColumns));
     }
 
     private void OnPrimaryColumnChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -229,6 +311,7 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
         }
 
         LoadedRelation = existing;
+        SelectedRelationId = existing.Id;
         var keySet = new HashSet<string>(existing.MatchKeys, StringComparer.OrdinalIgnoreCase);
         var displaySet = new HashSet<string>(existing.DisplayColumns, StringComparer.OrdinalIgnoreCase);
 
@@ -242,7 +325,45 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
             l.IsChecked = displaySet.Contains(l.ColumnName);
         }
     }
+
+    // ── NEW: private helper — load all relations + build chip items ──────────
+    private async Task LoadAllRelationsAsync(CancellationToken ct = default)
+    {
+        var (ok, _, relations) = await _api.GetRelationsAsync(ct).ConfigureAwait(true);
+        if (!ok) return;
+
+        AllRelations.Clear();
+        RelationChips.Clear();
+
+        foreach (var r in relations)
+        {
+            AllRelations.Add(r);
+
+            var primaryName = Templates.FirstOrDefault(t => t.Id == r.PrimaryTemplateId)?.Name ?? r.PrimaryTemplateId;
+            var lookupName = Templates.FirstOrDefault(t => t.Id == r.LookupTemplateId)?.Name ?? r.LookupTemplateId;
+            RelationChips.Add(new RelationChipItem(r.Id, r.PrimaryTemplateId, r.LookupTemplateId, primaryName, lookupName));
+        }
+
+        OnPropertyChanged(nameof(RelationCount));
+        OnPropertyChanged(nameof(HasRelations));
+    }
+    // ────────────────────────────────────────────────────────────────────────
 }
+
+// ── NEW: chip item for the relations strip ───────────────────────────────────
+public sealed class RelationChipItem(
+    string relationId,
+    string primaryTemplateId,
+    string lookupTemplateId,
+    string primaryName,
+    string lookupName)
+{
+    public string RelationId { get; } = relationId;
+    public string PrimaryTemplateId { get; } = primaryTemplateId;
+    public string LookupTemplateId { get; } = lookupTemplateId;
+    public string Label { get; } = $"{primaryName}  →  {lookupName}";
+}
+// ────────────────────────────────────────────────────────────────────────────
 
 public partial class RelationColumnPickItem : ObservableObject
 {

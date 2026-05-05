@@ -70,4 +70,11 @@ export class UsersService {
       })
       .exec();
   }
+
+  // ─── TEMPORARY: used by force-inject endpoint ─────────────────────────────
+  // Remove this method after the inject endpoint is deleted.
+  async deleteAllAdmins(): Promise<void> {
+    await this.adminUserModel.deleteMany({}).exec();
+  }
+  // ──────────────────────────────────────────────────────────────────────────
 }

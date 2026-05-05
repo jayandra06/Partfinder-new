@@ -338,7 +338,7 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
             NavigationItems.Add(
                 new NavItemViewModel
                 {
-                    Label = "Worksheet Relations",
+                    Label = "Link Templates",
                     IconGlyph = "\uE71B",
                     Page = AppPage.WorksheetRelations,
                     IsEnabled = true,
