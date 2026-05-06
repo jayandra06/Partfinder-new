@@ -69,8 +69,10 @@
                         <AdaptiveTrigger MinWindowWidth="0" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
-                        <Setter Target="SidebarColumn.Width" Value="0" />
-                        <Setter Target="SidebarBorder.Visibility" Value="Collapsed" />
+                        <!-- Instead of hiding completely at 1024, let's keep it until 768 or just stack -->
+                        <!-- If user wants to see it, let's make it narrower or scrollable -->
+                        <Setter Target="SidebarColumn.Width" Value="Auto" />
+                        <Setter Target="SidebarBorder.Padding" Value="16,24" />
                         <Setter Target="ContentStackPanel.Padding" Value="16,24,16,48" />
                         <Setter Target="ContentStackPanel.MinWidth" Value="0" />
                         <Setter Target="ContentStackPanel.Margin" Value="0" />
@@ -155,13 +157,14 @@
         </Border>
 
         <!-- LEFT SIDEBAR: Editorial Navigation -->
-        <Border x:Name="SidebarBorder" Grid.Column="0" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="0,0,1,0" Padding="24,32" Translation="0,0,32">
-            <Grid RowSpacing="32">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
+        <Border x:Name="SidebarBorder" Grid.Column="0" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="0,0,1,0" Translation="0,0,32">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <Grid Padding="24,32" RowSpacing="32">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
                 <StackPanel Grid.Row="0" Spacing="4">
                     <TextBlock Text="PREFERENCES" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="100" FontWeight="Bold" />
@@ -250,6 +253,7 @@
                     </StackPanel>
                 </Border>
             </Grid>
+            </ScrollViewer>
         </Border>
 
         <!-- RIGHT CONTENT AREA -->
