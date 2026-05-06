@@ -125,7 +125,7 @@
         </VisualStateManager.VisualStateGroups>
 
         <Grid.ColumnDefinitions>
-            <ColumnDefinition x:Name="SidebarColumn" Width="260" />
+            <ColumnDefinition x:Name="SidebarColumn" Width="240" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
@@ -258,8 +258,8 @@
 
         <!-- RIGHT CONTENT AREA -->
         <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
-            <!-- Constrain width for readability, but allow it to stretch nicely -->
-            <StackPanel x:Name="ContentStackPanel" HorizontalAlignment="Stretch" Padding="64,48,64,80" MaxWidth="1000">
+            <!-- Constrain width for readability, but align left to avoid large gaps on wide screens -->
+            <StackPanel x:Name="ContentStackPanel" HorizontalAlignment="Left" Padding="40,48,64,80" Width="800">
 
 
                 <StackPanel x:Name="ProfileSection" Visibility="Visible">
@@ -274,8 +274,8 @@
                                 <RowDefinition x:Name="AvatarGridDef2" Height="0" />
                             </Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition x:Name="AvatarCol1" Width="2*" />
-                                <ColumnDefinition x:Name="AvatarCol2" Width="3*" />
+                                <ColumnDefinition x:Name="AvatarCol1" Width="1.5*" />
+                                <ColumnDefinition x:Name="AvatarCol2" Width="3.5*" />
                             </Grid.ColumnDefinitions>
                             
                             <StackPanel x:Name="AvatarTitleStack" Spacing="8">
@@ -324,8 +324,8 @@
                                 <RowDefinition x:Name="PersonalGridDef2" Height="0" />
                             </Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition x:Name="PersonalCol1" Width="2*" />
-                                <ColumnDefinition x:Name="PersonalCol2" Width="3*" />
+                                <ColumnDefinition x:Name="PersonalCol1" Width="1.5*" />
+                                <ColumnDefinition x:Name="PersonalCol2" Width="3.5*" />
                             </Grid.ColumnDefinitions>
                             
                             <StackPanel x:Name="PersonalTitleStack" Spacing="8">
@@ -374,8 +374,8 @@
                                 <RowDefinition x:Name="BioGridDef2" Height="0" />
                             </Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition x:Name="BioCol1" Width="2*" />
-                                <ColumnDefinition x:Name="BioCol2" Width="3*" />
+                                <ColumnDefinition x:Name="BioCol1" Width="1.5*" />
+                                <ColumnDefinition x:Name="BioCol2" Width="3.5*" />
                             </Grid.ColumnDefinitions>
                             
                             <StackPanel x:Name="BioTitleStack" Spacing="8">
@@ -420,8 +420,8 @@
                                 <RowDefinition x:Name="SecurityStatusGridDef2" Height="0" />
                             </Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition x:Name="SecurityStatusCol1" Width="2*" />
-                                <ColumnDefinition x:Name="SecurityStatusCol2" Width="3*" />
+                                <ColumnDefinition x:Name="SecurityStatusCol1" Width="1.5*" />
+                                <ColumnDefinition x:Name="SecurityStatusCol2" Width="3.5*" />
                             </Grid.ColumnDefinitions>
 
                             <StackPanel x:Name="SecurityStatusTitleStack" Spacing="6">
@@ -645,53 +645,45 @@
                     <!-- Card wrapper -->
                     <Border Background="{StaticResource CardBackgroundBrush}"
                             BorderBrush="{StaticResource BorderDefaultBrush}"
-                            BorderThickness="1" CornerRadius="12" Padding="32,28">
-                        <StackPanel Spacing="24">
+                            BorderThickness="1" CornerRadius="12" Padding="28">
+                        <StackPanel Spacing="32">
 
                             <!-- CURRENT PASSWORD -->
-                            <StackPanel Spacing="8">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Border Width="32" Height="32" CornerRadius="8"
-                                            Background="#101F7AE0" BorderBrush="#201F7AE0" BorderThickness="1">
-                                        <FontIcon Glyph="&#xE8D7;" FontSize="14" Foreground="{StaticResource AccentPrimaryBrush}" />
-                                    </Border>
-                                    <TextBlock Text="Current Password" FontSize="15" FontWeight="SemiBold"
-                                               Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                            <StackPanel Spacing="10">
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <FontIcon Glyph="&#xE8D7;" FontSize="16" Foreground="{StaticResource AccentPrimaryBrush}" />
+                                    <TextBlock Text="Current Password" Style="{StaticResource SettingLabelStyle}" VerticalAlignment="Center" />
                                 </StackPanel>
                                 <PasswordBox x:Name="CurrentPasswordBox"
                                              PlaceholderText="Enter your current password"
-                                             PasswordChanged="OnCurrentPasswordChanged" />
+                                             PasswordChanged="OnCurrentPasswordChanged"
+                                             MaxWidth="500" HorizontalAlignment="Left" />
                                 <Border x:Name="CurrentPasswordErrorBorder" Visibility="Collapsed"
-                                        Background="#18E05252" BorderBrush="#30E05252"
-                                        BorderThickness="1" CornerRadius="6" Padding="10,8">
+                                        Background="#10E05252" BorderBrush="#20E05252"
+                                        BorderThickness="1" CornerRadius="8" Padding="12,10"
+                                        MaxWidth="500" HorizontalAlignment="Left">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <FontIcon Glyph="&#xE783;" FontSize="12" Foreground="#E05252" VerticalAlignment="Center" />
+                                        <FontIcon Glyph="&#xE783;" FontSize="14" Foreground="#E05252" VerticalAlignment="Center" />
                                         <TextBlock x:Name="CurrentPasswordErrorText"
                                                    Text="Current password is incorrect."
-                                                   FontSize="12" Foreground="#E05252" TextWrapping="WrapWholeWords" />
+                                                   FontSize="12" Foreground="#E05252" />
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
 
-                            <!-- Divider -->
-                            <Border Height="1" Background="{StaticResource BorderDefaultBrush}" />
-
                             <!-- NEW PASSWORD -->
-                            <StackPanel Spacing="8">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Border Width="32" Height="32" CornerRadius="8"
-                                            Background="#102ABD8F" BorderBrush="#202ABD8F" BorderThickness="1">
-                                        <FontIcon Glyph="&#xE72E;" FontSize="14" Foreground="{StaticResource SuccessBrush}" />
-                                    </Border>
-                                    <TextBlock Text="New Password" FontSize="15" FontWeight="SemiBold"
-                                               Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                            <StackPanel Spacing="10">
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <FontIcon Glyph="&#xE72E;" FontSize="16" Foreground="{StaticResource SuccessBrush}" />
+                                    <TextBlock Text="New Password" Style="{StaticResource SettingLabelStyle}" VerticalAlignment="Center" />
                                 </StackPanel>
 
-                                <!-- Auto-generate row -->
+                                <!-- Auto-generate option -->
                                 <Border Background="{StaticResource ElevatedCardBackgroundBrush}"
                                         BorderBrush="{StaticResource BorderDefaultBrush}"
-                                        BorderThickness="1" CornerRadius="8" Padding="16,12">
-                                    <Grid ColumnSpacing="12">
+                                        BorderThickness="1" CornerRadius="10" Padding="16,12"
+                                        MaxWidth="500" HorizontalAlignment="Left" Margin="0,4,0,4">
+                                    <Grid ColumnSpacing="16">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
@@ -699,22 +691,21 @@
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Spacing="2" VerticalAlignment="Center">
                                             <TextBlock Text="Auto-generate a strong password"
-                                                       FontSize="13" FontWeight="SemiBold"
-                                                       Foreground="{StaticResource TextPrimaryBrush}" />
-                                            <TextBlock Text="16 chars · upper · lower · digits · symbols"
+                                                       FontSize="13" FontWeight="SemiBold" />
+                                            <TextBlock Text="16 chars · complex"
                                                        FontSize="11" Foreground="{StaticResource TextTertiaryBrush}" />
                                         </StackPanel>
                                         <Button Grid.Column="1"
                                                 Style="{StaticResource PrimaryButtonStyle}"
-                                                Padding="16,8" FontSize="13"
+                                                Padding="12,6" FontSize="12"
                                                 Click="OnGeneratePasswordClick">
                                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <FontIcon Glyph="&#xE72C;" FontSize="12" />
+                                                <FontIcon Glyph="&#xE72C;" FontSize="11" />
                                                 <TextBlock Text="Generate" />
                                             </StackPanel>
                                         </Button>
                                         <Button Grid.Column="2" Style="{StaticResource GhostButtonStyle}"
-                                                Width="36" Height="36" Padding="0"
+                                                Width="32" Height="32" Padding="0"
                                                 ToolTipService.ToolTip="Copy generated password"
                                                 Click="OnCopyGeneratedPasswordClick">
                                             <FontIcon Glyph="&#xE8C8;" FontSize="13" />
@@ -722,85 +713,83 @@
                                     </Grid>
                                 </Border>
 
-                                <!-- New password input + strength -->
                                 <PasswordBox x:Name="NewPasswordBox"
                                              PlaceholderText="Enter or paste new password"
-                                             PasswordChanged="OnNewPasswordChanged" />
-                                <Grid ColumnSpacing="4">
+                                             PasswordChanged="OnNewPasswordChanged"
+                                             MaxWidth="500" HorizontalAlignment="Left" />
+                                
+                                <Grid MaxWidth="500" HorizontalAlignment="Left" ColumnSpacing="4" Margin="0,2,0,0">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
-                                    <Rectangle Grid.Column="0" Height="3" RadiusX="2" RadiusY="2" x:Name="StrengthBar1" Fill="{StaticResource BorderDefaultBrush}" />
-                                    <Rectangle Grid.Column="1" Height="3" RadiusX="2" RadiusY="2" x:Name="StrengthBar2" Fill="{StaticResource BorderDefaultBrush}" />
-                                    <Rectangle Grid.Column="2" Height="3" RadiusX="2" RadiusY="2" x:Name="StrengthBar3" Fill="{StaticResource BorderDefaultBrush}" />
-                                    <Rectangle Grid.Column="3" Height="3" RadiusX="2" RadiusY="2" x:Name="StrengthBar4" Fill="{StaticResource BorderDefaultBrush}" />
+                                    <Rectangle Grid.Column="0" Height="4" RadiusX="2" RadiusY="2" x:Name="StrengthBar1" Fill="{StaticResource BorderDefaultBrush}" />
+                                    <Rectangle Grid.Column="1" Height="4" RadiusX="2" RadiusY="2" x:Name="StrengthBar2" Fill="{StaticResource BorderDefaultBrush}" />
+                                    <Rectangle Grid.Column="2" Height="4" RadiusX="2" RadiusY="2" x:Name="StrengthBar3" Fill="{StaticResource BorderDefaultBrush}" />
+                                    <Rectangle Grid.Column="3" Height="4" RadiusX="2" RadiusY="2" x:Name="StrengthBar4" Fill="{StaticResource BorderDefaultBrush}" />
                                 </Grid>
                                 <TextBlock x:Name="StrengthLabel" Text="" FontSize="11"
                                            Foreground="{StaticResource TextTertiaryBrush}"
-                                           HorizontalAlignment="Right" />
+                                           MaxWidth="500" HorizontalAlignment="Right" />
                             </StackPanel>
 
-                            <!-- Divider -->
-                            <Border Height="1" Background="{StaticResource BorderDefaultBrush}" />
-
                             <!-- CONFIRM PASSWORD -->
-                            <StackPanel Spacing="8">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Border Width="32" Height="32" CornerRadius="8"
-                                            Background="#10E8A040" BorderBrush="#20E8A040" BorderThickness="1">
-                                        <FontIcon Glyph="&#xE73E;" FontSize="14" Foreground="#E8A040" />
-                                    </Border>
-                                    <TextBlock Text="Confirm New Password" FontSize="15" FontWeight="SemiBold"
-                                               Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                            <StackPanel Spacing="10">
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <FontIcon Glyph="&#xE73E;" FontSize="16" Foreground="#E8A040" />
+                                    <TextBlock Text="Confirm New Password" Style="{StaticResource SettingLabelStyle}" VerticalAlignment="Center" />
                                 </StackPanel>
                                 <PasswordBox x:Name="ConfirmPasswordBox"
                                              PlaceholderText="Re-enter new password"
-                                             PasswordChanged="OnConfirmPasswordChanged" />
+                                             PasswordChanged="OnConfirmPasswordChanged"
+                                             MaxWidth="500" HorizontalAlignment="Left" />
                             </StackPanel>
 
                             <!-- Requirements hint -->
                             <Border Background="{StaticResource ElevatedCardBackgroundBrush}"
                                     BorderBrush="{StaticResource BorderDefaultBrush}"
-                                    BorderThickness="1" CornerRadius="8" Padding="16,12">
+                                    BorderThickness="1" CornerRadius="10" Padding="16,14"
+                                    MaxWidth="600" HorizontalAlignment="Left">
                                 <StackPanel Orientation="Horizontal" Spacing="16">
-                                    <FontIcon Glyph="&#xE946;" FontSize="13" Foreground="{StaticResource TextTertiaryBrush}" VerticalAlignment="Center" />
-                                    <StackPanel Spacing="3">
-                                        <TextBlock Text="Password Requirements" FontSize="12" FontWeight="SemiBold"
+                                    <FontIcon Glyph="&#xE946;" FontSize="16" Foreground="{StaticResource TextTertiaryBrush}" VerticalAlignment="Top" Margin="0,2,0,0" />
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="Password Requirements" FontSize="13" FontWeight="SemiBold"
                                                    Foreground="{StaticResource TextSecondaryBrush}" />
-                                        <StackPanel Orientation="Horizontal" Spacing="16">
-                                            <TextBlock Text="• Min 8 characters" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}" />
-                                            <TextBlock Text="• Uppercase &amp; lowercase" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}" />
-                                            <TextBlock Text="• At least one number" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}" />
-                                            <TextBlock Text="• Special character recommended" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}" />
-                                        </StackPanel>
+                                        <ItemsControl>
+                                            <StackPanel Spacing="4">
+                                                <TextBlock Text="• Minimum 8 characters long" FontSize="12" Foreground="{StaticResource TextTertiaryBrush}" />
+                                                <TextBlock Text="• Mix of uppercase and lowercase letters" FontSize="12" Foreground="{StaticResource TextTertiaryBrush}" />
+                                                <TextBlock Text="• Include at least one number" FontSize="12" Foreground="{StaticResource TextTertiaryBrush}" />
+                                                <TextBlock Text="• Use a special character for extra security" FontSize="12" Foreground="{StaticResource TextTertiaryBrush}" />
+                                            </StackPanel>
+                                        </ItemsControl>
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
 
-                            <!-- Message -->
+                            <!-- Status Message -->
                             <Border x:Name="PasswordMessageBorder" Visibility="Collapsed"
-                                    BorderThickness="1" CornerRadius="6" Padding="12,10">
-                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    BorderThickness="1" CornerRadius="8" Padding="14,12"
+                                    MaxWidth="600" HorizontalAlignment="Left">
+                                <StackPanel Orientation="Horizontal" Spacing="12">
                                     <FontIcon x:Name="PasswordMessageIcon" Glyph="&#xE946;"
-                                              FontSize="13" VerticalAlignment="Top" Margin="0,1,0,0" />
+                                              FontSize="16" VerticalAlignment="Top" Margin="0,2,0,0" />
                                     <TextBlock x:Name="PasswordMessageText"
-                                               FontSize="12" TextWrapping="WrapWholeWords" />
+                                               FontSize="13" TextWrapping="WrapWholeWords" />
                                 </StackPanel>
                             </Border>
 
                             <!-- Actions -->
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
-                                <Button Style="{StaticResource GhostButtonStyle}" Content="Clear"
-                                        Click="OnClearPasswordFieldsClick" Padding="20,10" />
+                            <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,16,0,0">
                                 <Button Style="{StaticResource PrimaryButtonStyle}"
                                         Content="Update Password"
                                         Command="{Binding ChangePasswordCommand}"
-                                        Padding="24,10" />
+                                        Padding="32,12" FontSize="14" />
+                                <Button Style="{StaticResource GhostButtonStyle}" Content="Clear All"
+                                        Click="OnClearPasswordFieldsClick" Padding="20,12" />
                             </StackPanel>
-
                         </StackPanel>
                     </Border>
                 </StackPanel>
@@ -817,8 +806,8 @@
                                 <RowDefinition x:Name="AppLockGridDef2" Height="0" />
                             </Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition x:Name="AppLockCol1" Width="2*" />
-                                <ColumnDefinition x:Name="AppLockCol2" Width="3*" />
+                                <ColumnDefinition x:Name="AppLockCol1" Width="1.5*" />
+                                <ColumnDefinition x:Name="AppLockCol2" Width="3.5*" />
                             </Grid.ColumnDefinitions>
 
                             <StackPanel x:Name="AppLockTitleStack" Spacing="6">
