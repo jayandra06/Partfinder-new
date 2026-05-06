@@ -239,6 +239,7 @@ public sealed class MongoOrgUserDirectoryService : IOrgUserDirectoryService
             InvitedAtUtc = d.InvitedAtUtc,
             TemplatePermissions = d.TemplatePermissions,
             MasterDataPermissions = d.MasterDataPermissions,
+            Status = string.IsNullOrWhiteSpace(d.TemporaryPasswordHash) ? "Active" : "Pending",
         };
 
     private static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();

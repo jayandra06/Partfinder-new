@@ -798,13 +798,6 @@ public partial class SettingsViewModel : ViewModelBase
     private async Task ChangePasswordAsync(CancellationToken ct)
     {
         ChangePasswordMessage = string.Empty;
-        _session.Load();
-        if (!_session.HasSession || _session.AccessToken is null)
-        {
-            ChangePasswordMessage = "Sign in with your admin email and password first.";
-            return;
-        }
-
         if (string.IsNullOrWhiteSpace(ChangeCurrentPassword) ||
             string.IsNullOrWhiteSpace(ChangeNewPassword) ||
             string.IsNullOrWhiteSpace(ChangeConfirmPassword))
@@ -825,12 +818,23 @@ public partial class SettingsViewModel : ViewModelBase
             return;
         }
 
-        var (ok, err) = await AdminAuthApiClient.ChangePasswordAsync(
-                _session.AccessToken,
+        var orgCode = _setupContext.OrgCode?.Trim();
+        var email = _setupContext.AdminEmail?.Trim();
+
+        if (string.IsNullOrWhiteSpace(orgCode) || string.IsNullOrWhiteSpace(email))
+        {
+            ChangePasswordMessage = "Organization details are missing. Please complete setup first.";
+            return;
+        }
+
+        var (ok, err) = await SetupApiClient.ChangePasswordAsync(
+                orgCode,
+                email,
                 ChangeCurrentPassword,
                 ChangeNewPassword,
                 ct)
             .ConfigureAwait(true);
+
         if (!ok)
         {
             ChangePasswordMessage = err ?? "Could not change password.";

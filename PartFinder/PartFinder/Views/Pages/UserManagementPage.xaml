@@ -48,51 +48,6 @@
     </Page.Resources>
 
     <Grid Background="{StaticResource PageBackgroundBrush}">
-        <VisualStateManager.VisualStateGroups>
-            <VisualStateGroup x:Name="AdaptiveStates">
-                <VisualState x:Name="WideState">
-                    <VisualState.StateTriggers>
-                        <AdaptiveTrigger MinWindowWidth="1024" />
-                    </VisualState.StateTriggers>
-                </VisualState>
-                <VisualState x:Name="NarrowState">
-                    <VisualState.StateTriggers>
-                        <AdaptiveTrigger MinWindowWidth="0" />
-                    </VisualState.StateTriggers>
-                    <VisualState.Setters>
-                        <Setter Target="KpiGridDef2.Height" Value="Auto" />
-                        <Setter Target="KpiGridDef3.Height" Value="Auto" />
-                        <Setter Target="KpiGridDef4.Height" Value="Auto" />
-                        <Setter Target="KpiCol1.Width" Value="*" />
-                        <Setter Target="KpiCol2.Width" Value="0" />
-                        <Setter Target="KpiCol3.Width" Value="0" />
-                        <Setter Target="KpiCol4.Width" Value="0" />
-                        <Setter Target="Kpi1.(Grid.Row)" Value="0" />
-                        <Setter Target="Kpi1.(Grid.Column)" Value="0" />
-                        <Setter Target="Kpi2.(Grid.Row)" Value="1" />
-                        <Setter Target="Kpi2.(Grid.Column)" Value="0" />
-                        <Setter Target="Kpi3.(Grid.Row)" Value="2" />
-                        <Setter Target="Kpi3.(Grid.Column)" Value="0" />
-                        <Setter Target="Kpi4.(Grid.Row)" Value="3" />
-                        <Setter Target="Kpi4.(Grid.Column)" Value="0" />
-                        <Setter Target="KpiGrid.RowSpacing" Value="10" />
-                        
-                        <Setter Target="FilterGridDef2.Height" Value="Auto" />
-                        <Setter Target="FilterGridDef3.Height" Value="Auto" />
-                        <Setter Target="FilterCol1.Width" Value="*" />
-                        <Setter Target="FilterCol2.Width" Value="0" />
-                        <Setter Target="FilterCol3.Width" Value="0" />
-                        <Setter Target="FilterSearch.(Grid.Row)" Value="0" />
-                        <Setter Target="FilterSearch.(Grid.Column)" Value="0" />
-                        <Setter Target="FilterRole.(Grid.Row)" Value="1" />
-                        <Setter Target="FilterRole.(Grid.Column)" Value="0" />
-                        <Setter Target="FilterStatus.(Grid.Row)" Value="2" />
-                        <Setter Target="FilterStatus.(Grid.Column)" Value="0" />
-                        <Setter Target="FilterGrid.RowSpacing" Value="10" />
-                    </VisualState.Setters>
-                </VisualState>
-            </VisualStateGroup>
-        </VisualStateManager.VisualStateGroups>
 
         <!-- â”€â”€ Toast Popup â”€â”€ slide-up notification â”€â”€ -->
         <Border
@@ -122,7 +77,7 @@
             </StackPanel>
         </Border>
 
-        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel Padding="24,20,24,32" Spacing="20" HorizontalAlignment="Stretch">
                 <StackPanel.ChildrenTransitions>
                     <TransitionCollection>
@@ -159,84 +114,72 @@
                 </Grid>
 
                 <!-- â”€â”€ KPI Summary Cards â”€â”€ -->
-                <Grid x:Name="KpiGrid" ColumnSpacing="14">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition x:Name="KpiGridDef2" Height="0" />
-                        <RowDefinition x:Name="KpiGridDef3" Height="0" />
-                        <RowDefinition x:Name="KpiGridDef4" Height="0" />
-                    </Grid.RowDefinitions>
+                <Grid ColumnSpacing="14">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition x:Name="KpiCol1" Width="*" />
-                        <ColumnDefinition x:Name="KpiCol2" Width="*" />
-                        <ColumnDefinition x:Name="KpiCol3" Width="*" />
-                        <ColumnDefinition x:Name="KpiCol4" Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
                     <!-- Total users -->
-                    <Border x:Name="Kpi1" Grid.Column="0" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="14,12" Translation="0,0,32">
+                    <Border Grid.Column="0" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="14,12" Translation="0,0,32">
                             <Border.Shadow><ThemeShadow/></Border.Shadow>
                             <StackPanel Spacing="4">
                             <TextBlock Text="TOTAL USERS" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" />
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <FontIcon Glyph="&#xE77B;" FontSize="16" Foreground="{StaticResource AccentPrimaryBrush}" />
-                                <TextBlock Text="{Binding Users.Count}" FontSize="20" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding TotalUsersCount}" FontSize="20" FontWeight="SemiBold" />
                             </StackPanel>
                         </StackPanel>
                     </Border>
 
                     <!-- Active -->
-                    <Border x:Name="Kpi2" Grid.Column="1" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="14,12" Translation="0,0,32">
+                    <Border Grid.Column="1" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="14,12" Translation="0,0,32">
                             <Border.Shadow><ThemeShadow/></Border.Shadow>
                             <StackPanel Spacing="4">
                             <TextBlock Text="ACTIVE" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" />
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <Ellipse Width="8" Height="8" Fill="{StaticResource SuccessBrush}" VerticalAlignment="Center" />
-                                <TextBlock Text="{Binding Users.Count}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource SuccessBrush}" />
+                                <TextBlock Text="{Binding ActiveUsersCount}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource SuccessBrush}" />
                             </StackPanel>
                         </StackPanel>
                     </Border>
 
                     <!-- Admins -->
-                    <Border x:Name="Kpi3" Grid.Column="2" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="14,12" Translation="0,0,32">
+                    <Border Grid.Column="2" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="14,12" Translation="0,0,32">
                             <Border.Shadow><ThemeShadow/></Border.Shadow>
                             <StackPanel Spacing="4">
                             <TextBlock Text="ADMINS" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" />
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <FontIcon Glyph="&#xE7EF;" FontSize="16" Foreground="{StaticResource WarningBrush}" />
-                                <TextBlock Text="-" FontSize="20" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding AdminUsersCount}" FontSize="20" FontWeight="SemiBold" />
                             </StackPanel>
                         </StackPanel>
                     </Border>
 
                     <!-- Pending -->
-                    <Border x:Name="Kpi4" Grid.Column="3" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="14,12" Translation="0,0,32">
+                    <Border Grid.Column="3" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="14,12" Translation="0,0,32">
                             <Border.Shadow><ThemeShadow/></Border.Shadow>
                             <StackPanel Spacing="4">
                             <TextBlock Text="PENDING" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" />
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <FontIcon Glyph="&#xE823;" FontSize="16" Foreground="{StaticResource InfoBrush}" />
-                                <TextBlock Text="-" FontSize="20" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding PendingUsersCount}" FontSize="20" FontWeight="SemiBold" />
                             </StackPanel>
                         </StackPanel>
                     </Border>
                 </Grid>
 
                 <!-- â”€â”€ Search + Filters â”€â”€ -->
-                <Grid x:Name="FilterGrid" ColumnSpacing="10">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition x:Name="FilterGridDef2" Height="0" />
-                        <RowDefinition x:Name="FilterGridDef3" Height="0" />
-                    </Grid.RowDefinitions>
+                <Grid ColumnSpacing="10">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition x:Name="FilterCol1" Width="*" />
-                        <ColumnDefinition x:Name="FilterCol2" Width="140" />
-                        <ColumnDefinition x:Name="FilterCol3" Width="140" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="140" />
+                        <ColumnDefinition Width="140" />
                     </Grid.ColumnDefinitions>
 
                     <Border
-                        x:Name="FilterSearch"
                         Grid.Column="0"
                         CornerRadius="8"
                         Background="{StaticResource CardBackgroundBrush}"
@@ -263,14 +206,13 @@
                             </Grid>
                     </Border>
 
-                    <ComboBox x:Name="FilterRole" Grid.Column="1" HorizontalAlignment="Stretch" FontSize="12"
+                    <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" FontSize="12"
                               ItemsSource="{Binding RoleFilters}"
                               SelectedItem="{Binding SelectedRoleFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <ComboBox x:Name="FilterStatus" Grid.Column="2" PlaceholderText="All Status" HorizontalAlignment="Stretch" FontSize="12">
-                        <ComboBoxItem Content="Active" />
-                        <ComboBoxItem Content="Pending" />
-                    </ComboBox>
+                    <ComboBox Grid.Column="2" HorizontalAlignment="Stretch" FontSize="12"
+                              ItemsSource="{Binding StatusFilters}"
+                              SelectedItem="{Binding SelectedStatusFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                 </Grid>
 
                 <!-- â”€â”€ Status + Loading â”€â”€ -->

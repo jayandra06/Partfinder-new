@@ -5,6 +5,7 @@ import { SetupInviteUserDto } from './dto/setup-invite-user.dto';
 import { SetupOrgAdminDto } from './dto/setup-org-admin.dto';
 import { SetupOrgCodeDto } from './dto/setup-org-code.dto';
 import { SetupTestDatabaseDto } from './dto/setup-test-database.dto';
+import { SetupChangePasswordDto } from './dto/setup-change-password.dto';
 import { SetupService } from './setup.service';
 
 /** Public endpoints for PartFinder desktop setup wizard (org code is the shared secret). */
@@ -45,5 +46,10 @@ export class SetupController {
   @Post('invite-login')
   inviteLogin(@Body() dto: SetupInviteLoginDto) {
     return this.setupService.validateInviteLogin(dto);
+  }
+
+  @Post('change-password')
+  changePassword(@Body() dto: SetupChangePasswordDto) {
+    return this.setupService.changePassword(dto);
   }
 }

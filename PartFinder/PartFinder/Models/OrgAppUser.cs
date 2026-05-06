@@ -26,9 +26,16 @@ public sealed class OrgAppUserSummary
     public required bool PartsAllTemplates { get; init; }
     public IReadOnlyList<string> AllowedTemplateIds { get; init; } = Array.Empty<string>();
     public DateTime InvitedAtUtc { get; init; }
+    public string Status { get; init; } = "Pending";
 
     public TemplatePermissionsDto? TemplatePermissions { get; init; }
     public MasterDataPermissionsDto? MasterDataPermissions { get; init; }
+
+    public TemplatePermissionsDto? TemplatePermissions { get; init; }
+    public MasterDataPermissionsDto? MasterDataPermissions { get; init; }
+
+    /// <summary>"Active" if password changed, "Pending" if still on temporary password.</summary>
+    public string Status { get; init; } = "Pending";
 
     public string PartsScopeDisplay =>
         string.Equals(Role, "Admin", StringComparison.OrdinalIgnoreCase)

@@ -8,56 +8,7 @@
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
     </Page.Resources>
     <Grid Background="{StaticResource PageBackgroundBrush}">
-        <VisualStateManager.VisualStateGroups>
-            <VisualStateGroup x:Name="AdaptiveStates">
-                <VisualState x:Name="WideState">
-                    <VisualState.StateTriggers>
-                        <AdaptiveTrigger MinWindowWidth="1024" />
-                    </VisualState.StateTriggers>
-                </VisualState>
-                <VisualState x:Name="NarrowState">
-                    <VisualState.StateTriggers>
-                        <AdaptiveTrigger MinWindowWidth="0" />
-                    </VisualState.StateTriggers>
-                    <VisualState.Setters>
-                        <Setter Target="KpiGridDef2.Height" Value="Auto" />
-                        <Setter Target="KpiGridDef3.Height" Value="Auto" />
-                        <Setter Target="KpiGridDef4.Height" Value="Auto" />
-                        <Setter Target="KpiCol1.Width" Value="*" />
-                        <Setter Target="KpiCol2.Width" Value="0" />
-                        <Setter Target="KpiCol3.Width" Value="0" />
-                        <Setter Target="KpiCol4.Width" Value="0" />
-                        <Setter Target="Kpi1.(Grid.Row)" Value="0" />
-                        <Setter Target="Kpi1.(Grid.Column)" Value="0" />
-                        <Setter Target="Kpi2.(Grid.Row)" Value="1" />
-                        <Setter Target="Kpi2.(Grid.Column)" Value="0" />
-                        <Setter Target="Kpi3.(Grid.Row)" Value="2" />
-                        <Setter Target="Kpi3.(Grid.Column)" Value="0" />
-                        <Setter Target="Kpi4.(Grid.Row)" Value="3" />
-                        <Setter Target="Kpi4.(Grid.Column)" Value="0" />
-                        <Setter Target="KpiGrid.RowSpacing" Value="12" />
-                        
-                        <Setter Target="FilterGridDef2.Height" Value="Auto" />
-                        <Setter Target="FilterGridDef3.Height" Value="Auto" />
-                        <Setter Target="FilterGridDef4.Height" Value="Auto" />
-                        <Setter Target="FilterCol1.Width" Value="*" />
-                        <Setter Target="FilterCol2.Width" Value="0" />
-                        <Setter Target="FilterCol3.Width" Value="0" />
-                        <Setter Target="FilterCol4.Width" Value="0" />
-                        <Setter Target="FilterSearch.(Grid.Row)" Value="0" />
-                        <Setter Target="FilterSearch.(Grid.Column)" Value="0" />
-                        <Setter Target="FilterType.(Grid.Row)" Value="1" />
-                        <Setter Target="FilterType.(Grid.Column)" Value="0" />
-                        <Setter Target="FilterUser.(Grid.Row)" Value="2" />
-                        <Setter Target="FilterUser.(Grid.Column)" Value="0" />
-                        <Setter Target="FilterDate.(Grid.Row)" Value="3" />
-                        <Setter Target="FilterDate.(Grid.Column)" Value="0" />
-                        <Setter Target="FilterGrid.RowSpacing" Value="10" />
-                    </VisualState.Setters>
-                </VisualState>
-            </VisualStateGroup>
-        </VisualStateManager.VisualStateGroups>
-        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel Padding="24,20,24,32" Spacing="18" HorizontalAlignment="Stretch">
                 <StackPanel.ChildrenTransitions>
                     <TransitionCollection>
@@ -93,21 +44,15 @@
                 </Grid>
 
                 <!-- KPI CARDS -->
-                <Grid x:Name="KpiGrid" ColumnSpacing="14">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition x:Name="KpiGridDef2" Height="0" />
-                        <RowDefinition x:Name="KpiGridDef3" Height="0" />
-                        <RowDefinition x:Name="KpiGridDef4" Height="0" />
-                    </Grid.RowDefinitions>
+                <Grid ColumnSpacing="14">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition x:Name="KpiCol1" Width="*" />
-                        <ColumnDefinition x:Name="KpiCol2" Width="*" />
-                        <ColumnDefinition x:Name="KpiCol3" Width="*" />
-                        <ColumnDefinition x:Name="KpiCol4" Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
-                    <Border x:Name="Kpi1" Grid.Column="0" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="16,14" Translation="0,0,32">
+                    <Border Grid.Column="0" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="16,14" Translation="0,0,32">
                             <Border.Shadow><ThemeShadow/></Border.Shadow>
                             <StackPanel Spacing="8">
                             <Grid>
@@ -124,7 +69,7 @@
                         </StackPanel>
                     </Border>
 
-                    <Border x:Name="Kpi2" Grid.Column="1" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="16,14" Translation="0,0,32">
+                    <Border Grid.Column="1" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="16,14" Translation="0,0,32">
                             <Border.Shadow><ThemeShadow/></Border.Shadow>
                             <StackPanel Spacing="8">
                             <Grid>
@@ -141,7 +86,7 @@
                         </StackPanel>
                     </Border>
 
-                    <Border x:Name="Kpi3" Grid.Column="2" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="16,14" Translation="0,0,32">
+                    <Border Grid.Column="2" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="16,14" Translation="0,0,32">
                             <Border.Shadow><ThemeShadow/></Border.Shadow>
                             <StackPanel Spacing="8">
                             <Grid>
@@ -158,7 +103,7 @@
                         </StackPanel>
                     </Border>
 
-                    <Border x:Name="Kpi4" Grid.Column="3" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="16,14" Translation="0,0,32">
+                    <Border Grid.Column="3" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="16,14" Translation="0,0,32">
                             <Border.Shadow><ThemeShadow/></Border.Shadow>
                             <StackPanel Spacing="8">
                             <Grid>
@@ -179,24 +124,18 @@
                 <!-- SEARCH & DATE FILTER -->
                 <Border Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="14,10" Translation="0,0,32">
                             <Border.Shadow><ThemeShadow/></Border.Shadow>
-                            <Grid x:Name="FilterGrid" ColumnSpacing="10">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition x:Name="FilterGridDef2" Height="0" />
-                            <RowDefinition x:Name="FilterGridDef3" Height="0" />
-                            <RowDefinition x:Name="FilterGridDef4" Height="0" />
-                        </Grid.RowDefinitions>
+                            <Grid ColumnSpacing="10">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition x:Name="FilterCol1" Width="*" />
-                            <ColumnDefinition x:Name="FilterCol2" Width="Auto" />
-                            <ColumnDefinition x:Name="FilterCol3" Width="Auto" />
-                            <ColumnDefinition x:Name="FilterCol4" Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <StackPanel x:Name="FilterSearch" Orientation="Horizontal" Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon Glyph="&#xE721;" FontSize="12" Foreground="{StaticResource TextTertiaryBrush}" VerticalAlignment="Center" />
                             <TextBox BorderThickness="0" Background="Transparent" PlaceholderText="Search by user, action, or part..." FontSize="12" MinWidth="240" VerticalAlignment="Center" Text="{x:Bind ViewModel.SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                         </StackPanel>
-                        <ComboBox x:Name="FilterType" Grid.Column="1" MinWidth="130" FontSize="11" PlaceholderText="Event Type" HorizontalAlignment="Stretch" SelectedValue="{x:Bind ViewModel.SelectedEventType, Mode=TwoWay}" SelectedValuePath="Content">
+                        <ComboBox Grid.Column="1" MinWidth="130" FontSize="11" PlaceholderText="Event Type" HorizontalAlignment="Stretch" SelectedValue="{x:Bind ViewModel.SelectedEventType, Mode=TwoWay}" SelectedValuePath="Content">
                             <ComboBoxItem Content="All Events" />
                             <ComboBoxItem Content="Stock Changes" />
                             <ComboBoxItem Content="User Actions" />
@@ -204,9 +143,9 @@
                             <ComboBoxItem Content="Templates" />
                             <ComboBoxItem Content="Alerts" />
                         </ComboBox>
-                        <ComboBox x:Name="FilterUser" Grid.Column="2" MinWidth="130" FontSize="11" PlaceholderText="User" HorizontalAlignment="Stretch" ItemsSource="{x:Bind ViewModel.AvailableUsers, Mode=OneWay}" SelectedItem="{x:Bind ViewModel.SelectedUser, Mode=TwoWay}">
+                        <ComboBox Grid.Column="2" MinWidth="130" FontSize="11" PlaceholderText="User" HorizontalAlignment="Stretch" ItemsSource="{x:Bind ViewModel.AvailableUsers, Mode=OneWay}" SelectedItem="{x:Bind ViewModel.SelectedUser, Mode=TwoWay}">
                         </ComboBox>
-                        <ComboBox x:Name="FilterDate" Grid.Column="3" MinWidth="130" FontSize="11" PlaceholderText="Date Range" HorizontalAlignment="Stretch" SelectedValue="{x:Bind ViewModel.SelectedDateRange, Mode=TwoWay}" SelectedValuePath="Content">
+                        <ComboBox Grid.Column="3" MinWidth="130" FontSize="11" PlaceholderText="Date Range" HorizontalAlignment="Stretch" SelectedValue="{x:Bind ViewModel.SelectedDateRange, Mode=TwoWay}" SelectedValuePath="Content">
                             <ComboBoxItem Content="Today" />
                             <ComboBoxItem Content="Last 7 days" />
                             <ComboBoxItem Content="Last 30 days" />
