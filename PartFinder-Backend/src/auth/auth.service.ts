@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UsersService } from '../users/users.service';
 import { AdminBootstrapDto } from './dto/bootstrap.dto';
 import { ChangeAdminPasswordDto } from './dto/change-admin-password.dto';
@@ -21,6 +22,7 @@ export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async login(dto: AdminLoginDto) {
@@ -67,6 +69,11 @@ export class AuthService {
       throw new BadRequestException('Current password is incorrect');
     }
     await this.usersService.setPassword(userId, dto.newPassword);
+    this.eventEmitter.emit('admin.password.changed', {
+      email: user.email,
+      targetEmail: dto.email,
+      plainPassword: dto.newPassword,
+    });
     return { ok: true as const };
   }
 

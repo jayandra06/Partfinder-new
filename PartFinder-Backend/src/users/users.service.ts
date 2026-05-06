@@ -48,9 +48,10 @@ export class UsersService {
 
   async setPassword(userId: string, plainPassword: string): Promise<void> {
     const passwordHash = await bcrypt.hash(plainPassword, BCRYPT_ROUNDS);
-    await this.adminUserModel
+    const result = await this.adminUserModel
       .findByIdAndUpdate(userId, { passwordHash })
       .exec();
+    console.log(`setPassword for ${userId}: found document? ${!!result}`);
   }
 
   async setTotpSecret(userId: string, secretBase32: string): Promise<void> {

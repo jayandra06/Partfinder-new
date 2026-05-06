@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { pbkdf2Sync, randomBytes, timingSafeEqual } from 'crypto';
@@ -19,6 +20,7 @@ import { SetupCustomDatabaseDto } from './dto/setup-custom-database.dto';
 import { SetupInviteLoginDto } from './dto/setup-invite-login.dto';
 import { SetupInviteUserDto } from './dto/setup-invite-user.dto';
 import { SetupOrgAdminDto } from './dto/setup-org-admin.dto';
+import { SetupChangePasswordDto } from './dto/setup-change-password.dto';
 import { replaceMongoDatabasePath } from './org-database-uri.util';
 import { TenantMongoService } from './tenant-mongo.service';
 import { CasbinService } from '../casbin/casbin.service';
@@ -34,6 +36,57 @@ export class SetupService {
     private readonly config: ConfigService,
     private readonly casbin: CasbinService,
   ) {}
+
+  @OnEvent('admin.password.changed')
+  async handleAdminPasswordChanged(payload: { email: string; targetEmail?: string; plainPassword: string }) {
+    console.log(`[handleAdminPasswordChanged] Received event for email: ${payload.email}, targetEmail: ${payload.targetEmail}`);
+    try {
+      const orgs = await this.orgs.findAll();
+      console.log(`[handleAdminPasswordChanged] Found ${orgs.length} organizations in total.`);
+      const emailLower = payload.email.toLowerCase().trim();
+      const targetEmailLower = payload.targetEmail ? payload.targetEmail.toLowerCase().trim() : '';
+      const emailsToUpdate = [emailLower];
+      if (targetEmailLower && targetEmailLower !== emailLower) {
+        emailsToUpdate.push(targetEmailLower);
+      }
+
+      const passwordHash = await bcrypt.hash(payload.plainPassword, BCRYPT_ROUNDS);
+      const pbkdf2HashString = this.hashTemporaryPassword(payload.plainPassword);
+
+      for (const org of orgs) {
+        if (!org.orgDatabaseUri) {
+          console.log(`[handleAdminPasswordChanged] Org ${org.orgCode} has no database URI. Skipping.`);
+          continue;
+        }
+        try {
+          console.log(`[handleAdminPasswordChanged] Syncing to Org: ${org.orgCode} with DB URI: ${org.orgDatabaseUri}`);
+          const conn = await this.tenant.getConnection(org.orgDatabaseUri);
+
+          for (const emailToUpdate of emailsToUpdate) {
+            // Update OrgAdmin
+            const adminColl = this.tenant.orgAdminCollection(conn);
+            const adminResult = await adminColl.updateOne(
+              { email: emailToUpdate },
+              { $set: { passwordHash } }
+            );
+            console.log(`[handleAdminPasswordChanged] OrgAdmin update for ${org.orgCode} (${emailToUpdate}): matchedCount = ${adminResult.matchedCount}, modifiedCount = ${adminResult.modifiedCount}`);
+
+            // Update OrgAppUser
+            const userColl = this.tenant.orgAppUsersCollection(conn);
+            const userResult = await userColl.updateOne(
+              { emailNormalized: emailToUpdate },
+              { $set: { temporaryPasswordHash: pbkdf2HashString } }
+            );
+            console.log(`[handleAdminPasswordChanged] OrgAppUser update for ${org.orgCode} (${emailToUpdate}): matchedCount = ${userResult.matchedCount}, modifiedCount = ${userResult.modifiedCount}`);
+          }
+        } catch (e) {
+          console.error(`[handleAdminPasswordChanged] Failed to sync password for tenant ${org.orgCode}`, e);
+        }
+      }
+    } catch (err) {
+      console.error(`[handleAdminPasswordChanged] Critical error in handler:`, err);
+    }
+  }
 
   private async loadLicensedOrg(orgCode: string) {
     const v = await this.orgs.verifyLicense(orgCode);
@@ -453,5 +506,67 @@ export class SetupService {
       const msg = e instanceof Error ? e.message : 'Failed to send invite email.';
       return { sent: false, error: msg };
     }
+  }
+
+  async changePassword(dto: SetupChangePasswordDto) {
+    await this.loadLicensedOrg(dto.orgCode);
+    const org = await this.orgs.findByOrgCode(dto.orgCode);
+    if (!org?.orgDatabaseUri?.trim()) {
+      throw new BadRequestException('Organization database is not configured yet.');
+    }
+
+    const uri = org.orgDatabaseUri.trim();
+    const conn = await this.tenant.getConnection(uri);
+    const emailLower = dto.email.trim().toLowerCase();
+
+    // Try OrgAdmin first
+    const adminColl = this.tenant.orgAdminCollection(conn);
+    const orgAdmin = await adminColl.findOne({ email: emailLower });
+
+    let verified = false;
+    let isAppUser = false;
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, BCRYPT_ROUNDS);
+    const pbkdf2HashString = this.hashTemporaryPassword(dto.newPassword);
+
+    if (orgAdmin) {
+      if (typeof orgAdmin.passwordHash === 'string' && orgAdmin.passwordHash) {
+        verified = await bcrypt.compare(dto.currentPassword, orgAdmin.passwordHash);
+      }
+    }
+
+    // Try OrgAppUser if not verified or not found in OrgAdmin
+    let userColl: any;
+    let orgUser: any;
+    if (!verified) {
+      userColl = this.tenant.orgAppUsersCollection(conn);
+      orgUser = await userColl.findOne({ emailNormalized: emailLower });
+      if (orgUser) {
+        const storedHash = typeof orgUser.temporaryPasswordHash === 'string' ? orgUser.temporaryPasswordHash : '';
+        verified = this.verifyTemporaryPassword(dto.currentPassword, storedHash);
+        isAppUser = true;
+      }
+    }
+
+    if (!verified) {
+      throw new BadRequestException('Current password is incorrect.');
+    }
+
+    // Update password
+    if (orgAdmin) {
+      await adminColl.updateOne(
+        { email: emailLower },
+        { $set: { passwordHash } }
+      );
+    }
+
+    if (isAppUser && userColl) {
+      await userColl.updateOne(
+        { emailNormalized: emailLower },
+        { $set: { temporaryPasswordHash: pbkdf2HashString } }
+      );
+    }
+
+    return { ok: true as const };
   }
 }
