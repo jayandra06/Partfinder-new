@@ -315,6 +315,32 @@ public static class SetupApiClient
         return (false, err ?? ParseApiError(text), null);
     }
 
+    public static async Task<(bool ok, string? error)> ChangePasswordAsync(
+        string orgCode,
+        string email,
+        string currentPassword,
+        string newPassword,
+        CancellationToken ct = default)
+    {
+        var (success, err, text) = await RawPostAsync(
+            "/api/public/setup/change-password",
+            new
+            {
+                orgCode,
+                email,
+                currentPassword,
+                newPassword,
+            },
+            ct).ConfigureAwait(true);
+
+        if (!success)
+        {
+            return (false, err ?? ParseApiError(text));
+        }
+
+        return (true, null);
+    }
+
     private static async Task<T?> PostBodyAsync<T>(string path, object body, CancellationToken ct)
         where T : class
     {

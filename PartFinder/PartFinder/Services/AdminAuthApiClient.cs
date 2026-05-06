@@ -80,6 +80,7 @@ public sealed class AdminAuthApiClient
         string bearerToken,
         string currentPassword,
         string newPassword,
+        string? email = null,
         CancellationToken ct = default)
     {
         // Security: validate token shape before use
@@ -90,7 +91,7 @@ public sealed class AdminAuthApiClient
 
         var (success, err, text) = await RawPostAsync(
             "/api/auth/admin/change-password",
-            new { currentPassword, newPassword },
+            new { currentPassword, newPassword, email },
             bearerToken,
             ct).ConfigureAwait(true);
         if (!success)
