@@ -13,6 +13,26 @@
         <converters:InvertedBoolToVisibilityConverter x:Key="InvertedBoolToVisibilityConverter" />
     </UserControl.Resources>
     <Grid Background="{ThemeResource AppBackgroundBrush}">
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:Name="AdaptiveStates">
+                <VisualState x:Name="WideState">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="1024" />
+                    </VisualState.StateTriggers>
+                </VisualState>
+                <VisualState x:Name="NarrowState">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="0" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="SidebarColumn.Width" Value="56" />
+                        <Setter Target="SidebarRoot.Padding" Value="8" />
+                        <!-- We could also trigger the viewmodel property if we had access, but setter is safer for UI -->
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
+
         <Grid.ColumnDefinitions>
             <ColumnDefinition x:Name="SidebarColumn" Width="240" MinWidth="56" />
             <ColumnDefinition Width="*" />
