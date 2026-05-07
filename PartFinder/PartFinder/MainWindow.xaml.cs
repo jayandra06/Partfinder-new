@@ -428,6 +428,14 @@ public sealed partial class MainWindow : Window
         OrgCodeBox.Text = "";
         InviteLoginEmailBox.Text = "";
         InviteLoginPasswordBox.Password = "";
+        InviteLoginPasswordBox.PasswordRevealMode = Microsoft.UI.Xaml.Controls.PasswordRevealMode.Hidden;
+        if (InviteLoginPasswordRevealIcon != null) InviteLoginPasswordRevealIcon.Glyph = "\uE890";
+        if (CurrentPasswordBox != null) CurrentPasswordBox.PasswordRevealMode = Microsoft.UI.Xaml.Controls.PasswordRevealMode.Hidden;
+        if (SetupCurrentPasswordRevealIcon != null) SetupCurrentPasswordRevealIcon.Glyph = "\uE890";
+        if (NewPasswordBox != null) NewPasswordBox.PasswordRevealMode = Microsoft.UI.Xaml.Controls.PasswordRevealMode.Hidden;
+        if (SetupNewPasswordRevealIcon != null) SetupNewPasswordRevealIcon.Glyph = "\uE890";
+        if (ConfirmPasswordBox != null) ConfirmPasswordBox.PasswordRevealMode = Microsoft.UI.Xaml.Controls.PasswordRevealMode.Hidden;
+        if (SetupConfirmPasswordRevealIcon != null) SetupConfirmPasswordRevealIcon.Glyph = "\uE890";
         ValidationText.Text = "";
         LicenseSummaryPanel.Visibility = Visibility.Collapsed;
         UpdateStepUi();
@@ -1071,6 +1079,62 @@ public sealed partial class MainWindow : Window
             circleText.Text       = stepNum.ToString();
             circleText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 123, 141, 168));
             label.Opacity         = 0.4;
+        }
+    }
+
+    private void OnInviteLoginPasswordRevealClick(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        if (InviteLoginPasswordBox.PasswordRevealMode == Microsoft.UI.Xaml.Controls.PasswordRevealMode.Hidden)
+        {
+            InviteLoginPasswordBox.PasswordRevealMode = Microsoft.UI.Xaml.Controls.PasswordRevealMode.Visible;
+            InviteLoginPasswordRevealIcon.Glyph = "\uF22B";
+        }
+        else
+        {
+            InviteLoginPasswordBox.PasswordRevealMode = Microsoft.UI.Xaml.Controls.PasswordRevealMode.Hidden;
+            InviteLoginPasswordRevealIcon.Glyph = "\uE890";
+        }
+    }
+
+    private void OnSetupCurrentPasswordRevealClick(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        if (CurrentPasswordBox.PasswordRevealMode == Microsoft.UI.Xaml.Controls.PasswordRevealMode.Hidden)
+        {
+            CurrentPasswordBox.PasswordRevealMode = Microsoft.UI.Xaml.Controls.PasswordRevealMode.Visible;
+            SetupCurrentPasswordRevealIcon.Glyph = "\uF22B";
+        }
+        else
+        {
+            CurrentPasswordBox.PasswordRevealMode = Microsoft.UI.Xaml.Controls.PasswordRevealMode.Hidden;
+            SetupCurrentPasswordRevealIcon.Glyph = "\uE890";
+        }
+    }
+
+    private void OnSetupNewPasswordRevealClick(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        if (NewPasswordBox.PasswordRevealMode == Microsoft.UI.Xaml.Controls.PasswordRevealMode.Hidden)
+        {
+            NewPasswordBox.PasswordRevealMode = Microsoft.UI.Xaml.Controls.PasswordRevealMode.Visible;
+            SetupNewPasswordRevealIcon.Glyph = "\uF22B";
+        }
+        else
+        {
+            NewPasswordBox.PasswordRevealMode = Microsoft.UI.Xaml.Controls.PasswordRevealMode.Hidden;
+            SetupNewPasswordRevealIcon.Glyph = "\uE890";
+        }
+    }
+
+    private void OnSetupConfirmPasswordRevealClick(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        if (ConfirmPasswordBox.PasswordRevealMode == Microsoft.UI.Xaml.Controls.PasswordRevealMode.Hidden)
+        {
+            ConfirmPasswordBox.PasswordRevealMode = Microsoft.UI.Xaml.Controls.PasswordRevealMode.Visible;
+            SetupConfirmPasswordRevealIcon.Glyph = "\uF22B";
+        }
+        else
+        {
+            ConfirmPasswordBox.PasswordRevealMode = Microsoft.UI.Xaml.Controls.PasswordRevealMode.Hidden;
+            SetupConfirmPasswordRevealIcon.Glyph = "\uE890";
         }
     }
 
