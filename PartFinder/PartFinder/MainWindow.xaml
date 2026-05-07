@@ -819,11 +819,26 @@
                                             Margin="0,0,0,16" />
 
                                         <TextBlock Text="PASSWORD" Style="{StaticResource FieldLabelStyle}" />
-                                        <PasswordBox
-                                            x:Name="InviteLoginPasswordBox"
-                                            PlaceholderText="Enter password"
-                                            Style="{StaticResource DarkPasswordStyle}"
-                                            Margin="0,0,0,0" />
+                                        <Grid>
+                                             <PasswordBox
+                                                 x:Name="InviteLoginPasswordBox"
+                                                 PlaceholderText="Enter password"
+                                                 Style="{StaticResource DarkPasswordStyle}"
+                                                 PasswordRevealMode="Hidden"
+                                                 Margin="0,0,0,0" />
+                                             <Button x:Name="InviteLoginPasswordRevealButton"
+                                                     Click="OnInviteLoginPasswordRevealClick"
+                                                     Style="{StaticResource GhostButtonStyle}"
+                                                     BorderThickness="0"
+                                                     Background="Transparent"
+                                                     Width="36" Height="36"
+                                                     HorizontalAlignment="Right"
+                                                     VerticalAlignment="Center"
+                                                     Margin="0,0,4,0"
+                                                     Padding="0">
+                                                 <FontIcon x:Name="InviteLoginPasswordRevealIcon" Glyph="&#xE890;" FontSize="14" Foreground="#7B8DA8" />
+                                             </Button>
+                                         </Grid>
                                     </StackPanel>
 
                                     <!-- ========================= -->
@@ -923,26 +938,71 @@
                                         </Border>
 
                                         <TextBlock Text="CURRENT TEMPORARY PASSWORD" Style="{StaticResource FieldLabelStyle}" />
-                                        <PasswordBox
-                                            x:Name="CurrentPasswordBox"
-                                            PlaceholderText="Enter temporary password"
-                                            Style="{StaticResource DarkPasswordStyle}"
-                                            Margin="0,0,0,16" />
+                                        <Grid Margin="0,0,0,16">
+                                             <PasswordBox
+                                                 x:Name="CurrentPasswordBox"
+                                                 PlaceholderText="Enter temporary password"
+                                                 Style="{StaticResource DarkPasswordStyle}"
+                                                 PasswordRevealMode="Hidden"
+                                                 Margin="0,0,0,0" />
+                                             <Button x:Name="SetupCurrentPasswordRevealButton"
+                                                     Click="OnSetupCurrentPasswordRevealClick"
+                                                     Style="{StaticResource GhostButtonStyle}"
+                                                     BorderThickness="0"
+                                                     Background="Transparent"
+                                                     Width="36" Height="36"
+                                                     HorizontalAlignment="Right"
+                                                     VerticalAlignment="Center"
+                                                     Margin="0,0,4,0"
+                                                     Padding="0">
+                                                 <FontIcon x:Name="SetupCurrentPasswordRevealIcon" Glyph="&#xE890;" FontSize="14" Foreground="#7B8DA8" />
+                                             </Button>
+                                         </Grid>
 
                                         <TextBlock Text="NEW PASSWORD" Style="{StaticResource FieldLabelStyle}" />
-                                        <PasswordBox
-                                            x:Name="NewPasswordBox"
-                                            PlaceholderText="Create a strong password"
-                                            PasswordChanged="OnAdminPasswordChanged"
-                                            Style="{StaticResource DarkPasswordStyle}"
-                                            Margin="0,0,0,16" />
+                                        <Grid Margin="0,0,0,16">
+                                             <PasswordBox
+                                                 x:Name="NewPasswordBox"
+                                                 PlaceholderText="Create a strong password"
+                                                 PasswordChanged="OnAdminPasswordChanged"
+                                                 Style="{StaticResource DarkPasswordStyle}"
+                                                 PasswordRevealMode="Hidden"
+                                                 Margin="0,0,0,0" />
+                                             <Button x:Name="SetupNewPasswordRevealButton"
+                                                     Click="OnSetupNewPasswordRevealClick"
+                                                     Style="{StaticResource GhostButtonStyle}"
+                                                     BorderThickness="0"
+                                                     Background="Transparent"
+                                                     Width="36" Height="36"
+                                                     HorizontalAlignment="Right"
+                                                     VerticalAlignment="Center"
+                                                     Margin="0,0,4,0"
+                                                     Padding="0">
+                                                 <FontIcon x:Name="SetupNewPasswordRevealIcon" Glyph="&#xE890;" FontSize="14" Foreground="#7B8DA8" />
+                                             </Button>
+                                         </Grid>
 
                                         <TextBlock Text="CONFIRM NEW PASSWORD" Style="{StaticResource FieldLabelStyle}" />
-                                        <PasswordBox
-                                            x:Name="ConfirmPasswordBox"
-                                            PlaceholderText="Repeat new password"
-                                            Style="{StaticResource DarkPasswordStyle}"
-                                            Margin="0,0,0,12" />
+                                        <Grid Margin="0,0,0,12">
+                                             <PasswordBox
+                                                 x:Name="ConfirmPasswordBox"
+                                                 PlaceholderText="Repeat new password"
+                                                 Style="{StaticResource DarkPasswordStyle}"
+                                                 PasswordRevealMode="Hidden"
+                                                 Margin="0,0,0,0" />
+                                             <Button x:Name="SetupConfirmPasswordRevealButton"
+                                                     Click="OnSetupConfirmPasswordRevealClick"
+                                                     Style="{StaticResource GhostButtonStyle}"
+                                                     BorderThickness="0"
+                                                     Background="Transparent"
+                                                     Width="36" Height="36"
+                                                     HorizontalAlignment="Right"
+                                                     VerticalAlignment="Center"
+                                                     Margin="0,0,4,0"
+                                                     Padding="0">
+                                                 <FontIcon x:Name="SetupConfirmPasswordRevealIcon" Glyph="&#xE890;" FontSize="14" Foreground="#7B8DA8" />
+                                             </Button>
+                                         </Grid>
 
                                         <!-- Password hint -->
                                         <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,0">
