@@ -1,10 +1,11 @@
-﻿<Page
+<Page
     x:Class="PartFinder.Views.Pages.QrCodeManagerPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:converters="using:PartFinder.Converters">
     <Page.Resources>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+        <converters:InvertedBoolToVisibilityConverter x:Key="InvertedBoolToVisibilityConverter" />
 
         <!-- Utilitarian Panel Style -->
         <Style x:Key="TechPanelStyle" TargetType="Border">
@@ -38,7 +39,7 @@
         </Grid.Transitions>
 
         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel Padding="32,24,32,40" Spacing="24" HorizontalAlignment="Stretch" MaxWidth="1400">
+            <StackPanel Padding="32,24,48,40" Spacing="24" HorizontalAlignment="Stretch">
 
                 <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
                 <!-- HEADER (Industrial style)                  -->
@@ -87,14 +88,14 @@
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
-                    <Border Grid.Column="0" Style="{StaticResource TechPanelStyle}">
+                    <Border Grid.Column="0" Style="{StaticResource TechPanelStyle}" MinHeight="100">
                         <StackPanel Spacing="8">
                             <TextBlock Text="ACTIVE_TEMPLATE" Style="{StaticResource TechLabelStyle}" />
                             <TextBlock Text="{Binding SelectedTemplate.Name, FallbackValue='NO_TEMPLATE_SELECTED'}" Style="{StaticResource TechValueStyle}" FontSize="18" Foreground="{StaticResource AccentPrimaryBrush}" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
                     </Border>
 
-                    <Border Grid.Column="1" Style="{StaticResource TechPanelStyle}">
+                    <Border Grid.Column="1" Style="{StaticResource TechPanelStyle}" MinHeight="100">
                         <StackPanel Spacing="8">
                             <TextBlock Text="DATA_ROWS" Style="{StaticResource TechLabelStyle}" />
                             <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
@@ -104,7 +105,7 @@
                         </StackPanel>
                     </Border>
 
-                    <Border Grid.Column="2" Style="{StaticResource TechPanelStyle}">
+                    <Border Grid.Column="2" Style="{StaticResource TechPanelStyle}" MinHeight="100">
                         <StackPanel Spacing="8">
                             <TextBlock Text="MATRICES_GENERATED" Style="{StaticResource TechLabelStyle}" />
                             <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
@@ -114,7 +115,7 @@
                         </StackPanel>
                     </Border>
 
-                    <Border Grid.Column="3" Style="{StaticResource TechPanelStyle}">
+                    <Border Grid.Column="3" Style="{StaticResource TechPanelStyle}" MinHeight="100">
                         <StackPanel Spacing="8">
                             <TextBlock Text="SYSTEM_STATE" Style="{StaticResource TechLabelStyle}" />
                             <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="0,4,0,0">
@@ -130,24 +131,28 @@
                 <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
                 <!-- CONFIGURATION ROUTING                       -->
                 <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-                <Border Style="{StaticResource TechPanelStyle}" Padding="16,12">
+                <Border Style="{StaticResource TechPanelStyle}" Padding="16,10" Background="{StaticResource ElevatedCardBackgroundBrush}">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="SCHEMA_SOURCE:" Style="{StaticResource TechLabelStyle}" VerticalAlignment="Center" Margin="0,0,16,0" Foreground="{StaticResource AccentPrimaryBrush}" />
+                        <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,16,0">
+                            <FontIcon Glyph="&#xE81D;" FontSize="14" Foreground="{StaticResource AccentPrimaryBrush}" VerticalAlignment="Center" />
+                            <TextBlock Text="SCHEMA_SOURCE:" Style="{StaticResource TechLabelStyle}" VerticalAlignment="Center" Foreground="{StaticResource AccentPrimaryBrush}" />
+                        </StackPanel>
                         
                         <ComboBox
                             Grid.Column="1"
                             HorizontalAlignment="Stretch"
                             CornerRadius="2"
+                            BorderThickness="1"
                             FontFamily="Consolas"
                             DisplayMemberPath="Name"
                             ItemsSource="{Binding Templates}"
                             SelectedItem="{Binding SelectedTemplate, Mode=TwoWay}"
-                            PlaceholderText="Select target schema..." />
+                            PlaceholderText="SELECT_TARGET_SCHEMA_SEQUENCE..." />
                             
                         <ProgressRing Grid.Column="2" Width="20" Height="20" IsActive="{Binding IsLoading}" Margin="16,0,0,0" Foreground="{StaticResource AccentPrimaryBrush}" />
                     </Grid>
@@ -235,7 +240,7 @@
                                 <TextBlock Text="SCANNER_BAY_PREVIEW" Style="{StaticResource TechLabelStyle}" />
                                 
                                 <!-- Frame -->
-                                <Border Background="{StaticResource PageBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="32" HorizontalAlignment="Center">
+                                <Border Background="{StaticResource PageBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="32" HorizontalAlignment="Stretch">
                                     <Grid Width="200" Height="200">
                                         <!-- Crosshairs -->
                                         <Border BorderBrush="{StaticResource AccentPrimaryBrush}" BorderThickness="2,2,0,0" Width="20" Height="20" HorizontalAlignment="Left" VerticalAlignment="Top" />
@@ -244,12 +249,15 @@
                                         <Border BorderBrush="{StaticResource AccentPrimaryBrush}" BorderThickness="0,0,2,2" Width="20" Height="20" HorizontalAlignment="Right" VerticalAlignment="Bottom" />
                                         
                                         <!-- QR Image container -->
-                                        <Border x:Name="QrPreviewContainer" Background="White" Margin="10" Padding="8">
-                                            <Image x:Name="QrPreviewImage" Stretch="Uniform" />
+                                        <Border x:Name="QrPreviewContainer" Background="{StaticResource InputBackgroundBrush}" Margin="10" Padding="8" CornerRadius="4">
+                                            <Grid>
+                                                <Image x:Name="QrPreviewImage" Stretch="Uniform" />
+                                                <FontIcon Glyph="&#xED14;" FontSize="48" Foreground="{StaticResource TextTertiaryBrush}" Opacity="0.2" Visibility="{Binding PreviewQrText, Converter={StaticResource InvertedBoolToVisibilityConverter}, FallbackValue=Visible}" />
+                                            </Grid>
                                         </Border>
                                         
                                         <!-- Simulated Scanning Line -->
-                                        <Border Height="2" Background="{StaticResource AccentPrimaryBrush}" VerticalAlignment="Center" Opacity="0.5">
+                                        <Border Height="2" Background="{StaticResource AccentPrimaryBrush}" VerticalAlignment="Center" Opacity="0.4">
                                             <Border.Shadow><ThemeShadow/></Border.Shadow>
                                         </Border>
                                     </Grid>

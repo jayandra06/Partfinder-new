@@ -19,8 +19,12 @@ public sealed partial class SettingsPage : Page
     public SettingsPage()
     {
         InitializeComponent();
-        DataContext = App.Services.GetRequiredService<SettingsViewModel>();
-    }
+        DataContext = App.Services.GetRequiredService<SettingsViewModel>();
+        VisualStateManager.GoToState(this, "Collapsed", false);
+    }
+
+    private void OnSidebarEntered(object sender, PointerRoutedEventArgs e) => VisualStateManager.GoToState(this, "Expanded", true);
+    private void OnSidebarExited(object sender, PointerRoutedEventArgs e) => VisualStateManager.GoToState(this, "Collapsed", true);
 
     // ── Toast Popup ──────────────────────────────────────────
     private async void ShowToast(string title = "Saved successfully", string message = "Your changes have been applied.")

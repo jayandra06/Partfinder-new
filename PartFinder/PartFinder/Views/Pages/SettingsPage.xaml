@@ -48,7 +48,7 @@
 
         <Style x:Key="NavButtonStyle" TargetType="Button">
             <Setter Property="HorizontalAlignment" Value="Stretch" />
-            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Padding" Value="16,12" />
@@ -58,7 +58,7 @@
 
     <Grid Background="{StaticResource PageBackgroundBrush}">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="260" />
+            <ColumnDefinition Width="220" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
@@ -90,110 +90,93 @@
         </Border>
 
         <!-- LEFT SIDEBAR: Editorial Navigation -->
-        <Border Grid.Column="0" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="0,0,1,0" Padding="24,32" Translation="0,0,32">
-            <Grid RowSpacing="32">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
+        <Border Grid.Column="0" Background="{StaticResource CardBackgroundBrush}" 
+                BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="0,0,1,0" 
+                Padding="0,32" Translation="0,0,32">
+            <Grid>
+                <Grid RowSpacing="32">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
-                <StackPanel Grid.Row="0" Spacing="4">
-                    <TextBlock Text="PREFERENCES" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="100" FontWeight="Bold" />
-                    <TextBlock Text="Settings" FontSize="22" FontWeight="SemiBold" />
-                </StackPanel>
+                    <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel x:Name="NavItemsStack" Spacing="4" Padding="12,0" HorizontalAlignment="Stretch">
+                            <!-- Profile -->
+                            <Border x:Name="NavProfileItem" CornerRadius="6" Background="{StaticResource NavItemSelectedBrush}">
+                                <Button Style="{StaticResource NavButtonStyle}" Click="OnNavProfileClick">
+                                    <StackPanel Orientation="Horizontal" Spacing="16">
+                                        <FontIcon Glyph="&#xE77B;" FontSize="18" Foreground="{StaticResource AccentPrimaryBrush}" VerticalAlignment="Center" />
+                                        <TextBlock Text="Profile" FontSize="14" VerticalAlignment="Center" Foreground="{StaticResource TextPrimaryBrush}" />
+                                    </StackPanel>
+                                </Button>
+                            </Border>
 
-                <StackPanel Grid.Row="1" Spacing="4">
-                    <!-- Profile -->
-                    <Border x:Name="NavProfileItem" CornerRadius="6" Background="{StaticResource NavItemSelectedBrush}">
-                        <Button Style="{StaticResource NavButtonStyle}" Click="OnNavProfileClick">
-                            <StackPanel Orientation="Horizontal" Spacing="12">
-                                <FontIcon Glyph="&#xE77B;" FontSize="14" Foreground="{StaticResource AccentPrimaryBrush}" />
-                                <TextBlock Text="Profile" FontSize="13" FontWeight="Medium" Foreground="{StaticResource TextPrimaryBrush}" />
-                            </StackPanel>
-                        </Button>
-                    </Border>
+                            <!-- Security & 2FA -->
+                            <Border x:Name="NavSecurityItem" CornerRadius="6" Background="Transparent">
+                                <Button Style="{StaticResource NavButtonStyle}" Click="OnNavSecurityClick">
+                                    <StackPanel Orientation="Horizontal" Spacing="16">
+                                        <FontIcon Glyph="&#xE72E;" FontSize="18" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                                        <TextBlock Text="Security &amp; 2FA" FontSize="14" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
+                                    </StackPanel>
+                                </Button>
+                            </Border>
 
-                    <!-- Security & 2FA -->
-                    <Border x:Name="NavSecurityItem" CornerRadius="6" Background="Transparent">
-                        <Button Style="{StaticResource NavButtonStyle}" Click="OnNavSecurityClick">
-                            <StackPanel Orientation="Horizontal" Spacing="12">
-                                <FontIcon Glyph="&#xE72E;" FontSize="14" Foreground="{StaticResource TextSecondaryBrush}" />
-                                <TextBlock Text="Security &amp; 2FA" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" />
-                            </StackPanel>
-                        </Button>
-                    </Border>
+                            <!-- Change Password -->
+                            <Border x:Name="NavPasswordItem" CornerRadius="6" Background="Transparent">
+                                <Button Style="{StaticResource NavButtonStyle}" Click="OnNavPasswordClick">
+                                    <StackPanel Orientation="Horizontal" Spacing="16">
+                                        <FontIcon Glyph="&#xE8D7;" FontSize="18" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                                        <TextBlock Text="Password" FontSize="14" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
+                                    </StackPanel>
+                                </Button>
+                            </Border>
 
-                    <!-- Change Password -->
-                    <Border x:Name="NavPasswordItem" CornerRadius="6" Background="Transparent">
-                        <Button Style="{StaticResource NavButtonStyle}" Click="OnNavPasswordClick">
-                            <StackPanel Orientation="Horizontal" Spacing="12">
-                                <FontIcon Glyph="&#xE8D7;" FontSize="14" Foreground="{StaticResource TextSecondaryBrush}" />
-                                <TextBlock Text="Password" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" />
-                            </StackPanel>
-                        </Button>
-                    </Border>
+                            <!-- App Lock -->
+                            <Border x:Name="NavAppLockItem" CornerRadius="6" Background="Transparent">
+                                <Button Style="{StaticResource NavButtonStyle}" Click="OnNavAppLockClick">
+                                    <StackPanel Orientation="Horizontal" Spacing="16">
+                                        <FontIcon Glyph="&#xE72E;" FontSize="18" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                                        <TextBlock Text="App Lock" FontSize="14" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
+                                    </StackPanel>
+                                </Button>
+                            </Border>
 
-                    <!-- App Lock -->
-                    <Border x:Name="NavAppLockItem" CornerRadius="6" Background="Transparent">
-                        <Button Style="{StaticResource NavButtonStyle}" Click="OnNavAppLockClick">
-                            <StackPanel Orientation="Horizontal" Spacing="12">
-                                <FontIcon Glyph="&#xE72E;" FontSize="14" Foreground="{StaticResource TextSecondaryBrush}" />
-                                <TextBlock Text="App Lock" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" />
-                            </StackPanel>
-                        </Button>
-                    </Border>
+                            <!-- Logout -->
+                            <Border CornerRadius="6" Background="Transparent" Margin="0,8,0,0">
+                                <Button Style="{StaticResource NavButtonStyle}" Click="OnLogoutClick">
+                                    <StackPanel Orientation="Horizontal" Spacing="16">
+                                        <FontIcon Glyph="&#xF3B1;" FontSize="18" Foreground="#E05555" VerticalAlignment="Center" />
+                                        <TextBlock Text="Logout" FontSize="14" VerticalAlignment="Center" Foreground="#E05555" />
+                                    </StackPanel>
+                                </Button>
+                            </Border>
 
-                    <!-- Logout -->
-                    <Border CornerRadius="6" Background="Transparent" Margin="0,8,0,0">
-                        <Button Style="{StaticResource NavButtonStyle}" Click="OnLogoutClick">
-                            <StackPanel Orientation="Horizontal" Spacing="12">
-                                <FontIcon Glyph="&#xF3B1;" FontSize="14" Foreground="#E05555" />
-                                <TextBlock Text="Logout" FontSize="13" FontWeight="Medium" Foreground="#E05555" />
-                            </StackPanel>
-                        </Button>
-                    </Border>
-
-                    <!-- Hidden bindings -->
-                    <Border x:Name="NavTwoFactorItem" Visibility="Collapsed" />
-                    <Border x:Name="NavAppearanceItem" Visibility="Collapsed" />
-                    <Border x:Name="NavNotificationsItem" Visibility="Collapsed" />
-                </StackPanel>
-
-                <!-- Org info Minimal -->
-                <Border Grid.Row="2" Background="Transparent" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="0,1,0,0" Padding="0,24,0,0">
-                    <StackPanel Spacing="10">
-                        <TextBlock Text="ORGANIZATION" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="50" FontWeight="SemiBold" />
-
-                        <!-- Org Code -->
-                        <StackPanel Spacing="2">
-                            <TextBlock Text="Org Code" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" />
-                            <TextBlock Text="{Binding OrgCode}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                            <!-- Hidden bindings -->
+                            <Border x:Name="NavTwoFactorItem" Visibility="Collapsed" />
+                            <Border x:Name="NavAppearanceItem" Visibility="Collapsed" />
+                            <Border x:Name="NavNotificationsItem" Visibility="Collapsed" />
                         </StackPanel>
+                    </ScrollViewer>
 
-                        <!-- Org Name -->
-                        <StackPanel Spacing="2">
-                            <TextBlock Text="Org Name" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" />
-                            <TextBlock Text="{Binding OrgDisplayName}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
-                        </StackPanel>
-
-                        <!-- Org Plan -->
-                        <StackPanel Spacing="2">
-                            <TextBlock Text="Plan" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" />
-                            <TextBlock Text="{Binding OrgPlanDisplay}" FontSize="12" Foreground="{StaticResource AccentPrimaryBrush}" />
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
+                    <!-- Org info Minimal (Collapsed by default in icon view) -->
+                    <Border Grid.Row="1" x:Name="OrgInfoPanel" Visibility="Collapsed" />
+                </Grid>
             </Grid>
         </Border>
 
         <!-- RIGHT CONTENT AREA -->
         <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <!-- Constrain width for readability, but allow it to stretch nicely -->
-            <StackPanel HorizontalAlignment="Stretch" Padding="64,48,64,80" MaxWidth="1000">
+            <StackPanel HorizontalAlignment="Stretch" Padding="0,48,48,80">
 
+                <!-- Header moved to content area to stay undisturbed -->
+                <StackPanel Spacing="4" Margin="48,0,0,40">
+                    <TextBlock Text="PREFERENCES" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="100" FontWeight="Bold" />
+                    <TextBlock Text="Settings" FontSize="32" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                </StackPanel>
 
-                <StackPanel x:Name="ProfileSection" Visibility="Visible">
+                <StackPanel x:Name="ProfileSection" Visibility="Visible" Margin="48,0,0,0">
                     <TextBlock Text="PROFILE &amp; IDENTITY" Style="{StaticResource SectionTitleStyle}" />
                     <TextBlock Text="Manage your identity, personal information, and how you appear to others within the organization. Changes are reflected across the entire workspace." Style="{StaticResource SectionDescriptionStyle}" />
 
@@ -327,7 +310,7 @@
                 <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
                 <!-- SECURITY SECTION                                   -->
                 <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-                <StackPanel x:Name="SecuritySection" Visibility="Collapsed">
+                <StackPanel x:Name="SecuritySection" Visibility="Collapsed" Margin="48,0,0,0">
                     <TextBlock Text="SECURITY &amp; 2FA" Style="{StaticResource SectionTitleStyle}" />
                     <TextBlock Text="Protect your account with two-factor authentication. Once enabled, a 6-digit code from your authenticator app is required for sensitive operations." Style="{StaticResource SectionDescriptionStyle}" />
 
@@ -551,7 +534,7 @@
                 <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
                 <!-- PASSWORD SECTION                                   -->
                 <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-                <StackPanel x:Name="PasswordSection" Visibility="Collapsed">
+                <StackPanel x:Name="PasswordSection" Visibility="Collapsed" Margin="16,0,0,0">
                     <TextBlock Text="PASSWORD MANAGEMENT" Style="{StaticResource SectionTitleStyle}" />
                     <TextBlock Text="Change your account password. Enter your current password to verify identity, then set a new strong password." Style="{StaticResource SectionDescriptionStyle}" />
 
@@ -766,7 +749,7 @@
                     </Border>
                 </StackPanel>
                 <!-- APP LOCK SECTION -->
-                <StackPanel x:Name="AppLockSection" Visibility="Collapsed">
+                <StackPanel x:Name="AppLockSection" Visibility="Collapsed" Margin="48,0,0,0">
                     <TextBlock Text="APPLICATION LOCK" Style="{StaticResource SectionTitleStyle}" />
                     <TextBlock Text="When enabled, Windows Hello (fingerprint, face, or device PIN) is required every time the app opens." Style="{StaticResource SectionDescriptionStyle}" />
 
