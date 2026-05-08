@@ -65,16 +65,10 @@ public sealed partial class ShellLayout : UserControl
 
     private void ApplySidebarWidth()
     {
-        if (DataContext is ShellViewModel vm)
-        {
-            SidebarColumn.Width = new GridLength(vm.IsSidebarCollapsed ? 52 : 220);
-            SidebarRoot.Padding = vm.IsSidebarCollapsed
-                ? new Thickness(8, 12, 8, 16)
-                : new Thickness(12, 12, 12, 16);
-            NavListView.Margin = vm.IsSidebarCollapsed
-                ? new Thickness(0, 4, 0, 0)
-                : new Thickness(0, 2, 0, 0);
-        }
+        // Increased to 80px for a more substantial look while remaining icon-only
+        SidebarColumn.Width = new GridLength(80);
+        SidebarRoot.Padding = new Thickness(0, 16, 0, 16);
+        NavListView.Margin = new Thickness(0, 12, 0, 0);
     }
 
     private async void OnShellLayoutLoaded(object sender, RoutedEventArgs e)

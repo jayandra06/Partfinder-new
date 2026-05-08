@@ -48,17 +48,17 @@
 
         <Style x:Key="NavButtonStyle" TargetType="Button">
             <Setter Property="HorizontalAlignment" Value="Stretch" />
-            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="16,12" />
+            <Setter Property="Padding" Value="0,12" />
             <Setter Property="CornerRadius" Value="6" />
         </Style>
     </Page.Resources>
 
     <Grid Background="{StaticResource PageBackgroundBrush}">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="240" />
+            <ColumnDefinition Width="80" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
@@ -90,102 +90,63 @@
         </Border>
 
         <!-- LEFT SIDEBAR: Editorial Navigation -->
-        <Border Grid.Column="0" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="0,0,1,0" Padding="16,32" Translation="0,0,32">
-            <Grid RowSpacing="32">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
+        <Border Grid.Column="0" Background="{StaticResource CardBackgroundBrush}" 
+                BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="0,0,1,0" 
+                Padding="0,32" Translation="0,0,32">
+            <Grid>
+                <Grid RowSpacing="32">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
-                <StackPanel Grid.Row="0" Spacing="4">
-                    <TextBlock Text="PREFERENCES" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="100" FontWeight="Bold" />
-                    <TextBlock Text="Settings" FontSize="22" FontWeight="SemiBold" />
-                </StackPanel>
+                    <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel x:Name="NavItemsStack" Spacing="4" Padding="0" HorizontalAlignment="Center" Width="80">
+                            <!-- Profile -->
+                            <Border x:Name="NavProfileItem" CornerRadius="6" Background="{StaticResource NavItemSelectedBrush}">
+                                <Button Style="{StaticResource NavButtonStyle}" Click="OnNavProfileClick" ToolTipService.ToolTip="Profile" ToolTipService.Placement="Right">
+                                    <FontIcon Glyph="&#xE77B;" FontSize="18" Foreground="{StaticResource AccentPrimaryBrush}" HorizontalAlignment="Center" />
+                                </Button>
+                            </Border>
 
-                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                    <StackPanel Spacing="4" Padding="0,0,12,0">
-                        <!-- Profile -->
-                        <Border x:Name="NavProfileItem" CornerRadius="6" Background="{StaticResource NavItemSelectedBrush}">
-                            <Button Style="{StaticResource NavButtonStyle}" Click="OnNavProfileClick">
-                                <StackPanel Orientation="Horizontal" Spacing="12">
-                                    <FontIcon Glyph="&#xE77B;" FontSize="14" Foreground="{StaticResource AccentPrimaryBrush}" />
-                                    <TextBlock Text="Profile" FontSize="13" FontWeight="Medium" Foreground="{StaticResource TextPrimaryBrush}" />
-                                </StackPanel>
-                            </Button>
-                        </Border>
+                            <!-- Security & 2FA -->
+                            <Border x:Name="NavSecurityItem" CornerRadius="6" Background="Transparent">
+                                <Button Style="{StaticResource NavButtonStyle}" Click="OnNavSecurityClick" ToolTipService.ToolTip="Security &amp; 2FA" ToolTipService.Placement="Right">
+                                    <FontIcon Glyph="&#xE72E;" FontSize="18" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" />
+                                </Button>
+                            </Border>
 
-                        <!-- Security & 2FA -->
-                        <Border x:Name="NavSecurityItem" CornerRadius="6" Background="Transparent">
-                            <Button Style="{StaticResource NavButtonStyle}" Click="OnNavSecurityClick">
-                                <StackPanel Orientation="Horizontal" Spacing="12">
-                                    <FontIcon Glyph="&#xE72E;" FontSize="14" Foreground="{StaticResource TextSecondaryBrush}" />
-                                    <TextBlock Text="Security &amp; 2FA" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" />
-                                </StackPanel>
-                            </Button>
-                        </Border>
+                            <!-- Change Password -->
+                            <Border x:Name="NavPasswordItem" CornerRadius="6" Background="Transparent">
+                                <Button Style="{StaticResource NavButtonStyle}" Click="OnNavPasswordClick" ToolTipService.ToolTip="Password" ToolTipService.Placement="Right">
+                                    <FontIcon Glyph="&#xE8D7;" FontSize="18" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" />
+                                </Button>
+                            </Border>
 
-                        <!-- Change Password -->
-                        <Border x:Name="NavPasswordItem" CornerRadius="6" Background="Transparent">
-                            <Button Style="{StaticResource NavButtonStyle}" Click="OnNavPasswordClick">
-                                <StackPanel Orientation="Horizontal" Spacing="12">
-                                    <FontIcon Glyph="&#xE8D7;" FontSize="14" Foreground="{StaticResource TextSecondaryBrush}" />
-                                    <TextBlock Text="Password" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" />
-                                </StackPanel>
-                            </Button>
-                        </Border>
+                            <!-- App Lock -->
+                            <Border x:Name="NavAppLockItem" CornerRadius="6" Background="Transparent">
+                                <Button Style="{StaticResource NavButtonStyle}" Click="OnNavAppLockClick" ToolTipService.ToolTip="App Lock" ToolTipService.Placement="Right">
+                                    <FontIcon Glyph="&#xE72E;" FontSize="18" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" />
+                                </Button>
+                            </Border>
 
-                        <!-- App Lock -->
-                        <Border x:Name="NavAppLockItem" CornerRadius="6" Background="Transparent">
-                            <Button Style="{StaticResource NavButtonStyle}" Click="OnNavAppLockClick">
-                                <StackPanel Orientation="Horizontal" Spacing="12">
-                                    <FontIcon Glyph="&#xE72E;" FontSize="14" Foreground="{StaticResource TextSecondaryBrush}" />
-                                    <TextBlock Text="App Lock" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" />
-                                </StackPanel>
-                            </Button>
-                        </Border>
+                            <!-- Logout -->
+                            <Border CornerRadius="6" Background="Transparent" Margin="0,8,0,0">
+                                <Button Style="{StaticResource NavButtonStyle}" Click="OnLogoutClick" ToolTipService.ToolTip="Logout" ToolTipService.Placement="Right">
+                                    <FontIcon Glyph="&#xF3B1;" FontSize="18" Foreground="#E05555" HorizontalAlignment="Center" />
+                                </Button>
+                            </Border>
 
-                        <!-- Logout -->
-                        <Border CornerRadius="6" Background="Transparent" Margin="0,8,0,0">
-                            <Button Style="{StaticResource NavButtonStyle}" Click="OnLogoutClick">
-                                <StackPanel Orientation="Horizontal" Spacing="12">
-                                    <FontIcon Glyph="&#xF3B1;" FontSize="14" Foreground="#E05555" />
-                                    <TextBlock Text="Logout" FontSize="13" FontWeight="Medium" Foreground="#E05555" />
-                                </StackPanel>
-                            </Button>
-                        </Border>
-
-                        <!-- Hidden bindings -->
-                        <Border x:Name="NavTwoFactorItem" Visibility="Collapsed" />
-                        <Border x:Name="NavAppearanceItem" Visibility="Collapsed" />
-                        <Border x:Name="NavNotificationsItem" Visibility="Collapsed" />
-                    </StackPanel>
-                </ScrollViewer>
-
-                <!-- Org info Minimal -->
-                <Border Grid.Row="2" Background="Transparent" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="0,1,0,0" Padding="0,24,0,0">
-                    <StackPanel Spacing="10">
-                        <TextBlock Text="ORGANIZATION" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="50" FontWeight="SemiBold" />
-
-                        <!-- Org Code -->
-                        <StackPanel Spacing="2">
-                            <TextBlock Text="Org Code" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" />
-                            <TextBlock Text="{Binding OrgCode}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                            <!-- Hidden bindings -->
+                            <Border x:Name="NavTwoFactorItem" Visibility="Collapsed" />
+                            <Border x:Name="NavAppearanceItem" Visibility="Collapsed" />
+                            <Border x:Name="NavNotificationsItem" Visibility="Collapsed" />
                         </StackPanel>
+                    </ScrollViewer>
 
-                        <!-- Org Name -->
-                        <StackPanel Spacing="2">
-                            <TextBlock Text="Org Name" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" />
-                            <TextBlock Text="{Binding OrgDisplayName}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
-                        </StackPanel>
-
-                        <!-- Org Plan -->
-                        <StackPanel Spacing="2">
-                            <TextBlock Text="Plan" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" />
-                            <TextBlock Text="{Binding OrgPlanDisplay}" FontSize="12" Foreground="{StaticResource AccentPrimaryBrush}" />
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
+                    <!-- Org info Minimal (Collapsed by default in icon view) -->
+                    <Border Grid.Row="1" x:Name="OrgInfoPanel" Visibility="Collapsed" />
+                </Grid>
             </Grid>
         </Border>
 
@@ -194,6 +155,11 @@
             <!-- Constrain width for readability, but allow it to stretch nicely -->
             <StackPanel HorizontalAlignment="Stretch" Padding="0,48,0,80" MaxWidth="1200">
 
+                <!-- Header moved to content area to stay undisturbed -->
+                <StackPanel Spacing="4" Margin="48,0,48,40">
+                    <TextBlock Text="PREFERENCES" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="100" FontWeight="Bold" />
+                    <TextBlock Text="Settings" FontSize="32" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                </StackPanel>
 
                 <StackPanel x:Name="ProfileSection" Visibility="Visible" Margin="48,0,48,0">
                     <TextBlock Text="PROFILE &amp; IDENTITY" Style="{StaticResource SectionTitleStyle}" />
