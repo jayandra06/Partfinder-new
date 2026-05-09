@@ -12,6 +12,9 @@ public partial class FavouritesViewModel : ViewModelBase
     private readonly ITemplateSchemaService _templateSchema;
     private readonly Microsoft.UI.Dispatching.DispatcherQueue _dispatcherQueue;
 
+    // Kept so OnFavouritesChanged can add newly-starred templates without a full reload
+    private IReadOnlyList<PartTemplateDefinition> _allTemplates = Array.Empty<PartTemplateDefinition>();
+
     public FavouritesViewModel(IFavouriteStore favouriteStore, ITemplateSchemaService templateSchema)
     {
         _favouriteStore = favouriteStore;
@@ -30,9 +33,10 @@ public partial class FavouritesViewModel : ViewModelBase
 
     public bool IsEmpty => FavouriteTemplates.Count == 0;
 
-    public bool CanGoPrevious => ActiveIndex > 0;
+    // Always enabled when there are at least 2 cards — navigation is circular
+    public bool CanGoPrevious => FavouriteTemplates.Count > 1;
 
-    public bool CanGoNext => ActiveIndex < FavouriteTemplates.Count - 1;
+    public bool CanGoNext => FavouriteTemplates.Count > 1;
 
     public string IndexLabel =>
         FavouriteTemplates.Count == 0
@@ -74,19 +78,17 @@ public partial class FavouritesViewModel : ViewModelBase
     [RelayCommand]
     private void GoNext()
     {
-        if (CanGoNext)
-        {
-            ActiveIndex++;
-        }
+        if (FavouriteTemplates.Count < 2) return;
+        // Wrap around: last → first
+        ActiveIndex = (ActiveIndex + 1) % FavouriteTemplates.Count;
     }
 
     [RelayCommand]
     private void GoPrevious()
     {
-        if (CanGoPrevious)
-        {
-            ActiveIndex--;
-        }
+        if (FavouriteTemplates.Count < 2) return;
+        // Wrap around: first → last
+        ActiveIndex = (ActiveIndex - 1 + FavouriteTemplates.Count) % FavouriteTemplates.Count;
     }
 
     [RelayCommand]
@@ -120,10 +122,20 @@ public partial class FavouritesViewModel : ViewModelBase
         }
         else
         {
+            // Starred — update existing card or add new one
             var card = FavouriteTemplates.FirstOrDefault(c => c.Template.Id == templateId);
             if (card is not null)
             {
                 card.IsFavourite = true;
+            }
+            else
+            {
+                var template = _allTemplates.FirstOrDefault(t => string.Equals(t.Id, templateId, StringComparison.Ordinal));
+                if (template is not null)
+                {
+                    FavouriteTemplates.Add(new FavouriteCardViewModel(template, isFavourite: true));
+                    ActiveIndex = FavouriteTemplates.Count - 1;
+                }
             }
         }
     }
@@ -176,6 +188,8 @@ public partial class FavouritesViewModel : ViewModelBase
 
     public Task LoadAsync(IReadOnlyList<PartTemplateDefinition> allTemplates)
     {
+        _allTemplates = allTemplates;
+
         var favouriteIds = _favouriteStore.GetAll();
 
         FavouriteTemplates.Clear();
@@ -213,9 +227,43 @@ public partial class FavouritesViewModel : ViewModelBase
         }
 
         var favouriteIds = _favouriteStore.GetAll();
-        foreach (var card in FavouriteTemplates)
+
+        // Remove cards that are no longer favourites
+        var toRemove = FavouriteTemplates
+            .Where(card => !favouriteIds.Contains(card.Template.Id))
+            .ToList();
+
+        foreach (var card in toRemove)
         {
-            card.IsFavourite = favouriteIds.Contains(card.Template.Id);
+            FavouriteTemplates.Remove(card);
+        }
+
+        // Add newly-starred templates
+        foreach (var id in favouriteIds)
+        {
+            var existingCard = FavouriteTemplates.FirstOrDefault(c => c.Template.Id == id);
+            if (existingCard is not null)
+            {
+                existingCard.IsFavourite = true;
+                continue;
+            }
+
+            // New favourite — find template and add card
+            var template = _allTemplates.FirstOrDefault(t => string.Equals(t.Id, id, StringComparison.Ordinal));
+            if (template is not null)
+            {
+                FavouriteTemplates.Add(new FavouriteCardViewModel(template, isFavourite: true));
+            }
+        }
+
+        // Clamp active index if collection changed
+        if (FavouriteTemplates.Count > 0)
+        {
+            ActiveIndex = Math.Clamp(ActiveIndex, 0, FavouriteTemplates.Count - 1);
+        }
+        else
+        {
+            ActiveIndex = 0;
         }
     }
 

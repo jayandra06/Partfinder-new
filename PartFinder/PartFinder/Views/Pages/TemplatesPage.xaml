@@ -44,102 +44,104 @@
         </Style>
     </Page.Resources>
 
-    <Grid Padding="24" Background="{StaticResource PageBackgroundBrush}">
+    <Grid Padding="24,24,24,8" Background="{StaticResource PageBackgroundBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,12">
+        <Grid Grid.Row="0" Margin="0,0,0,12"
+              Visibility="{Binding IsCreatingTemplate, Converter={StaticResource InvertedBoolToVisibilityConverter}}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Left: Create New Template -->
             <Button
+                Grid.Column="0"
                 Style="{StaticResource GlowButtonStyle}"
                 Height="40"
                 Padding="14,0"
                 Click="OnCreateNewTemplateClick"
-                IsEnabled="{Binding CanAddTemplate}"
-                Visibility="{Binding IsCreatingTemplate, Converter={StaticResource InvertedBoolToVisibilityConverter}}">
+                IsEnabled="{Binding CanAddTemplate}">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <FontIcon Glyph="&#xE710;" FontSize="14" />
                     <TextBlock Text="Create New Template" FontSize="13" />
                 </StackPanel>
             </Button>
+
+            <!-- Center: Page heading -->
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        Spacing="10"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center">
+                <Border Width="32" Height="32" CornerRadius="8"
+                        Background="#181F7AE0"
+                        VerticalAlignment="Center">
+                    <FontIcon x:Name="PageIndicatorIcon"
+                              Glyph="&#xE735;"
+                              FontSize="15"
+                              Foreground="{StaticResource AccentPrimaryBrush}"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center" />
+                </Border>
+                <TextBlock x:Name="PageIndicatorText"
+                           Text="Your Favourite Templates"
+                           FontSize="16"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource TextPrimaryBrush}"
+                           VerticalAlignment="Center" />
+            </StackPanel>
+
+            <!-- Right: Toggle button — View All Templates / My Favourite Templates -->
             <Button
                 x:Name="ViewAllTemplatesButton"
-                Style="{StaticResource ModernOutlineButtonStyle}"
+                Grid.Column="2"
+                Style="{StaticResource GlowButtonStyle}"
                 Height="40"
                 Padding="14,0"
-                Click="OnShowAllTemplatesClick"
-                Visibility="{Binding IsCreatingTemplate, Converter={StaticResource InvertedBoolToVisibilityConverter}}">
+                Margin="0,0,8,0"
+                Click="OnShowAllTemplatesClick">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <FontIcon Glyph="&#xE8A5;" FontSize="12" />
-                    <TextBlock Text="All Templates" FontSize="12" />
+                    <TextBlock Text="View All Templates" FontSize="12" />
                 </StackPanel>
             </Button>
-        </StackPanel>
+
+            <Button
+                x:Name="ViewFavouritesButton"
+                Grid.Column="2"
+                Style="{StaticResource GlowButtonStyle}"
+                Height="40"
+                Padding="14,0"
+                Margin="0,0,8,0"
+                Click="OnShowFavouritesClick"
+                Visibility="Collapsed">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <FontIcon Glyph="&#xE735;" FontSize="12" />
+                    <TextBlock Text="My Favourite Templates" FontSize="12" />
+                </StackPanel>
+            </Button>
+        </Grid>
+
+        <!-- Canvas editor header (shown only when creating/editing) is inside the canvas Grid below -->
 
         <components:FavouritesSubPage
             x:Name="FavouritesSubPageControl"
             Grid.Row="1"
-            Padding="0"
+            Padding="0,0,0,0"
+            Margin="0,0,0,0"
+            VerticalAlignment="Stretch"
             Visibility="{Binding ElementName=TemplatesPageRoot, Path=DataContext.IsCreatingTemplate, Converter={StaticResource InvertedBoolToVisibilityConverter}}" />
 
         <!-- ── All Templates Panel ── -->
         <Grid x:Name="AllTemplatesPanel"
               Grid.Row="1"
               Visibility="Collapsed">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
-
-            <!-- Header -->
-            <Border Grid.Row="0"
-                    Background="{StaticResource CardBackgroundBrush}"
-                    BorderBrush="{StaticResource BorderDefaultBrush}"
-                    BorderThickness="1" CornerRadius="12" Padding="16,12"
-                    Margin="0,0,0,16">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <!-- Icon -->
-                    <Border Grid.Column="0"
-                            Width="40" Height="40" CornerRadius="10"
-                            Background="#181F7AE0"
-                            Margin="0,0,12,0" VerticalAlignment="Center">
-                        <FontIcon Glyph="&#xE8A5;" FontSize="18"
-                                  Foreground="{StaticResource AccentPrimaryBrush}"
-                                  HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
-
-                    <!-- Title + subtitle -->
-                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                        <TextBlock Text="All Templates" FontSize="16" FontWeight="SemiBold"
-                                   Foreground="{StaticResource TextPrimaryBrush}" />
-                        <TextBlock Text="Star to favourite · Edit or delete from here"
-                                   FontSize="12"
-                                   Foreground="{StaticResource TextSecondaryBrush}" />
-                    </StackPanel>
-
-                    <!-- Back button -->
-                    <Button Grid.Column="2" Style="{StaticResource GhostButtonStyle}"
-                            Padding="12,6" VerticalAlignment="Center"
-                            Click="OnCloseAllTemplatesClick">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <FontIcon Glyph="&#xE72B;" FontSize="12" />
-                            <TextBlock Text="Back" FontSize="12" />
-                        </StackPanel>
-                    </Button>
-                </Grid>
-            </Border>
-
-            <!-- Template list -->
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                <StackPanel x:Name="AllTemplatesList" Spacing="8" />
-            </ScrollViewer>
+            <components:AllTemplatesCarousel x:Name="AllTemplatesCarouselControl" />
         </Grid>
 
         <Grid

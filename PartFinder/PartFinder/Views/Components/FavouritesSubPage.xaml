@@ -52,12 +52,10 @@
         </Grid.RenderTransform>
 
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
+            <RowDefinition Height="0" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
+            <RowDefinition Height="80" />
         </Grid.RowDefinitions>
-
-        <!-- ── Header: Page Title ── -->
 
         <!-- ── Empty State ── -->
         <StackPanel
@@ -67,7 +65,6 @@
             VerticalAlignment="Center"
             Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibilityConverter}}">
 
-            <!-- Animated icon circle -->
             <Border Width="120" Height="120" CornerRadius="60"
                     Background="{StaticResource CardBackgroundBrush}"
                     BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="2"
@@ -79,7 +76,7 @@
             </Border>
 
             <StackPanel Spacing="12" HorizontalAlignment="Center">
-                <TextBlock Text="Your favourites empty" FontSize="28" FontWeight="SemiBold" 
+                <TextBlock Text="Your favourites empty" FontSize="28" FontWeight="SemiBold"
                           HorizontalAlignment="Center" Foreground="{StaticResource TextPrimaryBrush}" />
                 <TextBlock Text="Star your favorite templates to see them here."
                            FontSize="15" Foreground="{StaticResource TextTertiaryBrush}"
@@ -88,28 +85,50 @@
             </StackPanel>
         </StackPanel>
 
-        <!-- ── Horizontal Carousel + side arrows ── -->
-        <Grid
+        <!-- ── Carousel canvas (full height, clipped) ── -->
+        <Canvas
+            x:Name="CarouselCanvas"
             Grid.Row="1"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Stretch"
             Visibility="{Binding IsEmpty, Converter={StaticResource InvertedBoolToVisibilityConverter}}">
+            <Canvas.Clip>
+                <RectangleGeometry x:Name="CarouselClip" />
+            </Canvas.Clip>
+            <!-- Cards positioned absolutely in code-behind -->
+        </Canvas>
 
-            <!-- Carousel canvas -->
-            <Canvas
-                x:Name="CarouselCanvas"
-                HorizontalAlignment="Stretch"
-                VerticalAlignment="Center"
-                Height="460">
-                <!-- Cards will be positioned absolutely here -->
-            </Canvas>
+        <!-- ── Bottom bar: counter + prev/next buttons ── -->
+        <Grid Grid.Row="2"
+              Margin="0,0,0,0"
+              Visibility="{Binding IsEmpty, Converter={StaticResource InvertedBoolToVisibilityConverter}}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
 
-            <!-- Left arrow -->
+            <!-- Counter label centred -->
+            <TextBlock Grid.Column="0" Grid.ColumnSpan="5"
+                       Text="{Binding IndexLabel}"
+                       FontSize="14"
+                       Foreground="{StaticResource TextTertiaryBrush}"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       FontWeight="Medium"
+                       Margin="0,0,0,0" />
+
+            <!-- Prev button -->
             <Button x:Name="PrevButton"
-                    Width="44" Height="44"
+                    Grid.Column="1"
+                    Width="36" Height="36"
                     Padding="0"
-                    HorizontalAlignment="Left"
+                    Margin="0,0,12,0"
+                    HorizontalAlignment="Center"
                     VerticalAlignment="Center"
-                    Margin="8,0,0,0"
-                    CornerRadius="22"
+                    CornerRadius="18"
                     Background="Transparent"
                     BorderThickness="0"
                     IsEnabled="{Binding CanGoPrevious}"
@@ -119,17 +138,21 @@
                     <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="Transparent" />
                     <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="Transparent" />
                 </Button.Resources>
-                <FontIcon Glyph="&#xE76B;" FontSize="28" Foreground="White" />
+                <FontIcon Glyph="&#xE76B;" FontSize="18" Foreground="White" />
             </Button>
 
-            <!-- Right arrow -->
+            <!-- Spacer -->
+            <Border Grid.Column="2" Width="50" />
+
+            <!-- Next button -->
             <Button x:Name="NextButton"
-                    Width="44" Height="44"
+                    Grid.Column="3"
+                    Width="36" Height="36"
                     Padding="0"
-                    HorizontalAlignment="Right"
+                    Margin="12,0,0,0"
+                    HorizontalAlignment="Center"
                     VerticalAlignment="Center"
-                    Margin="0,0,8,0"
-                    CornerRadius="22"
+                    CornerRadius="18"
                     Background="Transparent"
                     BorderThickness="0"
                     IsEnabled="{Binding CanGoNext}"
@@ -139,21 +162,9 @@
                     <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="Transparent" />
                     <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="Transparent" />
                 </Button.Resources>
-                <FontIcon Glyph="&#xE76C;" FontSize="28" Foreground="White" />
+                <FontIcon Glyph="&#xE76C;" FontSize="18" Foreground="White" />
             </Button>
         </Grid>
-
-        <!-- ── Bottom counter only ── -->
-        <StackPanel Grid.Row="2"
-                   HorizontalAlignment="Center"
-                   Margin="0,0,0,40"
-                   Visibility="{Binding IsEmpty, Converter={StaticResource InvertedBoolToVisibilityConverter}}">
-            <TextBlock Text="{Binding IndexLabel}"
-                      FontSize="14"
-                      Foreground="{StaticResource TextTertiaryBrush}"
-                      HorizontalAlignment="Center"
-                      FontWeight="Medium" />
-        </StackPanel>
 
     </Grid>
 </UserControl>

@@ -84,20 +84,10 @@ public sealed partial class TemplatesPage : Page
             }
         };
 
-        // Force initial update of favorite stars after everything is loaded
+        // Update favourite stars once layout is ready
         DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
         {
             UpdateFavoriteStars();
-        });
-
-        // Also add a delayed update to ensure everything is properly loaded
-        _ = Task.Delay(500).ContinueWith(_ =>
-        {
-            DispatcherQueue.TryEnqueue(() =>
-            {
-                System.Diagnostics.Debug.WriteLine("Delayed favorite stars update");
-                UpdateFavoriteStars();
-            });
         });
     }
 
@@ -124,346 +114,42 @@ public sealed partial class TemplatesPage : Page
     {
         if (DataContext is not TemplatesViewModel vm) return;
 
-        // Hide favourites, show all templates panel
         FavouritesSubPageControl.Visibility = Visibility.Collapsed;
         AllTemplatesPanel.Visibility = Visibility.Visible;
+
+        // Toggle buttons
+        ViewAllTemplatesButton.Visibility = Visibility.Collapsed;
+        ViewFavouritesButton.Visibility = Visibility.Visible;
+
+        // Update page indicator
+        PageIndicatorIcon.Glyph = "\uE8A5";
+        PageIndicatorText.Text = "Your All Templates";
+
         BuildAllTemplatesList(vm);
+    }
+
+    private void OnShowFavouritesClick(object sender, RoutedEventArgs e)
+    {
+        OnCloseAllTemplatesClick(sender, e);
     }
 
     private void OnCloseAllTemplatesClick(object sender, RoutedEventArgs e)
     {
         AllTemplatesPanel.Visibility = Visibility.Collapsed;
         FavouritesSubPageControl.Visibility = Visibility.Visible;
+
+        // Toggle buttons
+        ViewAllTemplatesButton.Visibility = Visibility.Visible;
+        ViewFavouritesButton.Visibility = Visibility.Collapsed;
+
+        // Update page indicator
+        PageIndicatorIcon.Glyph = "\uE735";
+        PageIndicatorText.Text = "Your Favourite Templates";
     }
 
     private void BuildAllTemplatesList(TemplatesViewModel vm)
     {
-        AllTemplatesList.Children.Clear();
-
-        // 2-column grid layout
-        var grid = new Grid { ColumnSpacing = 12, RowSpacing = 12 };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-        var templates = vm.Templates.ToList();
-        int rowCount = (int)Math.Ceiling(templates.Count / 2.0);
-        for (int i = 0; i < rowCount; i++)
-            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-        for (int i = 0; i < templates.Count; i++)
-        {
-            var card = BuildTemplateRow(templates[i], vm);
-            Grid.SetRow(card, i / 2);
-            Grid.SetColumn(card, i % 2);
-            grid.Children.Add(card);
-        }
-
-        AllTemplatesList.Children.Add(grid);
-    }
-
-    private Border BuildTemplateRow(PartTemplateDefinition template, TemplatesViewModel vm)
-    {
-        var isFav = vm.IsFavouriteFor(template.Id);
-
-        var card = new Border
-        {
-            Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["CardBackgroundBrush"],
-            BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["BorderDefaultBrush"],
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(14),
-            Padding = new Thickness(20, 18, 20, 18),
-        };
-
-        var root = new Grid { RowSpacing = 14 };
-        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // header
-        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // fields preview
-        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // actions
-
-        // ── Row 0: Header — icon + name + star ──────────────────────────────
-        var header = new Grid { ColumnSpacing = 12 };
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-        // Icon badge
-        var iconBadge = new Border
-        {
-            Width = 42, Height = 42,
-            CornerRadius = new CornerRadius(10),
-            Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(
-                Microsoft.UI.ColorHelper.FromArgb(25, 31, 122, 224)),
-            VerticalAlignment = VerticalAlignment.Center,
-            Child = new FontIcon
-            {
-                Glyph = "\uE9D5",
-                FontSize = 20,
-                Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(
-                    Microsoft.UI.ColorHelper.FromArgb(255, 31, 122, 224)),
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-            },
-        };
-        Grid.SetColumn(iconBadge, 0);
-        header.Children.Add(iconBadge);
-
-        // Name + field count
-        var nameStack = new StackPanel { Spacing = 3, VerticalAlignment = VerticalAlignment.Center };
-        nameStack.Children.Add(new TextBlock
-        {
-            Text = template.Name,
-            FontSize = 15,
-            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextPrimaryBrush"],
-        });
-        var fieldCount = template.Fields.Count;
-        nameStack.Children.Add(new TextBlock
-        {
-            Text = $"{fieldCount} field{(fieldCount == 1 ? "" : "s")}",
-            FontSize = 11,
-            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextTertiaryBrush"],
-        });
-        Grid.SetColumn(nameStack, 1);
-        header.Children.Add(nameStack);
-
-        // Star button
-        var starIcon = new FontIcon
-        {
-            Glyph = isFav ? "\uE735" : "\uE734",
-            FontSize = 16,
-            Foreground = isFav
-                ? new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 31, 122, 224))
-                : Application.Current.Resources["TextTertiaryBrush"] as Microsoft.UI.Xaml.Media.Brush,
-        };
-        var starBtn = new Button
-        {
-            Content = starIcon,
-            Width = 36, Height = 36,
-            Padding = new Thickness(0),
-            Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent),
-            BorderThickness = new Thickness(0),
-            VerticalAlignment = VerticalAlignment.Center,
-        };
-        ToolTipService.SetToolTip(starBtn, isFav ? "Remove from favourites" : "Add to favourites");
-        starBtn.Click += async (_, _) =>
-        {
-            await vm.ToggleFavouritePublicAsync(template.Id);
-            var nowFav = vm.IsFavouriteFor(template.Id);
-            starIcon.Glyph = nowFav ? "\uE735" : "\uE734";
-            starIcon.Foreground = nowFav
-                ? new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 31, 122, 224))
-                : Application.Current.Resources["TextTertiaryBrush"] as Microsoft.UI.Xaml.Media.Brush;
-            ToolTipService.SetToolTip(starBtn, nowFav ? "Remove from favourites" : "Add to favourites");
-        };
-        Grid.SetColumn(starBtn, 2);
-        header.Children.Add(starBtn);
-
-        Grid.SetRow(header, 0);
-        root.Children.Add(header);
-
-        // ── Row 1: Fields preview chips ─────────────────────────────────────
-        if (template.Fields.Count > 0)
-        {
-            var fieldsWrap = new ItemsWrapGrid { Orientation = Orientation.Horizontal };
-            var chipsPanel = new VariableSizedWrapGrid
-            {
-                Orientation = Orientation.Horizontal,
-                MaximumRowsOrColumns = 99,
-            };
-
-            // Use a simple WrapPanel-like StackPanel with wrapping via ItemsControl
-            var chipHost = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                Spacing = 6,
-            };
-
-            // Show max 6 fields
-            var visibleFields = template.Fields
-                .OrderBy(f => f.DisplayOrder)
-                .Take(6)
-                .ToList();
-
-            foreach (var field in visibleFields)
-            {
-                var typeIcon = field.Type switch
-                {
-                    Models.TemplateFieldType.Number   => "\uE8EF",
-                    Models.TemplateFieldType.Date     => "\uE787",
-                    Models.TemplateFieldType.Dropdown => "\uE70D",
-                    Models.TemplateFieldType.RecordLink => "\uE71B",
-                    _                                 => "\uE8D2",
-                };
-
-                var chip = new Border
-                {
-                    Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(
-                        Microsoft.UI.ColorHelper.FromArgb(15, 255, 255, 255)),
-                    BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["BorderDefaultBrush"],
-                    BorderThickness = new Thickness(1),
-                    CornerRadius = new CornerRadius(6),
-                    Padding = new Thickness(8, 4, 8, 4),
-                    Margin = new Thickness(0, 0, 0, 6),
-                };
-
-                var chipContent = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5 };
-                chipContent.Children.Add(new FontIcon
-                {
-                    Glyph = typeIcon,
-                    FontSize = 10,
-                    Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextTertiaryBrush"],
-                    VerticalAlignment = VerticalAlignment.Center,
-                });
-                chipContent.Children.Add(new TextBlock
-                {
-                    Text = field.Label,
-                    FontSize = 11,
-                    Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextSecondaryBrush"],
-                    VerticalAlignment = VerticalAlignment.Center,
-                });
-                if (field.IsRequired)
-                {
-                    chipContent.Children.Add(new TextBlock
-                    {
-                        Text = "*",
-                        FontSize = 10,
-                        Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(
-                            Microsoft.UI.ColorHelper.FromArgb(255, 224, 82, 82)),
-                        VerticalAlignment = VerticalAlignment.Center,
-                    });
-                }
-
-                chip.Child = chipContent;
-                chipHost.Children.Add(chip);
-            }
-
-            // "+N more" if fields > 6
-            if (template.Fields.Count > 6)
-            {
-                var more = new Border
-                {
-                    Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(
-                        Microsoft.UI.ColorHelper.FromArgb(15, 255, 255, 255)),
-                    BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["BorderDefaultBrush"],
-                    BorderThickness = new Thickness(1),
-                    CornerRadius = new CornerRadius(6),
-                    Padding = new Thickness(8, 4, 8, 4),
-                    Child = new TextBlock
-                    {
-                        Text = $"+{template.Fields.Count - 6} more",
-                        FontSize = 11,
-                        Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextTertiaryBrush"],
-                    },
-                };
-                chipHost.Children.Add(more);
-            }
-
-            // Wrap chips using a ScrollViewer so they don't overflow
-            var chipScroll = new ScrollViewer
-            {
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden,
-                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                Content = chipHost,
-            };
-
-            Grid.SetRow(chipScroll, 1);
-            root.Children.Add(chipScroll);
-        }
-
-        // ── Row 2: Actions — Edit + Delete ───────────────────────────────────
-        var divider = new Border
-        {
-            BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["BorderDefaultBrush"],
-            BorderThickness = new Thickness(0, 1, 0, 0),
-            Padding = new Thickness(0, 12, 0, 0),
-        };
-
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-
-        // Edit button
-        var editBtn = new Button
-        {
-            Content = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                Spacing = 6,
-                Children =
-                {
-                    new FontIcon { Glyph = "\uE70F", FontSize = 12 },
-                    new TextBlock { Text = "Edit", FontSize = 12 },
-                },
-            },
-            Padding = new Thickness(14, 6, 14, 6),
-            Style = (Style)Application.Current.Resources["GhostButtonStyle"],
-        };
-        editBtn.Click += (_, _) =>
-        {
-            vm.SelectedTemplate = template;
-            vm.BeginEditSelectedTemplateCommand.Execute(null);
-            OnCloseAllTemplatesClick(editBtn, new RoutedEventArgs());
-        };
-
-        // Delete button
-        var deleteBtn = new Button
-        {
-            Content = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                Spacing = 6,
-                Children =
-                {
-                    new FontIcon
-                    {
-                        Glyph = "\uE74D",
-                        FontSize = 12,
-                        Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(
-                            Microsoft.UI.ColorHelper.FromArgb(255, 224, 82, 82)),
-                    },
-                    new TextBlock
-                    {
-                        Text = "Delete",
-                        FontSize = 12,
-                        Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(
-                            Microsoft.UI.ColorHelper.FromArgb(255, 224, 82, 82)),
-                    },
-                },
-            },
-            Padding = new Thickness(14, 6, 14, 6),
-            Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent),
-            BorderThickness = new Thickness(0),
-        };
-        ToolTipService.SetToolTip(deleteBtn, "Delete template");
-        deleteBtn.Click += async (_, _) =>
-        {
-            if (XamlRoot is null) return;
-            var dlg = new ContentDialog
-            {
-                Title = "Delete Template",
-                Content = $"Are you sure you want to delete \"{template.Name}\"? This cannot be undone.",
-                PrimaryButtonText = "Delete",
-                CloseButtonText = "Cancel",
-                DefaultButton = ContentDialogButton.Close,
-                XamlRoot = XamlRoot,
-            };
-            var result = await dlg.ShowAsync();
-            if (result != ContentDialogResult.Primary) return;
-            try
-            {
-                await vm.DeleteTemplateCommand.ExecuteAsync(template.Id);
-                _activity.LogTemplateChange("Template Deleted", $"Deleted template \"{template.Name}\"");
-                BuildAllTemplatesList(vm);
-            }
-            catch { /* ignore */ }
-        };
-
-        actions.Children.Add(editBtn);
-        actions.Children.Add(deleteBtn);
-        divider.Child = actions;
-
-        Grid.SetRow(divider, 2);
-        root.Children.Add(divider);
-
-        card.Child = root;
-        return card;
+        AllTemplatesCarouselControl.Load(vm);
     }
 
     private void OnTemplateCanvasPointerWheelChanged(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
@@ -1027,12 +713,7 @@ public sealed partial class TemplatesPage : Page
             var icon = FindChildOfType<FontIcon>(button);
             if (icon != null)
             {
-                // Ensure favorites are loaded before checking
                 var isFavorite = vm.IsFavouriteFor(template.Id);
-                
-                // Debug log to check if favorites are working
-                System.Diagnostics.Debug.WriteLine($"Template {template.Name} (ID: {template.Id}) - IsFavorite: {isFavorite}");
-                
                 icon.Glyph = isFavorite ? "\uE735" : "\uE734";
                 
                 if (isFavorite)
@@ -1065,31 +746,20 @@ public sealed partial class TemplatesPage : Page
                     var icon = FindChildOfType<FontIcon>(button);
                     if (icon != null)
                     {
-                        icon.Glyph = isFavorite ? "\uE735" : "\uE734"; // Filled vs outline star
-                        
-                        // Use theme colors
-                        if (isFavorite)
-                        {
-                            icon.Foreground = new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 31, 122, 224)); // #1F7AE0
-                        }
-                        else
-                        {
-                            icon.Foreground = Application.Current.Resources["TextSecondaryBrush"] as SolidColorBrush;
-                        }
-                        
-                        System.Diagnostics.Debug.WriteLine($"Star immediately updated for {template.Name}: {(isFavorite ? "Filled" : "Empty")}");
+                        icon.Glyph = isFavorite ? "\uE735" : "\uE734";
+                        icon.Foreground = isFavorite
+                            ? new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 31, 122, 224))
+                            : Application.Current.Resources["TextSecondaryBrush"] as SolidColorBrush;
                     }
 
-                    // Also update all other stars to ensure consistency (delayed)
                     DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
                     {
                         UpdateFavoriteStars();
                     });
                 }
-                catch (Exception ex)
+                catch
                 {
-                    // Log error but don't crash
-                    System.Diagnostics.Debug.WriteLine($"Error toggling favorite: {ex.Message}");
+                    // Silently ignore favorite toggle errors
                 }
             }
         }

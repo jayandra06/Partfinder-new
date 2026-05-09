@@ -108,14 +108,9 @@ public partial class TemplatesViewModel : ViewModelBase
     // Public method for UI to call
     public async Task ToggleFavouritePublicAsync(string templateId)
     {
-        System.Diagnostics.Debug.WriteLine($"ToggleFavouritePublicAsync called for: {templateId}");
-        
-        // Directly call the store — bypass the private method to ensure it runs
         await _favouriteStore.ToggleAsync(templateId).ConfigureAwait(true);
         FavouritesStoreVersion++;
         OnPropertyChanged(nameof(FavouritesStoreVersion));
-        
-        System.Diagnostics.Debug.WriteLine($"After toggle - IsFavorite: {IsFavouriteFor(templateId)}, Version: {FavouritesStoreVersion}");
     }
 
     public ObservableCollection<PartTemplateDefinition> Templates { get; } = [];

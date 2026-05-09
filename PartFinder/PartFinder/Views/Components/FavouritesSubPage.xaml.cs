@@ -21,15 +21,11 @@ public sealed partial class FavouritesSubPage : UserControl
     private TemplatesViewModel? _templatesVm;
     private readonly List<Border> _cardElements = new();
 
-    // Card sizing for carousel effect — scaled down to fit standard screens
-    private const double CENTER_CARD_WIDTH = 260.0;
-    private const double CENTER_CARD_HEIGHT = 380.0;
-    private const double ADJACENT_CARD_WIDTH = 200.0;
-    private const double ADJACENT_CARD_HEIGHT = 300.0;
-    private const double OUTER_CARD_WIDTH = 140.0;
-    private const double OUTER_CARD_HEIGHT = 220.0;
-    private const double FAR_OUTER_CARD_WIDTH = 90.0;
-    private const double FAR_OUTER_CARD_HEIGHT = 150.0;
+    // Peek width: how much of a side card is visible on each edge
+    // Center card fills the rest: canvasWidth - 2 * PEEK_WIDTH
+    private const double PEEK_WIDTH_MIN = 60.0;
+    private const double PEEK_WIDTH_MAX = 130.0;
+    private const double PEEK_WIDTH_RATIO = 0.13; // 13 % of canvas width
 
     // Theme colors — pulled from Colors.xaml
     private static readonly Color _cardBg = Color.FromArgb(255, 17, 26, 38);         // #111A26
@@ -68,6 +64,8 @@ public sealed partial class FavouritesSubPage : UserControl
         _vm.PropertyChanged += OnVmPropertyChanged;
         _vm.EditTemplateRequested -= OnEditTemplateRequested;
         _vm.EditTemplateRequested += OnEditTemplateRequested;
+        _vm.FavouriteTemplates.CollectionChanged -= OnFavouriteTemplatesCollectionChanged;
+        _vm.FavouriteTemplates.CollectionChanged += OnFavouriteTemplatesCollectionChanged;
 
         await _vm.LoadAsync(templatesVm.Templates).ConfigureAwait(true);
 
@@ -107,11 +105,12 @@ public sealed partial class FavouritesSubPage : UserControl
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        // View model is assigned in ShowAsync, so we just setup UI events here
-
-
-        // Update layout when canvas size changes
-        CarouselCanvas.SizeChanged += (s, e) => UpdateCarouselLayout(animate: false);
+        // Update layout and clip when canvas size changes
+        CarouselCanvas.SizeChanged += (s, args) =>
+        {
+            CarouselClip.Rect = new Windows.Foundation.Rect(0, 0, args.NewSize.Width, args.NewSize.Height);
+            UpdateCarouselLayout(animate: false);
+        };
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
@@ -120,6 +119,7 @@ public sealed partial class FavouritesSubPage : UserControl
         {
             _vm.PropertyChanged -= OnVmPropertyChanged;
             _vm.EditTemplateRequested -= OnEditTemplateRequested;
+            _vm.FavouriteTemplates.CollectionChanged -= OnFavouriteTemplatesCollectionChanged;
         }
     }
 
@@ -129,11 +129,13 @@ public sealed partial class FavouritesSubPage : UserControl
         {
             UpdateCarouselLayout(animate: true);
         }
-        else if (e.PropertyName == nameof(FavouritesViewModel.FavouriteTemplates))
-        {
-            BuildCarouselCards();
-            UpdateCarouselLayout(animate: false);
-        }
+    }
+
+    private void OnFavouriteTemplatesCollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    {
+        // Rebuild carousel smoothly whenever a card is added or removed
+        BuildCarouselCards();
+        UpdateCarouselLayout(animate: true);
     }
 
     // ── Carousel Building ─────────────────────────────────────────────────────
@@ -161,8 +163,8 @@ public sealed partial class FavouritesSubPage : UserControl
 
         var card = new Border
         {
-            Width = CENTER_CARD_WIDTH,
-            Height = CENTER_CARD_HEIGHT,
+            Width = 300,   // initial width, overridden in UpdateCarouselLayout
+            Height = 400,  // initial height, overridden in UpdateCarouselLayout
             CornerRadius = new CornerRadius(20),
             Background = new SolidColorBrush(_cardBg),
             BorderBrush = new SolidColorBrush(Color.FromArgb(100, _borderDefault.R, _borderDefault.G, _borderDefault.B)),
@@ -195,17 +197,17 @@ public sealed partial class FavouritesSubPage : UserControl
         var topSection = new StackPanel
         {
             Name = "TopSection",
-            Spacing = 10,
+            Spacing = 12,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(16, 32, 16, 0),
+            Margin = new Thickness(24, 60, 24, 0),
         };
 
         // Template icon
         var icon = new FontIcon
         {
             Glyph = "\uE8A5",
-            FontSize = 36,
+            FontSize = 52,
             Foreground = new SolidColorBrush(accentColor),
             HorizontalAlignment = HorizontalAlignment.Center,
         };
@@ -215,7 +217,7 @@ public sealed partial class FavouritesSubPage : UserControl
         var titleLabel = new TextBlock
         {
             Text = template.Name,
-            FontSize = 18,
+            FontSize = 22,
             FontWeight = Microsoft.UI.Text.FontWeights.Bold,
             Foreground = new SolidColorBrush(_textPrimary),
             HorizontalAlignment = HorizontalAlignment.Center,
@@ -223,7 +225,7 @@ public sealed partial class FavouritesSubPage : UserControl
             TextWrapping = TextWrapping.Wrap,
             MaxLines = 2,
             TextTrimming = TextTrimming.CharacterEllipsis,
-            MaxWidth = 220,
+            MaxWidth = 300,
         };
         topSection.Children.Add(titleLabel);
 
@@ -234,10 +236,10 @@ public sealed partial class FavouritesSubPage : UserControl
         var fieldsSection = new StackPanel
         {
             Name = "FieldsSection",
-            Spacing = 6,
-            Margin = new Thickness(16, 14, 16, 0),
+            Spacing = 8,
+            Margin = new Thickness(24, 20, 24, 0),
             VerticalAlignment = VerticalAlignment.Top,
-            Visibility = Visibility.Collapsed, // shown only when focused
+            Visibility = Visibility.Collapsed,
         };
 
         var fields = template.Template.Fields
@@ -314,15 +316,15 @@ public sealed partial class FavouritesSubPage : UserControl
         var bottomSection = new StackPanel
         {
             Name = "BottomSection",
-            Spacing = 14,
+            Spacing = 12,
             HorizontalAlignment = HorizontalAlignment.Center,
-            Margin = new Thickness(0, 0, 0, 24),
+            Margin = new Thickness(0, 0, 0, 32),
         };
 
         var fieldText = new TextBlock
         {
             Text = template.FieldCountLabel,
-            FontSize = 13,
+            FontSize = 14,
             Foreground = new SolidColorBrush(_textTertiary),
             HorizontalAlignment = HorizontalAlignment.Center,
             CharacterSpacing = 20,
@@ -340,31 +342,31 @@ public sealed partial class FavouritesSubPage : UserControl
 
         var editBtn = new Button
         {
-            Width = 100, Height = 38,
+            Width = 100, Height = 36,
             Background = new SolidColorBrush(_accentPrimary),
             BorderThickness = new Thickness(0),
-            CornerRadius = new CornerRadius(10),
+            CornerRadius = new CornerRadius(8),
             Tag = template,
         };
         editBtn.Click += OnCardEditClick;
-        var editContent = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, VerticalAlignment = VerticalAlignment.Center };
-        editContent.Children.Add(new FontIcon { Glyph = "\uE70F", FontSize = 14, Foreground = new SolidColorBrush(Microsoft.UI.Colors.White) });
-        editContent.Children.Add(new TextBlock { Text = "Edit", FontSize = 14, Foreground = new SolidColorBrush(Microsoft.UI.Colors.White), FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+        var editContent = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5, VerticalAlignment = VerticalAlignment.Center };
+        editContent.Children.Add(new FontIcon { Glyph = "\uE70F", FontSize = 13, Foreground = new SolidColorBrush(Microsoft.UI.Colors.White) });
+        editContent.Children.Add(new TextBlock { Text = "Edit", FontSize = 13, Foreground = new SolidColorBrush(Microsoft.UI.Colors.White), FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
         editBtn.Content = editContent;
 
         var unstarBtn = new Button
         {
-            Width = 100, Height = 38,
+            Width = 100, Height = 36,
             Background = new SolidColorBrush(Color.FromArgb(0, 0, 0, 0)),
             BorderBrush = new SolidColorBrush(Color.FromArgb(255, 255, 193, 7)),
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(10),
+            BorderThickness = new Thickness(1.5),
+            CornerRadius = new CornerRadius(8),
             Tag = template,
         };
         unstarBtn.Click += OnCardUnstarClick;
-        var unstarContent = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, VerticalAlignment = VerticalAlignment.Center };
-        unstarContent.Children.Add(new FontIcon { Glyph = "\uE735", FontSize = 14, Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 193, 7)) });
-        unstarContent.Children.Add(new TextBlock { Text = "Unstar", FontSize = 14, Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 193, 7)), FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+        var unstarContent = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5, VerticalAlignment = VerticalAlignment.Center };
+        unstarContent.Children.Add(new FontIcon { Glyph = "\uE735", FontSize = 13, Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 193, 7)) });
+        unstarContent.Children.Add(new TextBlock { Text = "Unstar", FontSize = 13, Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 193, 7)), FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
         unstarBtn.Content = unstarContent;
 
         buttonStack.Children.Add(editBtn);
@@ -424,156 +426,138 @@ public sealed partial class FavouritesSubPage : UserControl
         var canvasWidth = CarouselCanvas.ActualWidth;
         var canvasHeight = CarouselCanvas.ActualHeight;
 
-        // If canvas hasn't measured yet, try forcing it
+        // If canvas hasn't measured yet, schedule a retry
         if (canvasWidth <= 0)
         {
-            CarouselCanvas.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));
-            canvasWidth = CarouselCanvas.DesiredSize.Width;
-            canvasHeight = CarouselCanvas.DesiredSize.Height;
-            if (canvasWidth <= 0)
+            DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
             {
-                // Schedule a retry
-                DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
-                {
-                    UpdateCarouselLayout(animate);
-                });
-                return;
-            }
+                UpdateCarouselLayout(animate);
+            });
+            return;
         }
 
-        if (canvasHeight <= 0) canvasHeight = 400; // Fallback height
+        if (canvasHeight <= 0) canvasHeight = 400;
+
+        // Update clip so side cards don't overflow
+        CarouselClip.Rect = new Windows.Foundation.Rect(0, 0, canvasWidth, canvasHeight);
 
         var activeIndex = _vm.ActiveIndex;
-        var centerX = canvasWidth / 2.0;
 
-        // Calculate spacing relative to canvas width for responsive layout (increased gaps)
-        var adjacentSpacing = Math.Min(canvasWidth * 0.32, 280);
-        var outerSpacing = Math.Min(canvasWidth * 0.44, 400);
-        var farOuterSpacing = Math.Min(canvasWidth * 0.52, 500);
+        // Peek width = how much of a side card is visible on each edge
+        var peekWidth = Math.Clamp(canvasWidth * PEEK_WIDTH_RATIO, PEEK_WIDTH_MIN, PEEK_WIDTH_MAX);
+
+        // All cards share the same width and height — same size, side by side
+        var cardWidth  = canvasWidth - 2.0 * peekWidth;
+        var cardHeight = canvasHeight;
+
+        // Gap between cards (small gap so borders are clearly separate)
+        const double cardGap = 12.0;
 
         for (int i = 0; i < _cardElements.Count; i++)
         {
             var card = _cardElements[i];
             var distance = i - activeIndex;
-            var isCenter = Math.Abs(distance) == 0;
+            var isCenter = distance == 0;
+            var isLeft   = distance == -1;
+            var isRight  = distance == 1;
+            var isVisible = Math.Abs(distance) <= 1;
 
-            double width, height, opacity, offsetX, zIndex;
-            double scaleX, scaleY;
+            double finalX, finalY, opacity, zIndex;
             byte borderAlpha;
             Color glowColor;
-
-            // Get the card's accent colors
             var (accentColor, _) = GetCardAccentColors(i + 1);
 
-            // Calculate properties based on distance from center
-            switch (Math.Abs(distance))
+            if (isCenter)
             {
-                case 0: // Center card — full size, bright glow border
-                    width = CENTER_CARD_WIDTH;
-                    height = CENTER_CARD_HEIGHT;
-                    opacity = 1.0;
-                    offsetX = 0;
-                    zIndex = 100;
-                    scaleX = 1.0;
-                    scaleY = 1.0;
-                    borderAlpha = 200;
-                    glowColor = accentColor;
-                    break;
-
-                case 1: // Adjacent cards — medium, subtle border
-                    width = ADJACENT_CARD_WIDTH;
-                    height = ADJACENT_CARD_HEIGHT;
-                    opacity = 0.75;
-                    offsetX = distance > 0 ? adjacentSpacing : -adjacentSpacing;
-                    zIndex = 50;
-                    scaleX = 0.95;
-                    scaleY = 0.95;
-                    borderAlpha = 60;
-                    glowColor = _borderDefault;
-                    break;
-
-                case 2: // Second outer cards
-                    width = OUTER_CARD_WIDTH;
-                    height = OUTER_CARD_HEIGHT;
-                    opacity = 0.3;
-                    offsetX = distance > 0 ? outerSpacing : -outerSpacing;
-                    zIndex = 20;
-                    scaleX = 0.9;
-                    scaleY = 0.9;
-                    borderAlpha = 40;
-                    glowColor = _borderDefault;
-                    break;
-
-                default: // Far outer cards — completely hidden (max 5 visible cards)
-                    width = FAR_OUTER_CARD_WIDTH;
-                    height = FAR_OUTER_CARD_HEIGHT;
-                    opacity = 0.0;
-                    offsetX = distance > 0 ? farOuterSpacing : -farOuterSpacing;
-                    zIndex = 5;
-                    scaleX = 0.85;
-                    scaleY = 0.85;
-                    borderAlpha = 0;
-                    glowColor = _borderDefault;
-                    break;
+                // Center card: sits in the middle, full opacity, accent border
+                finalX      = peekWidth;
+                finalY      = 0;
+                opacity     = 1.0;
+                zIndex      = 100;
+                borderAlpha = 200;
+                glowColor   = accentColor;
             }
-
-            var finalX = centerX + offsetX - (width / 2.0);
-            var finalY = (canvasHeight - height) / 2.0; // Center vertically
-
-            // Show/hide buttons based on selection and fade out inactive text
-            if (card.Child is Grid grid)
+            else if (isLeft)
             {
-                foreach (var child in grid.Children)
-                {
-                    if (child is FrameworkElement fe)
-                    {
-                        if (fe.Name == "TopSection")
-                        {
-                            fe.Opacity = isCenter ? 1.0 : 0.15;
-                        }
-                        else if (fe.Name == "FieldsSection")
-                        {
-                            fe.Visibility = isCenter ? Visibility.Visible : Visibility.Collapsed;
-                        }
-                        else if (fe.Name == "BottomSection" && fe is StackPanel bottomSection)
-                        {
-                            foreach (var bChild in bottomSection.Children)
-                            {
-                                if (bChild is TextBlock txt)
-                                {
-                                    txt.Opacity = isCenter ? 1.0 : 0.15;
-                                }
-                                else if (bChild is StackPanel stack && stack.Name == "ButtonStack")
-                                {
-                                    stack.Visibility = isCenter ? Visibility.Visible : Visibility.Collapsed;
-                                }
-                            }
-                        }
-                    }
-                }
+                // Left card: positioned so its right edge peeks out from the left
+                finalX      = peekWidth - cardWidth - cardGap;
+                finalY      = 0;
+                opacity     = 1.0;
+                zIndex      = 90;
+                borderAlpha = 160;
+                glowColor   = _borderDefault;
             }
-
-            card.IsHitTestVisible = opacity > 0;
-
-            // Apply border glow effect — center card gets neon accent glow, others get subtle border
-            card.BorderBrush = new SolidColorBrush(
-                Color.FromArgb(borderAlpha, glowColor.R, glowColor.G, glowColor.B));
-
-            // Apply scale transform for depth perspective
-            card.RenderTransformOrigin = new Windows.Foundation.Point(0.5, 0.5);
-            card.RenderTransform = new CompositeTransform
+            else if (isRight)
             {
-                ScaleX = scaleX,
-                ScaleY = scaleY,
-            };
-
-            if (animate)
-            {
-                AnimateCard(card, finalX, finalY, width, height, opacity, zIndex);
+                // Right card: positioned so its left edge peeks out from the right
+                finalX      = peekWidth + cardWidth + cardGap;
+                finalY      = 0;
+                opacity     = 1.0;
+                zIndex      = 90;
+                borderAlpha = 160;
+                glowColor   = _borderDefault;
             }
             else
             {
-                ApplyCardTransform(card, finalX, finalY, width, height, opacity, zIndex);
+                // All other cards: hidden off-screen
+                finalX      = distance < 0 ? -(cardWidth + 40) : canvasWidth + 40;
+                finalY      = 0;
+                opacity     = 0.0;
+                zIndex      = 5;
+                borderAlpha = 0;
+                glowColor   = _borderDefault;
+            }
+
+            // All visible cards show full content — no hiding on side cards
+            ApplyCardContentVisibility(card, isCenter);
+
+            card.IsHitTestVisible = isVisible;
+
+            // Border: center gets accent glow, sides get same-style border
+            card.BorderBrush = new SolidColorBrush(
+                Color.FromArgb(borderAlpha, glowColor.R, glowColor.G, glowColor.B));
+
+            // No scale or blur — all cards same size, flat layout
+            card.RenderTransform = null;
+
+            if (animate)
+                AnimateCard(card, finalX, finalY, cardWidth, cardHeight, opacity, zIndex);
+            else
+                ApplyCardTransform(card, finalX, finalY, cardWidth, cardHeight, opacity, zIndex);
+        }
+    }
+
+    /// <summary>
+    /// Shows full content on center card.
+    /// Side cards show everything EXCEPT the Edit/Unstar buttons (those only make sense on focused card).
+    /// </summary>
+    private static void ApplyCardContentVisibility(Border card, bool isCenter)
+    {
+        if (card.Child is not Grid grid) return;
+
+        foreach (var child in grid.Children)
+        {
+            if (child is not FrameworkElement fe) continue;
+
+            switch (fe.Name)
+            {
+                case "TopSection":
+                    fe.Opacity = 1.0; // always fully visible
+                    break;
+                case "FieldsSection":
+                    fe.Visibility = Visibility.Visible; // always show columns
+                    fe.Opacity = 1.0;
+                    break;
+                case "BottomSection" when fe is StackPanel bottomSection:
+                    foreach (var bChild in bottomSection.Children)
+                    {
+                        if (bChild is TextBlock txt)
+                            txt.Opacity = 1.0;
+                        else if (bChild is StackPanel stack && stack.Name == "ButtonStack")
+                            // Edit/Unstar buttons only on focused card
+                            stack.Visibility = isCenter ? Visibility.Visible : Visibility.Collapsed;
+                    }
+                    break;
             }
         }
     }
@@ -685,7 +669,18 @@ public sealed partial class FavouritesSubPage : UserControl
 
     private void OnEditTemplateRequested(object? sender, string templateId)
     {
-        _templatesVm?.BeginEditSelectedTemplateCommand.Execute(null);
+        if (_templatesVm is null) return;
+
+        // Set the correct template before calling BeginEdit so it edits the right one
+        var target = _templatesVm.Templates.FirstOrDefault(
+            t => string.Equals(t.Id, templateId, StringComparison.Ordinal));
+
+        if (target is not null)
+        {
+            _templatesVm.SelectedTemplate = target;
+        }
+
+        _templatesVm.BeginEditSelectedTemplateCommand.Execute(null);
         BackRequested?.Invoke(this, EventArgs.Empty);
     }
 
