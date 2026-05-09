@@ -78,7 +78,10 @@
                     </ListView.ItemContainerStyle>
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="viewModels:NavItemViewModel">
-                            <Grid ToolTipService.ToolTip="{x:Bind Label}" ToolTipService.Placement="Right" Padding="0,4">
+                            <Grid ToolTipService.Placement="Right" Padding="0,4" PointerEntered="NavItem_PointerEntered" PointerExited="NavItem_PointerExited" PointerCanceled="NavItem_PointerExited">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="{x:Bind Label}" />
+                                </ToolTipService.ToolTip>
                                 <FontIcon
                                     Glyph="{x:Bind IconGlyph}"
                                     FontSize="18"
@@ -141,9 +144,12 @@
                             Width="36" Height="36"
                             Padding="0"
                             Style="{StaticResource GhostButtonStyle}"
-                            ToolTipService.ToolTip="Alerts"
                             ToolTipService.Placement="Right"
+                            PointerEntered="NavItem_PointerEntered" PointerExited="NavItem_PointerExited" PointerCanceled="NavItem_PointerExited"
                             Click="OnBellClicked">
+                            <ToolTipService.ToolTip>
+                                <ToolTip Content="Alerts" />
+                            </ToolTipService.ToolTip>
                             <FontIcon Glyph="&#xEA8F;" FontSize="18" />
                         </Button>
                         <!-- Red dot — only when alerts exist -->
@@ -161,15 +167,21 @@
                         Width="36" Height="36"
                         Padding="0"
                         Style="{StaticResource GhostButtonStyle}"
-                        ToolTipService.ToolTip="Account settings"
                         ToolTipService.Placement="Right"
+                        PointerEntered="NavItem_PointerEntered" PointerExited="NavItem_PointerExited" PointerCanceled="NavItem_PointerExited"
                         Click="OnAccountSettingsMenuClicked">
+                        <ToolTipService.ToolTip>
+                            <ToolTip Content="Account settings" />
+                        </ToolTipService.ToolTip>
                         <FontIcon Glyph="&#xE713;" FontSize="18" />
                     </Button>
                     <Button
                         Padding="8,4"
-                        ToolTipService.ToolTip="Profile menu"
+                        PointerEntered="NavItem_PointerEntered" PointerExited="NavItem_PointerExited" PointerCanceled="NavItem_PointerExited"
                         x:Name="ProfileMenuButton">
+                        <ToolTipService.ToolTip>
+                            <ToolTip Content="Profile menu" />
+                        </ToolTipService.ToolTip>
                         <Button.Content>
                             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
                                         DataContext="{Binding ElementName=ProfileMenuButton, Path=DataContext}">

@@ -82,4 +82,20 @@ public sealed partial class ShellLayout : UserControl
             await shellViewModel.InitializeAsync().ConfigureAwait(true);
         }
     }
+
+    private void NavItem_PointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (sender is FrameworkElement fe && ToolTipService.GetToolTip(fe) is ToolTip tt)
+        {
+            tt.IsOpen = true;
+        }
+    }
+
+    private void NavItem_PointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (sender is FrameworkElement fe && ToolTipService.GetToolTip(fe) is ToolTip tt)
+        {
+            tt.IsOpen = false;
+        }
+    }
 }
