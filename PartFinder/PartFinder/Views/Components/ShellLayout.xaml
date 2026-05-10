@@ -78,7 +78,7 @@
                     </ListView.ItemContainerStyle>
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="viewModels:NavItemViewModel">
-                            <Grid ToolTipService.Placement="Right" Padding="0,4" PointerEntered="NavItem_PointerEntered" PointerExited="NavItem_PointerExited" PointerCanceled="NavItem_PointerExited">
+                            <Grid Background="Transparent" ToolTipService.Placement="Right" Padding="0,4" PointerEntered="NavItem_PointerEntered" PointerExited="NavItem_PointerExited" PointerCanceled="NavItem_PointerExited">
                                 <ToolTipService.ToolTip>
                                     <ToolTip Content="{x:Bind Label}" />
                                 </ToolTipService.ToolTip>
