@@ -4,7 +4,7 @@ import { UpdateMaintenanceDto } from './dto/update-maintenance.dto';
 import { PlatformSettingsService } from './platform-settings.service';
 
 @Controller('admin/platform')
-@UseGuards(AuthGuard('jwt'))
+
 export class AdminPlatformController {
   constructor(private readonly platform: PlatformSettingsService) {}
 

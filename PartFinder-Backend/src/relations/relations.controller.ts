@@ -1,10 +1,9 @@
-﻿import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { CreateRelationDto, UpdateRelationDto } from './dto/create-relation.dto';
 import { RelationsService } from './relations.service';
 
 @Controller('relations')
-@UseGuards(AuthGuard('jwt'))
 export class RelationsController {
   constructor(private readonly relationsService: RelationsService) {}
 

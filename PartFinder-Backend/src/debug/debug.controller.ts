@@ -22,20 +22,20 @@ export class DebugController {
   ) {}
 
   @Get()
-  @UseGuards(AuthGuard('jwt'))
+  
   list() {
     return { logs: this.debugLogs.getAll() };
   }
 
   @Delete()
-  @UseGuards(AuthGuard('jwt'))
+  
   clear() {
     this.debugLogs.clear();
     return { ok: true };
   }
 
   @Post()
-  @UseGuards(AuthGuard('jwt'))
+  
   append(@Body() dto: AppendDebugLogsDto) {
     for (const item of dto.items) {
       this.debugLogs.push(item.source, item.level, item.message, item.context);

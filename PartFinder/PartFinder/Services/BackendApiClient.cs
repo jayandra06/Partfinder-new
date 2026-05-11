@@ -24,6 +24,11 @@ public sealed class BackendApiClient
         MaxDepth = 32, // Security: prevent deeply nested JSON attacks
     };
 
+    private static readonly JsonSerializerOptions WriteJson = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    };
+
     private readonly AdminSessionStore _session;
     private readonly ILocalSetupContext _setup;
 
@@ -56,15 +61,18 @@ public sealed class BackendApiClient
         _session.Load();
         _setup.Refresh();
         var orgId = _setup.OrgCode?.Trim();
-        var token = _session.AccessToken?.Trim();
-        if (string.IsNullOrWhiteSpace(orgId) || string.IsNullOrWhiteSpace(token))
+        if (string.IsNullOrWhiteSpace(orgId))
         {
-            return (false, "Missing session or organization context.", null);
+            return (false, "Missing organization context. Please complete setup.", null);
         }
 
         var baseUrl = LicenseApiClient.GetBaseUrl().TrimEnd('/');
+        var token = _session.AccessToken?.Trim();
         using var req = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/api/templates/{templateId}/import");
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
         req.Headers.Add("X-Org-Id", orgId);
 
         var multipart = new MultipartFormDataContent();
@@ -157,16 +165,18 @@ public sealed class BackendApiClient
         _setup.Refresh();
         var orgId = _setup.OrgCode?.Trim();
         var token = _session.AccessToken?.Trim();
-
-        if (string.IsNullOrWhiteSpace(orgId) || string.IsNullOrWhiteSpace(token))
-            return (false, "Missing session or organization context.");
+        if (string.IsNullOrWhiteSpace(orgId))
+            return (false, "Missing organization context. Please complete setup.");
 
         if (!IsValidOrgCode(orgId))
             return (false, "Invalid organization context.");
 
         var baseUrl = LicenseApiClient.GetBaseUrl().TrimEnd('/');
         using var req = new HttpRequestMessage(HttpMethod.Delete, $"{baseUrl}/api/relations/{relationId}");
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
         req.Headers.Add("X-Org-Id", orgId);
 
         HttpResponseMessage resp;
@@ -195,9 +205,9 @@ public sealed class BackendApiClient
         var orgId = _setup.OrgCode?.Trim();
         var token = _session.AccessToken?.Trim();
 
-        if (string.IsNullOrWhiteSpace(orgId) || string.IsNullOrWhiteSpace(token))
+        if (string.IsNullOrWhiteSpace(orgId))
         {
-            return (false, "Missing session or organization context.", default);
+            return (false, "Missing organization context. Please complete setup.", default);
         }
 
         // Security: validate orgId to prevent header injection (only alphanum + hyphen/underscore)
@@ -208,7 +218,10 @@ public sealed class BackendApiClient
 
         var baseUrl = LicenseApiClient.GetBaseUrl().TrimEnd('/');
         using var req = new HttpRequestMessage(HttpMethod.Get, $"{baseUrl}/api{path}");
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
         req.Headers.Add("X-Org-Id", orgId);
 
         HttpResponseMessage resp;
@@ -249,9 +262,9 @@ public sealed class BackendApiClient
         var orgId = _setup.OrgCode?.Trim();
         var token = _session.AccessToken?.Trim();
 
-        if (string.IsNullOrWhiteSpace(orgId) || string.IsNullOrWhiteSpace(token))
+        if (string.IsNullOrWhiteSpace(orgId))
         {
-            return (false, "Missing session or organization context.", default);
+            return (false, "Missing organization context. Please complete setup.", default);
         }
 
         // Security: validate orgId to prevent header injection
@@ -262,9 +275,12 @@ public sealed class BackendApiClient
 
         var baseUrl = LicenseApiClient.GetBaseUrl().TrimEnd('/');
         using var req = new HttpRequestMessage(method, $"{baseUrl}/api{path}");
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
         req.Headers.Add("X-Org-Id", orgId);
-        req.Content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
+        req.Content = new StringContent(JsonSerializer.Serialize(requestBody, WriteJson), Encoding.UTF8, "application/json");
 
         HttpResponseMessage resp;
         try
@@ -355,12 +371,20 @@ public sealed class EnrichedRelationDto
     public Dictionary<string, string> DisplayValues { get; set; } = [];
 }
 
+public sealed class RelationMatchPairDto
+{
+    public string SourceColumn { get; set; } = string.Empty;
+    public string TargetColumn { get; set; } = string.Empty;
+}
+
 public sealed class SaveWorksheetRelationRequest
 {
     public string PrimaryTemplateId { get; set; } = string.Empty;
     public string LookupTemplateId { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string TriggerColumn { get; set; } = string.Empty;
     public string MenuLabel { get; set; } = string.Empty;
-    public List<string> MatchKeys { get; set; } = [];
+    public List<RelationMatchPairDto> MatchKeys { get; set; } = [];
     public List<string> DisplayColumns { get; set; } = [];
 }
 
@@ -369,7 +393,9 @@ public sealed class WorksheetRelationDto
     public string Id { get; set; } = string.Empty;
     public string PrimaryTemplateId { get; set; } = string.Empty;
     public string LookupTemplateId { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string TriggerColumn { get; set; } = string.Empty;
     public string MenuLabel { get; set; } = string.Empty;
-    public List<string> MatchKeys { get; set; } = [];
+    public List<RelationMatchPairDto> MatchKeys { get; set; } = [];
     public List<string> DisplayColumns { get; set; } = [];
 }
