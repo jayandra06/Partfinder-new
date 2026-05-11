@@ -13,7 +13,7 @@ import { DbClustersService } from './db-clusters.service';
 import { DbClusterUriDto } from './dto/db-cluster-uri.dto';
 
 @Controller('admin/db-clusters')
-@UseGuards(AuthGuard('jwt'))
+
 export class DbClustersController {
   constructor(private readonly dbClustersService: DbClustersService) {}
 

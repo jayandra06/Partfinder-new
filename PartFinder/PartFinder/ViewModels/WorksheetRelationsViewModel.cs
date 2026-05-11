@@ -195,7 +195,9 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
             {
                 PrimaryTemplateId = PrimaryTemplate.Id,
                 LookupTemplateId = LookupTemplate.Id,
-                MatchKeys = selectedKeys,
+                Name = $"{PrimaryTemplate.Name} to {LookupTemplate.Name}",
+                TriggerColumn = selectedKeys.FirstOrDefault() ?? "",
+                MatchKeys = selectedKeys.Select(k => new RelationMatchPairDto { SourceColumn = k, TargetColumn = k }).ToList(),
                 DisplayColumns = selectedDisplays,
                 MenuLabel = $"{LookupTemplate.Name} info",
             };
@@ -312,7 +314,7 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
 
         LoadedRelation = existing;
         SelectedRelationId = existing.Id;
-        var keySet = new HashSet<string>(existing.MatchKeys, StringComparer.OrdinalIgnoreCase);
+        var keySet = new HashSet<string>(existing.MatchKeys.Select(k => k.SourceColumn), StringComparer.OrdinalIgnoreCase);
         var displaySet = new HashSet<string>(existing.DisplayColumns, StringComparer.OrdinalIgnoreCase);
 
         foreach (var p in PrimaryColumns)

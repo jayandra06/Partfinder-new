@@ -1,10 +1,10 @@
-﻿import { Body, Controller, Delete, Get, Headers, Param, ParseIntPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, Param, ParseIntPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { CreatePartDto, UpdatePartDto } from './dto/part.dto';
 import { PartsService } from './parts.service';
 
 @Controller('parts')
-@UseGuards(AuthGuard('jwt'))
+
 export class PartsController {
   constructor(private readonly partsService: PartsService) {}
 

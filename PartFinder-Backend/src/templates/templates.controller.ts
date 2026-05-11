@@ -7,7 +7,7 @@ import { UpdateColumnDto } from './dto/update-column.dto';
 import { TemplatesService } from './templates.service';
 
 @Controller('templates')
-@UseGuards(AuthGuard('jwt'))
+
 export class TemplatesController {
   constructor(private readonly templatesService: TemplatesService) {}
 

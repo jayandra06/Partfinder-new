@@ -4,7 +4,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ImportService } from './import.service';
 
 @Controller('templates')
-@UseGuards(AuthGuard('jwt'))
+
 export class ImportController {
   constructor(private readonly importService: ImportService) {}
 

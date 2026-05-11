@@ -1,9 +1,9 @@
-﻿import { Controller, Get, Headers, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Headers, Param, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ViewDataService } from './view-data.service';
 
 @Controller('view-data')
-@UseGuards(AuthGuard('jwt'))
+
 export class ViewDataController {
   constructor(private readonly viewDataService: ViewDataService) {}
 

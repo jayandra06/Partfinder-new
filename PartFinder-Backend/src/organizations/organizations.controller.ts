@@ -15,7 +15,7 @@ import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { OrganizationsService } from './organizations.service';
 
 @Controller('organizations')
-@UseGuards(AuthGuard('jwt'))
+
 export class OrganizationsController {
   constructor(private readonly organizationsService: OrganizationsService) {}
 
