@@ -152,6 +152,60 @@
                                 </Button>
                             </Border>
 
+                            <!-- Organization section — directly below logout, no border -->
+                            <StackPanel x:Name="OrgInfoPanel" Spacing="10" Padding="12,12,12,0" Margin="0,8,0,0">
+                                <!-- Divider -->
+                                <Border Height="1" Background="{StaticResource BorderDefaultBrush}" Margin="0,0,0,2" />
+                                <!-- Section label -->
+                                <TextBlock Text="ORGANIZATION"
+                                           FontSize="10"
+                                           FontWeight="Bold"
+                                           CharacterSpacing="80"
+                                           Foreground="{StaticResource TextTertiaryBrush}" />
+
+                                <!-- Org Name -->
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="Name"
+                                               FontSize="11"
+                                               Foreground="{StaticResource TextTertiaryBrush}" />
+                                    <TextBlock Text="{Binding OrgDisplayName}"
+                                               FontSize="13"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                               TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+
+                                <!-- Org Code -->
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="Org Code"
+                                               FontSize="11"
+                                               Foreground="{StaticResource TextTertiaryBrush}" />
+                                    <TextBlock Text="{Binding OrgCode}"
+                                               FontSize="13"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                               TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+
+                                <!-- Org Plan -->
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="Plan"
+                                               FontSize="11"
+                                               Foreground="{StaticResource TextTertiaryBrush}" />
+                                    <Border Background="#101F7AE0"
+                                            BorderBrush="#301F7AE0"
+                                            BorderThickness="1"
+                                            CornerRadius="4"
+                                            Padding="8,3"
+                                            HorizontalAlignment="Left">
+                                        <TextBlock Text="{Binding OrgPlanDisplay}"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource AccentPrimaryBrush}" />
+                                    </Border>
+                                </StackPanel>
+                            </StackPanel>
+
                             <!-- Hidden bindings -->
                             <Border x:Name="NavTwoFactorItem" Visibility="Collapsed" />
                             <Border x:Name="NavAppearanceItem" Visibility="Collapsed" />
@@ -159,8 +213,8 @@
                         </StackPanel>
                     </ScrollViewer>
 
-                    <!-- Org info Minimal (Collapsed by default in icon view) -->
-                    <Border Grid.Row="1" x:Name="OrgInfoPanel" Visibility="Collapsed" />
+                    <!-- Row 1: empty — org panel moved into nav stack above -->
+                    <Border Grid.Row="1" />
                 </Grid>
             </Grid>
         </Border>

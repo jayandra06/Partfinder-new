@@ -10,15 +10,18 @@ public partial class FavouritesViewModel : ViewModelBase
 {
     private readonly IFavouriteStore _favouriteStore;
     private readonly ITemplateSchemaService _templateSchema;
+    private readonly IMasterDataRecordsService _records;
     private readonly Microsoft.UI.Dispatching.DispatcherQueue _dispatcherQueue;
 
     // Kept so OnFavouritesChanged can add newly-starred templates without a full reload
     private IReadOnlyList<PartTemplateDefinition> _allTemplates = Array.Empty<PartTemplateDefinition>();
 
-    public FavouritesViewModel(IFavouriteStore favouriteStore, ITemplateSchemaService templateSchema)
+    public FavouritesViewModel(IFavouriteStore favouriteStore, ITemplateSchemaService templateSchema,
+        IMasterDataRecordsService records)
     {
         _favouriteStore = favouriteStore;
         _templateSchema = templateSchema;
+        _records = records;
         _dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
 
         FavouriteTemplates.CollectionChanged += OnFavouriteTemplatesCollectionChanged;
@@ -186,7 +189,7 @@ public partial class FavouritesViewModel : ViewModelBase
 
     // ── Load ──────────────────────────────────────────────────────────────────
 
-    public Task LoadAsync(IReadOnlyList<PartTemplateDefinition> allTemplates)
+    public async Task LoadAsync(IReadOnlyList<PartTemplateDefinition> allTemplates)
     {
         _allTemplates = allTemplates;
 
@@ -201,14 +204,23 @@ public partial class FavouritesViewModel : ViewModelBase
 
             if (template is not null)
             {
-                FavouriteTemplates.Add(new FavouriteCardViewModel(template, isFavourite: true));
+                // Fetch actual data rows for this template
+                IReadOnlyList<MasterDataRowRecord> rows;
+                try
+                {
+                    rows = await _records.GetRowsAsync(template.Id).ConfigureAwait(true);
+                }
+                catch
+                {
+                    rows = Array.Empty<MasterDataRowRecord>();
+                }
+
+                FavouriteTemplates.Add(new FavouriteCardViewModel(template, isFavourite: true, records: rows));
             }
         }
 
         ActiveIndex = 0;
         NotifyAllState();
-
-        return Task.CompletedTask;
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
@@ -252,7 +264,10 @@ public partial class FavouritesViewModel : ViewModelBase
             var template = _allTemplates.FirstOrDefault(t => string.Equals(t.Id, id, StringComparison.Ordinal));
             if (template is not null)
             {
-                FavouriteTemplates.Add(new FavouriteCardViewModel(template, isFavourite: true));
+                IReadOnlyList<MasterDataRowRecord> rows;
+                try { rows = _records.GetRowsAsync(template.Id).GetAwaiter().GetResult(); }
+                catch { rows = Array.Empty<MasterDataRowRecord>(); }
+                FavouriteTemplates.Add(new FavouriteCardViewModel(template, isFavourite: true, records: rows));
             }
         }
 

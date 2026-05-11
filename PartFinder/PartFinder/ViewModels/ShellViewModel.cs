@@ -306,7 +306,7 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
                 new NavItemViewModel
                 {
                     Label = "Inventory",
-                    IconGlyph = "\uE7B8",
+                    IconGlyph = "\uE179",
                     Page = AppPage.Inventory,
                     IsEnabled = true,
                 });
@@ -318,7 +318,7 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
                 new NavItemViewModel
                 {
                     Label = "Master Data",
-                    IconGlyph = "\uECC8",
+                    IconGlyph = "\uF0E2",
                     Page = AppPage.MasterData,
                     IsEnabled = true,
                 });
@@ -330,7 +330,7 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
                 new NavItemViewModel
                 {
                     Label = "Templates",
-                    IconGlyph = "\uE9D5",
+                    IconGlyph = "\uE8A5",
                     Page = AppPage.Templates,
                     IsEnabled = true,
                 });

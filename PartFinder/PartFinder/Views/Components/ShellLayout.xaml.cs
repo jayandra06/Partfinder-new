@@ -1,9 +1,12 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using PartFinder.Services;
 using PartFinder.ViewModels;
+using System;
 using System.ComponentModel;
+using System.Linq;
 
 namespace PartFinder.Views.Components;
 
@@ -65,10 +68,49 @@ public sealed partial class ShellLayout : UserControl
 
     private void ApplySidebarWidth()
     {
-        // Increased to 80px for a more substantial look while remaining icon-only
         SidebarColumn.Width = new GridLength(80);
-        SidebarRoot.Padding = new Thickness(0, 16, 0, 16);
-        NavListView.Margin = new Thickness(0, 12, 0, 0);
+        SidebarRoot.Padding = new Thickness(0);
+    }
+
+    // ── Instant tooltip — rendered at root level so it's never clipped ──────
+    private void OnNavItemPointerEntered(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is not Grid grid) return;
+
+        string label = grid.Tag as string ?? string.Empty;
+        if (string.IsNullOrEmpty(label)) return;
+
+        NavTooltipLabel.Text = label;
+
+        var transform = grid.TransformToVisual(RootGrid);
+        var pos = transform.TransformPoint(new Windows.Foundation.Point(0, 0));
+
+        double tooltipY = pos.Y + (grid.ActualHeight / 2) - 16;
+        double tooltipX = 88;
+
+        Canvas.SetLeft(NavTooltipBox, tooltipX);
+        Canvas.SetTop(NavTooltipBox, tooltipY);
+
+        NavTooltipOverlay.Visibility = Visibility.Visible;
+    }
+
+    private void OnNavItemPointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        NavTooltipOverlay.Visibility = Visibility.Collapsed;
+    }
+
+    private void OnNavItemTapped(object sender, TappedRoutedEventArgs e)
+    {
+        if (sender is not Grid grid) return;
+        if (DataContext is not ShellViewModel vm) return;
+
+        // Find the NavItemViewModel whose Label matches the Tag
+        string label = grid.Tag as string ?? string.Empty;
+        var item = vm.NavigationItems.FirstOrDefault(n => n.Label == label);
+        if (item is not null)
+            vm.SelectedNavigationItem = item;
+
+        NavTooltipOverlay.Visibility = Visibility.Collapsed;
     }
 
     private async void OnShellLayoutLoaded(object sender, RoutedEventArgs e)
@@ -80,22 +122,6 @@ public sealed partial class ShellLayout : UserControl
         if (DataContext is ShellViewModel shellViewModel)
         {
             await shellViewModel.InitializeAsync().ConfigureAwait(true);
-        }
-    }
-
-    private void NavItem_PointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
-    {
-        if (sender is FrameworkElement fe && ToolTipService.GetToolTip(fe) is ToolTip tt)
-        {
-            tt.IsOpen = true;
-        }
-    }
-
-    private void NavItem_PointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
-    {
-        if (sender is FrameworkElement fe && ToolTipService.GetToolTip(fe) is ToolTip tt)
-        {
-            tt.IsOpen = false;
         }
     }
 }
