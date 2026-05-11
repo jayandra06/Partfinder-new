@@ -193,41 +193,24 @@ public sealed partial class FavouritesSubPage : UserControl
         };
         mainGrid.Children.Add(glassEdge);
 
-        // ── Row 0: Template name only (no star) ──
-        var topSection = new StackPanel
+        // ── Row 0: small template name top-left ──
+        var topSection = new Grid
         {
             Name = "TopSection",
-            Spacing = 12,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(24, 60, 24, 0),
+            Margin = new Thickness(24, 18, 24, 0),
         };
 
-        // Template icon
-        var icon = new FontIcon
-        {
-            Glyph = "\uE8A5",
-            FontSize = 52,
-            Foreground = new SolidColorBrush(accentColor),
-            HorizontalAlignment = HorizontalAlignment.Center,
-        };
-        topSection.Children.Add(icon);
-
-        // Template name
-        var titleLabel = new TextBlock
+        var nameLabel = new TextBlock
         {
             Text = template.Name,
-            FontSize = 22,
-            FontWeight = Microsoft.UI.Text.FontWeights.Bold,
-            Foreground = new SolidColorBrush(_textPrimary),
-            HorizontalAlignment = HorizontalAlignment.Center,
-            TextAlignment = TextAlignment.Center,
-            TextWrapping = TextWrapping.Wrap,
-            MaxLines = 2,
+            FontSize = 12,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(_textSecondary),
+            HorizontalAlignment = HorizontalAlignment.Left,
             TextTrimming = TextTrimming.CharacterEllipsis,
-            MaxWidth = 300,
+            MaxWidth = 220,
         };
-        topSection.Children.Add(titleLabel);
+        topSection.Children.Add(nameLabel);
 
         Grid.SetRow(topSection, 0);
         mainGrid.Children.Add(topSection);
@@ -236,10 +219,39 @@ public sealed partial class FavouritesSubPage : UserControl
         var fieldsSection = new StackPanel
         {
             Name = "FieldsSection",
-            Spacing = 8,
+            Spacing = 10,
             Margin = new Thickness(24, 20, 24, 0),
             VerticalAlignment = VerticalAlignment.Top,
             Visibility = Visibility.Collapsed,
+        };
+
+        var previewScroller = new ScrollViewer
+        {
+            HorizontalScrollMode = ScrollMode.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden,
+            VerticalScrollMode = ScrollMode.Disabled,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            ZoomMode = ZoomMode.Disabled,
+        };
+
+        var previewRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 0,
+        };
+
+        const double previewColumnWidth = 108;
+        const double previewColumnHeight = 62;
+        const double previewOverflowWidth = 84;
+
+        var dividerBrush = new SolidColorBrush(Color.FromArgb(132, _borderDefault.R, _borderDefault.G, _borderDefault.B));
+        var previewSurface = new Border
+        {
+            Background = new SolidColorBrush(Color.FromArgb(16, 255, 255, 255)),
+            BorderBrush = dividerBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(0),
+            Child = previewRow,
         };
 
         var fields = template.Template.Fields
@@ -247,67 +259,110 @@ public sealed partial class FavouritesSubPage : UserControl
             .Take(6)
             .ToList();
 
-        foreach (var field in fields)
+        for (int i = 0; i < fields.Count; i++)
         {
-            var typeIcon = field.Type switch
+            var field = fields[i];
+            var typeCaption = field.Type switch
             {
-                Models.TemplateFieldType.Number     => "\uE8EF",
-                Models.TemplateFieldType.Date       => "\uE787",
-                Models.TemplateFieldType.Dropdown   => "\uE70D",
-                Models.TemplateFieldType.RecordLink => "\uE71B",
-                _                                   => "\uE8D2",
+                Models.TemplateFieldType.Number => "Number",
+                Models.TemplateFieldType.Decimal => "Decimal",
+                Models.TemplateFieldType.Date => "Date",
+                Models.TemplateFieldType.Boolean => "Yes / No",
+                Models.TemplateFieldType.Dropdown => "Dropdown",
+                Models.TemplateFieldType.RecordLink => "Link",
+                _ => "Text",
             };
 
-            var chip = new Border
+            var columnCell = new Border
             {
-                Background = new SolidColorBrush(Color.FromArgb(18, 255, 255, 255)),
-                BorderBrush = new SolidColorBrush(Color.FromArgb(60, _borderDefault.R, _borderDefault.G, _borderDefault.B)),
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(6),
-                Padding = new Thickness(8, 4, 8, 4),
+                Width = previewColumnWidth,
+                Height = previewColumnHeight,
+                Background = new SolidColorBrush(Color.FromArgb(10, 255, 255, 255)),
+                BorderBrush = dividerBrush,
+                BorderThickness = new Thickness(0, 0, i == fields.Count - 1 && template.Template.Fields.Count <= 6 ? 0 : 1, 0),
+                CornerRadius = new CornerRadius(0),
+                Padding = new Thickness(0),
+                Margin = new Thickness(0),
             };
 
-            var chipRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
-            chipRow.Children.Add(new FontIcon
+            var cellGrid = new Grid();
+            cellGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            cellGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+            var headerBand = new Border
             {
-                Glyph = typeIcon,
+                Background = new SolidColorBrush(Color.FromArgb(34, 255, 255, 255)),
+                BorderBrush = dividerBrush,
+                BorderThickness = new Thickness(0, 0, 0, 1),
+                Padding = new Thickness(8, 6, 8, 5),
+                Child = new TextBlock
+                {
+                    Text = field.Label,
+                    FontSize = 11,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    Foreground = new SolidColorBrush(_textPrimary),
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    MaxWidth = previewColumnWidth - 16,
+                },
+            };
+
+            var cellContent = new StackPanel
+            {
+                Spacing = 2,
+                Margin = new Thickness(8, 5, 8, 6),
+                VerticalAlignment = VerticalAlignment.Top,
+            };
+            cellContent.Children.Add(new TextBlock
+            {
                 FontSize = 10,
-                Foreground = new SolidColorBrush(_textTertiary),
-                VerticalAlignment = VerticalAlignment.Center,
-            });
-            chipRow.Children.Add(new TextBlock
-            {
-                Text = field.Label,
-                FontSize = 11,
+                Text = typeCaption,
                 Foreground = new SolidColorBrush(_textSecondary),
-                VerticalAlignment = VerticalAlignment.Center,
                 TextTrimming = TextTrimming.CharacterEllipsis,
-                MaxWidth = 160,
+                MaxWidth = previewColumnWidth - 16,
             });
             if (field.IsRequired)
             {
-                chipRow.Children.Add(new TextBlock
+                cellContent.Children.Add(new TextBlock
                 {
-                    Text = "*",
-                    FontSize = 10,
+                    Text = "Required",
+                    FontSize = 9,
                     Foreground = new SolidColorBrush(Color.FromArgb(255, 224, 82, 82)),
-                    VerticalAlignment = VerticalAlignment.Center,
                 });
             }
-            chip.Child = chipRow;
-            fieldsSection.Children.Add(chip);
+
+            cellGrid.Children.Add(headerBand);
+            Grid.SetRow(cellContent, 1);
+            cellGrid.Children.Add(cellContent);
+
+            columnCell.Child = cellGrid;
+            previewRow.Children.Add(columnCell);
         }
 
         if (template.Template.Fields.Count > 6)
         {
-            fieldsSection.Children.Add(new TextBlock
+            previewRow.Children.Add(new Border
             {
-                Text = $"+{template.Template.Fields.Count - 6} more fields",
-                FontSize = 10,
-                Foreground = new SolidColorBrush(_textTertiary),
-                Margin = new Thickness(4, 2, 0, 0),
+                Width = previewOverflowWidth,
+                Height = previewColumnHeight,
+                Background = new SolidColorBrush(Color.FromArgb(12, 31, 122, 224)),
+                BorderBrush = dividerBrush,
+                BorderThickness = new Thickness(0),
+                CornerRadius = new CornerRadius(0),
+                Padding = new Thickness(10, 8, 10, 8),
+                Margin = new Thickness(0),
+                Child = new TextBlock
+                {
+                    Text = $"+{template.Template.Fields.Count - 6} more",
+                    FontSize = 10,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    Foreground = new SolidColorBrush(_accentPrimary),
+                    VerticalAlignment = VerticalAlignment.Center,
+                }
             });
         }
+
+        previewScroller.Content = previewSurface;
+        fieldsSection.Children.Add(previewScroller);
 
         Grid.SetRow(fieldsSection, 1);
         mainGrid.Children.Add(fieldsSection);

@@ -287,88 +287,160 @@ public sealed partial class AllTemplatesCarousel : UserControl
             Margin = new Thickness(1, 0, 1, 0),
         });
 
-        // Row 0: icon + name
-        var topSection = new StackPanel
+        // Row 0: small template name top-left
+        var topSection = new Grid
         {
-            Name = "TopSection", Spacing = 10,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            Margin = new Thickness(20, 60, 20, 0),
+            Name = "TopSection",
+            Margin = new Thickness(24, 18, 24, 0),
         };
-        topSection.Children.Add(new FontIcon
+
+        var nameLabel = new TextBlock
         {
-            Glyph = "\uE8A5", FontSize = 52,
-            Foreground = new SolidColorBrush(accent),
-            HorizontalAlignment = HorizontalAlignment.Center,
-        });
-        topSection.Children.Add(new TextBlock
-        {
-            Text = template.Name, FontSize = 22,
-            FontWeight = Microsoft.UI.Text.FontWeights.Bold,
-            Foreground = new SolidColorBrush(Color.FromArgb(255, 234, 242, 255)),
-            HorizontalAlignment = HorizontalAlignment.Center,
-            TextAlignment = TextAlignment.Center,
-            TextWrapping = TextWrapping.Wrap, MaxLines = 2,
-            TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 300,
-        });
+            Text = template.Name,
+            FontSize = 12,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(Color.FromArgb(255, 170, 184, 202)),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            MaxWidth = 220,
+        };
+        topSection.Children.Add(nameLabel);
         Grid.SetRow(topSection, 0);
         mainGrid.Children.Add(topSection);
 
         // Row 1: field chips
         var fieldsSection = new StackPanel
         {
-            Name = "FieldsSection", Spacing = 8,
+            Name = "FieldsSection", Spacing = 10,
             Margin = new Thickness(24, 20, 24, 0),
             VerticalAlignment = VerticalAlignment.Top,
         };
-        foreach (var field in template.Fields.OrderBy(f => f.DisplayOrder).Take(6))
+        var previewScroller = new ScrollViewer
         {
-            var typeIcon = field.Type switch
+            HorizontalScrollMode = ScrollMode.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden,
+            VerticalScrollMode = ScrollMode.Disabled,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            ZoomMode = ZoomMode.Disabled,
+        };
+
+        var previewRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 0,
+        };
+
+        const double previewColumnWidth = 108;
+        const double previewColumnHeight = 62;
+        const double previewOverflowWidth = 84;
+
+        var dividerBrush = new SolidColorBrush(Color.FromArgb(132, 42, 61, 88));
+        var previewSurface = new Border
+        {
+            Background = new SolidColorBrush(Color.FromArgb(16, 255, 255, 255)),
+            BorderBrush = dividerBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(0),
+            Child = previewRow,
+        };
+
+        var visibleFields = template.Fields.OrderBy(f => f.DisplayOrder).Take(6).ToList();
+        for (int i = 0; i < visibleFields.Count; i++)
+        {
+            var field = visibleFields[i];
+            var typeCaption = field.Type switch
             {
-                Models.TemplateFieldType.Number     => "\uE8EF",
-                Models.TemplateFieldType.Date       => "\uE787",
-                Models.TemplateFieldType.Dropdown   => "\uE70D",
-                Models.TemplateFieldType.RecordLink => "\uE71B",
-                _                                   => "\uE8D2",
+                Models.TemplateFieldType.Number => "Number",
+                Models.TemplateFieldType.Decimal => "Decimal",
+                Models.TemplateFieldType.Date => "Date",
+                Models.TemplateFieldType.Boolean => "Yes / No",
+                Models.TemplateFieldType.Dropdown => "Dropdown",
+                Models.TemplateFieldType.RecordLink => "Link",
+                _ => "Text",
             };
-            var chip = new Border
+            var columnCell = new Border
             {
-                Background      = new SolidColorBrush(Color.FromArgb(18, 255, 255, 255)),
-                BorderBrush     = new SolidColorBrush(Color.FromArgb(60, 42, 61, 88)),
-                BorderThickness = new Thickness(1),
-                CornerRadius    = new CornerRadius(6),
-                Padding         = new Thickness(8, 4, 8, 4),
+                Width = previewColumnWidth,
+                Height = previewColumnHeight,
+                Background = new SolidColorBrush(Color.FromArgb(10, 255, 255, 255)),
+                BorderBrush = dividerBrush,
+                BorderThickness = new Thickness(0, 0, i == visibleFields.Count - 1 && template.Fields.Count <= 6 ? 0 : 1, 0),
+                CornerRadius = new CornerRadius(0),
+                Padding = new Thickness(0),
+                Margin = new Thickness(0),
             };
-            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
-            row.Children.Add(new FontIcon
+
+            var cellGrid = new Grid();
+            cellGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            cellGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+            var headerBand = new Border
             {
-                Glyph = typeIcon, FontSize = 10,
-                Foreground = new SolidColorBrush(Color.FromArgb(255, 123, 141, 168)),
-                VerticalAlignment = VerticalAlignment.Center,
-            });
-            row.Children.Add(new TextBlock
+                Background = new SolidColorBrush(Color.FromArgb(34, 255, 255, 255)),
+                BorderBrush = dividerBrush,
+                BorderThickness = new Thickness(0, 0, 0, 1),
+                Padding = new Thickness(8, 6, 8, 5),
+                Child = new TextBlock
+                {
+                    Text = field.Label,
+                    FontSize = 11,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    Foreground = new SolidColorBrush(Color.FromArgb(255, 234, 242, 255)),
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    MaxWidth = previewColumnWidth - 16,
+                },
+            };
+
+            var cellContent = new StackPanel
             {
-                Text = field.Label, FontSize = 11,
+                Spacing = 2,
+                Margin = new Thickness(8, 5, 8, 6),
+                VerticalAlignment = VerticalAlignment.Top,
+            };
+            cellContent.Children.Add(new TextBlock
+            {
+                Text = typeCaption,
+                FontSize = 10,
                 Foreground = new SolidColorBrush(Color.FromArgb(255, 170, 184, 202)),
-                VerticalAlignment = VerticalAlignment.Center,
-                TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 200,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                MaxWidth = previewColumnWidth - 16,
             });
             if (field.IsRequired)
-                row.Children.Add(new TextBlock
+                cellContent.Children.Add(new TextBlock
                 {
-                    Text = "*", FontSize = 10,
+                    Text = "Required", FontSize = 9,
                     Foreground = new SolidColorBrush(Color.FromArgb(255, 224, 82, 82)),
-                    VerticalAlignment = VerticalAlignment.Center,
                 });
-            chip.Child = row;
-            fieldsSection.Children.Add(chip);
+
+            cellGrid.Children.Add(headerBand);
+            Grid.SetRow(cellContent, 1);
+            cellGrid.Children.Add(cellContent);
+
+            columnCell.Child = cellGrid;
+            previewRow.Children.Add(columnCell);
         }
         if (template.Fields.Count > 6)
-            fieldsSection.Children.Add(new TextBlock
+            previewRow.Children.Add(new Border
             {
-                Text = $"+{template.Fields.Count - 6} more fields", FontSize = 10,
-                Foreground = new SolidColorBrush(Color.FromArgb(255, 123, 141, 168)),
-                Margin = new Thickness(4, 2, 0, 0),
+                Width = previewOverflowWidth,
+                Height = previewColumnHeight,
+                Background = new SolidColorBrush(Color.FromArgb(12, 31, 122, 224)),
+                BorderBrush = dividerBrush,
+                BorderThickness = new Thickness(0),
+                CornerRadius = new CornerRadius(0),
+                Padding = new Thickness(10, 8, 10, 8),
+                Margin = new Thickness(0),
+                Child = new TextBlock
+                {
+                    Text = $"+{template.Fields.Count - 6} more",
+                    FontSize = 10,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    Foreground = new SolidColorBrush(accent),
+                    VerticalAlignment = VerticalAlignment.Center,
+                }
             });
+        previewScroller.Content = previewSurface;
+        fieldsSection.Children.Add(previewScroller);
         Grid.SetRow(fieldsSection, 1);
         mainGrid.Children.Add(fieldsSection);
 

@@ -332,129 +332,161 @@
                                             </Grid>
                                         </Border>
 
-                                        <!-- Body: label input per type -->
-                                        <Grid Grid.Row="1" Margin="8,6,8,6">
-                                            <TextBox
-                                                Height="34"
-                                                VerticalAlignment="Center"
-                                                FontSize="13"
-                                                BorderThickness="1"
-                                                Background="#0D1E33"
-                                                BorderBrush="#2A3D58"
-                                                PlaceholderText="Field name..."
-                                                Text="{Binding Label, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                Visibility="{Binding FieldType, Converter={StaticResource TemplateFieldTypeEqualsToVisibilityConverter}, ConverterParameter=Text}" />
+                                        <!-- Body: type preview/config first, column name below -->
+                                        <Grid Grid.Row="1" Margin="8,6,8,8" RowSpacing="8">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
 
-                                            <TextBox
-                                                Height="34"
-                                                VerticalAlignment="Center"
-                                                FontSize="13"
-                                                BorderThickness="1"
-                                                Background="#0D1E33"
-                                                BorderBrush="#2A3D58"
-                                                PlaceholderText="Field name..."
-                                                Text="{Binding Label, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                Visibility="{Binding FieldType, Converter={StaticResource TemplateFieldTypeEqualsToVisibilityConverter}, ConverterParameter=Number}" />
-
-                                            <TextBox
-                                                Height="34"
-                                                VerticalAlignment="Center"
-                                                FontSize="13"
-                                                BorderThickness="1"
-                                                Background="#0D1E33"
-                                                BorderBrush="#2A3D58"
-                                                PlaceholderText="Field name..."
-                                                Text="{Binding Label, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                Visibility="{Binding FieldType, Converter={StaticResource TemplateFieldTypeEqualsToVisibilityConverter}, ConverterParameter=Decimal}" />
-
-                                            <DatePicker
-                                                Height="34"
-                                                VerticalAlignment="Center"
-                                                Visibility="{Binding FieldType, Converter={StaticResource TemplateFieldTypeEqualsToVisibilityConverter}, ConverterParameter=Date}" />
-
-                                            <ComboBox
-                                                Height="34"
-                                                HorizontalAlignment="Stretch"
-                                                VerticalAlignment="Center"
-                                                SelectedIndex="0"
-                                                Visibility="{Binding FieldType, Converter={StaticResource TemplateFieldTypeEqualsToVisibilityConverter}, ConverterParameter=Boolean}">
-                                                <x:String>Yes</x:String>
-                                                <x:String>No</x:String>
-                                            </ComboBox>
-
-                                            <Grid
-                                                Visibility="{Binding FieldType, Converter={StaticResource TemplateFieldTypeEqualsToVisibilityConverter}, ConverterParameter=Dropdown}">
-                                                <Grid.RowDefinitions>
-                                                    <RowDefinition Height="Auto" />
-                                                    <RowDefinition Height="Auto" />
-                                                </Grid.RowDefinitions>
-                                                <Grid ColumnSpacing="6">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="Auto" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <TextBox
-                                                        Grid.Column="0"
-                                                        Height="28"
-                                                        VerticalAlignment="Center"
+                                            <Grid Grid.Row="0">
+                                                <Border
+                                                    MinHeight="34"
+                                                    Padding="10,8"
+                                                    Background="#0D1E33"
+                                                    BorderBrush="#2A3D58"
+                                                    BorderThickness="1"
+                                                    CornerRadius="6"
+                                                    Visibility="{Binding FieldType, Converter={StaticResource TemplateFieldTypeEqualsToVisibilityConverter}, ConverterParameter=Text}">
+                                                    <TextBlock
+                                                        Text="Preview: free text value"
                                                         FontSize="12"
-                                                        BorderThickness="1"
-                                                        Background="#0D1E33"
-                                                        BorderBrush="#2A3D58"
-                                                        PlaceholderText="Add option..."
-                                                        Text="{Binding PendingDropdownOption, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                        KeyDown="OnDropdownOptionInputKeyDown" />
-                                                    <Button
-                                                        Grid.Column="1"
-                                                        Height="28"
-                                                        MinWidth="48"
-                                                        Content="+ Add"
-                                                        Click="OnAddDropdownOptionClick"
-                                                        Style="{StaticResource GhostButtonStyle}" />
+                                                        Foreground="{StaticResource TextSecondaryBrush}" />
+                                                </Border>
+
+                                                <Border
+                                                    MinHeight="34"
+                                                    Padding="10,8"
+                                                    Background="#0D1E33"
+                                                    BorderBrush="#2A3D58"
+                                                    BorderThickness="1"
+                                                    CornerRadius="6"
+                                                    Visibility="{Binding FieldType, Converter={StaticResource TemplateFieldTypeEqualsToVisibilityConverter}, ConverterParameter=Number}">
+                                                    <TextBlock
+                                                        Text="Preview: whole number (e.g. 25)"
+                                                        FontSize="12"
+                                                        Foreground="{StaticResource TextSecondaryBrush}" />
+                                                </Border>
+
+                                                <Border
+                                                    MinHeight="34"
+                                                    Padding="10,8"
+                                                    Background="#0D1E33"
+                                                    BorderBrush="#2A3D58"
+                                                    BorderThickness="1"
+                                                    CornerRadius="6"
+                                                    Visibility="{Binding FieldType, Converter={StaticResource TemplateFieldTypeEqualsToVisibilityConverter}, ConverterParameter=Decimal}">
+                                                    <TextBlock
+                                                        Text="Preview: decimal value (e.g. 99.95)"
+                                                        FontSize="12"
+                                                        Foreground="{StaticResource TextSecondaryBrush}" />
+                                                </Border>
+
+                                                <DatePicker
+                                                    Height="34"
+                                                    VerticalAlignment="Center"
+                                                    Visibility="{Binding FieldType, Converter={StaticResource TemplateFieldTypeEqualsToVisibilityConverter}, ConverterParameter=Date}" />
+
+                                                <ComboBox
+                                                    Height="34"
+                                                    HorizontalAlignment="Stretch"
+                                                    VerticalAlignment="Center"
+                                                    SelectedIndex="0"
+                                                    Visibility="{Binding FieldType, Converter={StaticResource TemplateFieldTypeEqualsToVisibilityConverter}, ConverterParameter=Boolean}">
+                                                    <x:String>Yes</x:String>
+                                                    <x:String>No</x:String>
+                                                </ComboBox>
+
+                                                <Grid
+                                                    Visibility="{Binding FieldType, Converter={StaticResource TemplateFieldTypeEqualsToVisibilityConverter}, ConverterParameter=Dropdown}">
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto" />
+                                                        <RowDefinition Height="Auto" />
+                                                    </Grid.RowDefinitions>
+                                                    <Grid ColumnSpacing="6">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBox
+                                                            Grid.Column="0"
+                                                            Height="28"
+                                                            VerticalAlignment="Center"
+                                                            FontSize="12"
+                                                            BorderThickness="1"
+                                                            Background="#0D1E33"
+                                                            BorderBrush="#2A3D58"
+                                                            PlaceholderText="Add option..."
+                                                            Text="{Binding PendingDropdownOption, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                            KeyDown="OnDropdownOptionInputKeyDown" />
+                                                        <Button
+                                                            Grid.Column="1"
+                                                            Height="28"
+                                                            MinWidth="48"
+                                                            Content="+ Add"
+                                                            Click="OnAddDropdownOptionClick"
+                                                            Style="{StaticResource GhostButtonStyle}" />
+                                                    </Grid>
+                                                    <ItemsControl
+                                                        Grid.Row="1"
+                                                        Margin="0,6,0,0"
+                                                        ItemsSource="{Binding DropdownOptions}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <StackPanel Orientation="Horizontal" Spacing="6" />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Border
+                                                                    Background="#16273A"
+                                                                    BorderBrush="#355983"
+                                                                    BorderThickness="1"
+                                                                    CornerRadius="6"
+                                                                    Padding="6,2">
+                                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                                        <TextBlock Text="{Binding}" FontSize="11" />
+                                                                        <Button
+                                                                            Width="16" Height="16"
+                                                                            Padding="0"
+                                                                            Content="×"
+                                                                            Background="Transparent"
+                                                                            BorderThickness="0"
+                                                                            Click="OnRemoveDropdownOptionClick" />
+                                                                    </StackPanel>
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
                                                 </Grid>
-                                                <ItemsControl
-                                                    Grid.Row="1"
-                                                    Margin="0,6,0,0"
-                                                    ItemsSource="{Binding DropdownOptions}">
-                                                    <ItemsControl.ItemsPanel>
-                                                        <ItemsPanelTemplate>
-                                                            <StackPanel Orientation="Horizontal" Spacing="6" />
-                                                        </ItemsPanelTemplate>
-                                                    </ItemsControl.ItemsPanel>
-                                                    <ItemsControl.ItemTemplate>
-                                                        <DataTemplate>
-                                                            <Border
-                                                                Background="#16273A"
-                                                                BorderBrush="#355983"
-                                                                BorderThickness="1"
-                                                                CornerRadius="6"
-                                                                Padding="6,2">
-                                                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                                                    <TextBlock Text="{Binding}" FontSize="11" />
-                                                                    <Button
-                                                                        Width="16" Height="16"
-                                                                        Padding="0"
-                                                                        Content="×"
-                                                                        Background="Transparent"
-                                                                        BorderThickness="0"
-                                                                        Click="OnRemoveDropdownOptionClick" />
-                                                                </StackPanel>
-                                                            </Border>
-                                                        </DataTemplate>
-                                                    </ItemsControl.ItemTemplate>
-                                                </ItemsControl>
+
+                                                <ComboBox
+                                                    Height="34"
+                                                    VerticalAlignment="Center"
+                                                    PlaceholderText="Select linked template"
+                                                    DisplayMemberPath="Name"
+                                                    SelectedValuePath="Id"
+                                                    ItemsSource="{Binding DataContext.LinkTargetCandidates, ElementName=TemplatesPageRoot}"
+                                                    SelectedValue="{Binding LinkedTemplateId, Mode=TwoWay}"
+                                                    Visibility="{Binding FieldType, Converter={StaticResource TemplateFieldTypeEqualsToVisibilityConverter}, ConverterParameter=RecordLink}" />
                                             </Grid>
 
-                                            <TextBox
-                                                Height="34"
-                                                VerticalAlignment="Center"
-                                                FontSize="13"
-                                                BorderThickness="1"
-                                                Background="#0D1E33"
-                                                BorderBrush="#2A3D58"
-                                                PlaceholderText="Field name..."
-                                                Text="{Binding Label, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                Visibility="{Binding FieldType, Converter={StaticResource TemplateFieldTypeEqualsToVisibilityConverter}, ConverterParameter=RecordLink}" />
+                                            <StackPanel Grid.Row="1" Spacing="4">
+                                                <TextBlock
+                                                    Text="Column name"
+                                                    FontSize="11"
+                                                    FontWeight="SemiBold"
+                                                    Foreground="{StaticResource TextSecondaryBrush}" />
+                                                <TextBox
+                                                    Height="34"
+                                                    VerticalAlignment="Center"
+                                                    FontSize="13"
+                                                    BorderThickness="1"
+                                                    Background="#0D1E33"
+                                                    BorderBrush="#2A3D58"
+                                                    PlaceholderText="Enter column name"
+                                                    Text="{Binding Label, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                            </StackPanel>
                                         </Grid>
 
                                         <!-- Required toggle footer -->
