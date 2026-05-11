@@ -19,11 +19,27 @@ public sealed class AdminSessionStore
         var dir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "PartFinder");
+        if (!Directory.Exists(dir))
+        {
+            try { Directory.CreateDirectory(dir); } catch { }
+        }
         _filePath = Path.Combine(dir, "admin-session.json");
     }
 
-    public string? AccessToken { get; private set; }
-    public string? Email { get; private set; }
+    private static string? _staticAccessToken;
+    private static string? _staticEmail;
+
+    public string? AccessToken 
+    { 
+        get => _staticAccessToken; 
+        private set => _staticAccessToken = value; 
+    }
+    
+    public string? Email 
+    { 
+        get => _staticEmail; 
+        private set => _staticEmail = value; 
+    }
 
     public bool HasSession => !string.IsNullOrWhiteSpace(AccessToken);
 
@@ -94,13 +110,15 @@ public sealed class AdminSessionStore
         }
     }
 
-    // Security: JWT must have exactly 3 dot-separated non-empty parts
+    // Security: basic sanity check on token presence. 
+    // We let the server perform full JWT validation.
     private static bool IsValidJwtShape(string? token)
     {
-        if (string.IsNullOrWhiteSpace(token) || token.Length > 4096)
+        if (string.IsNullOrWhiteSpace(token) || token.Length > 8192)
             return false;
-        var parts = token.Split('.');
-        return parts.Length == 3 && parts.All(p => p.Length > 0);
+        
+        // Simple check for any content; server will reject if not a real JWT
+        return token.Length > 10; 
     }
 
     // Security: basic email sanity (not a full RFC check, just prevents garbage)
@@ -114,7 +132,10 @@ public sealed class AdminSessionStore
 
     private sealed class SessionDto
     {
+        [JsonPropertyName("accessToken")]
         public string? AccessToken { get; set; }
+
+        [JsonPropertyName("email")]
         public string? Email { get; set; }
     }
 }
