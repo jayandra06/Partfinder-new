@@ -1,6 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <!-- Packaged WinUI cannot be AnyCPU; CLI `dotnet build` often defaults to Any CPU. -->
     <Platform Condition="'$(Platform)' == 'AnyCPU' or '$(Platform)' == ''">x64</Platform>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
@@ -15,6 +14,8 @@
     <EnableMsixTooling>true</EnableMsixTooling>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>preview</LangVersion>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -38,27 +39,21 @@
     <Manifest Include="$(ApplicationManifest)" />
   </ItemGroup>
 
-  <!-- Exclude accidental nested project copy to avoid duplicate type/member compile errors. -->
+  <!-- Prevent duplicate nested project issues -->
   <ItemGroup>
     <Compile Remove="PartFinder\**\*.cs" />
     <Page Remove="PartFinder\**\*.xaml" />
   </ItemGroup>
 
-  <!--
-    Defining the "Msix" ProjectCapability here allows the Single-project MSIX Packaging
-    Tools extension to be activated for this project even if the Windows App SDK Nuget
-    package has not yet been restored.
-  -->
+  <!-- Enable MSIX tooling -->
   <ItemGroup Condition="'$(DisableMsixProjectCapabilityAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
     <ProjectCapability Include="Msix" />
   </ItemGroup>
+
+  <!-- NuGet Packages -->
   <ItemGroup>
     <PackageReference Include="LiveChartsCore.SkiaSharpView.WinUI" Version="2.0.0" />
-    <!--
-      SkiaSharp.Views.WinUI.Native.Projection is only under runtimes/... in the package. WinUI's XAML InputSerializer omits runtimes/
-      paths from ReferenceAssemblies in input.json, which breaks MarkupCompilePass2. Copy into lib\ TFM and reference by HintPath.
-    -->
-    <PackageReference Include="SkiaSharp.NativeAssets.WinUI" Version="3.119.0" GeneratePathProperty="true" />
+    <PackageReference Include="SkiaSharp.NativeAssets.WinUI" Version="3.119.0" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.1721" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260317003" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
@@ -70,16 +65,12 @@
     <PackageReference Include="QRCoder" Version="1.6.0" />
   </ItemGroup>
 
-  <!--
-    Defining the "HasPackageAndPublishMenuAddedByProject" property here allows the Solution
-    Explorer "Package and Publish" context menu entry to be enabled for this project even if
-    the Windows App SDK Nuget package has not yet been restored.
-  -->
+  <!-- Enable Package & Publish menu -->
   <PropertyGroup Condition="'$(DisableHasPackageAndPublishMenuAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
     <HasPackageAndPublishMenu>true</HasPackageAndPublishMenu>
   </PropertyGroup>
 
-  <!-- Publish Properties -->
+  <!-- Publish settings -->
   <PropertyGroup>
     <PublishReadyToRun Condition="'$(Configuration)' == 'Debug'">False</PublishReadyToRun>
     <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">True</PublishReadyToRun>
@@ -87,31 +78,4 @@
     <PublishTrimmed Condition="'$(Configuration)' != 'Debug'">True</PublishTrimmed>
   </PropertyGroup>
 
-  <ItemGroup>
-    <Reference Include="SkiaSharp.Views.WinUI.Native.Projection">
-      <HintPath>$(PkgSkiaSharp_NativeAssets_WinUI)\lib\net8.0-windows10.0.19041\SkiaSharp.Views.WinUI.Native.Projection.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-  </ItemGroup>
-
-  <Target Name="PartFinderStageSkiaNativeProjection" BeforeTargets="ResolveAssemblyReferences">
-    <PropertyGroup Condition="'$(Platform)' == 'x64'">
-      <_SkiaNativeProjSrc>$(PkgSkiaSharp_NativeAssets_WinUI)\runtimes\win-x64\lib\net8.0-windows10.0.19041.0\SkiaSharp.Views.WinUI.Native.Projection.dll</_SkiaNativeProjSrc>
-    </PropertyGroup>
-    <PropertyGroup Condition="'$(Platform)' == 'x86'">
-      <_SkiaNativeProjSrc>$(PkgSkiaSharp_NativeAssets_WinUI)\runtimes\win-x86\lib\net8.0-windows10.0.19041.0\SkiaSharp.Views.WinUI.Native.Projection.dll</_SkiaNativeProjSrc>
-    </PropertyGroup>
-    <PropertyGroup Condition="'$(Platform)' == 'ARM64'">
-      <_SkiaNativeProjSrc>$(PkgSkiaSharp_NativeAssets_WinUI)\runtimes\win-arm64\lib\net8.0-windows10.0.19041.0\SkiaSharp.Views.WinUI.Native.Projection.dll</_SkiaNativeProjSrc>
-    </PropertyGroup>
-    <PropertyGroup>
-      <_SkiaNativeProjDst>$(PkgSkiaSharp_NativeAssets_WinUI)\lib\net8.0-windows10.0.19041\SkiaSharp.Views.WinUI.Native.Projection.dll</_SkiaNativeProjDst>
-    </PropertyGroup>
-    <MakeDir Directories="$(PkgSkiaSharp_NativeAssets_WinUI)\lib\net8.0-windows10.0.19041" />
-    <Copy
-      SourceFiles="$(_SkiaNativeProjSrc)"
-      DestinationFiles="$(_SkiaNativeProjDst)"
-      SkipUnchangedFiles="true"
-      Condition="'$(_SkiaNativeProjSrc)' != '' And Exists('$(_SkiaNativeProjSrc)')" />
-  </Target>
 </Project>

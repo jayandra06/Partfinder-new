@@ -341,9 +341,9 @@ public sealed partial class KpiItem : ObservableObject
     public string Icon      { get; }
     public string AccentHex { get; }
 
-    [ObservableProperty] private string        _value;
-    [ObservableProperty] private string        _delta;
-    [ObservableProperty] private KpiAlertLevel _alertLevel;
+    [ObservableProperty] public partial string Value { get; set; }
+    [ObservableProperty] public partial string Delta { get; set; }
+    [ObservableProperty] public partial KpiAlertLevel AlertLevel { get; set; }
 }
 
 public sealed class ActivityItem
