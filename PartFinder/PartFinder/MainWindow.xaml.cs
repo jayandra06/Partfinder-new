@@ -92,12 +92,33 @@ public sealed partial class MainWindow : Window
 
     public void RefreshShellTitleBarRegions()
     {
-        // No-op: top navigation is now below a dedicated drag strip.
+        UpdateShellTitleBarRegions();
     }
 
     private void UpdateShellTitleBarRegions()
     {
-        // No-op: top navigation is now below a dedicated drag strip.
+        if (ShellRoot is null || !ExtendsContentIntoTitleBar)
+            return;
+
+        try
+        {
+            var windowId = AppWindow.Id;
+            var inputSource = InputNonClientPointerSource.GetForWindowId(windowId);
+            if (inputSource is null) return;
+
+            var rects = ShellRoot.GetTitleBarPassthroughRects();
+            inputSource.SetRegionRects(NonClientRegionKind.Passthrough, rects);
+            System.Diagnostics.Debug.WriteLine($"[MainWindow] Registered {rects.Length} interactive regions via ShellRoot.");
+        }
+        catch (System.Runtime.InteropServices.COMException ex) when (ex.HResult == unchecked((int)0x80010108) || ex.Message.Contains("closed"))
+        {
+            // RPC_E_DISCONNECTED or similar window-closed errors
+            System.Diagnostics.Debug.WriteLine("[MainWindow] Title bar update skipped: Window object is already closed.");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MainWindow] Title bar update failed: {ex.Message}");
+        }
     }
 
     private sealed class SetupState
@@ -315,6 +336,8 @@ public sealed partial class MainWindow : Window
         _maintenanceUntilUtc = null;
         _orgCodeForMaintenanceRetry = null;
     }
+
+
 
     private void OnMaintenanceTimerTick(object? sender, object e)
     {

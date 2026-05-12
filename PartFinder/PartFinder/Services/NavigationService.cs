@@ -10,7 +10,7 @@ public sealed class NavigationService : INavigationService
     {
         [AppPage.MasterData]         = typeof(MasterDataPage),
         [AppPage.Dashboard]          = typeof(DashboardPage),
-        [AppPage.Parts]              = typeof(MasterDataPage),
+        [AppPage.Parts]              = typeof(PartsPage),
         [AppPage.Inventory]          = typeof(InventoryPage),
         [AppPage.Alerts]             = typeof(AlertsPage),
         [AppPage.Audit]              = typeof(AuditPage),
@@ -39,13 +39,28 @@ public sealed class NavigationService : INavigationService
 
     public bool Navigate(AppPage page, object? parameter = null)
     {
-        if (_frame is null || !_routes.TryGetValue(page, out var targetType))
+        if (_frame is null)
+        {
+            System.Diagnostics.Debug.WriteLine($"[NavigationService] Cannot navigate to {page}: Frame is null.");
             return false;
+        }
+
+        if (!_routes.TryGetValue(page, out var targetType))
+        {
+            System.Diagnostics.Debug.WriteLine($"[NavigationService] Cannot navigate to {page}: Route not registered.");
+            return false;
+        }
 
         if (_frame.Content?.GetType() == targetType)
+        {
+            System.Diagnostics.Debug.WriteLine($"[NavigationService] Already on {targetType.Name}. Navigation skipped.");
             return false;
+        }
 
-        return _frame.Navigate(targetType, parameter, new DrillInNavigationTransitionInfo());
+        System.Diagnostics.Debug.WriteLine($"[NavigationService] Navigating to {page} ({targetType.Name})...");
+        bool result = _frame.Navigate(targetType, parameter, new DrillInNavigationTransitionInfo());
+        System.Diagnostics.Debug.WriteLine($"[NavigationService] Frame.Navigate result: {result}");
+        return result;
     }
 
     public void GoBack()

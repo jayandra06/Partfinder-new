@@ -28,6 +28,7 @@ public sealed partial class TemplatesPage : Page
 
     public TemplatesPage()
     {
+        System.Diagnostics.Debug.WriteLine("[TemplatesPage] Constructor started.");
         InitializeComponent();
         DataContext = App.Services.GetRequiredService<TemplatesViewModel>();
         Loaded += OnLoaded;
@@ -54,6 +55,7 @@ public sealed partial class TemplatesPage : Page
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
+        System.Diagnostics.Debug.WriteLine("[TemplatesPage] OnLoaded triggered.");
         var vm = (TemplatesViewModel)DataContext;
 
         // IMPORTANT: Load favourite store FIRST before loading templates

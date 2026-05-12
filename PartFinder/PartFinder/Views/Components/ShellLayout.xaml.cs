@@ -103,14 +103,24 @@ public sealed partial class ShellLayout : UserControl
 
     private void OnTopNavItemClicked(object sender, RoutedEventArgs e)
     {
-        if (sender is not FrameworkElement { DataContext: NavItemViewModel item })
+        if (sender is not FrameworkElement element) return;
+
+        // Try to get item from DataContext
+        if (element.DataContext is not NavItemViewModel item)
         {
+            System.Diagnostics.Debug.WriteLine($"[ShellLayout] Nav item click failed: DataContext is {element.DataContext?.GetType().Name ?? "null"} (expected NavItemViewModel)");
             return;
         }
+
+        System.Diagnostics.Debug.WriteLine($"[ShellLayout] Nav item clicked: {item.Label} (Page: {item.Page})");
 
         if (DataContext is ShellViewModel vm)
         {
             vm.SelectedNavigationItem = item;
+        }
+        else
+        {
+            System.Diagnostics.Debug.WriteLine("[ShellLayout] Nav item click failed: ShellLayout DataContext is not ShellViewModel.");
         }
     }
 

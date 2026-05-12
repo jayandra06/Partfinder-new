@@ -70,7 +70,12 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
             _lastSelectedPage = value.Page;
             if (!_suppressNavigation)
             {
+                System.Diagnostics.Debug.WriteLine($"[ShellViewModel] Navigating to {value.Page}");
                 _navigationService.Navigate(value.Page);
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"[ShellViewModel] Navigation to {value.Page} suppressed by flag.");
             }
         }
     }

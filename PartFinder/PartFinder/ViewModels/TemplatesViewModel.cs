@@ -420,6 +420,7 @@ public partial class TemplatesViewModel : ViewModelBase
 
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
+        System.Diagnostics.Debug.WriteLine("[TemplatesViewModel] Loading templates...");
         FormError = string.Empty;
         if (!_access.Capabilities.CanViewTemplate)
         {

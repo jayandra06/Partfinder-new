@@ -186,6 +186,7 @@
                                         <Button
                                             Style="{StaticResource TopNavIconButtonStyle}"
                                             Click="OnTopNavItemClicked"
+                                            DataContext="{x:Bind}"
                                             ToolTipService.ToolTip="{x:Bind Label}">
                                             <Grid>
                                                 <FontIcon
