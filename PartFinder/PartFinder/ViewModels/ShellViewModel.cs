@@ -62,6 +62,11 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
                 return;
             }
 
+            foreach (var item in NavigationItems)
+            {
+                item.IsSelected = ReferenceEquals(item, value);
+            }
+
             _lastSelectedPage = value.Page;
             if (!_suppressNavigation)
             {
@@ -163,37 +168,6 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
         catch
         {
             HasUnreadAlerts = false;
-        }
-    }
-
-    private bool _isSidebarCollapsed;
-    public bool IsSidebarCollapsed
-    {
-        get => _isSidebarCollapsed;
-        set
-        {
-            if (SetProperty(ref _isSidebarCollapsed, value))
-            {
-                OnPropertyChanged(nameof(SidebarToggleGlyph));
-            }
-        }
-    }
-
-    /// <summary>Chevron left when expanded (collapse); chevron right when collapsed (expand).</summary>
-    public string SidebarToggleGlyph => IsSidebarCollapsed ? "\uE76B" : "\uE76C";
-
-    [RelayCommand]
-    private void ToggleSidebar()
-    {
-        IsSidebarCollapsed = !IsSidebarCollapsed;
-        SyncNavItemLabelsWithSidebar();
-    }
-
-    private void SyncNavItemLabelsWithSidebar()
-    {
-        foreach (var item in NavigationItems)
-        {
-            item.ShowNavLabel = !IsSidebarCollapsed;
         }
     }
 
@@ -396,7 +370,6 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
                 });
         }
 
-        SyncNavItemLabelsWithSidebar();
     }
 
     private async Task<bool> HasMasterDataTemplateAsync()

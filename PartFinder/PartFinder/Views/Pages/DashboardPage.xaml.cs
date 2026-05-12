@@ -54,7 +54,7 @@ public sealed partial class DashboardPage : Page
         var fadeIn = new DoubleAnimation
         {
             From = 0, To = 1,
-            Duration = TimeSpan.FromMilliseconds(400),
+            Duration = TimeSpan.FromMilliseconds(520),
             BeginTime = TimeSpan.FromMilliseconds(delay),
             EasingFunction = new ExponentialEase { EasingMode = EasingMode.EaseOut, Exponent = 4 },
         };
@@ -63,8 +63,8 @@ public sealed partial class DashboardPage : Page
 
         var slideUp = new DoubleAnimation
         {
-            From = 14, To = 0,
-            Duration = TimeSpan.FromMilliseconds(400),
+            From = 18, To = 0,
+            Duration = TimeSpan.FromMilliseconds(520),
             BeginTime = TimeSpan.FromMilliseconds(delay),
             EasingFunction = new ExponentialEase { EasingMode = EasingMode.EaseOut, Exponent = 4 },
         };
@@ -81,9 +81,9 @@ public sealed partial class DashboardPage : Page
     private void StartPulseDot()
     {
         // Scale pulse ring out and fade
-        var scaleX = new DoubleAnimation { From = 0.4, To = 1.8, Duration = TimeSpan.FromSeconds(1.6) };
-        var scaleY = new DoubleAnimation { From = 0.4, To = 1.8, Duration = TimeSpan.FromSeconds(1.6) };
-        var fade   = new DoubleAnimation { From = 0.7, To = 0,   Duration = TimeSpan.FromSeconds(1.6) };
+        var scaleX = new DoubleAnimation { From = 0.4, To = 1.8, Duration = TimeSpan.FromSeconds(2.1) };
+        var scaleY = new DoubleAnimation { From = 0.4, To = 1.8, Duration = TimeSpan.FromSeconds(2.1) };
+        var fade   = new DoubleAnimation { From = 0.7, To = 0,   Duration = TimeSpan.FromSeconds(2.1) };
 
         Storyboard.SetTarget(scaleX, PulseRing);
         Storyboard.SetTarget(scaleY, PulseRing);
@@ -110,7 +110,7 @@ public sealed partial class DashboardPage : Page
         var fadeIn = new DoubleAnimation
         {
             From = 0, To = 1,
-            Duration = TimeSpan.FromMilliseconds(500),
+            Duration = TimeSpan.FromMilliseconds(640),
             EasingFunction = new ExponentialEase { EasingMode = EasingMode.EaseOut, Exponent = 3 },
         };
         Storyboard.SetTarget(fadeIn, LowStockBanner);
@@ -121,7 +121,7 @@ public sealed partial class DashboardPage : Page
         {
             From = Windows.UI.Color.FromArgb(40, 255, 183, 129),
             To   = Windows.UI.Color.FromArgb(120, 255, 183, 129),
-            Duration = TimeSpan.FromSeconds(1.2),
+            Duration = TimeSpan.FromSeconds(1.8),
             AutoReverse = true,
             RepeatBehavior = RepeatBehavior.Forever,
             EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut },

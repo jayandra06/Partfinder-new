@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media.Animation;
 using PartFinder.Views.Pages;
 
 namespace PartFinder.Services;
@@ -25,7 +26,16 @@ public sealed class NavigationService : INavigationService
 
     public bool CanGoBack => _frame?.CanGoBack ?? false;
 
-    public void Initialize(Frame frame) => _frame = frame;
+    public void Initialize(Frame frame)
+    {
+        _frame = frame;
+        _frame.CacheSize = 1;
+        if (App.Current.Resources.TryGetValue("LuxuryPageTransitions", out var transitions) &&
+            transitions is TransitionCollection transitionCollection)
+        {
+            _frame.ContentTransitions = transitionCollection;
+        }
+    }
 
     public bool Navigate(AppPage page, object? parameter = null)
     {
@@ -35,7 +45,7 @@ public sealed class NavigationService : INavigationService
         if (_frame.Content?.GetType() == targetType)
             return false;
 
-        return _frame.Navigate(targetType, parameter);
+        return _frame.Navigate(targetType, parameter, new DrillInNavigationTransitionInfo());
     }
 
     public void GoBack()

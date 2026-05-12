@@ -7,13 +7,11 @@
     <Page.Resources>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
     </Page.Resources>
-    <Grid Background="{StaticResource PageBackgroundBrush}">
-        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <Grid Background="Transparent" Transitions="{StaticResource LuxuryPanelTransitions}">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="Transparent">
             <StackPanel Padding="24,20,24,32" Spacing="18" HorizontalAlignment="Stretch">
                 <StackPanel.ChildrenTransitions>
-                    <TransitionCollection>
-                        <EntranceThemeTransition IsStaggeringEnabled="True" FromVerticalOffset="50" />
-                    </TransitionCollection>
+                    <StaticResource ResourceKey="LuxuryListTransitions" />
                 </StackPanel.ChildrenTransitions>
 
                 <!-- HEADER -->

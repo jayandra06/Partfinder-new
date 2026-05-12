@@ -5,106 +5,122 @@
     <ResourceDictionary.ThemeDictionaries>
         <ResourceDictionary x:Key="Default">
             <!-- Backgrounds -->
-            <Color x:Key="PageBackgroundColor">#0A0E15</Color>
-            <Color x:Key="CardBackgroundColor">#111A26</Color>
-            <Color x:Key="ElevatedCardBackgroundColor">#172334</Color>
-            <Color x:Key="InputBackgroundColor">#0B1320</Color>
-            <Color x:Key="GridHeaderBackgroundColor">#1C2A3E</Color>
-            <Color x:Key="GridRowAltBackgroundColor">#0E1623</Color>
+            <Color x:Key="PageBackgroundColor">#50070C14</Color>
+            <Color x:Key="CardBackgroundColor">#B8141D2A</Color>
+            <Color x:Key="ElevatedCardBackgroundColor">#D81A2637</Color>
+            <Color x:Key="InputBackgroundColor">#96111A27</Color>
+            <Color x:Key="GridHeaderBackgroundColor">#B21C2C40</Color>
+            <Color x:Key="GridRowAltBackgroundColor">#660E1520</Color>
+            <Color x:Key="ShellSurfaceColor">#A1162130</Color>
+            <Color x:Key="ShellSidebarColor">#8C0B1220</Color>
+            <Color x:Key="GlassStrokeColor">#4CF4F8FF</Color>
+            <Color x:Key="GlassStrongStrokeColor">#66B8D3FF</Color>
+            <Color x:Key="GlassHighlightColor">#22FFFFFF</Color>
+            <Color x:Key="AmbientBlueColor">#332F7FD2</Color>
+            <Color x:Key="AmbientPurpleColor">#2E8B5CF6</Color>
+            <Color x:Key="AmbientPinkColor">#26F472B6</Color>
 
             <!-- Interactive states -->
-            <Color x:Key="RowHoverBackgroundColor">#1A2738</Color>
-            <Color x:Key="RowSelectedBackgroundColor">#1E3858</Color>
-            <Color x:Key="RowSelectedBorderColor">#2F7FD2</Color>
+            <Color x:Key="RowHoverBackgroundColor">#7A213047</Color>
+            <Color x:Key="RowSelectedBackgroundColor">#A01D456C</Color>
+            <Color x:Key="RowSelectedBorderColor">#7DB8FF</Color>
 
             <!-- Accent -->
-            <Color x:Key="AccentPrimaryColor">#1F7AE0</Color>
-            <Color x:Key="AccentHoverColor">#2D88ED</Color>
-            <Color x:Key="AccentPressedColor">#155DAF</Color>
+            <Color x:Key="AccentPrimaryColor">#5EA2FF</Color>
+            <Color x:Key="AccentHoverColor">#7CB7FF</Color>
+            <Color x:Key="AccentPressedColor">#2F75D6</Color>
 
             <!-- Text -->
-            <Color x:Key="TextPrimaryColor">#EAF2FF</Color>
-            <Color x:Key="TextSecondaryColor">#AAB8CA</Color>
-            <Color x:Key="TextTertiaryColor">#7B8DA8</Color>
+            <Color x:Key="TextPrimaryColor">#F4F8FF</Color>
+            <Color x:Key="TextSecondaryColor">#C4D0DF</Color>
+            <Color x:Key="TextTertiaryColor">#93A6C0</Color>
             <Color x:Key="TextOnAccentColor">#FFFFFF</Color>
 
             <!-- Borders -->
-            <Color x:Key="BorderDefaultColor">#2A3D58</Color>
-            <Color x:Key="BorderHoverColor">#3D567A</Color>
-            <Color x:Key="BorderFocusColor">#A4C9FF</Color>
+            <Color x:Key="BorderDefaultColor">#406884A8</Color>
+            <Color x:Key="BorderHoverColor">#7A9CC2E8</Color>
+            <Color x:Key="BorderFocusColor">#BDD8FF</Color>
 
             <!-- Semantic -->
-            <Color x:Key="SuccessColor">#2ABD8F</Color>
-            <Color x:Key="WarningColor">#FFB781</Color>
-            <Color x:Key="DangerColor">#FFB4AB</Color>
-            <Color x:Key="InfoColor">#A4C9FF</Color>
+            <Color x:Key="SuccessColor">#38D6A4</Color>
+            <Color x:Key="WarningColor">#FFC98D</Color>
+            <Color x:Key="DangerColor">#FFB4C7</Color>
+            <Color x:Key="InfoColor">#B8D6FF</Color>
 
             <!-- Navigation -->
-            <Color x:Key="NavBackgroundColor">#0B111B</Color>
-            <Color x:Key="NavItemHoverColor">#162234</Color>
-            <Color x:Key="NavItemSelectedColor">#1A2B43</Color>
-            <Color x:Key="NavItemSelectedBorderColor">#2F7FD2</Color>
+            <Color x:Key="NavBackgroundColor">#8C0B1220</Color>
+            <Color x:Key="NavItemHoverColor">#29243A57</Color>
+            <Color x:Key="NavItemSelectedColor">#4A25476D</Color>
+            <Color x:Key="NavItemSelectedBorderColor">#89BFFF</Color>
 
             <!-- Backward-compatible aliases -->
-            <Color x:Key="AppPrimaryColor">#185FA5</Color>
-            <Color x:Key="AppBackgroundColor">#131313</Color>
-            <Color x:Key="AppSurfaceColor">#201F1F</Color>
-            <Color x:Key="AppTextColor">#E5E2E1</Color>
-            <Color x:Key="AppBorderColor">#424751</Color>
-            <Color x:Key="AppSkeletonColor">#26262626</Color>
-            <Color x:Key="AppSubtleTextColor">#C2C6D2</Color>
+            <Color x:Key="AppPrimaryColor">#5EA2FF</Color>
+            <Color x:Key="AppBackgroundColor">#50070C14</Color>
+            <Color x:Key="AppSurfaceColor">#A1162130</Color>
+            <Color x:Key="AppTextColor">#F4F8FF</Color>
+            <Color x:Key="AppBorderColor">#406884A8</Color>
+            <Color x:Key="AppSkeletonColor">#26FFFFFF</Color>
+            <Color x:Key="AppSubtleTextColor">#C4D0DF</Color>
         </ResourceDictionary>
 
         <ResourceDictionary x:Key="Light">
             <!-- Backgrounds -->
-            <Color x:Key="PageBackgroundColor">#F3F4F6</Color>
-            <Color x:Key="CardBackgroundColor">#FFFFFF</Color>
-            <Color x:Key="ElevatedCardBackgroundColor">#F9FAFB</Color>
-            <Color x:Key="InputBackgroundColor">#FFFFFF</Color>
-            <Color x:Key="GridHeaderBackgroundColor">#E5E7EB</Color>
-            <Color x:Key="GridRowAltBackgroundColor">#F9FAFB</Color>
+            <Color x:Key="PageBackgroundColor">#B3F5F8FD</Color>
+            <Color x:Key="CardBackgroundColor">#D9FFFFFF</Color>
+            <Color x:Key="ElevatedCardBackgroundColor">#ECFFFFFF</Color>
+            <Color x:Key="InputBackgroundColor">#D6FFFFFF</Color>
+            <Color x:Key="GridHeaderBackgroundColor">#DCEAF7FF</Color>
+            <Color x:Key="GridRowAltBackgroundColor">#66FFFFFF</Color>
+            <Color x:Key="ShellSurfaceColor">#CCFFFFFF</Color>
+            <Color x:Key="ShellSidebarColor">#BFF6F8FD</Color>
+            <Color x:Key="GlassStrokeColor">#4C8AA4C4</Color>
+            <Color x:Key="GlassStrongStrokeColor">#6681A9D8</Color>
+            <Color x:Key="GlassHighlightColor">#66FFFFFF</Color>
+            <Color x:Key="AmbientBlueColor">#222F7FD2</Color>
+            <Color x:Key="AmbientPurpleColor">#1F8B5CF6</Color>
+            <Color x:Key="AmbientPinkColor">#18F472B6</Color>
 
             <!-- Interactive states -->
-            <Color x:Key="RowHoverBackgroundColor">#E5E7EB</Color>
-            <Color x:Key="RowSelectedBackgroundColor">#E0F2FE</Color>
-            <Color x:Key="RowSelectedBorderColor">#1F7AE0</Color>
+            <Color x:Key="RowHoverBackgroundColor">#E4F0FA</Color>
+            <Color x:Key="RowSelectedBackgroundColor">#CCE4F8FF</Color>
+            <Color x:Key="RowSelectedBorderColor">#5EA2FF</Color>
 
             <!-- Accent -->
-            <Color x:Key="AccentPrimaryColor">#1F7AE0</Color>
-            <Color x:Key="AccentHoverColor">#155DAF</Color>
-            <Color x:Key="AccentPressedColor">#0E3F78</Color>
+            <Color x:Key="AccentPrimaryColor">#2F7FD2</Color>
+            <Color x:Key="AccentHoverColor">#4A95E8</Color>
+            <Color x:Key="AccentPressedColor">#1F64B2</Color>
 
             <!-- Text -->
-            <Color x:Key="TextPrimaryColor">#1F2937</Color>
-            <Color x:Key="TextSecondaryColor">#4B5563</Color>
-            <Color x:Key="TextTertiaryColor">#9CA3AF</Color>
+            <Color x:Key="TextPrimaryColor">#172234</Color>
+            <Color x:Key="TextSecondaryColor">#4B5F77</Color>
+            <Color x:Key="TextTertiaryColor">#7A8EA8</Color>
             <Color x:Key="TextOnAccentColor">#FFFFFF</Color>
 
             <!-- Borders -->
-            <Color x:Key="BorderDefaultColor">#D1D5DB</Color>
-            <Color x:Key="BorderHoverColor">#9CA3AF</Color>
-            <Color x:Key="BorderFocusColor">#1F7AE0</Color>
+            <Color x:Key="BorderDefaultColor">#66A8BDD8</Color>
+            <Color x:Key="BorderHoverColor">#8D7FA6D6</Color>
+            <Color x:Key="BorderFocusColor">#2F7FD2</Color>
 
             <!-- Semantic -->
-            <Color x:Key="SuccessColor">#10B981</Color>
-            <Color x:Key="WarningColor">#F59E0B</Color>
-            <Color x:Key="DangerColor">#EF4444</Color>
-            <Color x:Key="InfoColor">#3B82F6</Color>
+            <Color x:Key="SuccessColor">#0FAF7A</Color>
+            <Color x:Key="WarningColor">#DB8B14</Color>
+            <Color x:Key="DangerColor">#D95879</Color>
+            <Color x:Key="InfoColor">#3D86E8</Color>
 
             <!-- Navigation -->
-            <Color x:Key="NavBackgroundColor">#F9FAFB</Color>
-            <Color x:Key="NavItemHoverColor">#E5E7EB</Color>
-            <Color x:Key="NavItemSelectedColor">#E0F2FE</Color>
-            <Color x:Key="NavItemSelectedBorderColor">#1F7AE0</Color>
+            <Color x:Key="NavBackgroundColor">#BFF6F8FD</Color>
+            <Color x:Key="NavItemHoverColor">#D6E8F9FF</Color>
+            <Color x:Key="NavItemSelectedColor">#D1E6FBFF</Color>
+            <Color x:Key="NavItemSelectedBorderColor">#4A95E8</Color>
 
             <!-- Backward-compatible aliases -->
-            <Color x:Key="AppPrimaryColor">#1F7AE0</Color>
-            <Color x:Key="AppBackgroundColor">#F3F4F6</Color>
-            <Color x:Key="AppSurfaceColor">#FFFFFF</Color>
-            <Color x:Key="AppTextColor">#1F2937</Color>
-            <Color x:Key="AppBorderColor">#D1D5DB</Color>
-            <Color x:Key="AppSkeletonColor">#E5E7EB</Color>
-            <Color x:Key="AppSubtleTextColor">#4B5563</Color>
+            <Color x:Key="AppPrimaryColor">#2F7FD2</Color>
+            <Color x:Key="AppBackgroundColor">#B3F5F8FD</Color>
+            <Color x:Key="AppSurfaceColor">#CCFFFFFF</Color>
+            <Color x:Key="AppTextColor">#172234</Color>
+            <Color x:Key="AppBorderColor">#66A8BDD8</Color>
+            <Color x:Key="AppSkeletonColor">#2E7FA6D6</Color>
+            <Color x:Key="AppSubtleTextColor">#4B5F77</Color>
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 
@@ -115,6 +131,11 @@
     <SolidColorBrush x:Key="InputBackgroundBrush" Color="{ThemeResource InputBackgroundColor}" />
     <SolidColorBrush x:Key="GridHeaderBackgroundBrush" Color="{ThemeResource GridHeaderBackgroundColor}" />
     <SolidColorBrush x:Key="GridRowAltBackgroundBrush" Color="{ThemeResource GridRowAltBackgroundColor}" />
+    <SolidColorBrush x:Key="ShellSurfaceBrush" Color="{ThemeResource ShellSurfaceColor}" />
+    <SolidColorBrush x:Key="ShellSidebarBrush" Color="{ThemeResource ShellSidebarColor}" />
+    <SolidColorBrush x:Key="GlassStrokeBrush" Color="{ThemeResource GlassStrokeColor}" />
+    <SolidColorBrush x:Key="GlassStrongStrokeBrush" Color="{ThemeResource GlassStrongStrokeColor}" />
+    <SolidColorBrush x:Key="GlassHighlightBrush" Color="{ThemeResource GlassHighlightColor}" />
     <SolidColorBrush x:Key="RowHoverBackgroundBrush" Color="{ThemeResource RowHoverBackgroundColor}" />
     <SolidColorBrush x:Key="RowSelectedBackgroundBrush" Color="{ThemeResource RowSelectedBackgroundColor}" />
     <SolidColorBrush x:Key="RowSelectedBorderBrush" Color="{ThemeResource RowSelectedBorderColor}" />
@@ -136,11 +157,20 @@
     <SolidColorBrush x:Key="NavItemHoverBrush" Color="{ThemeResource NavItemHoverColor}" />
     <SolidColorBrush x:Key="NavItemSelectedBrush" Color="{ThemeResource NavItemSelectedColor}" />
     <SolidColorBrush x:Key="NavItemSelectedBorderBrush" Color="{ThemeResource NavItemSelectedBorderColor}" />
+    <SolidColorBrush x:Key="AmbientBlueBrush" Color="{ThemeResource AmbientBlueColor}" />
+    <SolidColorBrush x:Key="AmbientPurpleBrush" Color="{ThemeResource AmbientPurpleColor}" />
+    <SolidColorBrush x:Key="AmbientPinkBrush" Color="{ThemeResource AmbientPinkColor}" />
+
+    <LinearGradientBrush x:Key="AccentHeroBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="{ThemeResource AccentHoverColor}" Offset="0" />
+        <GradientStop Color="{ThemeResource AccentPrimaryColor}" Offset="0.55" />
+        <GradientStop Color="#8B5CF6" Offset="1" />
+    </LinearGradientBrush>
 
     <!-- Backward-compatible aliases -->
     <SolidColorBrush x:Key="AppBackgroundBrush" Color="{ThemeResource AppBackgroundColor}" />
-    <SolidColorBrush x:Key="AppSidebarBrush" Color="{ThemeResource NavBackgroundColor}" />
-    <SolidColorBrush x:Key="AppSurfaceBrush" Color="{ThemeResource AppSurfaceColor}" />
+    <SolidColorBrush x:Key="AppSidebarBrush" Color="{ThemeResource ShellSidebarColor}" />
+    <SolidColorBrush x:Key="AppSurfaceBrush" Color="{ThemeResource ShellSurfaceColor}" />
     <SolidColorBrush x:Key="AppBorderBrush" Color="{ThemeResource AppBorderColor}" />
     <SolidColorBrush x:Key="AppSubtleTextBrush" Color="{ThemeResource AppSubtleTextColor}" />
     <SolidColorBrush x:Key="AppSuccessBrush" Color="{ThemeResource SuccessColor}" />

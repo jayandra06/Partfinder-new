@@ -9,7 +9,7 @@
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
     </Page.Resources>
 
-    <Grid Background="{StaticResource PageBackgroundBrush}">
+    <Grid Background="Transparent" Transitions="{StaticResource LuxuryPanelTransitions}">
         <VisualStateManager.VisualStateGroups>
             <VisualStateGroup x:Name="AdaptiveStates">
                 <VisualState x:Name="WideState">
@@ -44,12 +44,10 @@
                 </VisualState>
             </VisualStateGroup>
         </VisualStateManager.VisualStateGroups>
-        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Background="Transparent">
             <StackPanel Padding="24,20,24,32" Spacing="18" HorizontalAlignment="Stretch">
                 <StackPanel.ChildrenTransitions>
-                    <TransitionCollection>
-                        <EntranceThemeTransition IsStaggeringEnabled="True" FromVerticalOffset="50" />
-                    </TransitionCollection>
+                    <StaticResource ResourceKey="LuxuryListTransitions" />
                 </StackPanel.ChildrenTransitions>
 
                 <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->

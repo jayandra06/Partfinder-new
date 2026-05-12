@@ -21,30 +21,32 @@
         <!-- Custom Styles for Modern UI -->
         <Style x:Key="ModernCardStyle" TargetType="Border">
             <Setter Property="Background" Value="{StaticResource ElevatedCardBackgroundBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource GlassStrongStrokeBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="CornerRadius" Value="18" />
             <Setter Property="Padding" Value="20" />
         </Style>
         
         <Style x:Key="GlowButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
-            <Setter Property="Background" Value="#13096e" />
+            <Setter Property="Background" Value="{StaticResource AccentHeroBrush}" />
             <Setter Property="Foreground" Value="White" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="BorderBrush" Value="{StaticResource AccentPrimaryBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="14" />
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
         
         <Style x:Key="ModernOutlineButtonStyle" TargetType="Button" BasedOn="{StaticResource OutlinedButtonStyle}">
-            <Setter Property="BorderBrush" Value="#13096e" />
-            <Setter Property="Foreground" Value="#AAB8CA" />
+            <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource GlassStrokeBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="CornerRadius" Value="14" />
             <Setter Property="FontWeight" Value="Normal" />
         </Style>
     </Page.Resources>
 
-    <Grid Padding="24,24,24,8" Background="{StaticResource PageBackgroundBrush}">
+    <Grid Padding="24,24,24,8" Background="Transparent" Transitions="{StaticResource LuxuryPanelTransitions}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -78,8 +80,10 @@
                         Spacing="10"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center">
-                <Border Width="32" Height="32" CornerRadius="8"
-                        Background="#181F7AE0"
+                <Border Width="32" Height="32" CornerRadius="10"
+                        Background="#185EA2FF"
+                        BorderBrush="{StaticResource GlassStrokeBrush}"
+                        BorderThickness="1"
                         VerticalAlignment="Center">
                     <FontIcon x:Name="PageIndicatorIcon"
                               Glyph="&#xE735;"
@@ -146,7 +150,7 @@
 
         <Grid
             Grid.Row="1"
-            Background="{StaticResource PageBackgroundBrush}"
+            Background="Transparent"
             Visibility="{Binding IsCreatingTemplate, Converter={StaticResource BoolToVisibilityConverter}}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -174,9 +178,9 @@
                     <Run Text=" key removes selected cell. Double-click canvas to reset zoom." />
                 </TextBlock>
                 <!-- Row 2: Template name + field count + zoom + actions in one clean bar -->
-                <Border Background="{StaticResource CardBackgroundBrush}"
-                        BorderBrush="{StaticResource BorderDefaultBrush}"
-                        BorderThickness="1" CornerRadius="8" Padding="12,8">
+                <Border Background="{StaticResource ElevatedCardBackgroundBrush}"
+                        BorderBrush="{StaticResource GlassStrokeBrush}"
+                        BorderThickness="1" CornerRadius="16" Padding="14,10">
                     <Grid ColumnSpacing="12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -194,8 +198,9 @@
 
                         <!-- Field count badge -->
                         <Border Grid.Column="1" VerticalAlignment="Center"
-                                Background="#181F7AE0" BorderBrush="#301F7AE0"
-                                BorderThickness="1" CornerRadius="12" Padding="12,5">
+                                Background="#185EA2FF"
+                                BorderBrush="{StaticResource GlassStrokeBrush}"
+                                BorderThickness="1" CornerRadius="14" Padding="12,5">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <FontIcon Glyph="&#xE8EC;" FontSize="11"
                                           Foreground="{StaticResource AccentPrimaryBrush}" />
@@ -207,9 +212,9 @@
 
                         <!-- Zoom indicator + reset -->
                         <Border Grid.Column="2" VerticalAlignment="Center"
-                                Background="{StaticResource ElevatedCardBackgroundBrush}"
-                                BorderBrush="{StaticResource BorderDefaultBrush}"
-                                BorderThickness="1" CornerRadius="12" Padding="10,5">
+                                Background="{StaticResource CardBackgroundBrush}"
+                                BorderBrush="{StaticResource GlassStrokeBrush}"
+                                BorderThickness="1" CornerRadius="14" Padding="10,5">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon Glyph="&#xE71E;" FontSize="11"
                                           Foreground="{StaticResource TextTertiaryBrush}" />
@@ -308,10 +313,10 @@
                                                     Height="26"
                                                     FontSize="11"
                                                     Padding="6,0,20,0"
-                                                    Background="#0D1E33"
-                                                    BorderBrush="#2A3D58"
+                                                    Background="{StaticResource InputBackgroundBrush}"
+                                                    BorderBrush="{StaticResource GlassStrokeBrush}"
                                                     BorderThickness="1"
-                                                    Foreground="#EAF2FF"
+                                                    Foreground="{StaticResource TextPrimaryBrush}"
                                                     DisplayMemberPath="Label"
                                                     ItemsSource="{Binding DataContext.FieldTypeOptions, ElementName=TemplatesPageRoot}"
                                                     SelectedValue="{Binding FieldType, Mode=TwoWay}"

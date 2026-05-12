@@ -12,25 +12,25 @@
 
         <!-- Card hover style with glassmorphism elevation -->
         <Style x:Key="HoverCardStyle" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderDefaultBrush}"/>
+            <Setter Property="Background" Value="{StaticResource ElevatedCardBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource GlassStrokeBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="CornerRadius" Value="20"/>
         </Style>
 
         <!-- Quick action button style -->
         <Style x:Key="ActionRowStyle" TargetType="Button">
-            <Setter Property="Background" Value="{StaticResource ElevatedCardBackgroundBrush}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderDefaultBrush}"/>
+            <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource GlassStrokeBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="10"/>
-            <Setter Property="Padding" Value="10,9"/>
+            <Setter Property="CornerRadius" Value="14"/>
+            <Setter Property="Padding" Value="12,10"/>
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="HorizontalContentAlignment" Value="Left"/>
         </Style>
     </Page.Resources>
 
-    <ScrollViewer Background="{StaticResource PageBackgroundBrush}" HorizontalScrollBarVisibility="Auto">
+    <ScrollViewer Background="Transparent" HorizontalScrollBarVisibility="Auto">
         <Grid>
             <VisualStateManager.VisualStateGroups>
                 <VisualStateGroup x:Name="AdaptiveStates">
@@ -77,12 +77,13 @@
                 </VisualStateGroup>
             </VisualStateManager.VisualStateGroups>
 
-            <StackPanel x:Name="RootStack" Padding="24,20,24,36" Spacing="16" HorizontalAlignment="Stretch">
+            <StackPanel x:Name="RootStack" Padding="28,24,28,40" Spacing="18" HorizontalAlignment="Stretch"
+                        Transitions="{StaticResource LuxuryPanelTransitions}">
 
             <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
             <!-- HEADER                                                         -->
             <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-            <Grid x:Name="HeaderGrid" Opacity="0">
+            <Grid x:Name="HeaderGrid" Opacity="0" Transitions="{StaticResource LuxuryPanelTransitions}">
                 <Grid.RenderTransform><TranslateTransform x:Name="HeaderSlide" Y="-10"/></Grid.RenderTransform>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -95,8 +96,8 @@
                     <TextBlock Text="Inventory Dashboard" FontSize="26" FontWeight="Bold">
                         <TextBlock.Foreground>
                             <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
-                                <GradientStop Color="#4DA8FF" Offset="0"/>
-                                <GradientStop Color="#1F7AE0" Offset="0.4"/>
+                                <GradientStop Color="{ThemeResource AccentHoverColor}" Offset="0"/>
+                                <GradientStop Color="{ThemeResource AccentPrimaryColor}" Offset="0.4"/>
                                 <GradientStop Color="#8B5CF6" Offset="1"/>
                             </LinearGradientBrush>
                         </TextBlock.Foreground>
@@ -109,11 +110,11 @@
                 <Grid Grid.Column="1" VerticalAlignment="Center">
                     <!-- Outer pulsing glow halo -->
                     <Border CornerRadius="24" Margin="-6,-4"
-                            Background="#082ABD8F" Opacity="0.5"
+                            Background="#1038D6A4" Opacity="0.7"
                             IsHitTestVisible="False"/>
                     <!-- Badge -->
                     <Border CornerRadius="20"
-                            Padding="12,7" Background="#102ABD8F" BorderBrush="#302ABD8F" BorderThickness="1">
+                            Padding="12,7" Background="#1438D6A4" BorderBrush="{StaticResource GlassStrokeBrush}" BorderThickness="1">
                         <StackPanel Orientation="Horizontal" Spacing="7">
                             <Grid Width="10" Height="10" VerticalAlignment="Center">
                                 <!-- Outer pulse ring -->
@@ -220,7 +221,7 @@
             <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
             <!-- KPI CARDS ROW                                                  -->
             <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-            <ItemsControl x:Name="KpiRow" ItemsSource="{Binding Kpis}" Opacity="0">
+            <ItemsControl x:Name="KpiRow" ItemsSource="{Binding Kpis}" Opacity="0" Transitions="{StaticResource LuxuryListTransitions}">
                 <ItemsControl.RenderTransform><TranslateTransform x:Name="KpiSlide" Y="10"/></ItemsControl.RenderTransform>
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
@@ -243,7 +244,7 @@
             <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
             <!-- ROW 1: Trend Chart + Distribution Donut                        -->
             <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-            <Grid x:Name="Row1" ColumnSpacing="14" Opacity="0">
+            <Grid x:Name="Row1" ColumnSpacing="14" Opacity="0" Transitions="{StaticResource LuxuryPanelTransitions}">
                 <Grid.RenderTransform><TranslateTransform x:Name="Row1Slide" Y="12"/></Grid.RenderTransform>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -350,7 +351,7 @@
             <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
             <!-- ROW 2: Stock Level Bar Chart + Health Gauge                    -->
             <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-            <Grid x:Name="Row2" ColumnSpacing="14" Opacity="0">
+            <Grid x:Name="Row2" ColumnSpacing="14" Opacity="0" Transitions="{StaticResource LuxuryPanelTransitions}">
                 <Grid.RenderTransform><TranslateTransform x:Name="Row2Slide" Y="12"/></Grid.RenderTransform>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -443,7 +444,7 @@
             <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
             <!-- ROW 3: Activity Feed + Quick Actions                           -->
             <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-            <Grid x:Name="Row3" ColumnSpacing="14" Opacity="0">
+            <Grid x:Name="Row3" ColumnSpacing="14" Opacity="0" Transitions="{StaticResource LuxuryPanelTransitions}">
                 <Grid.RenderTransform><TranslateTransform x:Name="Row3Slide" Y="12"/></Grid.RenderTransform>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />

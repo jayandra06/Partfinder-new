@@ -1,0 +1,19 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <TransitionCollection x:Key="LuxuryPageTransitions">
+        <EntranceThemeTransition FromHorizontalOffset="34" IsStaggeringEnabled="False" />
+        <RepositionThemeTransition />
+    </TransitionCollection>
+
+    <TransitionCollection x:Key="LuxuryPanelTransitions">
+        <EntranceThemeTransition FromHorizontalOffset="20" IsStaggeringEnabled="True" />
+        <RepositionThemeTransition />
+    </TransitionCollection>
+
+    <TransitionCollection x:Key="LuxuryListTransitions">
+        <AddDeleteThemeTransition />
+        <ContentThemeTransition HorizontalOffset="20" VerticalOffset="8" />
+        <RepositionThemeTransition />
+    </TransitionCollection>
+</ResourceDictionary>

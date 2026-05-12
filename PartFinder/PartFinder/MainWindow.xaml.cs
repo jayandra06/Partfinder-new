@@ -1,11 +1,15 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Input;
+using Microsoft.UI.Windowing;
 using Microsoft.Extensions.DependencyInjection;
 using PartFinder.Services;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text.Json;
+using WinRT.Interop;
+using Windows.Graphics;
 
 namespace PartFinder;
 
@@ -27,15 +31,17 @@ public sealed partial class MainWindow : Window
     private Microsoft.UI.Xaml.DispatcherTimer? _maintenanceTimer;
     private DateTimeOffset? _maintenanceUntilUtc;
     private string? _orgCodeForMaintenanceRetry;
+    private AppWindow? _appWindow;
 
     private readonly string _setupFilePath = SetupPaths.SetupStateFilePath;
 
     public MainWindow()
     {
         InitializeComponent();
-        // Use native caption/title bar buttons to avoid overlap with app content.
+        // Setup and blocked states use the native title bar. Shell mode switches to a custom title bar.
         ExtendsContentIntoTitleBar = false;
         BackButton.IsEnabled = false;
+        ShellRoot.SizeChanged += OnShellRootSizeChanged;
 
 
         if (IsSetupCompleted())
@@ -46,6 +52,52 @@ public sealed partial class MainWindow : Window
 
         RootGrid.Loaded += OnRootGridLoadedResumeWizard;
         UpdateStepUi();
+    }
+
+    private AppWindow GetAppWindow()
+    {
+        _appWindow ??= AppWindow.GetFromWindowId(
+            Microsoft.UI.Win32Interop.GetWindowIdFromWindow(WindowNative.GetWindowHandle(this)));
+        return _appWindow;
+    }
+
+    private void EnableShellTitleBar()
+    {
+        ExtendsContentIntoTitleBar = true;
+        SetTitleBar(ShellRoot.TitleBarDragElement);
+
+        if (!AppWindowTitleBar.IsCustomizationSupported())
+        {
+            ShellRoot.UpdateTitleBarInsets(0, 0);
+            return;
+        }
+
+        ShellRoot.UpdateTitleBarInsets(0, 0);
+    }
+
+    private void DisableShellTitleBar()
+    {
+        ExtendsContentIntoTitleBar = false;
+        SetTitleBar(null);
+        ShellRoot.UpdateTitleBarInsets(0, 0);
+    }
+
+    private void OnShellRootSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (ExtendsContentIntoTitleBar)
+        {
+            UpdateShellTitleBarRegions();
+        }
+    }
+
+    public void RefreshShellTitleBarRegions()
+    {
+        // No-op: top navigation is now below a dedicated drag strip.
+    }
+
+    private void UpdateShellTitleBarRegions()
+    {
+        // No-op: top navigation is now below a dedicated drag strip.
     }
 
     private sealed class SetupState
@@ -212,6 +264,7 @@ public sealed partial class MainWindow : Window
 
     private void ShowSubscriptionBlocked(string message)
     {
+        DisableShellTitleBar();
         StopMaintenanceTimer();
         MaintenanceBlockedRoot.Visibility = Visibility.Collapsed;
         SubscriptionBlockedMessage.Text = message;
@@ -222,6 +275,7 @@ public sealed partial class MainWindow : Window
 
     private void ShowMaintenanceBlocked(string maintenanceUntilIso, string orgCode)
     {
+        DisableShellTitleBar();
         StopMaintenanceTimer();
         SubscriptionBlockedRoot.Visibility = Visibility.Collapsed;
         _orgCodeForMaintenanceRetry = orgCode.Trim();
@@ -403,6 +457,7 @@ public sealed partial class MainWindow : Window
 
     public void ResetToSetup()
     {
+        DisableShellTitleBar();
         StopMaintenanceTimer();
         MaintenanceBlockedRoot.Visibility = Visibility.Collapsed;
         try
@@ -533,11 +588,13 @@ public sealed partial class MainWindow : Window
                 {
                     AppLockRoot.Visibility = Visibility.Collapsed;
                     ShellRoot.Visibility = Visibility.Visible;
+                    EnableShellTitleBar();
                     LogAutoLoginIfSessionActive();
                     return;
                 }
 
                 // Not verified — show lock screen with retry
+                DisableShellTitleBar();
                 AppLockRoot.Visibility = Visibility.Visible;
                 ShellRoot.Visibility = Visibility.Collapsed;
                 AppLockErrorText.Text = "Verification failed. Try again.";
@@ -549,6 +606,7 @@ public sealed partial class MainWindow : Window
         // App lock off or Windows Hello not available — open directly
         AppLockRoot.Visibility = Visibility.Collapsed;
         ShellRoot.Visibility = Visibility.Visible;
+        EnableShellTitleBar();
         LogAutoLoginIfSessionActive();
     }
 
@@ -580,6 +638,7 @@ public sealed partial class MainWindow : Window
         {
             AppLockRoot.Visibility = Visibility.Collapsed;
             ShellRoot.Visibility = Visibility.Visible;
+            EnableShellTitleBar();
             LogAutoLoginIfSessionActive();
         }
         else

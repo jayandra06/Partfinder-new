@@ -31,13 +31,13 @@ public sealed partial class FavouritesSubPage : UserControl
     private const double PEEK_WIDTH_RATIO = 0.13; // 13 % of canvas width
 
     // Theme colors — pulled from Colors.xaml
-    private static readonly Color _cardBg = Color.FromArgb(255, 17, 26, 38);         // #111A26
-    private static readonly Color _elevatedBg = Color.FromArgb(255, 23, 35, 52);     // #172334
-    private static readonly Color _accentPrimary = Color.FromArgb(255, 31, 122, 224); // #1F7AE0
-    private static readonly Color _borderDefault = Color.FromArgb(255, 42, 61, 88);  // #2A3D58
-    private static readonly Color _textPrimary = Color.FromArgb(255, 234, 242, 255);  // #EAF2FF
-    private static readonly Color _textSecondary = Color.FromArgb(255, 170, 184, 202);// #AAB8CA
-    private static readonly Color _textTertiary = Color.FromArgb(255, 123, 141, 168); // #7B8DA8
+    private static readonly Color _cardBg = Color.FromArgb(224, 20, 29, 42);
+    private static readonly Color _elevatedBg = Color.FromArgb(236, 26, 38, 55);
+    private static readonly Color _accentPrimary = Color.FromArgb(255, 94, 162, 255);
+    private static readonly Color _borderDefault = Color.FromArgb(176, 104, 132, 168);
+    private static readonly Color _textPrimary = Color.FromArgb(255, 244, 248, 255);
+    private static readonly Color _textSecondary = Color.FromArgb(255, 196, 208, 223);
+    private static readonly Color _textTertiary = Color.FromArgb(255, 147, 166, 192);
 
     // Accent gradient colors for card decorative elements
     private static readonly Color _accentCyan = Color.FromArgb(255, 56, 189, 248);    // cyan glow
@@ -170,9 +170,9 @@ public sealed partial class FavouritesSubPage : UserControl
         {
             Width = 300,   // initial width, overridden in UpdateCarouselLayout
             Height = 400,  // initial height, overridden in UpdateCarouselLayout
-            CornerRadius = new CornerRadius(20),
+            CornerRadius = new CornerRadius(24),
             Background = new SolidColorBrush(_cardBg),
-            BorderBrush = new SolidColorBrush(Color.FromArgb(100, _borderDefault.R, _borderDefault.G, _borderDefault.B)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(140, _borderDefault.R, _borderDefault.G, _borderDefault.B)),
             BorderThickness = new Thickness(1.5),
             Tag = template,
             Padding = new Thickness(0),
@@ -188,35 +188,42 @@ public sealed partial class FavouritesSubPage : UserControl
         // ── Glassmorphism top edge ──
         var glassEdge = new Border
         {
-            CornerRadius = new CornerRadius(20, 20, 0, 0),
+            CornerRadius = new CornerRadius(24, 24, 0, 0),
             Height = 1,
             VerticalAlignment = VerticalAlignment.Top,
             IsHitTestVisible = false,
-            Opacity = 0.08,
+            Opacity = 0.16,
             Background = new SolidColorBrush(Microsoft.UI.Colors.White),
             Margin = new Thickness(1, 0, 1, 0),
         };
         mainGrid.Children.Add(glassEdge);
 
-        // ── Row 0: Icon + Template name centered at top ──
-        var topSection = new StackPanel
+        // ── Row 0: centered title + top-right actions ──
+        var topSection = new Grid
         {
             Name = "TopSection",
+            Margin = new Thickness(20, 24, 20, 0),
+        };
+        topSection.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(76) });
+        topSection.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        topSection.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(76) });
+
+        var titleStack = new StackPanel
+        {
+            Name = "TitleStack",
             Orientation = Orientation.Horizontal,
             Spacing = 10,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(20, 24, 20, 0),
         };
-
-        topSection.Children.Add(new FontIcon
+        titleStack.Children.Add(new FontIcon
         {
             Glyph = "\uE8A5",
             FontSize = 20,
             Foreground = new SolidColorBrush(accentColor),
             VerticalAlignment = VerticalAlignment.Center,
         });
-        topSection.Children.Add(new TextBlock
+        titleStack.Children.Add(new TextBlock
         {
             Text = template.Name,
             FontSize = 15,
@@ -225,7 +232,65 @@ public sealed partial class FavouritesSubPage : UserControl
             VerticalAlignment = VerticalAlignment.Center,
             TextWrapping = TextWrapping.NoWrap,
             TextTrimming = TextTrimming.CharacterEllipsis,
+            MaxWidth = 220,
         });
+        Grid.SetColumn(titleStack, 1);
+        topSection.Children.Add(titleStack);
+
+        var topActions = new StackPanel
+        {
+            Name = "ButtonStack",
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center,
+            Visibility = Visibility.Collapsed,
+        };
+
+        var editBtn = new Button
+        {
+            Width = 34,
+            Height = 34,
+            Padding = new Thickness(0),
+            Background = new SolidColorBrush(Color.FromArgb(28, _accentPrimary.R, _accentPrimary.G, _accentPrimary.B)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(120, _accentPrimary.R, _accentPrimary.G, _accentPrimary.B)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10),
+            Tag = template,
+            Content = new FontIcon
+            {
+                Glyph = "\uE70F",
+                FontSize = 14,
+                Foreground = new SolidColorBrush(Microsoft.UI.Colors.White),
+            },
+        };
+        ToolTipService.SetToolTip(editBtn, "Edit template");
+        editBtn.Click += OnCardEditClick;
+
+        var unstarBtn = new Button
+        {
+            Width = 34,
+            Height = 34,
+            Padding = new Thickness(0),
+            Background = new SolidColorBrush(Color.FromArgb(10, 255, 193, 7)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(180, 255, 193, 7)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10),
+            Tag = template,
+            Content = new FontIcon
+            {
+                Glyph = "\uE735",
+                FontSize = 14,
+                Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 193, 7)),
+            },
+        };
+        ToolTipService.SetToolTip(unstarBtn, "Remove from favourites");
+        unstarBtn.Click += OnCardUnstarClick;
+
+        topActions.Children.Add(editBtn);
+        topActions.Children.Add(unstarBtn);
+        Grid.SetColumn(topActions, 2);
+        topSection.Children.Add(topActions);
 
         Grid.SetRow(topSection, 0);
         mainGrid.Children.Add(topSection);
@@ -267,7 +332,7 @@ public sealed partial class FavouritesSubPage : UserControl
         Grid.SetRow(fieldsSection, 1);
         mainGrid.Children.Add(fieldsSection);
 
-        // ── Row 2: Bottom — [<]  [Edit][Unstar]  [>] ──
+        // ── Row 2: Bottom — [<]  [field count]  [>] ──
         var bottomGrid = new Grid
         {
             Name = "BottomSection",
@@ -294,48 +359,6 @@ public sealed partial class FavouritesSubPage : UserControl
             CharacterSpacing = 20,
         };
         centerStack.Children.Add(fieldText);
-
-        var buttonStack = new StackPanel
-        {
-            Name = "ButtonStack",
-            Orientation = Orientation.Horizontal,
-            Spacing = 10,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            Visibility = Visibility.Collapsed,
-        };
-
-        var editBtn = new Button
-        {
-            Width = 100, Height = 36,
-            Background = new SolidColorBrush(_accentPrimary),
-            BorderThickness = new Thickness(0),
-            CornerRadius = new CornerRadius(8),
-            Tag = template,
-        };
-        editBtn.Click += OnCardEditClick;
-        var editContent = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5, VerticalAlignment = VerticalAlignment.Center };
-        editContent.Children.Add(new FontIcon { Glyph = "\uE70F", FontSize = 13, Foreground = new SolidColorBrush(Microsoft.UI.Colors.White) });
-        editContent.Children.Add(new TextBlock { Text = "Edit", FontSize = 13, Foreground = new SolidColorBrush(Microsoft.UI.Colors.White), FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-        editBtn.Content = editContent;
-
-        var unstarBtn = new Button
-        {
-            Width = 100, Height = 36,
-            Background = new SolidColorBrush(Color.FromArgb(0, 0, 0, 0)),
-            BorderBrush = new SolidColorBrush(Color.FromArgb(255, 255, 193, 7)),
-            BorderThickness = new Thickness(1.5),
-            CornerRadius = new CornerRadius(8),
-            Tag = template,
-        };
-        unstarBtn.Click += OnCardUnstarClick;
-        var unstarContent = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5, VerticalAlignment = VerticalAlignment.Center };
-        unstarContent.Children.Add(new FontIcon { Glyph = "\uE735", FontSize = 13, Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 193, 7)) });
-        unstarContent.Children.Add(new TextBlock { Text = "Unstar", FontSize = 13, Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 193, 7)), FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-        unstarBtn.Content = unstarContent;
-
-        buttonStack.Children.Add(editBtn);
-        buttonStack.Children.Add(unstarBtn);
-        centerStack.Children.Add(buttonStack);
 
         Grid.SetColumn(centerStack, 1);
         bottomGrid.Children.Add(centerStack);
@@ -806,7 +829,7 @@ public sealed partial class FavouritesSubPage : UserControl
             }
 
             // All visible cards show full content — no hiding on side cards
-            ApplyCardContentVisibility(card, isCenter);
+            ApplyCardContentVisibility(card, isCenter, isLeft, isRight);
 
             card.IsHitTestVisible = isVisible;
 
@@ -828,7 +851,7 @@ public sealed partial class FavouritesSubPage : UserControl
     /// Shows full content on center card.
     /// Side cards show everything EXCEPT the Edit/Unstar buttons (those only make sense on focused card).
     /// </summary>
-    private static void ApplyCardContentVisibility(Border card, bool isCenter)
+    private static void ApplyCardContentVisibility(Border card, bool isCenter, bool isLeft, bool isRight)
     {
         if (card.Child is not Grid grid) return;
 
@@ -840,6 +863,32 @@ public sealed partial class FavouritesSubPage : UserControl
             {
                 case "TopSection":
                     fe.Opacity = 1.0;
+                    if (fe is Grid topGrid)
+                    {
+                        foreach (var topChild in topGrid.Children)
+                        {
+                            if (topChild is FrameworkElement topElement && topElement.Name == "ButtonStack")
+                                topElement.Visibility = isCenter ? Visibility.Visible : Visibility.Collapsed;
+                            else if (topChild is StackPanel titleStack && titleStack.Name == "TitleStack")
+                            {
+                                titleStack.HorizontalAlignment = isCenter
+                                    ? HorizontalAlignment.Center
+                                    : isLeft
+                                        ? HorizontalAlignment.Right
+                                        : HorizontalAlignment.Left;
+
+                                if (titleStack.Children.Count > 0 && titleStack.Children[0] is FontIcon icon)
+                                    icon.Visibility = isCenter ? Visibility.Visible : Visibility.Collapsed;
+
+                                if (titleStack.Children.Count > 1 && titleStack.Children[1] is TextBlock title)
+                                {
+                                    title.FontSize = isCenter ? 15 : 13;
+                                    title.MaxWidth = isCenter ? 220 : 86;
+                                    title.TextAlignment = isLeft ? TextAlignment.Right : TextAlignment.Left;
+                                }
+                            }
+                        }
+                    }
                     break;
                 case "FieldsSection":
                     fe.Visibility = Visibility.Visible;
@@ -853,8 +902,6 @@ public sealed partial class FavouritesSubPage : UserControl
                             foreach (var cc in centerStack.Children)
                             {
                                 if (cc is TextBlock txt) txt.Opacity = 1.0;
-                                else if (cc is StackPanel stack && stack.Name == "ButtonStack")
-                                    stack.Visibility = isCenter ? Visibility.Visible : Visibility.Collapsed;
                             }
                         }
                     }

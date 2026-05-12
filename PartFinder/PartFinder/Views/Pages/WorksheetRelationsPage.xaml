@@ -62,9 +62,9 @@
         ════════════════════════════════════════════════════════════════ -->
         <Style x:Key="ColumnRowBorderStyle" TargetType="Border">
             <Setter Property="Background" Value="{StaticResource GridRowAltBackgroundBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource GlassStrokeBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="CornerRadius" Value="14" />
             <Setter Property="Padding" Value="12,0" />
             <Setter Property="MinHeight" Value="44" />
             <Setter Property="Margin" Value="0,0,0,4" />
@@ -99,7 +99,7 @@
         <Style x:Key="RelationChipStyle" TargetType="Button">
             <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}" />
             <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource GlassStrokeBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="20" />
             <Setter Property="Padding" Value="14,6" />
@@ -121,7 +121,8 @@
         Opacity="0"
         Padding="24"
         RowSpacing="14"
-        Background="{StaticResource PageBackgroundBrush}">
+        Background="Transparent"
+        Transitions="{StaticResource LuxuryPanelTransitions}">
         <Grid.RenderTransform>
             <TranslateTransform x:Name="PageSlideTransform" Y="14" />
         </Grid.RenderTransform>

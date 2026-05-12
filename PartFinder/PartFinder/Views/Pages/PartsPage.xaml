@@ -68,8 +68,11 @@
         </Style>
     </Page.Resources>
 
-    <Grid Background="{StaticResource PageBackgroundBrush}">
+    <Grid Background="Transparent" Transitions="{StaticResource LuxuryPanelTransitions}">
         <StackPanel Padding="20" Spacing="12">
+            <StackPanel.ChildrenTransitions>
+                <StaticResource ResourceKey="LuxuryListTransitions" />
+            </StackPanel.ChildrenTransitions>
 
             <!-- Header -->
             <Grid ColumnSpacing="10">
@@ -104,7 +107,7 @@
             </Grid>
 
             <!-- Filters bar -->
-            <Border Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="14,10" Translation="0,0,32">
+            <Border Background="{StaticResource ElevatedCardBackgroundBrush}" BorderBrush="{StaticResource GlassStrokeBrush}" BorderThickness="1" CornerRadius="16" Padding="14,10" Translation="0,0,32">
                             <Border.Shadow><ThemeShadow/></Border.Shadow>
                             <StackPanel Spacing="6">
                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -127,7 +130,7 @@
             </Border>
 
             <!-- Data table -->
-            <Border Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="0" Translation="0,0,32">
+            <Border Background="{StaticResource ElevatedCardBackgroundBrush}" BorderBrush="{StaticResource GlassStrokeBrush}" BorderThickness="1" CornerRadius="18" Padding="0" Translation="0,0,32">
                 <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" MinHeight="420">
                     <StackPanel>
                         <ListView

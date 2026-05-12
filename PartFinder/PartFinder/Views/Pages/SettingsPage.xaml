@@ -51,14 +51,14 @@
         <Style x:Key="NavButtonStyle" TargetType="Button">
             <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Background" Value="#06000000" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Padding" Value="16,12" />
-            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="CornerRadius" Value="12" />
         </Style>
     </Page.Resources>
 
-    <Grid Background="{StaticResource PageBackgroundBrush}">
+    <Grid Background="Transparent" Transitions="{StaticResource LuxuryPanelTransitions}">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="220" />
             <ColumnDefinition Width="*" />
@@ -72,9 +72,9 @@
             VerticalAlignment="Bottom"
             Margin="0,0,32,32"
             Padding="20,16"
-            CornerRadius="8"
+            CornerRadius="14"
             Background="{StaticResource ElevatedCardBackgroundBrush}"
-            BorderBrush="{StaticResource BorderDefaultBrush}"
+            BorderBrush="{StaticResource GlassStrokeBrush}"
             BorderThickness="1"
             Opacity="0"
             IsHitTestVisible="False"
@@ -92,8 +92,8 @@
         </Border>
 
         <!-- LEFT SIDEBAR: Editorial Navigation -->
-        <Border Grid.Column="0" Background="{StaticResource CardBackgroundBrush}" 
-                BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="0,0,1,0" 
+        <Border Grid.Column="0" Background="{StaticResource ShellSurfaceBrush}" 
+                BorderBrush="{StaticResource GlassStrokeBrush}" BorderThickness="0,0,1,0" 
                 Padding="0,32" Translation="0,0,32">
             <Grid>
                 <Grid RowSpacing="32">
