@@ -29,10 +29,6 @@ public sealed class LocalProfileStore
     /// Absolute path to the saved avatar image, or null if none is set.
     /// </summary>
     public string? AvatarPath { get; private set; }
-    public string? LastLoginIp { get; private set; }
-    public double LastLoginLat { get; private set; }
-    public double LastLoginLon { get; private set; }
-    public string? LastLoginLocation { get; private set; }
 
     public event Action? ProfileChanged;
 
@@ -45,10 +41,6 @@ public sealed class LocalProfileStore
                 DisplayName = null;
                 Department = null;
                 AvatarPath = null;
-                LastLoginIp = null;
-                LastLoginLat = 0;
-                LastLoginLon = 0;
-                LastLoginLocation = null;
                 return;
             }
 
@@ -59,11 +51,6 @@ public sealed class LocalProfileStore
 
             Department = dto?.Department?.Trim();
             if (string.IsNullOrWhiteSpace(Department)) Department = null;
-
-            LastLoginIp = dto?.LastLoginIp?.Trim();
-            LastLoginLat = dto?.LastLoginLat ?? 0;
-            LastLoginLon = dto?.LastLoginLon ?? 0;
-            LastLoginLocation = dto?.LastLoginLocation?.Trim();
 
             // Validate stored avatar path still exists
             var storedAvatar = dto?.AvatarPath?.Trim();
@@ -79,24 +66,13 @@ public sealed class LocalProfileStore
         }
     }
 
-    public void SaveProfile(
-        string? displayName, 
-        string? department, 
-        string? lastLoginIp = null, 
-        double lat = 0, 
-        double lon = 0, 
-        string? location = null)
+    public void SaveProfile(string? displayName, string? department)
     {
         DisplayName = displayName?.Trim();
         if (string.IsNullOrWhiteSpace(DisplayName)) DisplayName = null;
 
         Department = department?.Trim();
         if (string.IsNullOrWhiteSpace(Department)) Department = null;
-
-        if (lastLoginIp != null) LastLoginIp = lastLoginIp;
-        if (lat != 0) LastLoginLat = lat;
-        if (lon != 0) LastLoginLon = lon;
-        if (location != null) LastLoginLocation = location;
 
         Persist();
         ProfileChanged?.Invoke();
@@ -157,10 +133,6 @@ public sealed class LocalProfileStore
                     DisplayName = DisplayName,
                     Department = Department,
                     AvatarPath = AvatarPath,
-                    LastLoginIp = LastLoginIp,
-                    LastLoginLat = LastLoginLat,
-                    LastLoginLon = LastLoginLon,
-                    LastLoginLocation = LastLoginLocation,
                 },
                 Json));
     }
@@ -170,9 +142,5 @@ public sealed class LocalProfileStore
         public string? DisplayName { get; set; }
         public string? Department { get; set; }
         public string? AvatarPath { get; set; }
-        public string? LastLoginIp { get; set; }
-        public double LastLoginLat { get; set; }
-        public double LastLoginLon { get; set; }
-        public string? LastLoginLocation { get; set; }
     }
 }

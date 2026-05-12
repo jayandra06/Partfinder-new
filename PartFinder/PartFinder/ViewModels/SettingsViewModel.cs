@@ -8,10 +8,6 @@ using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Storage.Streams;
 using System.Threading;
 using Windows.Storage;
-using System.Collections.ObjectModel;
-using PartFinder.Models;
-using System.Net.Http;
-using System.Text.Json;
 
 namespace PartFinder.ViewModels;
 
@@ -23,8 +19,6 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly ActivityLogger _activityLogger;
     private readonly IAppStateStore _appState;
     private readonly ILocalSetupContext _setupContext;
-    private readonly DeviceMetadataService _metadataService;
-    private readonly SessionPersistenceService _sessionPersistence;
     private string? _pendingTwoFactorSecret;
 
     public SettingsViewModel(
@@ -33,9 +27,7 @@ public partial class SettingsViewModel : ViewModelBase
         LocalProfileStore profile,
         ActivityLogger activityLogger,
         IAppStateStore appState,
-        ILocalSetupContext setupContext,
-        DeviceMetadataService metadataService,
-        SessionPersistenceService sessionPersistence)
+        ILocalSetupContext setupContext)
     {
         _security = security;
         _session = session;
@@ -43,28 +35,8 @@ public partial class SettingsViewModel : ViewModelBase
         _activityLogger = activityLogger;
         _appState = appState;
         _setupContext = setupContext;
-        _metadataService = metadataService;
-        _sessionPersistence = sessionPersistence;
         _setupContext.Refresh();
-
-        LoginHistoryItems = new ObservableCollection<LoginHistory>();
-        _ = LoadLoginHistoryAsync();
-
-        // Load the actual persisted session
-        _ = LoadLoginSessionAsync();
-
-        // MANDATORY TEST ASSIGNMENTS (Step 4)
-        LastLoginIp = "192.168.1.1";
-        LastLoginLocation = "Hyderabad, IN";
-        LastLoginBrowser = "WinUI 3 Desktop App";
-        LastLoginOsVersion = Environment.OSVersion.ToString();
-        LastLoginDeviceName = Environment.MachineName;
-        LastLoginTime = DateTime.Now.ToString("dd-MMM-yyyy hh:mm tt");
-        LastLoginCoordinates = "17.3850, 78.4867";
-
         RefreshAllState();
-
-        System.Diagnostics.Debug.WriteLine($"[SettingsViewModel] INSTANCE CREATED: {this.GetHashCode()}");
     }
 
     /// <summary>Org code from local setup state.</summary>
@@ -120,31 +92,31 @@ public partial class SettingsViewModel : ViewModelBase
         string.IsNullOrWhiteSpace(s) ? s : char.ToUpperInvariant(s[0]) + s[1..].ToLowerInvariant();
 
     [ObservableProperty]
-    public partial string ProfileName { get; set; } = string.Empty;
+    private string _profileName = string.Empty;
 
     [ObservableProperty]
-    public partial string ProfileMessage { get; set; } = string.Empty;
+    private string _profileMessage = string.Empty;
 
     [ObservableProperty]
-    public partial string PasscodeCurrent { get; set; } = string.Empty;
+    private string _passcodeCurrent = string.Empty;
 
     [ObservableProperty]
-    public partial string PasscodeNew { get; set; } = string.Empty;
+    private string _passcodeNew = string.Empty;
 
     [ObservableProperty]
-    public partial string PasscodeConfirm { get; set; } = string.Empty;
+    private string _passcodeConfirm = string.Empty;
 
     [ObservableProperty]
-    public partial string PasscodeMessage { get; set; } = string.Empty;
+    private string _passcodeMessage = string.Empty;
 
     [ObservableProperty]
-    public partial bool PasscodeIsConfigured { get; set; }
+    private bool _passcodeIsConfigured;
 
     [ObservableProperty]
-    public partial bool ShowAppLockEditor { get; set; }
+    private bool _showAppLockEditor;
 
     [ObservableProperty]
-    public partial bool AppLockEnabled { get; set; }
+    private bool _appLockEnabled;
 
     partial void OnAppLockEnabledChanged(bool value)
     {
@@ -153,86 +125,52 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     [ObservableProperty]
-    public partial string TwoFactorSecretDisplay { get; set; } = string.Empty;
+    private string _twoFactorSecretDisplay = string.Empty;
 
     [ObservableProperty]
-    public partial ImageSource? TwoFactorQrImage { get; set; }
+    private ImageSource? _twoFactorQrImage;
 
     [ObservableProperty]
-    public partial string TwoFactorConfirmCode { get; set; } = string.Empty;
+    private string _twoFactorConfirmCode = string.Empty;
 
     [ObservableProperty]
-    public partial string TwoFactorMessage { get; set; } = string.Empty;
+    private string _twoFactorMessage = string.Empty;
 
     [ObservableProperty]
-    public partial bool TwoFactorEnabled { get; set; }
+    private bool _twoFactorEnabled;
 
     [ObservableProperty]
-    public partial bool TwoFactorSetupVisible { get; set; }
+    private bool _twoFactorSetupVisible;
 
     [ObservableProperty]
-    public partial string TwoFactorDisableCode { get; set; } = string.Empty;
+    private string _twoFactorDisableCode = string.Empty;
 
     [ObservableProperty]
-    public partial string TwoFactorVerifyCode { get; set; } = string.Empty;
+    private string _twoFactorVerifyCode = string.Empty;
 
     [ObservableProperty]
-    public partial string PasscodeRemoveTotpCode { get; set; } = string.Empty;
+    private string _passcodeRemoveTotpCode = string.Empty;
 
     [ObservableProperty]
-    public partial string LoginEmail { get; set; } = string.Empty;
+    private string _loginEmail = string.Empty;
 
     [ObservableProperty]
-    public partial string LoginPassword { get; set; } = string.Empty;
+    private string _loginPassword = string.Empty;
 
     [ObservableProperty]
-    public partial string LoginMessage { get; set; } = string.Empty;
+    private string _loginMessage = string.Empty;
 
     [ObservableProperty]
-    public partial bool AdminSessionActive { get; set; }
+    private bool _adminSessionActive;
 
     [ObservableProperty]
-    public partial string SessionEmailDisplay { get; set; } = string.Empty;
+    private string _sessionEmailDisplay = string.Empty;
 
     [ObservableProperty]
-    public partial string LastLoginIp { get; set; } = string.Empty;
+    private string _profileDepartment = string.Empty;
 
     [ObservableProperty]
-    public partial string LastLoginLocation { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    public partial string LastLoginCoordinates { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    public partial string LastLoginBrowser { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    public partial string LastLoginOsVersion { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    public partial string LastLoginDeviceName { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    public partial string LastLoginTime { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    public partial string LastLoginStatus { get; set; } = "Secure Session";
-
-    [ObservableProperty]
-    public partial string LastLoginStatusColor { get; set; } = "#2ABD8F"; // Green
-
-
-    public ObservableCollection<LoginHistory> LoginHistoryItems { get; set; }
-    public ObservableCollection<SessionUIWrapper> ActiveSessions { get; } = new();
-
-    [ObservableProperty]
-    public partial string CurrentSessionId { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    public partial string ProfileDepartment { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    public partial ImageSource? AvatarImageSource { get; set; }
+    private ImageSource? _avatarImageSource;
 
     /// <summary>Initials fallback when no avatar photo is set.</summary>
     public string AvatarInitial =>
@@ -246,19 +184,16 @@ public partial class SettingsViewModel : ViewModelBase
     public bool HasAvatarPhoto => AvatarImageSource is not null;
 
     [ObservableProperty]
-    public partial string ChangeCurrentPassword { get; set; } = string.Empty;
+    private string _changeCurrentPassword = string.Empty;
 
     [ObservableProperty]
-    public partial string ChangeNewPassword { get; set; } = string.Empty;
+    private string _changeNewPassword = string.Empty;
 
     [ObservableProperty]
-    public partial string ChangeConfirmPassword { get; set; } = string.Empty;
+    private string _changeConfirmPassword = string.Empty;
 
     [ObservableProperty]
-    public partial bool ChangePasswordIsError { get; set; }
-
-    [ObservableProperty]
-    public partial string ChangePasswordMessage { get; set; } = string.Empty;
+    private string _changePasswordMessage = string.Empty;
 
     partial void OnChangeNewPasswordChanged(string value)
     {
@@ -294,40 +229,40 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     [ObservableProperty]
-    public partial string ResetPasscodeTotp { get; set; } = string.Empty;
+    private string _resetPasscodeTotp = string.Empty;
 
     [ObservableProperty]
-    public partial string ResetPasscodeNew { get; set; } = string.Empty;
+    private string _resetPasscodeNew = string.Empty;
 
     [ObservableProperty]
-    public partial string ResetPasscodeConfirm { get; set; } = string.Empty;
+    private string _resetPasscodeConfirm = string.Empty;
 
     [ObservableProperty]
-    public partial string PasscodeRecoveryMessage { get; set; } = string.Empty;
+    private string _passcodeRecoveryMessage = string.Empty;
 
     [ObservableProperty]
-    public partial string ResetPasswordRecoveryEmail { get; set; } = string.Empty;
+    private string _resetPasswordRecoveryEmail = string.Empty;
 
     [ObservableProperty]
-    public partial string ResetPasswordRecoveryTotp { get; set; } = string.Empty;
+    private string _resetPasswordRecoveryTotp = string.Empty;
 
     [ObservableProperty]
-    public partial string ResetPasswordRecoveryNew { get; set; } = string.Empty;
+    private string _resetPasswordRecoveryNew = string.Empty;
 
     [ObservableProperty]
-    public partial string ResetPasswordRecoveryConfirm { get; set; } = string.Empty;
+    private string _resetPasswordRecoveryConfirm = string.Empty;
 
     [ObservableProperty]
-    public partial string PasswordRecoveryMessage { get; set; } = string.Empty;
+    private string _passwordRecoveryMessage = string.Empty;
 
     [ObservableProperty]
-    public partial bool ShowTwoFactorKeyCopied { get; set; }
+    private bool _showTwoFactorKeyCopied;
 
     [ObservableProperty]
-    public partial bool ShowServerAccountEditor { get; set; }
+    private bool _showServerAccountEditor;
 
     [ObservableProperty]
-    public partial bool ShowTwoFactorEditor { get; set; }
+    private bool _showTwoFactorEditor;
 
     partial void OnProfileNameChanged(string value)
     {
@@ -417,10 +352,7 @@ public partial class SettingsViewModel : ViewModelBase
     private void RefreshAllState()
     {
         _security.Load();
-        if (!_session.HasSession)
-        {
-            _session.Load();
-        }
+        _session.Load();
         _profile.Load();
         PasscodeIsConfigured = _security.PasscodeIsSet;
         AppLockEnabled = _security.AppLockEnabled;
@@ -446,85 +378,7 @@ public partial class SettingsViewModel : ViewModelBase
         SessionEmailDisplay = string.IsNullOrWhiteSpace(emailToShow) ? "—" : emailToShow;
         ProfileName = _profile.DisplayName ?? string.Empty;
         ProfileDepartment = _profile.Department ?? string.Empty;
-        
-        // Load persisted session asynchronously (best effort)
-        _ = LoadLoginSessionAsync();
-
         _ = LoadAvatarAsync(_profile.AvatarPath);
-        
-        // Fetch latest profile data from server if authenticated to populate geolocation
-        if (AdminSessionActive && !string.IsNullOrWhiteSpace(_session.AccessToken))
-        {
-            _ = Task.Run(async () =>
-            {
-                (bool ok, string? err, AdminAuthApiClient.LoginUserDto? user) = await AdminAuthApiClient.GetProfileAsync(_session.AccessToken);
-                if (ok && user != null)
-                {
-                    _profile.SaveProfile(
-                        user.Email,
-                        _profile.Department,
-                        user.LastLoginIp,
-                        user.LastLoginLat,
-                        user.LastLoginLon,
-                        user.LastLoginLocation);
-                        
-                    // Update UI on main thread
-                    App.MainAppWindow?.DispatcherQueue.TryEnqueue(() =>
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[Profile] Server-side profile refresh for: {user.Email}");
-                        
-                        if (!string.IsNullOrWhiteSpace(user.LastLoginIp)) LastLoginIp = user.LastLoginIp;
-                        if (!string.IsNullOrWhiteSpace(user.LastLoginLocation)) LastLoginLocation = user.LastLoginLocation;
-                        
-                        if (user.LastLoginLat != 0 || user.LastLoginLon != 0)
-                        {
-                            LastLoginCoordinates = $"{user.LastLoginLat:F4}, {user.LastLoginLon:F4}";
-                        }
-
-                        if (user.LastSession != null)
-                        {
-                            LastLoginBrowser = user.LastSession.Browser ?? "PartFinder App";
-                            LastLoginOsVersion = user.LastSession.OperatingSystem ?? LastLoginOsVersion;
-                            LastLoginDeviceName = user.LastSession.DeviceType ?? LastLoginDeviceName;
-                            LastLoginTime = user.LastSession.LoginTime.ToLocalTime().ToString("dd-MMM-yyyy hh:mm tt");
-                            
-                            LastLoginStatus = user.LastSession.Status == "suspicious" ? "Suspicious Login" : 
-                                             user.LastSession.Status == "warning" ? "New Device" : "Secure Session";
-                            LastLoginStatusColor = user.LastSession.Status == "suspicious" ? "#E05252" : 
-                                                   user.LastSession.Status == "warning" ? "#E8A040" : "#2ABD8F";
-                        }
-                    });
-                }
-            });
-
-            // Fetch History
-            _ = Task.Run(async () =>
-            {
-                var (ok, _, history) = await AdminAuthApiClient.GetLoginHistoryAsync(_session.AccessToken);
-                if (ok && history != null)
-                {
-                    App.MainAppWindow?.DispatcherQueue.TryEnqueue(() =>
-                    {
-                        LoginHistoryItems.Clear();
-                        foreach (var s in history)
-                        {
-                            LoginHistoryItems.Add(new LoginHistory
-                            {
-                                Time = s.LoginTime.ToLocalTime().ToString("dd-MMM-yyyy hh:mm tt"),
-                                Details = $"{s.Browser ?? "Unknown"} on {s.OperatingSystem ?? "Unknown"} | {s.City ?? "Unknown"}",
-                                IP = s.IpAddress ?? "Unknown",
-                                Status = s.Status ?? "SUCCESS"
-                            });
-                        }
-                        OnPropertyChanged(nameof(HasLoginHistory));
-                    });
-                }
-            });
-
-            // Fetch Active Sessions
-            _ = RefreshSessionsAsync();
-        }
-
         OnPropertyChanged(nameof(IsStartTwoFactorEnabled));
         OnPropertyChanged(nameof(TwoFactorStatusText));
     }
@@ -538,54 +392,6 @@ public partial class SettingsViewModel : ViewModelBase
         ProfileMessage = string.Empty;
         LoginMessage = string.Empty;
         ChangePasswordMessage = string.Empty;
-    }
-
-    [RelayCommand]
-    private async Task RefreshSessionsAsync()
-    {
-        if (!AdminSessionActive || string.IsNullOrWhiteSpace(_session.AccessToken)) return;
-        var (ok, _, sessions) = await AdminAuthApiClient.GetActiveSessionsAsync(_session.AccessToken);
-        if (ok && sessions != null)
-        {
-            // Try to find current session if not set
-            if (string.IsNullOrEmpty(CurrentSessionId))
-            {
-                // Simple heuristic: latest session from this IP/OS
-                var current = sessions.OrderByDescending(s => s.LoginTime).FirstOrDefault();
-                if (current != null) CurrentSessionId = current.Id ?? string.Empty;
-            }
-
-            App.MainAppWindow?.DispatcherQueue.TryEnqueue(() =>
-            {
-                ActiveSessions.Clear();
-                foreach (var s in sessions) 
-                    ActiveSessions.Add(new SessionUIWrapper(s, CurrentSessionId));
-            });
-        }
-    }
-
-    [RelayCommand]
-    private async Task LogoutSessionAsync(string sessionId)
-    {
-        if (string.IsNullOrWhiteSpace(sessionId) || string.IsNullOrWhiteSpace(_session.AccessToken)) return;
-        var (ok, _) = await AdminAuthApiClient.LogoutSessionAsync(_session.AccessToken, sessionId);
-        if (ok)
-        {
-            _activityLogger.LogUserAction("Session Revoked", $"Logged out device session: {sessionId}");
-            await RefreshSessionsAsync();
-        }
-    }
-
-    [RelayCommand]
-    private async Task LogoutAllSessionsAsync()
-    {
-        if (string.IsNullOrWhiteSpace(_session.AccessToken)) return;
-        var (ok, _) = await AdminAuthApiClient.LogoutAllSessionsAsync(_session.AccessToken);
-        if (ok)
-        {
-            _activityLogger.LogUserAction("All Sessions Revoked", "Logged out all other device sessions");
-            await RefreshSessionsAsync();
-        }
     }
 
     [RelayCommand]
@@ -941,264 +747,29 @@ public partial class SettingsViewModel : ViewModelBase
     [RelayCommand]
     private async Task LoginAsync(CancellationToken ct)
     {
-        LoginMessage = "Authenticating...";
-        
+        LoginMessage = string.Empty;
         if (string.IsNullOrWhiteSpace(LoginEmail) || string.IsNullOrWhiteSpace(LoginPassword))
         {
             LoginMessage = "Email and password are required.";
             return;
         }
 
-        // 1. Fetch metadata for the login request
-        var metadata = await _metadataService.GetMetadataAsync();
-
-        // 2. Perform Authentication
-        (bool ok, string? err, AdminAuthApiClient.LoginResponseBody? body) = await AdminAuthApiClient.LoginAsync(
-            LoginEmail.Trim(), 
-            LoginPassword, 
-            metadata.IpAddress,
-            metadata.Latitude,
-            metadata.Longitude,
-            metadata.DeviceName,
-            metadata.OsVersion,
-            ct: ct).ConfigureAwait(true);
-
+        var (ok, err, body) = await AdminAuthApiClient.LoginAsync(LoginEmail.Trim(), LoginPassword, ct)
+            .ConfigureAwait(true);
         if (!ok || body?.AccessToken is null)
         {
             LoginMessage = err ?? "Login failed.";
             return;
         }
 
-        // 3. Save Session
         var email = body.User?.Email ?? LoginEmail.Trim();
         _session.Save(body.AccessToken, email);
+        LoginPassword = string.Empty;
+        LoginMessage = "Signed in. You can change your password below.";
         AdminSessionActive = true;
         SessionEmailDisplay = email;
-        LoginPassword = string.Empty;
-        LoginMessage = "Signed in successfully.";
-
-        // 4. MANDATORY: Load and assign current session details to UI immediately
-        System.Diagnostics.Debug.WriteLine("[LoginSession] Calling LoadCurrentLoginSession...");
-        await LoadCurrentLoginSession();
-        System.Diagnostics.Debug.WriteLine("[LoginSession] LoadCurrentLoginSession completed.");
-
         _activityLogger.LogLogin(email);
-        RefreshStatus();
     }
-
-    public async Task LoadCurrentLoginSession()
-    {
-        System.Diagnostics.Debug.WriteLine("[LoginSession] Starting complete data assignment flow...");
-
-        // 1. Fetch Public IP
-        string ip = await GetPublicIPAsync();
-        LastLoginIp = string.IsNullOrEmpty(ip) || ip == "Not Available" ? "Not Available" : ip;
-        System.Diagnostics.Debug.WriteLine($"[LoginSession] IP: {LastLoginIp}");
-
-        // 2. Fetch Geolocation & Coordinates
-        var (lat, lon, status) = await GetLocationAsync();
-        if (lat != 0 || lon != 0)
-        {
-            LastLoginCoordinates = $"{lat:F4}, {lon:F4}";
-            LastLoginLocation = status == "Success" ? $"Lat: {lat:F4}, Lon: {lon:F4}" : status;
-        }
-        else
-        {
-            LastLoginCoordinates = "Not Available";
-            LastLoginLocation = string.IsNullOrEmpty(status) || status == "Not Captured" ? "Not Available" : status;
-        }
-
-        // STEP 3 — Add Debugging
-        System.Diagnostics.Debug.WriteLine($"[LoginSession] DEBUG => IP: {LastLoginIp}");
-        System.Diagnostics.Debug.WriteLine($"[LoginSession] DEBUG => Location: {LastLoginLocation}");
-        System.Diagnostics.Debug.WriteLine($"[LoginSession] DEBUG => Coordinates: {LastLoginCoordinates}");
-        System.Diagnostics.Debug.WriteLine($"[LoginSession] DEBUG => Device: {LastLoginDeviceName}");
-
-        // 3. Fetch Device Information
-        LastLoginDeviceName = Environment.MachineName;
-        LastLoginOsVersion = Environment.OSVersion.ToString();
-        LastLoginBrowser = "WinUI 3 Desktop App";
-        LastLoginTime = DateTime.Now.ToString("dd-MMM-yyyy hh:mm tt");
-        
-        System.Diagnostics.Debug.WriteLine($"[LoginSession] Device: {LastLoginDeviceName}, OS: {LastLoginOsVersion}, Time: {LastLoginTime}");
-
-        // 4. Update fallback specific fields
-        LastLoginStatus = "Secure Session";
-        LastLoginStatusColor = "#2ABD8F";
-
-        // 5. Persist the current session
-        _ = _sessionPersistence.SaveLoginSessionAsync(new LoginSession
-        {
-            IpAddress = LastLoginIp,
-            Location = LastLoginLocation,
-            Coordinates = LastLoginCoordinates,
-            Browser = LastLoginBrowser,
-            OsVersion = LastLoginOsVersion,
-            DeviceName = LastLoginDeviceName,
-            LoginTime = LastLoginTime
-        });
-
-        System.Diagnostics.Debug.WriteLine($"[LoginSession] Session persisted to storage.");
-
-        // STEP 7 — Force Property Notifications
-        OnPropertyChanged(nameof(LastLoginIp));
-        OnPropertyChanged(nameof(LastLoginLocation));
-        OnPropertyChanged(nameof(LastLoginCoordinates));
-        OnPropertyChanged(nameof(LastLoginBrowser));
-        OnPropertyChanged(nameof(LastLoginOsVersion));
-        OnPropertyChanged(nameof(LastLoginDeviceName));
-        OnPropertyChanged(nameof(LastLoginTime));
-        OnPropertyChanged(nameof(LastLoginStatus));
-        OnPropertyChanged(nameof(LastLoginStatusColor));
-
-        // 6. Save session permanently using LocalSettings
-        await _sessionPersistence.SaveLoginSessionAsync(new LoginSession
-        {
-            IpAddress = LastLoginIp,
-            Location = LastLoginLocation,
-            Coordinates = LastLoginCoordinates,
-            Browser = LastLoginBrowser,
-            OsVersion = LastLoginOsVersion,
-            DeviceName = LastLoginDeviceName,
-            LoginTime = LastLoginTime
-        });
-        
-        System.Diagnostics.Debug.WriteLine("[LoginSession] UI properties assigned and notified.");
-
-        // Create a LoginHistory item for this successful session
-        var historyItem = new LoginHistory
-        {
-            Time = DateTime.Now.ToString("dd-MMM-yyyy hh:mm tt"),
-            Details = $"{Environment.MachineName} | Windows Desktop",
-            IP = LastLoginIp,
-            Status = "SUCCESS"
-        };
-        
-        App.MainAppWindow?.DispatcherQueue.TryEnqueue(() =>
-        {
-            LoginHistoryItems.Insert(0, historyItem);
-            OnPropertyChanged(nameof(LoginHistoryItems));
-            OnPropertyChanged(nameof(HasLoginHistory));
-            _ = SaveLoginHistoryAsync();
-        });
-    }
-
-    public bool HasLoginHistory => LoginHistoryItems.Count > 0;
-
-    public async Task SaveLoginHistoryAsync()
-    {
-        try
-        {
-            var json = JsonSerializer.Serialize(LoginHistoryItems);
-            ApplicationData.Current.LocalSettings.Values["LoginHistoryAudit"] = json;
-            System.Diagnostics.Debug.WriteLine($"[LoginSession] History saved. Count: {LoginHistoryItems.Count}");
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[LoginSession] Failed to save history: {ex.Message}");
-        }
-        await Task.CompletedTask;
-    }
-
-    public async Task LoadLoginHistoryAsync()
-    {
-        try
-        {
-            object data = ApplicationData.Current.LocalSettings.Values["LoginHistoryAudit"];
-            if (data != null && !string.IsNullOrWhiteSpace(data.ToString()))
-            {
-                var history = JsonSerializer.Deserialize<List<LoginHistory>>(data.ToString()!);
-                if (history != null)
-                {
-                    App.MainAppWindow?.DispatcherQueue.TryEnqueue(() =>
-                    {
-                        LoginHistoryItems.Clear();
-                        foreach (var item in history) LoginHistoryItems.Add(item);
-                        System.Diagnostics.Debug.WriteLine($"[LoginSession] Loaded history count: {LoginHistoryItems.Count}");
-                        OnPropertyChanged(nameof(HasLoginHistory));
-                    });
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[LoginSession] Failed to load history: {ex.Message}");
-        }
-        await Task.CompletedTask;
-    }
-
-    public async Task LoadLoginSessionAsync()
-    {
-        var session = _sessionPersistence.LoadLoginSession();
-        if (session != null)
-        {
-            LastLoginIp = session.IpAddress;
-            LastLoginLocation = session.Location;
-            LastLoginCoordinates = session.Coordinates;
-            LastLoginBrowser = session.Browser;
-            LastLoginOsVersion = session.OsVersion;
-            LastLoginDeviceName = session.DeviceName;
-            LastLoginTime = session.LoginTime;
-            
-            System.Diagnostics.Debug.WriteLine($"[SettingsViewModel] Loaded IP: {LastLoginIp}");
-            System.Diagnostics.Debug.WriteLine($"[SettingsViewModel] Loaded Device: {LastLoginDeviceName}");
-        }
-        else
-        {
-            // Only set fallbacks if current values are empty
-            if (string.IsNullOrEmpty(LastLoginIp))
-            {
-                LastLoginIp = "Not Available";
-                LastLoginLocation = "Not Available";
-                LastLoginCoordinates = "Not Available";
-                LastLoginBrowser = "Not Available";
-                LastLoginOsVersion = "Not Available";
-                LastLoginDeviceName = "Not Available";
-                LastLoginTime = "Not Available";
-            }
-            System.Diagnostics.Debug.WriteLine($"[SettingsViewModel] No persisted login session found.");
-        }
-        await Task.CompletedTask;
-    }
-
-    public async Task<string> GetPublicIPAsync()
-    {
-        try
-        {
-            System.Diagnostics.Debug.WriteLine("[LoginSession] Fetching Public IP from api.ipify.org...");
-            using HttpClient client = new HttpClient();
-            client.Timeout = TimeSpan.FromSeconds(5);
-            var ip = await client.GetStringAsync("https://api.ipify.org").ConfigureAwait(false);
-            return string.IsNullOrWhiteSpace(ip) ? "Not Available" : ip.Trim();
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[LoginSession] IP fetch failed: {ex.Message}");
-            return "Not Available";
-        }
-    }
-
-    private async Task<(double lat, double lon, string status)> GetLocationAsync()
-    {
-        try
-        {
-            var accessStatus = await Windows.Devices.Geolocation.Geolocator.RequestAccessAsync();
-            if (accessStatus == Windows.Devices.Geolocation.GeolocationAccessStatus.Allowed)
-            {
-                var geolocator = new Windows.Devices.Geolocation.Geolocator { DesiredAccuracyInMeters = 50 };
-                var pos = await geolocator.GetGeopositionAsync().AsTask().ConfigureAwait(false);
-                return (pos.Coordinate.Point.Position.Latitude, pos.Coordinate.Point.Position.Longitude, "Success");
-            }
-            return (0, 0, "Location Access Denied");
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[LoginSession] Location fetch failed: {ex.Message}");
-            return (0, 0, "Location Error");
-        }
-    }
-
-
 
     [RelayCommand]
     private async Task LogoutAsync()
@@ -1227,41 +798,45 @@ public partial class SettingsViewModel : ViewModelBase
     private async Task ChangePasswordAsync(CancellationToken ct)
     {
         ChangePasswordMessage = string.Empty;
-        ChangePasswordIsError = false;
-
         if (string.IsNullOrWhiteSpace(ChangeCurrentPassword) ||
             string.IsNullOrWhiteSpace(ChangeNewPassword) ||
             string.IsNullOrWhiteSpace(ChangeConfirmPassword))
         {
-            ChangePasswordIsError = true;
             ChangePasswordMessage = "Fill in current password, new password, and confirmation.";
             return;
         }
 
         if (ChangeNewPassword != ChangeConfirmPassword)
         {
-            ChangePasswordIsError = true;
             ChangePasswordMessage = "New password and confirmation do not match.";
             return;
         }
 
         if (!IsStrongPassword(ChangeNewPassword))
         {
-            ChangePasswordIsError = true;
             ChangePasswordMessage = "New password must be at least 8 characters with upper, lower, and a number.";
             return;
         }
 
-        var (ok, err) = await AdminAuthApiClient.ChangePasswordAsync(
-                _session.AccessToken ?? string.Empty,
+        var orgCode = _setupContext.OrgCode?.Trim();
+        var email = _setupContext.AdminEmail?.Trim();
+
+        if (string.IsNullOrWhiteSpace(orgCode) || string.IsNullOrWhiteSpace(email))
+        {
+            ChangePasswordMessage = "Organization details are missing. Please complete setup first.";
+            return;
+        }
+
+        var (ok, err) = await SetupApiClient.ChangePasswordAsync(
+                orgCode,
+                email,
                 ChangeCurrentPassword,
                 ChangeNewPassword,
-                ct: ct)
+                ct)
             .ConfigureAwait(true);
 
         if (!ok)
         {
-            ChangePasswordIsError = true;
             ChangePasswordMessage = err ?? "Could not change password.";
             return;
         }
@@ -1269,7 +844,6 @@ public partial class SettingsViewModel : ViewModelBase
         ChangeCurrentPassword = string.Empty;
         ChangeNewPassword = string.Empty;
         ChangeConfirmPassword = string.Empty;
-        ChangePasswordIsError = false;
         ChangePasswordMessage = "Password updated. If 2FA is enabled, use your authenticator app for any reset flows.";
         _activityLogger.LogUserAction("Password Changed", "Account password was changed");
     }
@@ -1371,7 +945,7 @@ public partial class SettingsViewModel : ViewModelBase
                 ResetPasswordRecoveryEmail.Trim(),
                 ResetPasswordRecoveryTotp,
                 ResetPasswordRecoveryNew,
-                ct: ct)
+                ct)
             .ConfigureAwait(true);
         if (!ok)
         {

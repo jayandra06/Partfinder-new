@@ -19,49 +19,49 @@ public partial class UserManagementViewModel : ViewModelBase
     public string[] RoleOptions { get; } = ["Admin", "Employee"];
 
     [ObservableProperty]
-    public partial string InviteName { get; set; } = string.Empty;
+    private string inviteName = string.Empty;
 
     [ObservableProperty]
-    public partial string InviteEmail { get; set; } = string.Empty;
+    private string inviteEmail = string.Empty;
 
     [ObservableProperty]
-    public partial string InviteRole { get; set; } = "Employee";
+    private string inviteRole = "Employee";
 
     [ObservableProperty]
-    public partial bool InvitePartsAllTemplates { get; set; } = false;
+    private bool invitePartsAllTemplates = false;
 
     [ObservableProperty]
-    public partial string StatusMessage { get; set; } = string.Empty;
+    private string statusMessage = string.Empty;
 
     [ObservableProperty]
-    public partial bool IsBusy { get; set; }
+    private bool isBusy;
 
     // Granular Permissions (for Invite/Edit)
-    [ObservableProperty] public partial bool InviteCanAddTemplate { get; set; } = false;
-    [ObservableProperty] public partial bool InviteCanViewTemplate { get; set; } = false;
-    [ObservableProperty] public partial bool InviteCanEditTemplate { get; set; } = false;
-    [ObservableProperty] public partial bool InviteCanDeleteTemplate { get; set; } = false;
+    [ObservableProperty] private bool inviteCanAddTemplate = false;
+    [ObservableProperty] private bool inviteCanViewTemplate = false;
+    [ObservableProperty] private bool inviteCanEditTemplate = false;
+    [ObservableProperty] private bool inviteCanDeleteTemplate = false;
 
-    [ObservableProperty] public partial bool InviteCanCopyMasterData { get; set; } = false;
-    [ObservableProperty] public partial bool InviteCanViewMasterData { get; set; } = false;
-    [ObservableProperty] public partial bool InviteCanEditMasterData { get; set; } = false;
-    [ObservableProperty] public partial bool InviteCanAddMasterData { get; set; } = false;
-    [ObservableProperty] public partial bool InviteCanDeleteMasterData { get; set; } = false;
+    [ObservableProperty] private bool inviteCanCopyMasterData = false;
+    [ObservableProperty] private bool inviteCanViewMasterData = false;
+    [ObservableProperty] private bool inviteCanEditMasterData = false;
+    [ObservableProperty] private bool inviteCanAddMasterData = false;
+    [ObservableProperty] private bool inviteCanDeleteMasterData = false;
 
     [ObservableProperty]
-    public partial bool IsEditMode { get; set; }
+    private bool isEditMode;
 
     private string? _editUserId;
 
     private List<OrgAppUserSummary> _allUsers = [];
 
     [ObservableProperty]
-    public partial string SearchQuery { get; set; } = string.Empty;
+    private string searchQuery = string.Empty;
 
     public string[] RoleFilters { get; } = ["All", "Admin", "Employee"];
 
     [ObservableProperty]
-    public partial string SelectedRoleFilter { get; set; } = "All";
+    private string selectedRoleFilter = "All";
 
     partial void OnSelectedRoleFilterChanged(string value)
     {
@@ -71,7 +71,7 @@ public partial class UserManagementViewModel : ViewModelBase
     public string[] StatusFilters { get; } = ["All Status", "Active", "Pending"];
 
     [ObservableProperty]
-    public partial string SelectedStatusFilter { get; set; } = "All Status";
+    private string selectedStatusFilter = "All Status";
 
     partial void OnSelectedStatusFilterChanged(string value)
     {

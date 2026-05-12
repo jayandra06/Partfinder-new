@@ -51,8 +51,6 @@ namespace PartFinder
             services.AddSingleton<MongoAuditService>();
             services.AddSingleton<MongoAlertsService>();
             services.AddSingleton<ActivityLogger>();
-            services.AddSingleton<DeviceMetadataService>();
-            services.AddSingleton<SessionPersistenceService>();
 
             services.AddSingleton<ShellViewModel>();
             services.AddSingleton<IShellNavCoordinator>(sp => sp.GetRequiredService<ShellViewModel>());
@@ -62,7 +60,7 @@ namespace PartFinder
             services.AddTransient<ViewDataViewModel>();
             services.AddTransient<WorksheetRelationsViewModel>();
             services.AddTransient<MasterDataViewModel>();
-            services.AddSingleton<SettingsViewModel>();
+            services.AddTransient<SettingsViewModel>();
             services.AddTransient<UserManagementViewModel>();
             services.AddTransient<QrCodeManagerViewModel>();
             services.AddTransient<AlertsViewModel>();

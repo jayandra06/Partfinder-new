@@ -39,11 +39,6 @@ public sealed class AdminAuthApiClient
     public static async Task<(bool ok, string? error, LoginResponseBody? body)> LoginAsync(
         string email,
         string password,
-        string? ipAddress = null,
-        double? latitude = null,
-        double? longitude = null,
-        string? deviceName = null,
-        string? osVersion = null,
         CancellationToken ct = default)
     {
         // Security: basic input sanity before sending to server
@@ -54,16 +49,7 @@ public sealed class AdminAuthApiClient
 
         var (success, err, text) = await RawPostAsync(
             "/api/auth/admin/login",
-            new 
-            { 
-                email = email.Trim(), 
-                password,
-                ipAddress,
-                latitude,
-                longitude,
-                deviceName,
-                osVersion
-            },
+            new { email = email.Trim(), password },
             null,
             ct).ConfigureAwait(true);
         if (!success || string.IsNullOrWhiteSpace(text))
@@ -97,7 +83,9 @@ public sealed class AdminAuthApiClient
         string? email = null,
         CancellationToken ct = default)
     {
-        // The server will perform full validation on the bearerToken
+        // Security: validate token shape before use
+        if (!IsValidJwtShape(bearerToken))
+            return (false, "Invalid session token.");
         if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length > 256)
             return (false, "Invalid new password.");
 
@@ -170,118 +158,6 @@ public sealed class AdminAuthApiClient
         return success ? (true, null) : (false, err ?? "Recovery failed.");
     }
 
-    public static async Task<(bool ok, string? error, LoginUserDto? user)> GetProfileAsync(
-        string bearerToken,
-        CancellationToken ct = default)
-    {
-        if (!IsValidJwtShape(bearerToken))
-            return (false, "Invalid session token.", null);
-
-        var (success, err, text) = await RawGetAsync(
-            "/api/auth/admin/profile",
-            bearerToken,
-            ct).ConfigureAwait(true);
-        if (!success || string.IsNullOrWhiteSpace(text))
-        {
-            return (false, err ?? "Failed to fetch profile.", null);
-        }
-
-        try
-        {
-            var user = JsonSerializer.Deserialize<LoginUserDto>(text, ReadJson);
-            return (true, null, user);
-        }
-        catch
-        {
-            return (false, "Failed to parse profile data.", null);
-        }
-    }
-
-    public static async Task<(bool ok, string? error, List<LoginSessionDto>? history)> GetLoginHistoryAsync(
-        string bearerToken,
-        CancellationToken ct = default)
-    {
-        if (!IsValidJwtShape(bearerToken))
-            return (false, "Invalid session token.", null);
-
-        var (success, err, text) = await RawGetAsync(
-            "/api/auth/admin/login-history",
-            bearerToken,
-            ct).ConfigureAwait(true);
-        if (!success || string.IsNullOrWhiteSpace(text))
-        {
-            return (false, err ?? "Failed to fetch history.", null);
-        }
-
-        try
-        {
-            var history = JsonSerializer.Deserialize<List<LoginSessionDto>>(text, ReadJson);
-            return (true, null, history);
-        }
-        catch
-        {
-            return (false, "Failed to parse history data.", null);
-        }
-    }
-
-    public static async Task<(bool ok, string? error, List<LoginSessionDto>? sessions)> GetActiveSessionsAsync(
-        string bearerToken,
-        CancellationToken ct = default)
-    {
-        if (!IsValidJwtShape(bearerToken))
-            return (false, "Invalid session token.", null);
-
-        var (success, err, text) = await RawGetAsync(
-            "/api/auth/admin/active-sessions",
-            bearerToken,
-            ct).ConfigureAwait(true);
-        if (!success || string.IsNullOrWhiteSpace(text))
-        {
-            return (false, err ?? "Failed to fetch sessions.", null);
-        }
-
-        try
-        {
-            var sessions = JsonSerializer.Deserialize<List<LoginSessionDto>>(text, ReadJson);
-            return (true, null, sessions);
-        }
-        catch
-        {
-            return (false, "Failed to parse session data.", null);
-        }
-    }
-
-    public static async Task<(bool ok, string? error)> LogoutSessionAsync(
-        string bearerToken,
-        string sessionId,
-        CancellationToken ct = default)
-    {
-        if (!IsValidJwtShape(bearerToken))
-            return (false, "Invalid session token.");
-
-        var (success, err, _) = await RawPostAsync(
-            "/api/auth/admin/logout-session",
-            new { sessionId },
-            bearerToken,
-            ct).ConfigureAwait(true);
-        return success ? (true, null) : (false, err ?? "Logout failed.");
-    }
-
-    public static async Task<(bool ok, string? error)> LogoutAllSessionsAsync(
-        string bearerToken,
-        CancellationToken ct = default)
-    {
-        if (!IsValidJwtShape(bearerToken))
-            return (false, "Invalid session token.");
-
-        var (success, err, _) = await RawPostAsync(
-            "/api/auth/admin/logout-all-sessions",
-            new { },
-            bearerToken,
-            ct).ConfigureAwait(true);
-        return success ? (true, null) : (false, err ?? "Logout failed.");
-    }
-
     private static async Task<(bool success, string? error, string? body)> RawPostAsync(
         string path,
         object body,
@@ -298,39 +174,7 @@ public sealed class AdminAuthApiClient
         req.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json") { CharSet = "utf-8" };
         if (!string.IsNullOrWhiteSpace(bearerToken))
         {
-            req.Headers.TryAddWithoutValidation("Authorization", $"Bearer {bearerToken.Trim()}");
-        }
-
-        HttpResponseMessage resp;
-        try
-        {
-            resp = await Http.SendAsync(req, ct).ConfigureAwait(true);
-        }
-        catch (Exception ex)
-        {
-            return (false, ex.Message, null);
-        }
-
-        var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(true);
-        if (resp.IsSuccessStatusCode)
-        {
-            return (true, null, text);
-        }
-
-        return (false, ParseApiError(text), text);
-    }
-
-    private static async Task<(bool success, string? error, string? body)> RawGetAsync(
-        string path,
-        string bearerToken,
-        CancellationToken ct)
-    {
-        var baseUrl = LicenseApiClient.GetBaseUrl();
-        var url = $"{baseUrl.TrimEnd('/')}{path}";
-        using var req = new HttpRequestMessage(HttpMethod.Get, url);
-        if (!string.IsNullOrWhiteSpace(bearerToken))
-        {
-            req.Headers.TryAddWithoutValidation("Authorization", $"Bearer {bearerToken.Trim()}");
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken.Trim());
         }
 
         HttpResponseMessage resp;
@@ -389,11 +233,12 @@ public sealed class AdminAuthApiClient
     }
 
     // Security: JWT must have exactly 3 dot-separated non-empty parts
-    private static bool IsValidJwtShape(string? token)
+    private static bool IsValidJwtShape(string token)
     {
-        if (string.IsNullOrWhiteSpace(token) || token.Length > 8192)
+        if (string.IsNullOrWhiteSpace(token) || token.Length > 4096)
             return false;
-        return token.Length > 10;
+        var parts = token.Split('.');
+        return parts.Length == 3 && parts.All(p => p.Length > 0);
     }
 
     // Security: Base32 alphabet only (RFC 4648)
@@ -419,68 +264,5 @@ public sealed class AdminAuthApiClient
 
         [JsonPropertyName("email")]
         public string? Email { get; set; }
-
-        [JsonPropertyName("lastLoginIp")]
-        public string? LastLoginIp { get; set; }
-
-        [JsonPropertyName("lastLoginLat")]
-        public double LastLoginLat { get; set; }
-
-        [JsonPropertyName("lastLoginLon")]
-        public double LastLoginLon { get; set; }
-
-        [JsonPropertyName("lastLoginLocation")]
-        public string? LastLoginLocation { get; set; }
-
-        [JsonPropertyName("lastSession")]
-        public LoginSessionDto? LastSession { get; set; }
-    }
-
-    public sealed class LoginSessionDto
-    {
-        [JsonPropertyName("_id")]
-        public string? Id { get; set; }
-
-        [JsonPropertyName("ipAddress")]
-        public string? IpAddress { get; set; }
-
-        [JsonPropertyName("latitude")]
-        public double Latitude { get; set; }
-
-        [JsonPropertyName("longitude")]
-        public double Longitude { get; set; }
-
-        [JsonPropertyName("city")]
-        public string? City { get; set; }
-
-        [JsonPropertyName("region")]
-        public string? Region { get; set; }
-
-        [JsonPropertyName("country")]
-        public string? Country { get; set; }
-
-        [JsonPropertyName("browser")]
-        public string? Browser { get; set; }
-
-        [JsonPropertyName("operatingSystem")]
-        public string? OperatingSystem { get; set; }
-
-        [JsonPropertyName("deviceType")]
-        public string? DeviceType { get; set; }
-
-        [JsonPropertyName("deviceName")]
-        public string? DeviceName { get; set; }
-
-        [JsonPropertyName("status")]
-        public string? Status { get; set; }
-
-        [JsonPropertyName("suspiciousReason")]
-        public string? SuspiciousReason { get; set; }
-
-        [JsonPropertyName("loginTime")]
-        public DateTime LoginTime { get; set; }
-
-        [JsonPropertyName("updatedAt")]
-        public DateTime UpdatedAt { get; set; }
     }
 }
