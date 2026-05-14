@@ -117,6 +117,8 @@ public partial class TemplatesViewModel : ViewModelBase
 
     public ObservableCollection<ColumnLabelDraft> ColumnLabels { get; } = [];
 
+    public ObservableCollection<CellConnection> CellConnections { get; } = [];
+
     public ObservableCollection<ContextActionListRow> ContextActionRows { get; } = [];
 
     private ContextActionListRow? _selectedContextAction;

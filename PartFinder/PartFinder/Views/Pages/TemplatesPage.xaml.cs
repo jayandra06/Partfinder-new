@@ -11,6 +11,8 @@ using WinRT.Interop;
 using Windows.Storage.Pickers;
 using System.Linq;
 using Microsoft.UI.Dispatching;
+using Windows.ApplicationModel.DataTransfer;
+using Microsoft.UI.Xaml.Shapes;
 
 namespace PartFinder.Views.Pages;
 
@@ -25,6 +27,7 @@ public sealed partial class TemplatesPage : Page
     private Windows.Foundation.Point _canvasPanLastPoint;
     private double _canvasBaseTranslateX;
     private double _canvasBaseTranslateY;
+    private ColumnLabelDraft? _draggedColumn;
 
     public TemplatesPage()
     {
@@ -49,6 +52,12 @@ public sealed partial class TemplatesPage : Page
         TemplateCanvasScrollViewer.AddHandler(
             UIElement.PointerCanceledEvent,
             new Microsoft.UI.Xaml.Input.PointerEventHandler(OnTemplateCanvasPointerCanceled),
+            true);
+
+        // Right-click for connector line context menu (must use handledEventsToo to bypass child controls)
+        TemplateCanvasScrollViewer.AddHandler(
+            UIElement.RightTappedEvent,
+            new Microsoft.UI.Xaml.Input.RightTappedEventHandler(OnConnectorOverlayRightTapped),
             true);
     }
 
@@ -97,9 +106,12 @@ public sealed partial class TemplatesPage : Page
         vm.StartNewCustomTemplateCommand.Execute(null);
         vm.ColumnLabels.Clear();
         vm.ColumnLabels.Add(new ColumnLabelDraft());
+        vm.CellConnections.Clear();
         RefreshAllCanvasCellBorders();
         CenterCanvasContent();
         RefreshCanvasUiState(vm);
+        EnsureConnectorRenderer();
+        _connectorRenderer?.Clear();
     }
 
     private async void OnShowFavouritesInlineClick(object sender, RoutedEventArgs e)
@@ -154,6 +166,13 @@ public sealed partial class TemplatesPage : Page
 
     private void OnTemplateCanvasPointerWheelChanged(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
     {
+        // Disable zoom while drawing a connection
+        if (_isDrawingConnection)
+        {
+            e.Handled = true;
+            return;
+        }
+
         var point = e.GetCurrentPoint(TemplateCanvasScrollViewer);
         var delta = point.Properties.MouseWheelDelta;
         if (delta == 0)
@@ -169,6 +188,12 @@ public sealed partial class TemplatesPage : Page
 
     private void OnTemplateCanvasPointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
     {
+        // Disable pan while drawing a connection
+        if (_isDrawingConnection)
+        {
+            return;
+        }
+
         // Never start panning from interactive controls; this keeps input and button clicks reliable.
         if (!_isSpacePanMode && IsFromInteractiveEditor(e.OriginalSource as DependencyObject))
         {
@@ -189,7 +214,8 @@ public sealed partial class TemplatesPage : Page
 
     private void OnTemplateCanvasPointerMoved(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
     {
-        if (!_isCanvasPanning)
+        // Disable pan while drawing a connection
+        if (_isDrawingConnection || !_isCanvasPanning)
         {
             return;
         }
@@ -205,6 +231,8 @@ public sealed partial class TemplatesPage : Page
             TemplateCanvasTranslateTransform.Y += dy;
             ClampCanvasTranslation();
         }
+        SyncOverlayTransform();
+        RedrawConnectorLines();
         e.Handled = true;
     }
 
@@ -263,10 +291,19 @@ public sealed partial class TemplatesPage : Page
             ZoomLevelText.Text = $"{(int)Math.Round(_canvasZoom * 100)}%";
 
         ClampCanvasTranslation();
+        SyncOverlayTransform();
+        RedrawConnectorLines();
     }
 
     private void OnTemplateCanvasDoubleTapped(object sender, Microsoft.UI.Xaml.Input.DoubleTappedRoutedEventArgs e)
     {
+        // Disable double-tap zoom-reset while drawing
+        if (_isDrawingConnection)
+        {
+            e.Handled = true;
+            return;
+        }
+
         ResetCanvasView();
         e.Handled = true;
     }
@@ -323,6 +360,8 @@ public sealed partial class TemplatesPage : Page
         _canvasBaseTranslateY = 0;
         if (ZoomLevelText is not null)
             ZoomLevelText.Text = "100%";
+        SyncOverlayTransform();
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => RedrawConnectorLines());
     }
 
     private void CenterCanvasContent()
@@ -446,8 +485,611 @@ public sealed partial class TemplatesPage : Page
         if (vm.ColumnLabels.Count <= 1) return;
         var draft = (sender as FrameworkElement)?.DataContext as ColumnLabelDraft;
         if (draft is null) return;
+
+        var deletedIndex = vm.ColumnLabels.IndexOf(draft);
         vm.ColumnLabels.Remove(draft);
+
+        // Remove connections involving the deleted cell and update indices
+        if (deletedIndex >= 0)
+        {
+            var toRemove = vm.CellConnections
+                .Where(c => c.SourceCellIndex == deletedIndex || c.TargetCellIndex == deletedIndex)
+                .ToList();
+            foreach (var conn in toRemove)
+                vm.CellConnections.Remove(conn);
+
+            // Shift indices for remaining connections
+            foreach (var conn in vm.CellConnections)
+            {
+                if (conn.SourceCellIndex > deletedIndex) conn.SourceCellIndex--;
+                if (conn.TargetCellIndex > deletedIndex) conn.TargetCellIndex--;
+            }
+        }
+
         RefreshCanvasUiState(vm);
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => RedrawConnectorLines());
+    }
+
+    // ─── Drag & Drop Reordering ───────────────────────────────────────────────
+
+    private void OnCanvasCellDragStarting(UIElement sender, DragStartingEventArgs args)
+    {
+        if (sender is FrameworkElement fe && fe.DataContext is ColumnLabelDraft draft)
+        {
+            _draggedColumn = draft;
+            args.Data.RequestedOperation = DataPackageOperation.Move;
+            args.Data.SetText("ColumnReorder");
+            // Make the dragged cell semi-transparent for visual feedback
+            fe.Opacity = 0.4;
+        }
+    }
+
+    private void OnCanvasCellDragOver(object sender, DragEventArgs e)
+    {
+        if (_draggedColumn is null) return;
+
+        e.AcceptedOperation = DataPackageOperation.Move;
+
+        // Visual indicator: highlight the drop target
+        if (sender is FrameworkElement fe && fe.DataContext is ColumnLabelDraft target && target != _draggedColumn)
+        {
+            // Find the cell border and highlight it
+            var cellBorder = FindChildOfType<Border>(fe);
+            if (cellBorder is not null && Equals(cellBorder.Tag, "canvas-cell-shell"))
+            {
+                cellBorder.BorderBrush = new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 31, 122, 224)); // Accent blue
+                cellBorder.BorderThickness = new Thickness(2);
+            }
+        }
+
+        e.Handled = true;
+    }
+
+    private void OnCanvasCellDragLeave(object sender, DragEventArgs e)
+    {
+        // Reset visual indicator when drag leaves
+        if (sender is FrameworkElement fe)
+        {
+            var cellBorder = FindChildOfType<Border>(fe);
+            if (cellBorder is not null && Equals(cellBorder.Tag, "canvas-cell-shell"))
+            {
+                cellBorder.BorderBrush = (Brush)Application.Current.Resources["BorderDefaultBrush"];
+                cellBorder.BorderThickness = new Thickness(1);
+            }
+        }
+    }
+
+    private void OnCanvasCellDrop(object sender, DragEventArgs e)
+    {
+        if (_draggedColumn is null || DataContext is not TemplatesViewModel vm) return;
+
+        if (sender is FrameworkElement fe && fe.DataContext is ColumnLabelDraft target && target != _draggedColumn)
+        {
+            var oldIndex = vm.ColumnLabels.IndexOf(_draggedColumn);
+            var newIndex = vm.ColumnLabels.IndexOf(target);
+
+            if (oldIndex >= 0 && newIndex >= 0 && oldIndex != newIndex)
+            {
+                vm.ColumnLabels.Move(oldIndex, newIndex);
+
+                // Update connection indices after reorder
+                UpdateConnectionIndicesAfterMove(vm, oldIndex, newIndex);
+
+                RefreshAllCanvasCellBorders();
+                RefreshCanvasUiState(vm);
+                DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => RedrawConnectorLines());
+            }
+
+            // Reset drop target visual
+            var cellBorder = FindChildOfType<Border>(fe);
+            if (cellBorder is not null && Equals(cellBorder.Tag, "canvas-cell-shell"))
+            {
+                cellBorder.BorderBrush = (Brush)Application.Current.Resources["BorderDefaultBrush"];
+                cellBorder.BorderThickness = new Thickness(1);
+            }
+        }
+
+        // Reset dragged cell opacity
+        ResetDraggedCellOpacity();
+        _draggedColumn = null;
+        e.Handled = true;
+    }
+
+    private static void UpdateConnectionIndicesAfterMove(TemplatesViewModel vm, int oldIndex, int newIndex)
+    {
+        foreach (var conn in vm.CellConnections)
+        {
+            conn.SourceCellIndex = UpdateIndexForMove(conn.SourceCellIndex, oldIndex, newIndex);
+            conn.TargetCellIndex = UpdateIndexForMove(conn.TargetCellIndex, oldIndex, newIndex);
+        }
+    }
+
+    private static int UpdateIndexForMove(int currentIndex, int oldIndex, int newIndex)
+    {
+        if (currentIndex == oldIndex)
+            return newIndex;
+
+        if (oldIndex < newIndex)
+        {
+            // Moved forward: items between old+1..new shift left
+            if (currentIndex > oldIndex && currentIndex <= newIndex)
+                return currentIndex - 1;
+        }
+        else
+        {
+            // Moved backward: items between new..old-1 shift right
+            if (currentIndex >= newIndex && currentIndex < oldIndex)
+                return currentIndex + 1;
+        }
+
+        return currentIndex;
+    }
+
+    private void ResetDraggedCellOpacity()
+    {
+        // Find all Grid items in the canvas and reset opacity
+        if (TemplateCanvasItemsControl is null) return;
+        foreach (var grid in FindVisualChildren<Grid>(TemplateCanvasItemsControl))
+        {
+            if (grid.DataContext is ColumnLabelDraft && grid.Opacity < 1.0)
+            {
+                grid.Opacity = 1.0;
+            }
+        }
+    }
+
+    // ─── Cell Grouping / Connector Lines ──────────────────────────────────────
+
+    private ConnectorRenderer? _connectorRenderer;
+    private bool _isDrawingConnection;
+    private ColumnLabelDraft? _connectionSourceDraft;
+    private ConnectionPortSide _connectionSourceSide;
+    private Windows.Foundation.Point _connectionSourcePoint;
+
+    private void EnsureConnectorRenderer()
+    {
+        if (_connectorRenderer is null && ConnectorOverlayCanvas is not null)
+        {
+            _connectorRenderer = new ConnectorRenderer(ConnectorOverlayCanvas);
+        }
+    }
+
+    private void OnCanvasCellPointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (sender is not Grid cellGrid) return;
+        // Show connection port dots on this cell (hover or drawing mode)
+        ShowPortsOnCell(cellGrid, 0.7);
+    }
+
+    private void OnCanvasCellPointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (sender is not Grid cellGrid) return;
+        // When drawing: hide ports on cells that cursor leaves (only hovered cell shows ports)
+        // When not drawing: normal hide behavior
+        ShowPortsOnCell(cellGrid, 0);
+    }
+
+    private static void ShowPortsOnCell(Grid cellGrid, double opacity)
+    {
+        foreach (var ellipse in FindVisualChildren<Microsoft.UI.Xaml.Shapes.Ellipse>(cellGrid))
+        {
+            if (ellipse.Tag is string tag && tag.StartsWith("port-"))
+            {
+                ellipse.Opacity = opacity;
+            }
+        }
+    }
+
+    private void OnConnectionPortPointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (sender is Microsoft.UI.Xaml.Shapes.Ellipse ellipse)
+        {
+            ellipse.Opacity = 1.0;
+            ellipse.Width = 14;
+            ellipse.Height = 14;
+        }
+    }
+
+    private void OnConnectionPortPointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (sender is Microsoft.UI.Xaml.Shapes.Ellipse ellipse)
+        {
+            ellipse.Width = 12;
+            ellipse.Height = 12;
+            // Keep visible if parent cell is hovered
+            if (!_isDrawingConnection)
+            {
+                ellipse.Opacity = 0.7;
+            }
+        }
+    }
+
+    private void OnConnectionPortPointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (sender is not Microsoft.UI.Xaml.Shapes.Ellipse ellipse) return;
+        if (DataContext is not TemplatesViewModel vm) return;
+
+        var tag = ellipse.Tag as string;
+        if (tag is null || !tag.StartsWith("port-")) return;
+
+        // Determine which cell and side
+        var draft = FindAncestorDataContext<ColumnLabelDraft>(ellipse);
+        if (draft is null) return;
+
+        var cellIndex = vm.ColumnLabels.IndexOf(draft);
+        if (cellIndex < 0) return;
+
+        // Check if this port is already occupied
+        var side = ParsePortSide(tag);
+        if (IsPortOccupied(vm, cellIndex, side)) return;
+
+        _isDrawingConnection = true;
+        _connectionSourceDraft = draft;
+        _connectionSourceSide = side;
+
+        // CRITICAL: Use overlay Canvas as coordinate reference
+        // This ensures the line starts EXACTLY at the port position even after zoom/pan
+        var transform = ellipse.TransformToVisual(ConnectorOverlayCanvas);
+        var portCenter = transform.TransformPoint(new Windows.Foundation.Point(ellipse.ActualWidth / 2, ellipse.ActualHeight / 2));
+        _connectionSourcePoint = portCenter;
+
+        // Freeze everything: disable cell drag, capture pointer on ScrollViewer
+        SetCellsCanDrag(false);
+
+        // Enable overlay hit testing during connection draw
+        ConnectorOverlayCanvas.IsHitTestVisible = true;
+
+        // Capture pointer to receive all subsequent move/release events
+        TemplateCanvasScrollViewer.CapturePointer(e.Pointer);
+
+        // Register page-level pointer handlers for the draw
+        TemplateCanvasScrollViewer.AddHandler(
+            UIElement.PointerMovedEvent,
+            new Microsoft.UI.Xaml.Input.PointerEventHandler(OnConnectionDrawPointerMoved),
+            true);
+        TemplateCanvasScrollViewer.AddHandler(
+            UIElement.PointerReleasedEvent,
+            new Microsoft.UI.Xaml.Input.PointerEventHandler(OnConnectionDrawPointerReleased),
+            true);
+        TemplateCanvasScrollViewer.AddHandler(
+            UIElement.PointerCanceledEvent,
+            new Microsoft.UI.Xaml.Input.PointerEventHandler(OnConnectionDrawPointerReleased),
+            true);
+
+        e.Handled = true;
+    }
+
+    private void OnConnectionDrawPointerMoved(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (!_isDrawingConnection) return;
+
+        EnsureConnectorRenderer();
+        // Use overlay Canvas coordinate space
+        var currentPoint = e.GetCurrentPoint(ConnectorOverlayCanvas).Position;
+        _connectorRenderer?.DrawPreviewLine(_connectionSourcePoint, currentPoint);
+        e.Handled = true;
+    }
+
+    private void OnConnectionDrawPointerReleased(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (!_isDrawingConnection)
+        {
+            CleanupConnectionDrawHandlers(e.Pointer);
+            return;
+        }
+
+        EnsureConnectorRenderer();
+        _connectorRenderer?.RemovePreviewLine();
+
+        if (DataContext is not TemplatesViewModel vm)
+        {
+            CancelConnectionDraw();
+            CleanupConnectionDrawHandlers(e.Pointer);
+            return;
+        }
+
+        // Find if we're over a valid port (use overlay Canvas coordinate space)
+        var releasePoint = e.GetCurrentPoint(ConnectorOverlayCanvas).Position;
+        var (targetDraft, targetSide) = FindPortAtPoint(releasePoint, vm);
+
+        if (targetDraft is not null && targetDraft != _connectionSourceDraft)
+        {
+            var targetIndex = vm.ColumnLabels.IndexOf(targetDraft);
+            var sourceIndex = vm.ColumnLabels.IndexOf(_connectionSourceDraft!);
+
+            if (targetIndex >= 0 && sourceIndex >= 0 && !IsPortOccupied(vm, targetIndex, targetSide))
+            {
+                // Generate unique default group name
+                var defaultName = GenerateUniqueGroupName(vm);
+
+                // Create the connection
+                var connection = new CellConnection
+                {
+                    SourceCellIndex = sourceIndex,
+                    SourceSide = _connectionSourceSide,
+                    TargetCellIndex = targetIndex,
+                    TargetSide = targetSide,
+                    SourceCellKey = _connectionSourceDraft!.StableKey ?? $"idx-{sourceIndex}",
+                    TargetCellKey = targetDraft.StableKey ?? $"idx-{targetIndex}",
+                    Label = defaultName,
+                };
+
+                vm.CellConnections.Add(connection);
+                DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, async () =>
+                {
+                    RedrawConnectorLines();
+                    // Show label edit dialog immediately after connection is created
+                    await ShowEditLabelDialogAsync(connection);
+                    RedrawConnectorLines();
+                });
+            }
+        }
+
+        CancelConnectionDraw();
+        CleanupConnectionDrawHandlers(e.Pointer);
+        e.Handled = true;
+    }
+
+    private void CleanupConnectionDrawHandlers(Microsoft.UI.Xaml.Input.Pointer? pointer = null)
+    {
+        ConnectorOverlayCanvas.IsHitTestVisible = false;
+
+        // Re-enable cell dragging
+        SetCellsCanDrag(true);
+
+        // Release pointer capture
+        if (pointer is not null)
+        {
+            try { TemplateCanvasScrollViewer.ReleasePointerCapture(pointer); } catch { }
+        }
+
+        TemplateCanvasScrollViewer.RemoveHandler(
+            UIElement.PointerMovedEvent,
+            new Microsoft.UI.Xaml.Input.PointerEventHandler(OnConnectionDrawPointerMoved));
+        TemplateCanvasScrollViewer.RemoveHandler(
+            UIElement.PointerReleasedEvent,
+            new Microsoft.UI.Xaml.Input.PointerEventHandler(OnConnectionDrawPointerReleased));
+        TemplateCanvasScrollViewer.RemoveHandler(
+            UIElement.PointerCanceledEvent,
+            new Microsoft.UI.Xaml.Input.PointerEventHandler(OnConnectionDrawPointerReleased));
+    }
+
+    private void SetCellsCanDrag(bool canDrag)
+    {
+        if (TemplateCanvasItemsControl is null) return;
+        foreach (var cellGrid in FindVisualChildren<Grid>(TemplateCanvasItemsControl))
+        {
+            if (cellGrid.DataContext is ColumnLabelDraft && cellGrid.MinWidth >= 230)
+            {
+                cellGrid.CanDrag = canDrag;
+            }
+        }
+    }
+
+    private void OnConnectorOverlayRightTapped(object sender, Microsoft.UI.Xaml.Input.RightTappedRoutedEventArgs e)
+    {
+        EnsureConnectorRenderer();
+        if (_connectorRenderer is null || DataContext is not TemplatesViewModel vm) return;
+
+        // Get position in overlay Canvas coordinate space (where lines are drawn)
+        var point = e.GetPosition(ConnectorOverlayCanvas);
+        var hit = _connectorRenderer.HitTest(point);
+        if (hit is null) return;
+
+        // Show context menu to delete
+        var menu = new MenuFlyout();
+        var deleteItem = new MenuFlyoutItem
+        {
+            Text = "Delete Connection",
+            Icon = new FontIcon { Glyph = "\uE74D" },
+        };
+        deleteItem.Click += (_, _) =>
+        {
+            vm.CellConnections.Remove(hit);
+            RedrawConnectorLines();
+        };
+        menu.Items.Add(deleteItem);
+
+        // Edit label option
+        var editLabelItem = new MenuFlyoutItem
+        {
+            Text = "Edit Label",
+            Icon = new FontIcon { Glyph = "\uE8AC" },
+        };
+        editLabelItem.Click += async (_, _) =>
+        {
+            await ShowEditLabelDialogAsync(hit);
+        };
+        menu.Items.Add(editLabelItem);
+
+        // Show menu at the screen position (use ScrollViewer-relative position)
+        var screenPoint = e.GetPosition(TemplateCanvasScrollViewer);
+        menu.ShowAt(TemplateCanvasScrollViewer, screenPoint);
+        e.Handled = true;
+    }
+
+    private async Task ShowEditLabelDialogAsync(CellConnection connection)
+    {
+        if (XamlRoot is null || DataContext is not TemplatesViewModel vm) return;
+
+        var input = new TextBox
+        {
+            Text = connection.Label,
+            PlaceholderText = "Group name",
+            MaxLength = 50,
+        };
+
+        var errorText = new TextBlock
+        {
+            FontSize = 11,
+            Foreground = new SolidColorBrush(Microsoft.UI.Colors.OrangeRed),
+            Visibility = Visibility.Collapsed,
+            Margin = new Thickness(0, 6, 0, 0),
+        };
+
+        var panel = new StackPanel();
+        panel.Children.Add(input);
+        panel.Children.Add(errorText);
+
+        var dialog = new ContentDialog
+        {
+            Title = "Edit Connection Label",
+            Content = panel,
+            PrimaryButtonText = "Save",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = XamlRoot,
+        };
+
+        var result = await dialog.ShowAsync();
+        if (result == ContentDialogResult.Primary)
+        {
+            var newLabel = input.Text.Trim();
+            if (string.IsNullOrWhiteSpace(newLabel)) return;
+
+            // Check for duplicate group name
+            var isDuplicate = vm.CellConnections.Any(c =>
+                c != connection &&
+                string.Equals(c.Label, newLabel, StringComparison.OrdinalIgnoreCase));
+
+            if (isDuplicate)
+            {
+                // Show error and re-open dialog
+                errorText.Text = $"Group name \"{newLabel}\" already exists. Choose a different name.";
+                errorText.Visibility = Visibility.Visible;
+                await ShowEditLabelDialogAsync(connection);
+                return;
+            }
+
+            connection.Label = newLabel;
+            RedrawConnectorLines();
+        }
+    }
+
+    private void CancelConnectionDraw()
+    {
+        _isDrawingConnection = false;
+        _connectionSourceDraft = null;
+    }
+
+    private static string GenerateUniqueGroupName(TemplatesViewModel vm)
+    {
+        var baseName = "Group";
+        if (!vm.CellConnections.Any(c => string.Equals(c.Label, baseName, StringComparison.OrdinalIgnoreCase)))
+            return baseName;
+
+        for (int i = 2; i < 100; i++)
+        {
+            var name = $"Group {i}";
+            if (!vm.CellConnections.Any(c => string.Equals(c.Label, name, StringComparison.OrdinalIgnoreCase)))
+                return name;
+        }
+
+        return $"Group {Guid.NewGuid().ToString("N")[..4]}";
+    }
+
+    private (ColumnLabelDraft? draft, ConnectionPortSide side) FindPortAtPoint(Windows.Foundation.Point point, TemplatesViewModel vm)
+    {
+        // Check all port ellipses to see if the point is near one
+        // Point is in ConnectorOverlayCanvas coordinate space
+        foreach (var cellGrid in FindVisualChildren<Grid>(TemplateCanvasItemsControl))
+        {
+            if (cellGrid.DataContext is not ColumnLabelDraft draft) continue;
+
+            foreach (var ellipse in FindVisualChildren<Ellipse>(cellGrid))
+            {
+                if (ellipse.Tag is not string tag || !tag.StartsWith("port-")) continue;
+
+                try
+                {
+                    var transform = ellipse.TransformToVisual(ConnectorOverlayCanvas);
+                    var portCenter = transform.TransformPoint(new Windows.Foundation.Point(ellipse.ActualWidth / 2, ellipse.ActualHeight / 2));
+
+                    var dist = Math.Sqrt(Math.Pow(point.X - portCenter.X, 2) + Math.Pow(point.Y - portCenter.Y, 2));
+                    if (dist <= 18) // 18px tolerance for drop target
+                    {
+                        return (draft, ParsePortSide(tag));
+                    }
+                }
+                catch { /* transform may fail if element not in tree */ }
+            }
+        }
+
+        return (null, ConnectionPortSide.Top);
+    }
+
+    private static ConnectionPortSide ParsePortSide(string tag)
+    {
+        return tag switch
+        {
+            "port-top" => ConnectionPortSide.Top,
+            "port-bottom" => ConnectionPortSide.Bottom,
+            "port-left" => ConnectionPortSide.Left,
+            "port-right" => ConnectionPortSide.Right,
+            _ => ConnectionPortSide.Left,
+        };
+    }
+
+    private static bool IsPortOccupied(TemplatesViewModel vm, int cellIndex, ConnectionPortSide side)
+    {
+        // Allow multiple connections per port (no limit)
+        return false;
+    }
+
+    private void RedrawConnectorLines()
+    {
+        EnsureConnectorRenderer();
+        if (_connectorRenderer is null || DataContext is not TemplatesViewModel vm) return;
+
+        var cellBounds = GetCellBoundsRelativeToOverlay();
+        _connectorRenderer.Redraw(vm.CellConnections.ToList(), cellBounds);
+    }
+
+    private List<Windows.Foundation.Rect> GetCellBoundsRelativeToOverlay()
+    {
+        var bounds = new List<Windows.Foundation.Rect>();
+
+        if (TemplateCanvasItemsControl is null || ConnectorOverlayCanvas is null) return bounds;
+
+        // Get cell positions relative to the overlay Canvas (which is a sibling in the same Grid)
+        // This accounts for the ItemsControl's RenderTransform (zoom/pan)
+        foreach (var cellGrid in FindDirectCellGrids())
+        {
+            try
+            {
+                var transform = cellGrid.TransformToVisual(ConnectorOverlayCanvas);
+                var topLeft = transform.TransformPoint(new Windows.Foundation.Point(0, 0));
+                var bottomRight = transform.TransformPoint(new Windows.Foundation.Point(cellGrid.ActualWidth, cellGrid.ActualHeight));
+                bounds.Add(new Windows.Foundation.Rect(topLeft.X, topLeft.Y, bottomRight.X - topLeft.X, bottomRight.Y - topLeft.Y));
+            }
+            catch
+            {
+                bounds.Add(new Windows.Foundation.Rect(0, 0, 0, 0));
+            }
+        }
+
+        return bounds;
+    }
+
+    private IEnumerable<Grid> FindDirectCellGrids()
+    {
+        if (TemplateCanvasItemsControl is null) yield break;
+
+        var vm = DataContext as TemplatesViewModel;
+        if (vm is null) yield break;
+
+        foreach (var grid in FindVisualChildren<Grid>(TemplateCanvasItemsControl))
+        {
+            if (grid.DataContext is ColumnLabelDraft && grid.MinWidth >= 230)
+            {
+                yield return grid;
+            }
+        }
+    }
+
+    private void SyncOverlayTransform()
+    {
+        // No-op: overlay shares parent Grid with ItemsControl, inherits same transform
     }
 
     private void OnAddFieldRowClick(object sender, RoutedEventArgs e)
@@ -464,6 +1106,16 @@ public sealed partial class TemplatesPage : Page
             FieldCountText.Text = count == 1 ? "1 field" : $"{count} fields";
         if (CanvasEmptyState is not null)
             CanvasEmptyState.Visibility = count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void OnZoomInClick(object sender, RoutedEventArgs e)
+    {
+        SetCanvasZoom(_canvasZoom + 0.1);
+    }
+
+    private void OnZoomOutClick(object sender, RoutedEventArgs e)
+    {
+        SetCanvasZoom(_canvasZoom - 0.1);
     }
 
     private void OnZoomResetClick(object sender, RoutedEventArgs e)

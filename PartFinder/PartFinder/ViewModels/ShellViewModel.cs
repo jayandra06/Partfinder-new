@@ -356,15 +356,6 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
             NavigationItems.Add(
                 new NavItemViewModel
                 {
-                    Label = "Alerts",
-                    IconGlyph = "\uEA8F",
-                    Page = AppPage.Alerts,
-                    IsEnabled = true,
-                });
-
-            NavigationItems.Add(
-                new NavItemViewModel
-                {
                     Label = "Activities",
                     IconGlyph = "\uE81C",
                     Page = AppPage.Audit,
@@ -380,6 +371,18 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
                     Label = "User Management",
                     IconGlyph = "\uE716",
                     Page = AppPage.UserManagement,
+                    IsEnabled = true,
+                });
+        }
+
+        if (c.CanAccessTemplates)
+        {
+            NavigationItems.Add(
+                new NavItemViewModel
+                {
+                    Label = "Alerts",
+                    IconGlyph = "\uEA8F",
+                    Page = AppPage.Alerts,
                     IsEnabled = true,
                 });
         }

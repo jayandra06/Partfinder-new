@@ -13,153 +13,75 @@
         <converters:InvertedBoolToVisibilityConverter x:Key="InvertedBoolToVisibilityConverter" />
     </UserControl.Resources>
 
-    <!-- Root grid — tooltip overlay sits here at top level so it's never clipped -->
+    <!-- Root grid -->
     <Grid x:Name="RootGrid" Background="{ThemeResource AppBackgroundBrush}">
-        <VisualStateManager.VisualStateGroups>
-            <VisualStateGroup x:Name="AdaptiveStates">
-                <VisualState x:Name="WideState">
-                    <VisualState.StateTriggers>
-                        <AdaptiveTrigger MinWindowWidth="1024" />
-                    </VisualState.StateTriggers>
-                </VisualState>
-                <VisualState x:Name="NarrowState">
-                    <VisualState.StateTriggers>
-                        <AdaptiveTrigger MinWindowWidth="0" />
-                    </VisualState.StateTriggers>
-                </VisualState>
-            </VisualStateGroup>
-        </VisualStateManager.VisualStateGroups>
-
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition x:Name="SidebarColumn" Width="80" />
-            <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
-            <RowDefinition Height="64" />
+            <RowDefinition Height="56" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <!-- ═══════════════════════════════════════════════════ -->
-        <!-- SIDEBAR                                             -->
+        <!-- HEADER BAR (contains logo, brand, nav, bell, profile) -->
         <!-- ═══════════════════════════════════════════════════ -->
-        <Border Grid.RowSpan="2" Grid.Column="0"
-                Background="{ThemeResource AppSidebarBrush}"
-                BorderBrush="{ThemeResource AppBorderBrush}"
-                BorderThickness="0,0,1,0">
-            <Grid x:Name="SidebarRoot">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="64" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-
-                <!-- Logo in top row — same height as header -->
-                <Border Grid.Row="0"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center">
-                    <Border Width="43" Height="43" CornerRadius="20"
-                            Background="{StaticResource ElevatedCardBackgroundBrush}">
-                        <Image Source="ms-appx:///Assets/logo.png" Stretch="Uniform" Margin="5" />
-                    </Border>
-                </Border>
-
-                <!-- Nav icons — start right below logo, small gap between each -->
-                <ItemsRepeater
-                    x:Name="NavListView"
-                    Grid.Row="1"
-                    Margin="0,4,0,0"
-                    ItemsSource="{Binding NavigationItems}"
-                    HorizontalAlignment="Stretch"
-                    VerticalAlignment="Top">
-                    <ItemsRepeater.Layout>
-                        <StackLayout Orientation="Vertical" Spacing="6" />
-                    </ItemsRepeater.Layout>
-                    <ItemsRepeater.ItemTemplate>
-                        <DataTemplate x:DataType="viewModels:NavItemViewModel">
-                            <Grid Height="40"
-                                  PointerEntered="OnNavItemPointerEntered"
-                                  PointerExited="OnNavItemPointerExited"
-                                  Tapped="OnNavItemTapped"
-                                  Tag="{x:Bind Label}">
-                                <FontIcon
-                                    Glyph="{x:Bind IconGlyph}"
-                                    FontSize="19"
-                                    HorizontalAlignment="Center"
-                                    VerticalAlignment="Center" />
-                            </Grid>
-                        </DataTemplate>
-                    </ItemsRepeater.ItemTemplate>
-                </ItemsRepeater>
-            </Grid>
-        </Border>
-
-        <!-- ═══════════════════════════════════════════════════ -->
-        <!-- HEADER BAR                                          -->
-        <!-- ═══════════════════════════════════════════════════ -->
-        <Border Grid.Row="0" Grid.Column="1"
-                Background="{ThemeResource AppSurfaceBrush}"
+        <Border Grid.Row="0"
+                Background="#0A0E15"
                 BorderBrush="{ThemeResource AppBorderBrush}"
                 BorderThickness="0,0,0,1">
-            <Grid Padding="0,0,24,0" ColumnSpacing="16">
+            <Grid Padding="12,0,16,0" ColumnSpacing="12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <!-- Brand: PartFinder text only — logo is now in sidebar -->
-                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="0" VerticalAlignment="Center" MinWidth="180" Margin="14,0,0,0">
-                    <StackPanel Spacing="1" VerticalAlignment="Center">
+                <!-- LEFT: Logo + PartFinder text -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+                    <Border Width="50" Height="50" CornerRadius="20"
+                            Background="{StaticResource ElevatedCardBackgroundBrush}">
+                        <Image Source="ms-appx:///Assets/logo.png" Stretch="Uniform" Margin="5" />
+                    </Border>
+                    <StackPanel Spacing="2" VerticalAlignment="Center">
                         <TextBlock Text="PartFinder"
                                    FontSize="17" FontWeight="Bold"
                                    Foreground="{StaticResource TextPrimaryBrush}" />
-                        <TextBlock Text="for Inventory Management"
+                        <TextBlock Text="Inventory Management"
                                    FontSize="11"
                                    Foreground="{StaticResource TextSecondaryBrush}"
-                                   CharacterSpacing="10"
+                                   CharacterSpacing="12"
                                    TextWrapping="NoWrap" />
                     </StackPanel>
                 </StackPanel>
 
-                <!-- Search Bar — centered -->
-                <Border Grid.Column="1"
-                        VerticalAlignment="Center"
-                        MaxWidth="420"
-                        HorizontalAlignment="Center"
-                        CornerRadius="8"
-                        Background="{StaticResource CardBackgroundBrush}"
-                        BorderBrush="{StaticResource BorderDefaultBrush}"
-                        BorderThickness="1"
-                        Padding="10,0">
-                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                        <FontIcon Glyph="&#xE721;" FontSize="13"
-                                  Foreground="{ThemeResource AppSubtleTextBrush}"
-                                  VerticalAlignment="Center" />
-                        <TextBox BorderThickness="0"
-                                 Background="Transparent"
-                                 PlaceholderText="Search templates, parts, reports..."
-                                 FontSize="13"
-                                 MinWidth="240"
-                                 MaxWidth="360"
-                                 VerticalAlignment="Center"
-                                 Text="{Binding SearchText, Mode=TwoWay}" />
-                    </StackPanel>
-                </Border>
+                <!-- CENTER: Nav icons (horizontal) -->
+                <ItemsRepeater
+                    x:Name="NavListView"
+                    Grid.Column="1"
+                    ItemsSource="{Binding NavigationItems}"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+                    <ItemsRepeater.Layout>
+                        <StackLayout Orientation="Horizontal" Spacing="20" />
+                    </ItemsRepeater.Layout>
+                    <ItemsRepeater.ItemTemplate>
+                        <DataTemplate x:DataType="viewModels:NavItemViewModel">
+                            <Grid Width="40" Height="40"
+                                  CornerRadius="8"
+                                  PointerEntered="OnNavItemPointerEntered"
+                                  PointerExited="OnNavItemPointerExited"
+                                  Tapped="OnNavItemTapped"
+                                  Tag="{x:Bind Label}">
+                                <FontIcon
+                                    Glyph="{x:Bind IconGlyph}"
+                                    FontSize="20"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsRepeater.ItemTemplate>
+                </ItemsRepeater>
 
-                <!-- Right icons -->
+                <!-- RIGHT: Profile only -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
-                    <Grid>
-                        <Button Width="36" Height="36" Padding="0"
-                                Style="{StaticResource GhostButtonStyle}"
-                                ToolTipService.ToolTip="Alerts"
-                                Click="OnBellClicked">
-                            <FontIcon Glyph="&#xEA8F;" FontSize="18" />
-                        </Button>
-                        <Border Width="8" Height="8" CornerRadius="4"
-                                Background="#E05252"
-                                HorizontalAlignment="Right" VerticalAlignment="Top"
-                                Margin="0,4,4,0" IsHitTestVisible="False"
-                                Visibility="{Binding HasUnreadAlerts, Converter={StaticResource BoolToVisibilityConverter}}" />
-                    </Grid>
                     <Button Padding="8,4"
                             ToolTipService.ToolTip="Profile menu"
                             x:Name="ProfileMenuButton">
@@ -189,18 +111,19 @@
             </Grid>
         </Border>
 
-        <!-- Content frame -->
+        <!-- ═══════════════════════════════════════════════════ -->
+        <!-- CONTENT FRAME — full width now                      -->
+        <!-- ═══════════════════════════════════════════════════ -->
         <Frame x:Name="ContentFrame"
-               Grid.Row="1" Grid.Column="1"
+               Grid.Row="1"
                HorizontalAlignment="Stretch"
                VerticalAlignment="Stretch" />
 
         <!-- ═══════════════════════════════════════════════════ -->
-        <!-- TOOLTIP OVERLAY — spans full root grid, always on  -->
-        <!-- top, never clipped by sidebar bounds               -->
+        <!-- TOOLTIP OVERLAY — shows below nav icons on hover    -->
         <!-- ═══════════════════════════════════════════════════ -->
         <Border x:Name="NavTooltipOverlay"
-                Grid.RowSpan="2" Grid.ColumnSpan="2"
+                Grid.RowSpan="2"
                 IsHitTestVisible="False"
                 Visibility="Collapsed"
                 Canvas.ZIndex="999">

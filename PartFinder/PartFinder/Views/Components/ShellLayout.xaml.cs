@@ -19,22 +19,12 @@ public sealed partial class ShellLayout : UserControl
         DataContext = vm;
         vm.PropertyChanged += OnShellVmPropertyChanged;
         Loaded += OnShellLayoutLoaded;
-        ApplySidebarWidth();
     }
 
     private void OnAccountSettingsMenuClicked(object sender, RoutedEventArgs e)
     {
         var navigation = App.Services.GetRequiredService<INavigationService>();
         _ = navigation.Navigate(AppPage.Settings);
-    }
-
-    private void OnBellClicked(object sender, RoutedEventArgs e)
-    {
-        var navigation = App.Services.GetRequiredService<INavigationService>();
-        navigation.Navigate(AppPage.Alerts);
-        // Clear badge after opening alerts
-        if (DataContext is ShellViewModel vm)
-            vm.HasUnreadAlerts = false;
     }
 
     private async void OnProfileLogoutMenuClicked(object sender, RoutedEventArgs e)
@@ -46,7 +36,6 @@ public sealed partial class ShellLayout : UserControl
         await activityLogger.FlushAsync().ConfigureAwait(true);
         
         adminSession.Clear();
-        // Do NOT delete setup-state.json — it holds orgCode/dbUri needed after re-login
 
         if (App.MainAppWindow is MainWindow main)
         {
@@ -60,19 +49,10 @@ public sealed partial class ShellLayout : UserControl
 
     private void OnShellVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(ShellViewModel.IsSidebarCollapsed))
-        {
-            ApplySidebarWidth();
-        }
+        // No sidebar width changes needed anymore
     }
 
-    private void ApplySidebarWidth()
-    {
-        SidebarColumn.Width = new GridLength(80);
-        SidebarRoot.Padding = new Thickness(0);
-    }
-
-    // ── Instant tooltip — rendered at root level so it's never clipped ──────
+    // ── Tooltip — rendered at root level, shows BELOW the nav icon ──────
     private void OnNavItemPointerEntered(object sender, PointerRoutedEventArgs e)
     {
         if (sender is not Grid grid) return;
@@ -85,8 +65,9 @@ public sealed partial class ShellLayout : UserControl
         var transform = grid.TransformToVisual(RootGrid);
         var pos = transform.TransformPoint(new Windows.Foundation.Point(0, 0));
 
-        double tooltipY = pos.Y + (grid.ActualHeight / 2) - 16;
-        double tooltipX = 88;
+        // Position tooltip below the nav icon
+        double tooltipX = pos.X + (grid.ActualWidth / 2) - 30;
+        double tooltipY = pos.Y + grid.ActualHeight + 6;
 
         Canvas.SetLeft(NavTooltipBox, tooltipX);
         Canvas.SetTop(NavTooltipBox, tooltipY);
@@ -104,7 +85,6 @@ public sealed partial class ShellLayout : UserControl
         if (sender is not Grid grid) return;
         if (DataContext is not ShellViewModel vm) return;
 
-        // Find the NavItemViewModel whose Label matches the Tag
         string label = grid.Tag as string ?? string.Empty;
         var item = vm.NavigationItems.FirstOrDefault(n => n.Label == label);
         if (item is not null)
