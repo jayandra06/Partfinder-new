@@ -133,7 +133,7 @@ public sealed class ConnectorRenderer
             else
             {
                 visual.Path.StrokeThickness = 2;
-                visual.Path.Opacity = 0.8;
+                visual.Path.Opacity = 0.85;
             }
         }
     }
@@ -169,25 +169,81 @@ public sealed class ConnectorRenderer
 
     private ConnectorVisual CreateConnectorVisual(CellConnection conn, Point source, Point target)
     {
-        var isCurved = NeedsCurve(conn.SourceSide, conn.TargetSide);
         var accentBrush = new SolidColorBrush(ColorHelper.FromArgb(204, 31, 122, 224)); // 80% opacity
 
-        Shape pathShape;
+        // Bracket-style lines: go UP from source, horizontal across, then DOWN to target
+        // Like a bracket/bridge connecting cells from the top
+        var heightOffset = 40.0; // How high the horizontal bar goes above the cells
 
-        if (isCurved)
+        // For top-to-top connections, use bracket style
+        // For other connections, use straight elbow lines
+        Shape pathShape;
+        Point labelPos;
+
+        if (conn.SourceSide == ConnectionPortSide.Top && conn.TargetSide == ConnectionPortSide.Top)
         {
+            // Bracket style: source up → horizontal → target down
+            // Calculate dynamic height based on how far apart the cells are
+            var distance = Math.Abs(target.X - source.X);
+            heightOffset = Math.Max(30.0, Math.Min(60.0, distance * 0.15));
+
+            var midY = Math.Min(source.Y, target.Y) - heightOffset;
+
+            var pathFigure = new PathFigure { StartPoint = source, IsClosed = false };
+            // Go up from source
+            pathFigure.Segments.Add(new LineSegment { Point = new Point(source.X, midY) });
+            // Go horizontal to target X
+            pathFigure.Segments.Add(new LineSegment { Point = new Point(target.X, midY) });
+            // Go down to target
+            pathFigure.Segments.Add(new LineSegment { Point = new Point(target.X, target.Y) });
+
+            var geometry = new PathGeometry();
+            geometry.Figures.Add(pathFigure);
+
             var path = new Microsoft.UI.Xaml.Shapes.Path
             {
                 Stroke = accentBrush,
                 StrokeThickness = 2,
-                Opacity = 0.8,
+                Opacity = 0.85,
                 IsHitTestVisible = false,
-                Data = CreateBezierGeometry(source, target, conn.SourceSide, conn.TargetSide),
+                Data = geometry,
+                StrokeLineJoin = PenLineJoin.Round,
             };
             pathShape = path;
+            labelPos = new Point((source.X + target.X) / 2, midY);
         }
-        else
+        else if (conn.SourceSide == ConnectionPortSide.Bottom && conn.TargetSide == ConnectionPortSide.Bottom)
         {
+            // Bottom bracket: source down → horizontal → target up
+            var distance = Math.Abs(target.X - source.X);
+            heightOffset = Math.Max(30.0, Math.Min(60.0, distance * 0.15));
+
+            var midY = Math.Max(source.Y, target.Y) + heightOffset;
+
+            var pathFigure = new PathFigure { StartPoint = source, IsClosed = false };
+            pathFigure.Segments.Add(new LineSegment { Point = new Point(source.X, midY) });
+            pathFigure.Segments.Add(new LineSegment { Point = new Point(target.X, midY) });
+            pathFigure.Segments.Add(new LineSegment { Point = new Point(target.X, target.Y) });
+
+            var geometry = new PathGeometry();
+            geometry.Figures.Add(pathFigure);
+
+            var path = new Microsoft.UI.Xaml.Shapes.Path
+            {
+                Stroke = accentBrush,
+                StrokeThickness = 2,
+                Opacity = 0.85,
+                IsHitTestVisible = false,
+                Data = geometry,
+                StrokeLineJoin = PenLineJoin.Round,
+            };
+            pathShape = path;
+            labelPos = new Point((source.X + target.X) / 2, midY);
+        }
+        else if ((conn.SourceSide == ConnectionPortSide.Right && conn.TargetSide == ConnectionPortSide.Left) ||
+                 (conn.SourceSide == ConnectionPortSide.Left && conn.TargetSide == ConnectionPortSide.Right))
+        {
+            // Horizontal straight line
             var line = new Line
             {
                 X1 = source.X,
@@ -196,18 +252,52 @@ public sealed class ConnectorRenderer
                 Y2 = target.Y,
                 Stroke = accentBrush,
                 StrokeThickness = 2,
-                Opacity = 0.8,
+                Opacity = 0.85,
                 IsHitTestVisible = false,
             };
             pathShape = line;
+            labelPos = new Point((source.X + target.X) / 2, (source.Y + target.Y) / 2);
+        }
+        else
+        {
+            // Mixed sides: use elbow connector (L-shape)
+            var midX = (source.X + target.X) / 2;
+            var midY = (source.Y + target.Y) / 2;
+
+            var pathFigure = new PathFigure { StartPoint = source, IsClosed = false };
+
+            if (conn.SourceSide == ConnectionPortSide.Top || conn.SourceSide == ConnectionPortSide.Bottom)
+            {
+                // Go vertical first, then horizontal
+                pathFigure.Segments.Add(new LineSegment { Point = new Point(source.X, target.Y) });
+                pathFigure.Segments.Add(new LineSegment { Point = target });
+            }
+            else
+            {
+                // Go horizontal first, then vertical
+                pathFigure.Segments.Add(new LineSegment { Point = new Point(target.X, source.Y) });
+                pathFigure.Segments.Add(new LineSegment { Point = target });
+            }
+
+            var geometry = new PathGeometry();
+            geometry.Figures.Add(pathFigure);
+
+            var path = new Microsoft.UI.Xaml.Shapes.Path
+            {
+                Stroke = accentBrush,
+                StrokeThickness = 2,
+                Opacity = 0.85,
+                IsHitTestVisible = false,
+                Data = geometry,
+                StrokeLineJoin = PenLineJoin.Round,
+            };
+            pathShape = path;
+            labelPos = new Point(midX, midY);
         }
 
         _overlayCanvas.Children.Add(pathShape);
 
-        // Calculate the TRUE midpoint on the curve (not just average of endpoints)
-        var labelPos = GetCurveMidpoint(source, target, conn.SourceSide, conn.TargetSide, isCurved);
-
-        // Add small compact label chip stuck to the line
+        // Add small compact label chip at the midpoint of the horizontal bar
         var labelBorder = new Border
         {
             Background = new SolidColorBrush(ColorHelper.FromArgb(240, 8, 20, 40)),
@@ -229,9 +319,9 @@ public sealed class ConnectorRenderer
         };
         labelBorder.Child = labelBlock;
 
-        // Position label exactly at the curve midpoint (centered on it)
+        // Position label centered on the horizontal bar
         Canvas.SetLeft(labelBorder, labelPos.X - 16);
-        Canvas.SetTop(labelBorder, labelPos.Y - 8);
+        Canvas.SetTop(labelBorder, labelPos.Y - 10);
         _overlayCanvas.Children.Add(labelBorder);
 
         // Add small dots at connection points
@@ -245,7 +335,7 @@ public sealed class ConnectorRenderer
             LabelBorder = labelBorder,
             SourcePoint = source,
             TargetPoint = target,
-            IsCurved = isCurved,
+            IsCurved = false,
         };
     }
 
@@ -346,20 +436,26 @@ public sealed class ConnectorRenderer
 
     private static bool IsPointNearPath(Point point, Point source, Point target, bool isCurved, double tolerance)
     {
-        if (!isCurved)
-        {
-            return DistanceToLineSegment(point, source, target) <= tolerance;
-        }
+        // For bracket-style lines, check distance to each segment
+        // Segment 1: source → (source.X, midY)
+        // Segment 2: (source.X, midY) → (target.X, midY)
+        // Segment 3: (target.X, midY) → target
+        var midY = Math.Min(source.Y, target.Y) - 40;
 
-        // For curves, sample points along the bezier and check distance
-        for (double t = 0; t <= 1.0; t += 0.05)
-        {
-            var bezierPoint = GetBezierPoint(source, target, t);
-            var dist = Math.Sqrt(Math.Pow(point.X - bezierPoint.X, 2) + Math.Pow(point.Y - bezierPoint.Y, 2));
-            if (dist <= tolerance)
-                return true;
-        }
-        return false;
+        var seg1Start = source;
+        var seg1End = new Point(source.X, midY);
+        if (DistanceToLineSegment(point, seg1Start, seg1End) <= tolerance) return true;
+
+        var seg2Start = seg1End;
+        var seg2End = new Point(target.X, midY);
+        if (DistanceToLineSegment(point, seg2Start, seg2End) <= tolerance) return true;
+
+        var seg3Start = seg2End;
+        var seg3End = target;
+        if (DistanceToLineSegment(point, seg3Start, seg3End) <= tolerance) return true;
+
+        // Also check simple straight line (for left-right connections)
+        return DistanceToLineSegment(point, source, target) <= tolerance;
     }
 
     private static Point GetBezierPoint(Point source, Point target, double t)
