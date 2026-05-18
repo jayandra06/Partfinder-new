@@ -35,6 +35,7 @@ public sealed partial class TemplatesPage : Page
         DataContext = App.Services.GetRequiredService<TemplatesViewModel>();
         Loaded += OnLoaded;
         DataContextChanged += OnDataContextChanged;
+        AllTemplatesCarouselControl.CreateTemplateRequested += OnGalleryCreateTemplateRequested;
 
         // Ensure drag-pan still works when child controls mark events handled.
         TemplateCanvasScrollViewer.AddHandler(
@@ -68,9 +69,18 @@ public sealed partial class TemplatesPage : Page
         // IMPORTANT: Load favourite store FIRST before loading templates
         await vm.LoadFavouriteStoreAsync().ConfigureAwait(true);
 
-        // Then load templates
+        // Then load templates (does not auto-open Master Data editor)
         await vm.LoadAsync().ConfigureAwait(true);
-        await FavouritesSubPageControl.ShowAsync(vm).ConfigureAwait(true);
+        vm.ExitTemplateEditor();
+
+        if (vm.Templates.Count == 0)
+        {
+            OnShowAllTemplatesClick(this, new RoutedEventArgs());
+        }
+        else
+        {
+            await FavouritesSubPageControl.ShowAsync(vm).ConfigureAwait(true);
+        }
 
         // Hook template save to log activity
         vm.PropertyChanged += (_, args) =>
@@ -102,11 +112,32 @@ public sealed partial class TemplatesPage : Page
 
     private void OnCreateNewTemplateClick(object sender, RoutedEventArgs e)
     {
+        BeginCreateTemplateEditor();
+    }
+
+    private void OnGalleryCreateTemplateRequested(object? sender, EventArgs e)
+    {
+        BeginCreateTemplateEditor();
+    }
+
+    private void OnClearTemplateNameClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is TemplatesViewModel vm)
+        {
+            vm.NewTemplateName = string.Empty;
+        }
+    }
+
+    private void BeginCreateTemplateEditor()
+    {
         if (DataContext is not TemplatesViewModel vm) return;
-        vm.StartNewCustomTemplateCommand.Execute(null);
-        vm.ColumnLabels.Clear();
-        vm.ColumnLabels.Add(new ColumnLabelDraft());
-        vm.CellConnections.Clear();
+
+        AllTemplatesPanel.Visibility = Visibility.Collapsed;
+        FavouritesSubPageControl.Visibility = Visibility.Collapsed;
+        ViewAllTemplatesButton.Visibility = Visibility.Visible;
+        ViewFavouritesButton.Visibility = Visibility.Collapsed;
+
+        vm.StartCreateFromGallery();
         RefreshAllCanvasCellBorders();
         CenterCanvasContent();
         RefreshCanvasUiState(vm);
@@ -1258,11 +1289,26 @@ public sealed partial class TemplatesPage : Page
         vm.HideFavouritesCommand.Execute(null);
     }
 
+    private void OnAllTemplatesViewRequested(object? sender, EventArgs e)
+    {
+        if (DataContext is not TemplatesViewModel vm)
+        {
+            return;
+        }
+
+        EnsureConnectorRenderer();
+        _connectorRenderer?.Clear();
+
+        OnShowAllTemplatesClick(this, new RoutedEventArgs());
+        BuildAllTemplatesList(vm);
+    }
+
     private void OnDataContextChanged(FrameworkElement sender, DataContextChangedEventArgs args)
     {
         if (_boundVm is not null)
         {
             _boundVm.PropertyChanged -= OnTemplatesVmPropertyChanged;
+            _boundVm.AllTemplatesViewRequested -= OnAllTemplatesViewRequested;
             _boundVm = null;
         }
 
@@ -1270,6 +1316,7 @@ public sealed partial class TemplatesPage : Page
         {
             _boundVm = newVm;
             newVm.PropertyChanged += OnTemplatesVmPropertyChanged;
+            newVm.AllTemplatesViewRequested += OnAllTemplatesViewRequested;
         }
     }
 

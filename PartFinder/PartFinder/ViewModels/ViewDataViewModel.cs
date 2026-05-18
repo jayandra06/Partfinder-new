@@ -111,22 +111,8 @@ public partial class ViewDataViewModel : ViewModelBase
 
         foreach (var relation in orderedRelations)
         {
-            var details = relation.Value.DisplayValues
-                .OrderBy(k => k.Key, StringComparer.OrdinalIgnoreCase)
-                .Select(kv => new DisplayPair(kv.Key, kv.Value))
-                .ToList();
-            if (details.Count == 0)
-            {
-                details.Add(new DisplayPair("Status", relation.Value.Matched ? "Matched" : "No vendor linked"));
-            }
-
             HoveredRelationSections.Add(
-                new RelationDetailSection
-                {
-                    Title = string.IsNullOrWhiteSpace(relation.Value.MenuLabel) ? relation.Key : relation.Value.MenuLabel,
-                    IsMatched = relation.Value.Matched,
-                    Details = details,
-                });
+                RelationDetailSectionBuilder.FromEnrichedRelation(relation.Key, relation.Value));
         }
 
         IsFlyoutOpen = true;
@@ -209,5 +195,18 @@ public sealed class RelationDetailSection
     public required string Title { get; init; }
     public required bool IsMatched { get; init; }
     public required List<DisplayPair> Details { get; init; }
-    public string MatchLabel => IsMatched ? "Matched" : "Not linked";
+    public int MatchCount { get; init; }
+    public IReadOnlyList<RelationMatchGroup> MatchGroups { get; init; } = [];
+    public string RelationId { get; init; } = string.Empty;
+    public string LookupTemplateId { get; init; } = string.Empty;
+    public string LookupTemplateName { get; init; } = string.Empty;
+    public bool CanOpenLookup => !string.IsNullOrWhiteSpace(LookupTemplateId);
+    public string MatchLabel =>
+        MatchCount > 1 ? $"{MatchCount} matches" : IsMatched ? "Matched" : "Not linked";
+}
+
+public sealed class RelationMatchGroup
+{
+    public required string Title { get; init; }
+    public required List<DisplayPair> Details { get; init; }
 }

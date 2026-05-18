@@ -84,7 +84,7 @@
                     <CheckBox Content="Delete" IsChecked="{Binding InviteCanDeleteTemplate, Mode=TwoWay}" FontSize="12" />
                 </ItemsControl>
 
-                <TextBlock Text="MASTER DATA PERMISSIONS" Style="{StaticResource InviteFieldLabelStyle}" Margin="0,4,0,0" />
+                <TextBlock Text="EXPLORER PERMISSIONS" Style="{StaticResource InviteFieldLabelStyle}" Margin="0,4,0,0" />
                 <ItemsControl>
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>

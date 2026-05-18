@@ -14,6 +14,51 @@
             <RowDefinition Height="56" />
         </Grid.RowDefinitions>
 
+        <!-- ── Empty state (no templates) ── -->
+        <StackPanel
+            x:Name="EmptyStatePanel"
+            Grid.Row="1"
+            Spacing="24"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Visibility="Collapsed">
+            <Border Width="120" Height="120" CornerRadius="60"
+                    Background="{StaticResource CardBackgroundBrush}"
+                    BorderBrush="{StaticResource BorderDefaultBrush}"
+                    BorderThickness="2"
+                    HorizontalAlignment="Center">
+                <Border.Shadow>
+                    <ThemeShadow />
+                </Border.Shadow>
+                <FontIcon Glyph="&#xE8A5;" FontSize="48" Foreground="{StaticResource AccentPrimaryBrush}" />
+            </Border>
+            <StackPanel Spacing="12" HorizontalAlignment="Center">
+                <TextBlock Text="No templates yet"
+                           FontSize="28"
+                           FontWeight="SemiBold"
+                           HorizontalAlignment="Center"
+                           Foreground="{StaticResource TextPrimaryBrush}" />
+                <TextBlock Text="Create your first template to get started. Your first template should be named Explorer."
+                           FontSize="15"
+                           Foreground="{StaticResource TextTertiaryBrush}"
+                           HorizontalAlignment="Center"
+                           TextAlignment="Center"
+                           MaxWidth="420"
+                           TextWrapping="WrapWholeWords" />
+            </StackPanel>
+            <Button x:Name="EmptyCreateTemplateButton"
+                    Style="{StaticResource PrimaryButtonStyle}"
+                    MinWidth="200"
+                    HorizontalAlignment="Center"
+                    Padding="20,10"
+                    Click="OnEmptyCreateTemplateClick">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE710;" FontSize="14" />
+                    <TextBlock Text="Create New Template" FontSize="14" FontWeight="SemiBold" />
+                </StackPanel>
+            </Button>
+        </StackPanel>
+
         <!-- ── Carousel canvas (full height, clipped) ── -->
         <Canvas
             x:Name="CarouselCanvas"
@@ -26,7 +71,9 @@
         </Canvas>
 
         <!-- ── Bottom bar: counter + prev/next ── -->
-        <Grid Grid.Row="2" Margin="0,0,0,0">
+        <Grid x:Name="BottomNavBar"
+              Grid.Row="2"
+              Margin="0,0,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />

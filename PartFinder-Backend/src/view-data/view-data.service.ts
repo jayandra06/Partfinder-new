@@ -92,7 +92,7 @@ export class ViewDataService {
         const keys = matchKeysByRelation.get(relationId) ?? [];
         const lookupRows = lookupRowsByTemplate.get(relation.lookupTemplateId) ?? [];
 
-        const matchedRow = lookupRows.find((lookupRow) =>
+        const matchedRows = lookupRows.filter((lookupRow) =>
           keys.every((key) =>
             this.equalsIgnoreCase(
               primaryRow.cells[key.sourceColumn] ?? '',
@@ -101,31 +101,43 @@ export class ViewDataService {
           ),
         );
 
-        if (!matchedRow) {
+        const displayColumnNames = displayByRelation.get(relationId) ?? [];
+
+        const buildDisplayValues = (row: HydratedRow): Record<string, string> => {
+          const displayValues: Record<string, string> = {};
+          if (!displayColumnNames.length) {
+            for (const [key, value] of Object.entries(row.cells)) {
+              displayValues[key] = value;
+            }
+          } else {
+            for (const column of displayColumnNames) {
+              displayValues[column] = row.cells[column] ?? '';
+            }
+          }
+          return displayValues;
+        };
+
+        if (!matchedRows.length) {
           linkedData[relationId] = {
             matched: false,
+            matchCount: 0,
             displayValues: {},
+            matches: [],
             menuLabel: relation.menuLabel,
           };
           continue;
         }
 
-        const displayColumns = displayByRelation.get(relationId) ?? [];
-        const displayValues: Record<string, string> = {};
-
-        if (!displayColumns.length) {
-          for (const [key, value] of Object.entries(matchedRow.cells)) {
-            displayValues[key] = value;
-          }
-        } else {
-          for (const column of displayColumns) {
-            displayValues[column] = matchedRow.cells[column] ?? '';
-          }
-        }
+        const matches = matchedRows.map((row) => ({
+          rowId: row.rowId,
+          displayValues: buildDisplayValues(row),
+        }));
 
         linkedData[relationId] = {
           matched: true,
-          displayValues,
+          matchCount: matches.length,
+          displayValues: matches[0].displayValues,
+          matches,
           menuLabel: relation.menuLabel,
         };
       }

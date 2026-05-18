@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.Input;
+using PartFinder.Core;
 using PartFinder.Models;
 using PartFinder.Services;
 using System.Collections.ObjectModel;
@@ -83,6 +84,11 @@ public partial class TemplatesViewModel : ViewModelBase
         NotifyTemplateUiState();
     }
 
+    /// <summary>Raised after a template is deleted so the page can show View All Templates.</summary>
+    public event EventHandler? AllTemplatesViewRequested;
+
+    public bool IsAllTemplatesGalleryEmpty => Templates.Count == 0;
+
     [RelayCommand]
     private async Task DeleteTemplateAsync(string templateId)
     {
@@ -91,10 +97,30 @@ public partial class TemplatesViewModel : ViewModelBase
         {
             await _templateSchema.DeleteTemplateAsync(templateId).ConfigureAwait(true);
             _activityLogger.LogTemplateChange("Template Deleted", $"Template {templateId} deleted");
+            ExitTemplateEditor();
             await LoadAsync().ConfigureAwait(true);
             await _shellNav.NotifyTemplatesChangedAsync().ConfigureAwait(true);
+            OnPropertyChanged(nameof(IsAllTemplatesGalleryEmpty));
+            AllTemplatesViewRequested?.Invoke(this, EventArgs.Empty);
         }
         catch { /* ignore */ }
+    }
+
+    /// <summary>Leave canvas editor after delete or cancel; does not start Master Data flow.</summary>
+    public void ExitTemplateEditor()
+    {
+        FormError = string.Empty;
+        IsEditingExisting = false;
+        EditingTemplateId = null;
+        IsCreatingTemplate = false;
+        IsTemplateNameReadOnly = false;
+        NewTemplateName = string.Empty;
+        SelectedBaseTemplateId = null;
+        ColumnLabels.Clear();
+        ColumnLabels.Add(new ColumnLabelDraft());
+        CellConnections.Clear();
+        SelectedTemplate = Templates.FirstOrDefault();
+        NotifyTemplateUiState();
     }
 
     [RelayCommand]
@@ -173,6 +199,8 @@ public partial class TemplatesViewModel : ViewModelBase
             if (SetProperty(ref _isEditingExisting, value))
             {
                 OnPropertyChanged(nameof(LinkTargetCandidates));
+                OnPropertyChanged(nameof(CanSaveTemplate));
+                OnPropertyChanged(nameof(EditorHeaderTitle));
             }
         }
     }
@@ -195,6 +223,20 @@ public partial class TemplatesViewModel : ViewModelBase
             t => !IsEditingExisting
                  || !string.Equals(t.Id, EditingTemplateId, StringComparison.Ordinal));
 
+    public IEnumerable<PartTemplateDefinition> InheritableTemplates => LinkTargetCandidates;
+
+    private string? _selectedBaseTemplateId;
+    public string? SelectedBaseTemplateId
+    {
+        get => _selectedBaseTemplateId;
+        set => SetProperty(ref _selectedBaseTemplateId, value);
+    }
+
+    public PartTemplateDefinition? SelectedBaseTemplate =>
+        string.IsNullOrWhiteSpace(SelectedBaseTemplateId)
+            ? null
+            : Templates.FirstOrDefault(t => string.Equals(t.Id, SelectedBaseTemplateId, StringComparison.Ordinal));
+
     public IReadOnlyList<TemplateFieldTypeOption> FieldTypeOptions { get; } =
     [
         new(TemplateFieldType.Text, "Text"),
@@ -211,6 +253,13 @@ public partial class TemplatesViewModel : ViewModelBase
     public bool CanDeleteSelectedTemplate => !IsCreatingTemplate && SelectedTemplate is not null && _access.Capabilities.CanDeleteTemplate;
 
     public bool CanAddTemplate => _access.Capabilities.CanAddTemplate;
+
+    /// <summary>Whether Save Template is allowed in the canvas editor.</summary>
+    public bool CanSaveTemplate =>
+        IsCreatingTemplate
+        && (IsEditingExisting
+            ? _access.Capabilities.CanEditTemplate
+            : _access.Capabilities.CanAddTemplate);
 
     public string EditorHeaderTitle => IsEditingExisting ? "Edit template" : "New template";
 
@@ -269,6 +318,7 @@ public partial class TemplatesViewModel : ViewModelBase
     private void NotifyTemplateUiState()
     {
         OnPropertyChanged(nameof(ShowDbMissingBanner));
+        OnPropertyChanged(nameof(IsAllTemplatesGalleryEmpty));
         OnPropertyChanged(nameof(ShowTemplateList));
         OnPropertyChanged(nameof(ShowTemplateEditor));
         OnPropertyChanged(nameof(ShowTemplatePreviewPanel));
@@ -277,6 +327,7 @@ public partial class TemplatesViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanEditSelectedTemplate));
         OnPropertyChanged(nameof(CanDeleteSelectedTemplate));
         OnPropertyChanged(nameof(CanAddTemplate));
+        OnPropertyChanged(nameof(CanSaveTemplate));
         OnPropertyChanged(nameof(LinkTargetCandidates));
         OnPropertyChanged(nameof(EditorHeaderTitle));
         OnPropertyChanged(nameof(ShowFavouritesSubPage));
@@ -427,6 +478,7 @@ public partial class TemplatesViewModel : ViewModelBase
         {
             FormError = "You do not have permission to view templates.";
             Templates.Clear();
+            OnPropertyChanged(nameof(IsAllTemplatesGalleryEmpty));
             return;
         }
         _setupContext.Refresh();
@@ -450,19 +502,15 @@ public partial class TemplatesViewModel : ViewModelBase
         }
 
         var hasMaster = templates.Any(
-            t => string.Equals(t.Name, MongoTemplateSchemaService.MasterDataTemplateName, StringComparison.OrdinalIgnoreCase));
+            t => MongoTemplateSchemaService.IsExplorerTemplateName(t.Name));
         CanAddAnotherTemplate = hasMaster && _access.Capabilities.CanAddTemplate;
 
         SelectedTemplate = Templates.FirstOrDefault();
 
-        if (!hasMaster && _hasTenantDb)
-        {
-            BeginMasterDataFlow();
-        }
-        else
-        {
-            IsCreatingTemplate = false;
-        }
+        // Never auto-open the canvas on load; user chooses Create from gallery or favourites.
+        IsCreatingTemplate = false;
+        IsEditingExisting = false;
+        EditingTemplateId = null;
 
         NotifyTemplateUiState();
     }
@@ -476,6 +524,7 @@ public partial class TemplatesViewModel : ViewModelBase
         IsTemplateNameReadOnly = true;
         ColumnLabels.Clear();
         ColumnLabels.Add(new ColumnLabelDraft());
+        CellConnections.Clear();
         SelectedTemplate = null;
         NotifyTemplateUiState();
     }
@@ -516,9 +565,18 @@ public partial class TemplatesViewModel : ViewModelBase
         ColumnLabels.Remove(draft);
     }
 
-    [RelayCommand]
-    private void StartNewCustomTemplate()
+    /// <summary>Opens the canvas editor for a new template (Master Data first if none exists).</summary>
+    public void StartCreateFromGallery()
     {
+        var hasMaster = Templates.Any(
+            t => MongoTemplateSchemaService.IsExplorerTemplateName(t.Name));
+
+        if (!hasMaster && _hasTenantDb)
+        {
+            BeginMasterDataFlow();
+            return;
+        }
+
         if (!CanAddAnotherTemplate)
         {
             return;
@@ -532,9 +590,13 @@ public partial class TemplatesViewModel : ViewModelBase
         NewTemplateName = string.Empty;
         ColumnLabels.Clear();
         ColumnLabels.Add(new ColumnLabelDraft());
+        CellConnections.Clear();
         SelectedTemplate = null;
         NotifyTemplateUiState();
     }
+
+    [RelayCommand]
+    private void StartNewCustomTemplate() => StartCreateFromGallery();
 
     [RelayCommand]
     private void BeginEditSelectedTemplate()
@@ -548,11 +610,9 @@ public partial class TemplatesViewModel : ViewModelBase
         IsEditingExisting = true;
         EditingTemplateId = SelectedTemplate.Id;
         IsCreatingTemplate = true;
-        IsTemplateNameReadOnly = string.Equals(
-            SelectedTemplate.Name,
-            MongoTemplateSchemaService.MasterDataTemplateName,
-            StringComparison.OrdinalIgnoreCase);
+        IsTemplateNameReadOnly = MongoTemplateSchemaService.IsExplorerTemplateName(SelectedTemplate.Name);
         NewTemplateName = SelectedTemplate.Name;
+        SelectedBaseTemplateId = SelectedTemplate.BaseTemplateId;
 
         var templateNameForLog = SelectedTemplate.Name;
 
@@ -585,18 +645,68 @@ public partial class TemplatesViewModel : ViewModelBase
     [RelayCommand]
     private void CancelCreate()
     {
-        FormError = string.Empty;
-        IsEditingExisting = false;
-        EditingTemplateId = null;
-        IsCreatingTemplate = false;
-        SelectedTemplate = Templates.FirstOrDefault();
+        ExitTemplateEditor();
+        AllTemplatesViewRequested?.Invoke(this, EventArgs.Empty);
+    }
 
-        var hasMaster = Templates.Any(
-            t => string.Equals(t.Name, MongoTemplateSchemaService.MasterDataTemplateName, StringComparison.OrdinalIgnoreCase));
-        if (!hasMaster && _hasTenantDb)
+    [RelayCommand]
+    private void AddStandardCatalogColumns()
+    {
+        var existing = ColumnLabels.Select(c => c.Label).ToList();
+        var added = 0;
+        foreach (var entry in ColumnCatalog.GetMissingByLabel(existing))
         {
-            BeginMasterDataFlow();
+            ColumnLabels.Add(
+                new ColumnLabelDraft
+                {
+                    Label = entry.Label,
+                    StableKey = entry.Key,
+                    FieldType = TemplateFieldType.Text,
+                });
+            added++;
         }
+
+        FormError = added == 0 ? "All standard columns are already on this template." : string.Empty;
+        NotifyTemplateUiState();
+    }
+
+    [RelayCommand]
+    private void ApplyBaseTemplateColumns()
+    {
+        var baseTemplate = SelectedBaseTemplate;
+        if (baseTemplate is null)
+        {
+            FormError = "Choose a base template to extend.";
+            return;
+        }
+
+        var existing = new HashSet<string>(
+            ColumnLabels.Select(c => c.Label.Trim()),
+            StringComparer.OrdinalIgnoreCase);
+        var added = 0;
+        foreach (var field in baseTemplate.Fields.OrderBy(f => f.DisplayOrder))
+        {
+            if (!existing.Add(field.Label))
+            {
+                continue;
+            }
+
+            ColumnLabels.Add(
+                new ColumnLabelDraft
+                {
+                    Label = field.Label,
+                    StableKey = field.Key,
+                    FieldType = field.Type,
+                    LinkedTemplateId = field.LinkedTemplateId,
+                    IsRequired = field.IsRequired,
+                });
+            added++;
+        }
+
+        FormError = added == 0
+            ? $"\"{baseTemplate.Name}\" columns are already present."
+            : string.Empty;
+        NotifyTemplateUiState();
     }
 
     [RelayCommand]
@@ -611,21 +721,19 @@ public partial class TemplatesViewModel : ViewModelBase
         }
 
         var hasMasterAlready = Templates.Any(
-            t => string.Equals(t.Name, MongoTemplateSchemaService.MasterDataTemplateName, StringComparison.OrdinalIgnoreCase));
+            t => MongoTemplateSchemaService.IsExplorerTemplateName(t.Name));
 
         if (!IsEditingExisting)
         {
-            if (!hasMasterAlready
-                && !string.Equals(name, MongoTemplateSchemaService.MasterDataTemplateName, StringComparison.OrdinalIgnoreCase))
+            if (!hasMasterAlready && !MongoTemplateSchemaService.IsExplorerTemplateName(name))
             {
-                FormError = "Your first template must be named Master Data.";
+                FormError = "Your first template must be named Explorer.";
                 return;
             }
 
-            if (hasMasterAlready
-                && string.Equals(name, MongoTemplateSchemaService.MasterDataTemplateName, StringComparison.OrdinalIgnoreCase))
+            if (hasMasterAlready && MongoTemplateSchemaService.IsExplorerTemplateName(name))
             {
-                FormError = "A template named Master Data already exists.";
+                FormError = "A template named Explorer already exists.";
                 return;
             }
 
@@ -726,6 +834,7 @@ public partial class TemplatesViewModel : ViewModelBase
             Name = name,
             Version = version,
             IsPublished = true,
+            BaseTemplateId = string.IsNullOrWhiteSpace(SelectedBaseTemplateId) ? null : SelectedBaseTemplateId,
             Fields = fields,
         };
 
@@ -739,6 +848,7 @@ public partial class TemplatesViewModel : ViewModelBase
             return;
         }
 
+        SelectedBaseTemplateId = null;
         _activityLogger.LogTemplateChange(
             IsEditingExisting ? "Template Edited" : "Template Created",
             $"Template \"{name}\" {(IsEditingExisting ? "updated" : "created")}");
@@ -748,6 +858,8 @@ public partial class TemplatesViewModel : ViewModelBase
         EditingTemplateId = null;
         await LoadAsync().ConfigureAwait(true);
         await _shellNav.NotifyTemplatesChangedAsync(openMasterDataPage: firstMasterSave).ConfigureAwait(true);
+        OnPropertyChanged(nameof(IsAllTemplatesGalleryEmpty));
+        AllTemplatesViewRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private static string MakeFieldKey(string label, int index)

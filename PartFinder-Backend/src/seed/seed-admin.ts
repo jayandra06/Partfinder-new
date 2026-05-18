@@ -3,7 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../app.module';
 import { UsersService } from '../users/users.service';
 
-/** Default admin for local seed; override with SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD */
+/** Default admin for local seed; override with SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD. Set SEED_ADMIN_UPDATE_PASSWORD=1 to reset password when admin exists. */
 const DEFAULT_EMAIL = 'jayandraa5@gmail.com';
 const DEFAULT_PASSWORD = 'J@yandra06';
 
@@ -18,6 +18,14 @@ async function run() {
 
     const existing = await users.findByEmail(email);
     if (existing) {
+      const updatePw =
+        process.env.SEED_ADMIN_UPDATE_PASSWORD === '1' ||
+        process.env.SEED_ADMIN_UPDATE_PASSWORD === 'true';
+      if (updatePw) {
+        await users.setPassword(String(existing._id), password);
+        console.log(`Updated admin password: ${email}`);
+        return;
+      }
       console.log(`Admin already exists: ${email}`);
       return;
     }

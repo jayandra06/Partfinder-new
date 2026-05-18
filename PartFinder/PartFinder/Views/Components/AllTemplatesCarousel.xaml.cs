@@ -39,10 +39,18 @@ public sealed partial class AllTemplatesCarousel : UserControl
         Color.FromArgb(255, 236, 72,  153),
     };
 
+    /// <summary>User tapped Create New Template on the empty gallery state.</summary>
+    public event EventHandler? CreateTemplateRequested;
+
     public AllTemplatesCarousel()
     {
         InitializeComponent();
         _records = App.Services.GetRequiredService<IMasterDataRecordsService>();
+    }
+
+    private void OnEmptyCreateTemplateClick(object sender, RoutedEventArgs e)
+    {
+        CreateTemplateRequested?.Invoke(this, EventArgs.Empty);
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
@@ -57,7 +65,16 @@ public sealed partial class AllTemplatesCarousel : UserControl
         _cardColOffset.Clear();
 
         var templates = vm.Templates.ToList();
-        
+        var isEmpty = templates.Count == 0;
+        EmptyStatePanel.Visibility = isEmpty ? Visibility.Visible : Visibility.Collapsed;
+        CarouselCanvas.Visibility = isEmpty ? Visibility.Collapsed : Visibility.Visible;
+        BottomNavBar.Visibility = isEmpty ? Visibility.Collapsed : Visibility.Visible;
+
+        if (isEmpty)
+        {
+            return;
+        }
+
         // Create cards immediately without data (fast UI response)
         for (int i = 0; i < templates.Count; i++)
         {
@@ -552,15 +569,6 @@ public sealed partial class AllTemplatesCarousel : UserControl
             try
             {
                 await vm.DeleteTemplateCommand.ExecuteAsync(template.Id);
-                if (_cards.Contains(card))
-                {
-                    _cards.Remove(card);
-                    _cardColOffset.Remove(card);
-                    CarouselCanvas.Children.Remove(card);
-                    if (_activeIndex >= _cards.Count && _activeIndex > 0) _activeIndex--;
-                    UpdateLayout(animate: true);
-                    UpdateNav();
-                }
             }
             catch { /* ignore */ }
         };

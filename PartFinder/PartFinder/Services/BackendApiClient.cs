@@ -367,7 +367,15 @@ public sealed class EnrichedRowDto
 public sealed class EnrichedRelationDto
 {
     public bool Matched { get; set; }
+    public int MatchCount { get; set; }
     public string MenuLabel { get; set; } = string.Empty;
+    public Dictionary<string, string> DisplayValues { get; set; } = [];
+    public List<EnrichedRelationMatchDto> Matches { get; set; } = [];
+}
+
+public sealed class EnrichedRelationMatchDto
+{
+    public string RowId { get; set; } = string.Empty;
     public Dictionary<string, string> DisplayValues { get; set; } = [];
 }
 

@@ -65,9 +65,9 @@
             <Setter Property="BorderBrush" Value="{StaticResource BorderDefaultBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="8" />
-            <Setter Property="Padding" Value="12,0" />
+            <Setter Property="Padding" Value="10,8" />
             <Setter Property="MinHeight" Value="44" />
-            <Setter Property="Margin" Value="0,0,0,4" />
+            <Setter Property="Margin" Value="0,0,8,0" />
         </Style>
 
         <!-- Badge styles -->
@@ -154,16 +154,37 @@
                     FontWeight="SemiBold"
                     Foreground="{StaticResource TextPrimaryBrush}" />
                 <TextBlock
-                    Text="Connect columns between templates to enable cross-template lookups and data enrichment in your inventory explorer."
+                    Text="Match on one or more shared columns, then choose which lookup fields appear in Explorer when you click a row."
                     FontSize="12"
                     Foreground="{StaticResource TextSecondaryBrush}"
                     TextWrapping="WrapWholeWords" />
             </StackPanel>
 
+            <StackPanel Grid.Column="1" VerticalAlignment="Top" Spacing="8">
+            <Border
+                Visibility="{Binding HasRelationHealthInsight, Converter={StaticResource BoolToVisibilityConverter}}"
+                Background="{StaticResource CardBackgroundBrush}"
+                BorderBrush="{StaticResource BorderDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="10"
+                Padding="10,8"
+                MaxWidth="320">
+                <StackPanel Spacing="4">
+                    <TextBlock
+                        Text="LINK HEALTH"
+                        FontSize="9"
+                        CharacterSpacing="80"
+                        FontWeight="SemiBold"
+                        Foreground="{StaticResource AccentPrimaryBrush}" />
+                    <TextBlock
+                        Text="{Binding RelationHealthInsight}"
+                        FontSize="11"
+                        Foreground="{StaticResource TextSecondaryBrush}"
+                        TextWrapping="WrapWholeWords" />
+                </StackPanel>
+            </Border>
             <!-- Saved relations count badge (NEW) -->
             <Border
-                Grid.Column="1"
-                VerticalAlignment="Top"
                 Visibility="{Binding HasRelations, Converter={StaticResource BoolToVisibilityConverter}}"
                 Background="{StaticResource NavItemSelectedBrush}"
                 BorderBrush="{StaticResource AccentPrimaryBrush}"
@@ -181,6 +202,7 @@
                     </TextBlock>
                 </StackPanel>
             </Border>
+            </StackPanel>
         </Grid>
 
         <!-- ═══════════════════════════════════════════════════════════════
@@ -281,7 +303,7 @@
                                 FontWeight="SemiBold"
                                 Foreground="{StaticResource TextPrimaryBrush}" />
                             <TextBlock
-                                Text="Source of match keys"
+                                Text="Match columns (one or more)"
                                 FontSize="10"
                                 Foreground="{StaticResource TextTertiaryBrush}" />
                         </StackPanel>
@@ -299,21 +321,48 @@
                         ItemsSource="{Binding Templates}"
                         SelectedItem="{Binding PrimaryTemplate, Mode=TwoWay}" />
 
-                    <!-- KEY indicator hint -->
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <Border Width="8" Height="8" CornerRadius="4" Background="{StaticResource AccentPrimaryBrush}" VerticalAlignment="Center" />
-                        <TextBlock
-                            Text="Check columns to use as match keys"
-                            FontSize="10"
-                            Foreground="{StaticResource TextTertiaryBrush}"
-                            VerticalAlignment="Center" />
-                    </StackPanel>
+                    <TextBlock
+                        Text="{Binding SelectedMatchColumnHint}"
+                        FontSize="11"
+                        Foreground="{StaticResource TextSecondaryBrush}"
+                        TextWrapping="WrapWholeWords" />
 
-                    <!-- Column list -->
+                    <Border
+                        Padding="10,8"
+                        CornerRadius="8"
+                        Background="{StaticResource NavItemSelectedBrush}"
+                        BorderBrush="{StaticResource AccentPrimaryBrush}"
+                        BorderThickness="1"
+                        Visibility="{Binding HasSharedColumns, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock
+                                Grid.Column="0"
+                                Text="{Binding SharedColumnSummary}"
+                                FontSize="11"
+                                Foreground="{StaticResource TextSecondaryBrush}"
+                                TextWrapping="WrapWholeWords"
+                                VerticalAlignment="Center" />
+                            <Button
+                                Grid.Column="1"
+                                Content="Match all shared"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                FontSize="11"
+                                MinHeight="32"
+                                Padding="12,6"
+                                Command="{Binding ApplySharedMatchKeysCommand}" />
+                        </Grid>
+                    </Border>
+
+                    <!-- Column chips — one row, scroll horizontally when needed -->
                     <ScrollViewer
-                        MaxHeight="300"
-                        VerticalScrollMode="Auto"
-                        VerticalScrollBarVisibility="Auto">
+                        HorizontalScrollMode="Auto"
+                        HorizontalScrollBarVisibility="Auto"
+                        VerticalScrollMode="Disabled"
+                        VerticalScrollBarVisibility="Disabled">
                         <StackPanel>
                             <!-- Empty state -->
                             <StackPanel
@@ -330,30 +379,28 @@
                             </StackPanel>
 
                             <ItemsControl ItemsSource="{Binding PrimaryColumns}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" Spacing="0" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <Border Style="{StaticResource ColumnRowBorderStyle}">
-                                            <Grid MinHeight="44">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto" />
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="Auto" />
-                                                </Grid.ColumnDefinitions>
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
                                                 <CheckBox
                                                     IsChecked="{Binding IsChecked, Mode=TwoWay}"
                                                     VerticalAlignment="Center"
-                                                    MinWidth="0"
-                                                    Margin="0,0,4,0" />
+                                                    MinWidth="0" />
                                                 <TextBlock
-                                                    Grid.Column="1"
                                                     Text="{Binding ColumnName}"
                                                     VerticalAlignment="Center"
                                                     FontSize="13"
                                                     Foreground="{StaticResource TextPrimaryBrush}" />
-                                                <Border Grid.Column="2" Style="{StaticResource KeyBadgeStyle}">
-                                                    <TextBlock Text="KEY" Style="{StaticResource BadgeLabelStyle}" />
+                                                <Border Style="{StaticResource KeyBadgeStyle}">
+                                                    <TextBlock Text="MATCH" Style="{StaticResource BadgeLabelStyle}" />
                                                 </Border>
-                                            </Grid>
+                                            </StackPanel>
                                         </Border>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
@@ -453,11 +500,12 @@
                             VerticalAlignment="Center" />
                     </StackPanel>
 
-                    <!-- Column list -->
+                    <!-- Column chips — one row, scroll horizontally when needed -->
                     <ScrollViewer
-                        MaxHeight="300"
-                        VerticalScrollMode="Auto"
-                        VerticalScrollBarVisibility="Auto">
+                        HorizontalScrollMode="Auto"
+                        HorizontalScrollBarVisibility="Auto"
+                        VerticalScrollMode="Disabled"
+                        VerticalScrollBarVisibility="Disabled">
                         <StackPanel>
                             <!-- Empty state -->
                             <StackPanel
@@ -474,40 +522,34 @@
                             </StackPanel>
 
                             <ItemsControl ItemsSource="{Binding LookupColumns}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" Spacing="0" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <Border Style="{StaticResource ColumnRowBorderStyle}">
-                                            <Grid MinHeight="44">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto" />
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="Auto" />
-                                                    <ColumnDefinition Width="Auto" />
-                                                </Grid.ColumnDefinitions>
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
                                                 <CheckBox
                                                     IsChecked="{Binding IsChecked, Mode=TwoWay}"
                                                     IsEnabled="{Binding IsSelectable}"
                                                     VerticalAlignment="Center"
-                                                    MinWidth="0"
-                                                    Margin="0,0,4,0" />
+                                                    MinWidth="0" />
                                                 <TextBlock
-                                                    Grid.Column="1"
                                                     Text="{Binding ColumnName}"
                                                     VerticalAlignment="Center"
                                                     FontSize="13"
                                                     Foreground="{StaticResource TextPrimaryBrush}" />
-                                                <Border
-                                                    Grid.Column="2"
-                                                    Style="{StaticResource DisplayBadgeStyle}">
+                                                <Border Style="{StaticResource DisplayBadgeStyle}">
                                                     <TextBlock Text="DISPLAY" Style="{StaticResource BadgeLabelStyle}" />
                                                 </Border>
                                                 <Border
-                                                    Grid.Column="3"
                                                     Style="{StaticResource KeyBadgeStyle}"
                                                     Visibility="{Binding IsAutoMatchKey, Converter={StaticResource BoolToVisibilityConverter}}">
                                                     <TextBlock Text="KEY" Style="{StaticResource BadgeLabelStyle}" />
                                                 </Border>
-                                            </Grid>
+                                            </StackPanel>
                                         </Border>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>

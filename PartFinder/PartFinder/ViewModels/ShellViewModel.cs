@@ -42,9 +42,17 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
         _alertsService = alertsService;
         _profile.ProfileChanged += OnProfileChanged;
         NavigationItems = new ObservableCollection<NavItemViewModel>();
+        PrimaryNavigationItems = new ObservableCollection<NavItemViewModel>();
+        OverflowNavigationItems = new ObservableCollection<NavItemViewModel>();
     }
 
     public ObservableCollection<NavItemViewModel> NavigationItems { get; }
+
+    public ObservableCollection<NavItemViewModel> PrimaryNavigationItems { get; }
+
+    public ObservableCollection<NavItemViewModel> OverflowNavigationItems { get; }
+
+    public bool HasOverflowNavigation => OverflowNavigationItems.Count > 0;
 
     private NavItemViewModel? _selectedNavigationItem;
     public NavItemViewModel? SelectedNavigationItem
@@ -287,119 +295,82 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
     private void RebuildNavigationItems(bool hasMasterData, UserAccessCapabilities c)
     {
         NavigationItems.Clear();
+        PrimaryNavigationItems.Clear();
+        OverflowNavigationItems.Clear();
 
         if (c.CanAccessDashboard)
         {
-            NavigationItems.Add(
-                new NavItemViewModel
-                {
-                    Label = "Dashboard",
-                    IconGlyph = "\uE80F",
-                    Page = AppPage.Dashboard,
-                    IsEnabled = true,
-                });
-        }
-
-        if (c.CanAccessTemplates)
-        {
-            NavigationItems.Add(
-                new NavItemViewModel
-                {
-                    Label = "Inventory",
-                    IconGlyph = "\uE179",
-                    Page = AppPage.Inventory,
-                    IsEnabled = true,
-                });
+            AddNavItem(isPrimary: true, "Home", "\uE80F", AppPage.Dashboard);
         }
 
         if ((c.CanAccessMasterData || c.CanAccessParts) && hasMasterData)
         {
-            NavigationItems.Add(
-                new NavItemViewModel
-                {
-                    Label = "Master Data",
-                    IconGlyph = "\uF0E2",
-                    Page = AppPage.MasterData,
-                    IsEnabled = true,
-                });
+            AddNavItem(isPrimary: true, "Explorer", "\uE721", AppPage.MasterData);
         }
 
         if (c.CanAccessTemplates)
         {
-            NavigationItems.Add(
-                new NavItemViewModel
-                {
-                    Label = "Templates",
-                    IconGlyph = "\uE8A5",
-                    Page = AppPage.Templates,
-                    IsEnabled = true,
-                });
+            AddNavItem(isPrimary: true, "Templates", "\uE8A5", AppPage.Templates);
+            AddNavItem(isPrimary: true, "Links", "\uE71B", AppPage.WorksheetRelations);
+        }
 
-            NavigationItems.Add(
-                new NavItemViewModel
-                {
-                    Label = "Link Templates",
-                    IconGlyph = "\uE71B",
-                    Page = AppPage.WorksheetRelations,
-                    IsEnabled = true,
-                });
-
-            NavigationItems.Add(
-                new NavItemViewModel
-                {
-                    Label = "QR Codes",
-                    IconGlyph = "\uED14",
-                    Page = AppPage.QrCodeManager,
-                    IsEnabled = true,
-                });
-
-            NavigationItems.Add(
-                new NavItemViewModel
-                {
-                    Label = "Activities",
-                    IconGlyph = "\uE81C",
-                    Page = AppPage.Audit,
-                    IsEnabled = true,
-                });
+        if (c.CanAccessTemplates)
+        {
+            AddNavItem(isPrimary: false, "Inventory", "\uE179", AppPage.Inventory);
+            AddNavItem(isPrimary: false, "View Data", "\uE8F1", AppPage.ViewData);
+            AddNavItem(isPrimary: false, "QR Codes", "\uED14", AppPage.QrCodeManager);
+            AddNavItem(isPrimary: false, "Activity", "\uE81C", AppPage.Audit);
+            AddNavItem(isPrimary: false, "Alerts", "\uEA8F", AppPage.Alerts);
         }
 
         if (c.CanAccessUserManagement)
         {
-            NavigationItems.Add(
-                new NavItemViewModel
-                {
-                    Label = "User Management",
-                    IconGlyph = "\uE716",
-                    Page = AppPage.UserManagement,
-                    IsEnabled = true,
-                });
-        }
-
-        if (c.CanAccessTemplates)
-        {
-            NavigationItems.Add(
-                new NavItemViewModel
-                {
-                    Label = "Alerts",
-                    IconGlyph = "\uEA8F",
-                    Page = AppPage.Alerts,
-                    IsEnabled = true,
-                });
+            AddNavItem(isPrimary: false, "Users", "\uE716", AppPage.UserManagement);
         }
 
         if (c.CanAccessSettings)
         {
-            NavigationItems.Add(
-                new NavItemViewModel
-                {
-                    Label = "Settings",
-                    IconGlyph = "\uE713",
-                    Page = AppPage.Settings,
-                    IsEnabled = true,
-                });
+            AddNavItem(isPrimary: false, "Settings", "\uE713", AppPage.Settings);
         }
 
+        OnPropertyChanged(nameof(HasOverflowNavigation));
         SyncNavItemLabelsWithSidebar();
+    }
+
+    private void AddNavItem(bool isPrimary, string label, string iconGlyph, AppPage page)
+    {
+        var item = new NavItemViewModel
+        {
+            Label = label,
+            IconGlyph = iconGlyph,
+            Page = page,
+            IsEnabled = true,
+        };
+
+        NavigationItems.Add(item);
+        if (isPrimary)
+        {
+            PrimaryNavigationItems.Add(item);
+        }
+        else
+        {
+            OverflowNavigationItems.Add(item);
+        }
+    }
+
+    public void NavigateToPage(AppPage page)
+    {
+        var pick = NavigationItems.FirstOrDefault(i => i.Page == page);
+        if (pick is null)
+        {
+            return;
+        }
+
+        _suppressNavigation = true;
+        SelectedNavigationItem = pick;
+        _suppressNavigation = false;
+        _lastSelectedPage = page;
+        _navigationService.Navigate(page);
     }
 
     private async Task<bool> HasMasterDataTemplateAsync()
@@ -407,11 +378,7 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
         try
         {
             var list = await _templateSchema.GetTemplatesAsync().ConfigureAwait(false);
-            return list.Any(
-                t => string.Equals(
-                    t.Name,
-                    MongoTemplateSchemaService.MasterDataTemplateName,
-                    StringComparison.OrdinalIgnoreCase));
+            return list.Any(t => MongoTemplateSchemaService.IsExplorerTemplateName(t.Name));
         }
         catch
         {

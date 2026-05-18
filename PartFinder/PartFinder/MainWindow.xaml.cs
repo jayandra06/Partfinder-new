@@ -1,3 +1,4 @@
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
@@ -6,6 +7,7 @@ using PartFinder.Services;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text.Json;
+using Windows.Foundation;
 
 namespace PartFinder;
 
@@ -30,10 +32,13 @@ public sealed partial class MainWindow : Window
 
     private readonly string _setupFilePath = SetupPaths.SetupStateFilePath;
 
+    private AppWindow? _shellTitleBarAppWindow;
+    private TypedEventHandler<AppWindow, AppWindowChangedEventArgs>? _shellTitleBarAppWindowChangedHandler;
+
     public MainWindow()
     {
         InitializeComponent();
-        // Use native caption/title bar buttons to avoid overlap with app content.
+        // Setup / blocked / app-lock use the standard caption strip; shell applies extended chrome.
         ExtendsContentIntoTitleBar = false;
         BackButton.IsEnabled = false;
 
@@ -213,6 +218,7 @@ public sealed partial class MainWindow : Window
     private void ShowSubscriptionBlocked(string message)
     {
         StopMaintenanceTimer();
+        RestoreNonShellTitleBarChrome();
         MaintenanceBlockedRoot.Visibility = Visibility.Collapsed;
         SubscriptionBlockedMessage.Text = message;
         SubscriptionBlockedRoot.Visibility = Visibility.Visible;
@@ -223,6 +229,7 @@ public sealed partial class MainWindow : Window
     private void ShowMaintenanceBlocked(string maintenanceUntilIso, string orgCode)
     {
         StopMaintenanceTimer();
+        RestoreNonShellTitleBarChrome();
         SubscriptionBlockedRoot.Visibility = Visibility.Collapsed;
         _orgCodeForMaintenanceRetry = orgCode.Trim();
         if (!DateTimeOffset.TryParse(
@@ -404,6 +411,7 @@ public sealed partial class MainWindow : Window
     public void ResetToSetup()
     {
         StopMaintenanceTimer();
+        RestoreNonShellTitleBarChrome();
         MaintenanceBlockedRoot.Visibility = Visibility.Collapsed;
         try
         {
@@ -510,8 +518,124 @@ public sealed partial class MainWindow : Window
         SaveSetupState(st);
     }
 
+    private void UnsubscribeShellTitleBarAppWindowChanged()
+    {
+        if (_shellTitleBarAppWindow is not null && _shellTitleBarAppWindowChangedHandler is not null)
+        {
+            _shellTitleBarAppWindow.Changed -= _shellTitleBarAppWindowChangedHandler;
+        }
+    }
+
+    private void OnShellTitleBarAppWindowChanged(AppWindow sender, AppWindowChangedEventArgs args)
+    {
+        SyncShellTitleBarCaptionInsets();
+    }
+
+    private void ApplyShellExtendedTitleBar()
+    {
+        if (ShellRoot.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+
+        try
+        {
+            UnsubscribeShellTitleBarAppWindowChanged();
+            _shellTitleBarAppWindowChangedHandler = null;
+            _shellTitleBarAppWindow = null;
+
+            var appWindow = AppWindow;
+            _shellTitleBarAppWindow = appWindow;
+
+            var caption = appWindow.TitleBar;
+            caption.ExtendsContentIntoTitleBar = true;
+
+            ExtendsContentIntoTitleBar = true;
+            SetTitleBar(ShellRoot.ShellTitleBarDragTarget);
+
+            Windows.UI.Color bar = Windows.UI.Color.FromArgb(255, 10, 14, 21);
+            caption.BackgroundColor = bar;
+            caption.InactiveBackgroundColor = bar;
+            caption.ForegroundColor = Windows.UI.Color.FromArgb(255, 234, 242, 255);
+            caption.InactiveForegroundColor = Windows.UI.Color.FromArgb(255, 127, 141, 168);
+
+            caption.ButtonBackgroundColor = bar;
+            caption.ButtonInactiveBackgroundColor = bar;
+            caption.ButtonForegroundColor = Windows.UI.Color.FromArgb(255, 234, 242, 255);
+            caption.ButtonInactiveForegroundColor = Windows.UI.Color.FromArgb(255, 120, 130, 150);
+            caption.ButtonHoverBackgroundColor = Windows.UI.Color.FromArgb(255, 30, 45, 70);
+            caption.ButtonHoverForegroundColor = Windows.UI.Color.FromArgb(255, 255, 255, 255);
+            caption.ButtonPressedBackgroundColor = Windows.UI.Color.FromArgb(255, 25, 38, 58);
+            caption.ButtonPressedForegroundColor = Windows.UI.Color.FromArgb(255, 255, 255, 255);
+
+            _shellTitleBarAppWindowChangedHandler = OnShellTitleBarAppWindowChanged;
+            appWindow.Changed += _shellTitleBarAppWindowChangedHandler;
+
+            SyncShellTitleBarCaptionInsets();
+        }
+        catch
+        {
+            RestoreNonShellTitleBarChrome();
+        }
+    }
+
+    private void RestoreNonShellTitleBarChrome()
+    {
+        UnsubscribeShellTitleBarAppWindowChanged();
+        _shellTitleBarAppWindowChangedHandler = null;
+        _shellTitleBarAppWindow = null;
+
+        try
+        {
+            SetTitleBar(null);
+        }
+        catch
+        {
+            // ignore
+        }
+
+        ExtendsContentIntoTitleBar = false;
+
+        try
+        {
+            var caption = AppWindow.TitleBar;
+            caption.ExtendsContentIntoTitleBar = false;
+            caption.BackgroundColor = null;
+            caption.InactiveBackgroundColor = null;
+            caption.ForegroundColor = null;
+            caption.InactiveForegroundColor = null;
+            caption.ButtonBackgroundColor = null;
+            caption.ButtonInactiveBackgroundColor = null;
+            caption.ButtonForegroundColor = null;
+            caption.ButtonInactiveForegroundColor = null;
+            caption.ButtonHoverBackgroundColor = null;
+            caption.ButtonHoverForegroundColor = null;
+            caption.ButtonPressedBackgroundColor = null;
+            caption.ButtonPressedForegroundColor = null;
+        }
+        catch
+        {
+            // ignore
+        }
+
+        ShellRoot.ResetShellTitleBarCaptionInsets();
+    }
+
+    private void SyncShellTitleBarCaptionInsets()
+    {
+        if (_shellTitleBarAppWindow is null || ShellRoot.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+
+        var caption = _shellTitleBarAppWindow.TitleBar;
+        var scale = ShellRoot.XamlRoot?.RasterizationScale ?? 1.0;
+        ShellRoot.UpdateShellTitleBarCaptionInsets(caption.LeftInset, caption.RightInset, scale);
+    }
+
     private async void ShowShell()
     {
+        RestoreNonShellTitleBarChrome();
         SetupRoot.Visibility = Visibility.Collapsed;
 
         // Check if Windows Hello app lock is enabled
@@ -533,6 +657,7 @@ public sealed partial class MainWindow : Window
                 {
                     AppLockRoot.Visibility = Visibility.Collapsed;
                     ShellRoot.Visibility = Visibility.Visible;
+                    ApplyShellExtendedTitleBar();
                     LogAutoLoginIfSessionActive();
                     return;
                 }
@@ -549,6 +674,7 @@ public sealed partial class MainWindow : Window
         // App lock off or Windows Hello not available — open directly
         AppLockRoot.Visibility = Visibility.Collapsed;
         ShellRoot.Visibility = Visibility.Visible;
+        ApplyShellExtendedTitleBar();
         LogAutoLoginIfSessionActive();
     }
 
@@ -580,6 +706,7 @@ public sealed partial class MainWindow : Window
         {
             AppLockRoot.Visibility = Visibility.Collapsed;
             ShellRoot.Visibility = Visibility.Visible;
+            ApplyShellExtendedTitleBar();
             LogAutoLoginIfSessionActive();
         }
         else

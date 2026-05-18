@@ -45,6 +45,7 @@ namespace PartFinder
             services.AddSingleton<IPartsDataService, MongoPartsDataService>();
             services.AddSingleton<IExcelTemplateService, ClosedXmlExcelTemplateService>();
             services.AddSingleton<IFavouriteStore, MongoFavouriteStore>();
+            services.AddSingleton<ExplorerNavigationCoordinator>();
 
             // Dedicated services for pages
             services.AddSingleton<MongoInventoryService>();

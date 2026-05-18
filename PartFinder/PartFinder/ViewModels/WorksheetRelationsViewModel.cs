@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using PartFinder.Core;
 using PartFinder.Models;
 using PartFinder.Services;
 using System.Collections.ObjectModel;
@@ -10,11 +11,16 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
 {
     private readonly ITemplateSchemaService _templates;
     private readonly BackendApiClient _api;
+    private readonly ExplorerNavigationCoordinator _explorerNav;
 
-    public WorksheetRelationsViewModel(ITemplateSchemaService templates, BackendApiClient api)
+    public WorksheetRelationsViewModel(
+        ITemplateSchemaService templates,
+        BackendApiClient api,
+        ExplorerNavigationCoordinator explorerNav)
     {
         _templates = templates;
         _api = api;
+        _explorerNav = explorerNav;
     }
 
     public ObservableCollection<PartTemplateDefinition> Templates { get; } = [];
@@ -55,6 +61,22 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
     public bool HasLoadedRelation => LoadedRelation is not null;
     public bool HasNoPrimaryColumns => PrimaryColumns.Count == 0;
     public bool HasNoLookupColumns => LookupColumns.Count == 0;
+
+    public int SharedColumnCount =>
+        PrimaryTemplate is null || LookupTemplate is null
+            ? 0
+            : WorksheetRelationUiText.GetSharedColumnNames(
+                PrimaryTemplate.Fields.Select(f => f.Label),
+                LookupTemplate.Fields.Select(f => f.Label)).Count;
+
+    public bool HasSharedColumns => SharedColumnCount > 0;
+
+    public string SharedColumnSummary => WorksheetRelationUiText.GetSharedColumnsSummary(SharedColumnCount);
+
+    [ObservableProperty]
+    private string relationHealthInsight = "Open Explorer and load a template to see link match rates.";
+
+    public bool HasRelationHealthInsight => !string.IsNullOrWhiteSpace(RelationHealthInsight);
     // ────────────────────────────────────────────────────────────────────────
 
     public async Task InitializeAsync(CancellationToken ct = default)
@@ -87,6 +109,7 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
             // ────────────────────────────────────────────────────────────────
 
             await TryLoadExistingRelationAsync(ct).ConfigureAwait(true);
+            RefreshRelationHealthInsight();
         }
         catch (Exception ex)
         {
@@ -98,16 +121,83 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
         }
     }
 
+    private void RefreshRelationHealthInsight()
+    {
+        var snapshot = _explorerNav.LastHealth;
+        if (snapshot is null)
+        {
+            RelationHealthInsight =
+                HasRelations
+                    ? $"{RelationCount} link(s) saved — open Explorer to view match rates."
+                    : "No links yet. Match shared columns between templates, then check match rates in Explorer.";
+            OnPropertyChanged(nameof(HasRelationHealthInsight));
+            return;
+        }
+
+        if (PrimaryTemplate is not null
+            && !string.Equals(snapshot.PrimaryTemplateId, PrimaryTemplate.Id, StringComparison.Ordinal))
+        {
+            RelationHealthInsight =
+                $"Latest health is for \"{snapshot.PrimaryTemplateName}\" ({snapshot.MatchedRows}/{snapshot.TotalRows} matched).";
+        }
+        else
+        {
+            RelationHealthInsight =
+                $"\"{snapshot.PrimaryTemplateName}\": {snapshot.MatchedRows}/{snapshot.TotalRows} rows matched ({snapshot.MatchRatePercent}%).";
+        }
+
+        OnPropertyChanged(nameof(HasRelationHealthInsight));
+    }
+
     partial void OnPrimaryTemplateChanged(PartTemplateDefinition? value)
     {
         BuildColumnLists();
+        OnPropertyChanged(nameof(SharedColumnCount));
+        OnPropertyChanged(nameof(HasSharedColumns));
+        OnPropertyChanged(nameof(SharedColumnSummary));
+        RefreshRelationHealthInsight();
         _ = TryLoadExistingRelationAsync();
     }
 
     partial void OnLookupTemplateChanged(PartTemplateDefinition? value)
     {
         BuildColumnLists();
+        OnPropertyChanged(nameof(SharedColumnCount));
+        OnPropertyChanged(nameof(HasSharedColumns));
+        OnPropertyChanged(nameof(SharedColumnSummary));
         _ = TryLoadExistingRelationAsync();
+    }
+
+    [RelayCommand]
+    private void ApplySharedMatchKeys()
+    {
+        var count = SelectSharedMatchColumns();
+        StatusMessage = count > 0
+            ? $"Selected {count} shared match column(s)."
+            : "No shared column names between these templates.";
+    }
+
+    private int SelectSharedMatchColumns()
+    {
+        if (PrimaryTemplate is null || LookupTemplate is null)
+        {
+            return 0;
+        }
+
+        var shared = new HashSet<string>(
+            WorksheetRelationUiText.GetSharedColumnNames(
+                PrimaryTemplate.Fields.Select(f => f.Label),
+                LookupTemplate.Fields.Select(f => f.Label)),
+            StringComparer.OrdinalIgnoreCase);
+
+        foreach (var column in PrimaryColumns)
+        {
+            column.IsChecked = shared.Contains(column.ColumnName);
+        }
+
+        SyncLookupWithPrimary();
+        OnPropertyChanged(nameof(SelectedMatchColumnHint));
+        return shared.Count;
     }
 
     // ── NEW: Select a relation chip → load it into the editor ───────────────
@@ -173,7 +263,7 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
         var selectedKeys = PrimaryColumns.Where(x => x.IsChecked).Select(x => x.ColumnName).ToList();
         if (selectedKeys.Count == 0)
         {
-            ErrorMessage = "Select at least one match key on the primary side.";
+            ErrorMessage = "Select at least one match column on the source template.";
             return;
         }
 
@@ -245,6 +335,16 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
             PrimaryColumns.Add(item);
         }
 
+        if (LoadedRelation is null && SharedColumnCount > 0)
+        {
+            _ = SelectSharedMatchColumns();
+        }
+
+        OnPropertyChanged(nameof(SelectedMatchColumnHint));
+        OnPropertyChanged(nameof(SharedColumnCount));
+        OnPropertyChanged(nameof(HasSharedColumns));
+        OnPropertyChanged(nameof(SharedColumnSummary));
+
         var primarySet = new HashSet<string>(PrimaryColumns.Select(x => x.ColumnName), StringComparer.OrdinalIgnoreCase);
         foreach (var f in LookupTemplate.Fields.OrderBy(f => f.DisplayOrder))
         {
@@ -270,7 +370,12 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
         }
 
         SyncLookupWithPrimary();
+        OnPropertyChanged(nameof(SelectedMatchColumnHint));
     }
+
+    public string SelectedMatchColumnHint =>
+        WorksheetRelationUiText.GetMatchColumnHint(
+            PrimaryColumns.Where(x => x.IsChecked).Select(x => x.ColumnName).ToList());
 
     private void SyncLookupWithPrimary()
     {
@@ -314,14 +419,24 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
 
         LoadedRelation = existing;
         SelectedRelationId = existing.Id;
-        var keySet = new HashSet<string>(existing.MatchKeys.Select(k => k.SourceColumn), StringComparer.OrdinalIgnoreCase);
+
+        var matchKeySet = new HashSet<string>(
+            existing.MatchKeys.Select(k => k.SourceColumn).Where(k => !string.IsNullOrWhiteSpace(k)),
+            StringComparer.OrdinalIgnoreCase);
+        if (matchKeySet.Count == 0 && !string.IsNullOrWhiteSpace(existing.TriggerColumn))
+        {
+            matchKeySet.Add(existing.TriggerColumn);
+        }
+
         var displaySet = new HashSet<string>(existing.DisplayColumns, StringComparer.OrdinalIgnoreCase);
 
         foreach (var p in PrimaryColumns)
         {
-            p.IsChecked = keySet.Contains(p.ColumnName);
+            p.IsChecked = matchKeySet.Contains(p.ColumnName);
         }
+
         SyncLookupWithPrimary();
+        OnPropertyChanged(nameof(SelectedMatchColumnHint));
         foreach (var l in LookupColumns.Where(x => !x.IsDisabled))
         {
             l.IsChecked = displaySet.Contains(l.ColumnName);

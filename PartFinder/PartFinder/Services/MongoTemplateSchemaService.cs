@@ -1,7 +1,9 @@
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
+using PartFinder.Core;
 using PartFinder.Models;
+using FieldSnapshot = PartFinder.Core.TemplateFieldMerge.FieldSnapshot;
 
 namespace PartFinder.Services;
 
@@ -11,8 +13,13 @@ namespace PartFinder.Services;
 public sealed class MongoTemplateSchemaService : ITemplateSchemaService
 {
     public const string CollectionName = "partfinder_templates";
-    public const string MasterDataTemplateId = "master-data";
-    public const string MasterDataTemplateName = "Master Data";
+    public const string MasterDataTemplateId = ExplorerTemplateNames.TemplateId;
+    /// <summary>Display name for the primary reference-data template (Explorer).</summary>
+    public const string MasterDataTemplateName = ExplorerTemplateNames.DisplayName;
+    public const string LegacyMasterDataTemplateName = ExplorerTemplateNames.LegacyDisplayName;
+
+    public static bool IsExplorerTemplateName(string? name) =>
+        ExplorerTemplateNames.IsExplorerTemplateName(name);
 
     private readonly ILocalSetupContext _setupContext;
 
@@ -48,7 +55,8 @@ public sealed class MongoTemplateSchemaService : ITemplateSchemaService
             .SortBy(d => d.Name)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
-        return docs.Select(MapToDefinition).ToList();
+        var byId = docs.ToDictionary(d => d.TemplateId, StringComparer.Ordinal);
+        return docs.Select(d => MapToDefinition(d, byId)).ToList();
     }
 
     public async Task<PartTemplateDefinition?> GetTemplateAsync(
@@ -64,7 +72,24 @@ public sealed class MongoTemplateSchemaService : ITemplateSchemaService
         var doc = await coll.Find(d => d.TemplateId == templateId)
             .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
-        return doc is null ? null : MapToDefinition(doc);
+        if (doc is null)
+        {
+            return null;
+        }
+
+        var lookup = new Dictionary<string, TemplateDoc>(StringComparer.Ordinal) { [doc.TemplateId] = doc };
+        if (!string.IsNullOrWhiteSpace(doc.BaseTemplateId))
+        {
+            var baseDoc = await coll.Find(d => d.TemplateId == doc.BaseTemplateId)
+                .FirstOrDefaultAsync(cancellationToken)
+                .ConfigureAwait(false);
+            if (baseDoc is not null)
+            {
+                lookup[baseDoc.TemplateId] = baseDoc;
+            }
+        }
+
+        return MapToDefinition(doc, lookup);
     }
 
     public async Task SaveTemplateAsync(
@@ -101,10 +126,21 @@ public sealed class MongoTemplateSchemaService : ITemplateSchemaService
         await coll.DeleteOneAsync(filter, cancellationToken).ConfigureAwait(false);
     }
 
-    private static PartTemplateDefinition MapToDefinition(TemplateDoc d)
+    private static PartTemplateDefinition MapToDefinition(
+        TemplateDoc d,
+        IReadOnlyDictionary<string, TemplateDoc>? docsByTemplateId = null)
     {
-        var fields = d.Fields
-            .OrderBy(f => f.DisplayOrder)
+        IReadOnlyList<FieldSnapshot>? baseFields = null;
+        if (!string.IsNullOrWhiteSpace(d.BaseTemplateId)
+            && docsByTemplateId is not null
+            && docsByTemplateId.TryGetValue(d.BaseTemplateId, out var baseDoc))
+        {
+            baseFields = baseDoc.Fields.Select(ToFieldSnapshot).ToList();
+        }
+
+        var childFields = d.Fields.Select(ToFieldSnapshot).ToList();
+        var merged = TemplateFieldMerge.MergeInheritedFields(baseFields, childFields);
+        var fields = merged
             .Select(
                 f => new TemplateFieldDefinition
                 {
@@ -113,8 +149,8 @@ public sealed class MongoTemplateSchemaService : ITemplateSchemaService
                     Type = ParseFieldType(f.Type),
                     IsRequired = f.IsRequired,
                     DisplayOrder = f.DisplayOrder,
-                    ValidationPattern = f.ValidationPattern,
-                    Options = f.Options,
+                    ValidationPattern = null,
+                    Options = null,
                     LinkedTemplateId = f.LinkedTemplateId,
                     LinkedDisplayFieldKey = f.LinkedDisplayFieldKey,
                 })
@@ -126,9 +162,20 @@ public sealed class MongoTemplateSchemaService : ITemplateSchemaService
             Name = d.Name,
             Version = d.Version,
             IsPublished = d.IsPublished,
+            BaseTemplateId = string.IsNullOrWhiteSpace(d.BaseTemplateId) ? null : d.BaseTemplateId,
             Fields = fields,
         };
     }
+
+    private static FieldSnapshot ToFieldSnapshot(FieldDoc f) =>
+        new(
+            f.Key,
+            f.Label,
+            f.Type,
+            f.IsRequired,
+            f.DisplayOrder,
+            f.LinkedTemplateId,
+            f.LinkedDisplayFieldKey);
 
     private static TemplateDoc MapToDoc(PartTemplateDefinition t)
     {
@@ -138,6 +185,7 @@ public sealed class MongoTemplateSchemaService : ITemplateSchemaService
             Name = t.Name,
             Version = t.Version,
             IsPublished = t.IsPublished,
+            BaseTemplateId = t.BaseTemplateId,
             Fields = t.Fields
                 .OrderBy(f => f.DisplayOrder)
                 .Select(
@@ -186,6 +234,9 @@ public sealed class MongoTemplateSchemaService : ITemplateSchemaService
 
         [BsonElement("isPublished")]
         public bool IsPublished { get; set; } = true;
+
+        [BsonElement("baseTemplateId")]
+        public string? BaseTemplateId { get; set; }
 
         [BsonElement("fields")]
         public List<FieldDoc> Fields { get; set; } = [];
