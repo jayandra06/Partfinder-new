@@ -3,7 +3,9 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
+using PartFinder.Models;
 using PartFinder.Services;
+using System.Collections.ObjectModel;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Storage.Streams;
 using System.Threading;
@@ -19,6 +21,7 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly ActivityLogger _activityLogger;
     private readonly IAppStateStore _appState;
     private readonly ILocalSetupContext _setupContext;
+    private readonly MongoSessionService _sessionService;
     private string? _pendingTwoFactorSecret;
 
     public SettingsViewModel(
@@ -27,7 +30,8 @@ public partial class SettingsViewModel : ViewModelBase
         LocalProfileStore profile,
         ActivityLogger activityLogger,
         IAppStateStore appState,
-        ILocalSetupContext setupContext)
+        ILocalSetupContext setupContext,
+        MongoSessionService sessionService)
     {
         _security = security;
         _session = session;
@@ -35,6 +39,7 @@ public partial class SettingsViewModel : ViewModelBase
         _activityLogger = activityLogger;
         _appState = appState;
         _setupContext = setupContext;
+        _sessionService = sessionService;
         _setupContext.Refresh();
         RefreshAllState();
     }
@@ -769,6 +774,9 @@ public partial class SettingsViewModel : ViewModelBase
         AdminSessionActive = true;
         SessionEmailDisplay = email;
         _activityLogger.LogLogin(email);
+
+        // Track session in MongoDB (fire-and-forget, non-blocking)
+        _ = CreateLoginSessionAsync(email, ct);
     }
 
     [RelayCommand]
@@ -776,6 +784,10 @@ public partial class SettingsViewModel : ViewModelBase
     {
         _activityLogger.LogLogout(SessionEmailDisplay != "—" ? SessionEmailDisplay : "unknown");
         await _activityLogger.FlushAsync().ConfigureAwait(true);
+
+        // Deactivate current session in MongoDB
+        await DeactivateCurrentSessionAsync().ConfigureAwait(true);
+
         _session.Clear();
         // Do NOT delete setup-state.json — it holds orgCode/dbUri needed after re-login
         AdminSessionActive = false;
@@ -961,6 +973,205 @@ public partial class SettingsViewModel : ViewModelBase
 
     private static bool IsSixDigits(string value) =>
         value.Length == 6 && value.All(char.IsDigit);
+
+    // ── Login Management ──────────────────────────────────────────────────────
+
+    [ObservableProperty]
+    private ObservableCollection<LoginSessionRecord> _activeSessions = new();
+
+    [ObservableProperty]
+    private bool _isLoadingSessions;
+
+    [ObservableProperty]
+    private string _loginManagementMessage = string.Empty;
+
+    /// <summary>
+    /// Checks if a session is the current device session.
+    /// Matches by SessionId first (same app launch), then falls back to
+    /// matching by machine name (app was restarted but session still active).
+    /// </summary>
+    public bool IsCurrentSession(LoginSessionRecord session)
+    {
+        // Primary: exact session ID match (same app launch that created the session)
+        if (string.Equals(session.SessionId, MongoSessionService.CurrentSessionId, StringComparison.Ordinal))
+            return true;
+
+        // Fallback: match by machine name — the most recent session from this machine is "current"
+        var machineName = Environment.MachineName;
+        if (!string.Equals(session.DeviceName, machineName, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        // Only consider it current if no other session in the list has an exact SessionId match
+        // AND this is the most recent session from this machine
+        var hasExactMatch = ActiveSessions.Any(s =>
+            string.Equals(s.SessionId, MongoSessionService.CurrentSessionId, StringComparison.Ordinal));
+        if (hasExactMatch)
+            return false;
+
+        // This machine's most recent session is the current one
+        var mostRecent = ActiveSessions
+            .Where(s => string.Equals(s.DeviceName, machineName, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(s => s.LoginTime)
+            .FirstOrDefault();
+
+        return mostRecent is not null &&
+               string.Equals(mostRecent.SessionId, session.SessionId, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Creates a session record in MongoDB when user logs in.
+    /// Fire-and-forget — never blocks login flow.
+    /// </summary>
+    public async Task CreateLoginSessionAsync(string email, CancellationToken ct = default)
+    {
+        try
+        {
+            await _sessionService.CreateSessionAsync(email, ct).ConfigureAwait(false);
+        }
+        catch { /* Never block login */ }
+    }
+
+    /// <summary>
+    /// Deactivates the current session in MongoDB when user logs out.
+    /// </summary>
+    public async Task DeactivateCurrentSessionAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            await _sessionService.DeactivateCurrentSessionAsync(ct).ConfigureAwait(false);
+        }
+        catch { /* Silent */ }
+    }
+
+    [RelayCommand]
+    private async Task LoadActiveSessionsAsync(CancellationToken ct)
+    {
+        LoginManagementMessage = string.Empty;
+        IsLoadingSessions = true;
+
+        try
+        {
+            _session.Load();
+            var email = _session.Email;
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                email = _setupContext.AdminEmail;
+            }
+
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                LoginManagementMessage = "Sign in to view active sessions.";
+                ActiveSessions.Clear();
+                IsLoadingSessions = false;
+                return;
+            }
+
+            var sessions = await _sessionService.GetActiveSessionsAsync(email, ct).ConfigureAwait(true);
+
+            // If no sessions found, register the current device session automatically
+            if (sessions.Count == 0)
+            {
+                await _sessionService.CreateSessionAsync(email, ct).ConfigureAwait(true);
+                // Re-fetch after creating
+                sessions = await _sessionService.GetActiveSessionsAsync(email, ct).ConfigureAwait(true);
+            }
+
+            ActiveSessions.Clear();
+            
+            if (sessions.Count == 0)
+            {
+                LoginManagementMessage = "Could not load sessions. Check your database connection.";
+            }
+            else
+            {
+                // Claim the current machine's most recent session by updating its SessionId
+                // so that IsCurrentSession() works with exact match going forward
+                var machineName = Environment.MachineName;
+                var mySession = sessions
+                    .Where(s => string.Equals(s.DeviceName, machineName, StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(s => s.LoginTime)
+                    .FirstOrDefault();
+
+                if (mySession is not null &&
+                    !string.Equals(mySession.SessionId, MongoSessionService.CurrentSessionId, StringComparison.Ordinal))
+                {
+                    // Update the session ID in MongoDB to claim it for this app instance
+                    await _sessionService.ClaimSessionAsync(mySession.SessionId, MongoSessionService.CurrentSessionId, ct).ConfigureAwait(true);
+                    mySession.SessionId = MongoSessionService.CurrentSessionId;
+                }
+
+                foreach (var s in sessions)
+                {
+                    ActiveSessions.Add(s);
+                }
+                LoginManagementMessage = string.Empty;
+            }
+        }
+        catch (Exception ex)
+        {
+            LoginManagementMessage = $"Error: {ex.Message}";
+            System.Diagnostics.Debug.WriteLine($"LoadActiveSessionsAsync error: {ex}");
+        }
+        finally
+        {
+            IsLoadingSessions = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task LogoutRemoteSessionAsync(LoginSessionRecord? session, CancellationToken ct)
+    {
+        if (session is null) return;
+
+        // Prevent logging out current device
+        if (IsCurrentSession(session))
+        {
+            LoginManagementMessage = "Cannot logout from the current device here. Use the Logout button instead.";
+            return;
+        }
+
+        LoginManagementMessage = string.Empty;
+
+        var success = await _sessionService.LogoutSessionAsync(session.SessionId, ct).ConfigureAwait(true);
+        if (success)
+        {
+            ActiveSessions.Remove(session);
+            LoginManagementMessage = $"Logged out from {session.DeviceName}.";
+            _activityLogger.LogUserAction("Remote Logout",
+                $"Remotely logged out session on '{session.DeviceName}' ({session.IpAddress})");
+        }
+        else
+        {
+            LoginManagementMessage = "Could not logout that session. Try again.";
+        }
+    }
+
+    [RelayCommand]
+    private async Task LogoutAllOtherSessionsAsync(CancellationToken ct)
+    {
+        LoginManagementMessage = string.Empty;
+
+        _session.Load();
+        var email = _session.Email ?? _setupContext.AdminEmail;
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            LoginManagementMessage = "Sign in first.";
+            return;
+        }
+
+        var count = await _sessionService.LogoutAllOtherSessionsAsync(email, ct).ConfigureAwait(true);
+        if (count > 0)
+        {
+            LoginManagementMessage = $"Logged out from {count} other device(s).";
+            _activityLogger.LogUserAction("Logout All Others", $"Logged out {count} remote session(s)");
+            // Refresh the list
+            await LoadActiveSessionsAsync(ct).ConfigureAwait(true);
+        }
+        else
+        {
+            LoginManagementMessage = "No other active sessions to logout.";
+        }
+    }
 
     private static bool IsStrongPassword(string password)
     {

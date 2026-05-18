@@ -51,6 +51,7 @@ namespace PartFinder
             services.AddSingleton<MongoInventoryService>();
             services.AddSingleton<MongoAuditService>();
             services.AddSingleton<MongoAlertsService>();
+            services.AddSingleton<MongoSessionService>();
             services.AddSingleton<ActivityLogger>();
 
             services.AddSingleton<ShellViewModel>();

@@ -830,8 +830,11 @@ public sealed partial class TemplatesPage : Page
 
             if (targetIndex >= 0 && sourceIndex >= 0 && !IsPortOccupied(vm, targetIndex, targetSide))
             {
-                // Generate unique default group name
-                var defaultName = GenerateUniqueGroupName(vm);
+                // Smart group merging: if either cell is already in a group, extend that group
+                var existingGroup = FindExistingGroupForCell(vm, sourceIndex, _connectionSourceSide)
+                                 ?? FindExistingGroupForCell(vm, targetIndex, targetSide);
+
+                var groupLabel = existingGroup ?? GenerateUniqueGroupName(vm);
 
                 // Create the connection
                 var connection = new CellConnection
@@ -842,16 +845,19 @@ public sealed partial class TemplatesPage : Page
                     TargetSide = targetSide,
                     SourceCellKey = _connectionSourceDraft!.StableKey ?? $"idx-{sourceIndex}",
                     TargetCellKey = targetDraft.StableKey ?? $"idx-{targetIndex}",
-                    Label = defaultName,
+                    Label = groupLabel,
                 };
 
                 vm.CellConnections.Add(connection);
                 DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, async () =>
                 {
                     RedrawConnectorLines();
-                    // Show label edit dialog immediately after connection is created
-                    await ShowEditLabelDialogAsync(connection);
-                    RedrawConnectorLines();
+                    // Only show label edit dialog if this is a brand new group
+                    if (existingGroup is null)
+                    {
+                        await ShowEditLabelDialogAsync(connection);
+                        RedrawConnectorLines();
+                    }
                 });
             }
         }
@@ -964,7 +970,7 @@ public sealed partial class TemplatesPage : Page
 
         var dialog = new ContentDialog
         {
-            Title = "Edit Connection Label",
+            Title = "Edit Group Name",
             Content = panel,
             PrimaryButtonText = "Save",
             CloseButtonText = "Cancel",
@@ -978,21 +984,17 @@ public sealed partial class TemplatesPage : Page
             var newLabel = input.Text.Trim();
             if (string.IsNullOrWhiteSpace(newLabel)) return;
 
-            // Check for duplicate group name
-            var isDuplicate = vm.CellConnections.Any(c =>
-                c != connection &&
-                string.Equals(c.Label, newLabel, StringComparison.OrdinalIgnoreCase));
+            var oldLabel = connection.Label;
 
-            if (isDuplicate)
+            // Rename ALL connections in the same group (same label)
+            foreach (var conn in vm.CellConnections)
             {
-                // Show error and re-open dialog
-                errorText.Text = $"Group name \"{newLabel}\" already exists. Choose a different name.";
-                errorText.Visibility = Visibility.Visible;
-                await ShowEditLabelDialogAsync(connection);
-                return;
+                if (string.Equals(conn.Label, oldLabel, StringComparison.OrdinalIgnoreCase))
+                {
+                    conn.Label = newLabel;
+                }
             }
 
-            connection.Label = newLabel;
             RedrawConnectorLines();
         }
     }
@@ -1017,6 +1019,20 @@ public sealed partial class TemplatesPage : Page
         }
 
         return $"Group {Guid.NewGuid().ToString("N")[..4]}";
+    }
+
+    /// <summary>
+    /// Finds if a cell (by index and side) is already part of an existing group.
+    /// If yes, returns the group label so the new connection joins the same group.
+    /// This allows users to chain multiple cells into one group without creating separate groups.
+    /// </summary>
+    private static string? FindExistingGroupForCell(TemplatesViewModel vm, int cellIndex, ConnectionPortSide side)
+    {
+        // Check if this cell is already connected to any group (on any side)
+        var existingConnection = vm.CellConnections.FirstOrDefault(c =>
+            c.SourceCellIndex == cellIndex || c.TargetCellIndex == cellIndex);
+
+        return existingConnection?.Label;
     }
 
     private (ColumnLabelDraft? draft, ConnectionPortSide side) FindPortAtPoint(Windows.Foundation.Point point, TemplatesViewModel vm)
