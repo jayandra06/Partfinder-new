@@ -135,6 +135,7 @@
                                 <CheckBox
                                     Margin="0,4,0,4"
                                     Content="{Binding Name}"
+                                    IsChecked="{Binding IsSelected, Mode=TwoWay}"
                                     FontSize="12" />
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>

@@ -13,4 +13,7 @@ public interface ILocalSetupContext
 
     /// <summary>Org admin email from setup-state.json (merged; last non-empty wins).</summary>
     string? AdminEmail { get; }
+
+    /// <summary>True when the current session was started via an invite login (not the org creator).</summary>
+    bool InvitedUserLogin { get; }
 }

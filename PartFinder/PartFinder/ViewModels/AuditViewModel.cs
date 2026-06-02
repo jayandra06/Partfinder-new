@@ -8,13 +8,18 @@ namespace PartFinder.ViewModels;
 public partial class AuditViewModel : ViewModelBase
 {
     private readonly MongoAuditService _auditService;
+    private readonly ICurrentUserAccessService _access;
 
-    public AuditViewModel(MongoAuditService auditService)
+    public AuditViewModel(MongoAuditService auditService, ICurrentUserAccessService access)
     {
         _auditService = auditService;
+        _access = access;
     }
 
     public ObservableCollection<AuditLogEntry> AuditLogs { get; } = [];
+
+    /// <summary>Only org creator can delete audit logs.</summary>
+    public bool CanDeleteLogs => _access.Capabilities.CanAccessUserManagement;
 
     [ObservableProperty] private bool _isLoading;
     [ObservableProperty] private string _statusMessage = string.Empty;
@@ -152,6 +157,21 @@ public partial class AuditViewModel : ViewModelBase
 
     [RelayCommand]
     private async Task RefreshAsync() => await LoadAuditLogsAsync();
+
+    [RelayCommand]
+    private async Task DeleteAllLogsAsync()
+    {
+        await _auditService.DeleteAllAsync().ConfigureAwait(true);
+        await LoadAuditLogsAsync().ConfigureAwait(true);
+    }
+
+    [RelayCommand]
+    private async Task DeleteSelectedLogsAsync(IReadOnlyList<string> ids)
+    {
+        if (ids.Count == 0) return;
+        await _auditService.DeleteByIdsAsync(ids).ConfigureAwait(true);
+        await LoadAuditLogsAsync().ConfigureAwait(true);
+    }
 }
 
 public sealed class AuditLogEntry
@@ -166,6 +186,8 @@ public sealed class AuditLogEntry
     public required string SessionId { get; init; }
     public string FormattedDate { get; init; } = string.Empty;
     public string FormattedTime { get; init; } = string.Empty;
+
+    public bool IsSelected { get; set; }
 
     public string EventTypeColor => EventType switch
     {

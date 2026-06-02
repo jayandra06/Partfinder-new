@@ -1,19 +1,37 @@
+using MongoDB.Bson.Serialization.Attributes;
+
 namespace PartFinder.Models;
 
 public sealed class TemplatePermissionsDto
 {
+    [BsonElement("add")]
     public bool Add { get; set; }
+
+    [BsonElement("view")]
     public bool View { get; set; }
+
+    [BsonElement("edit")]
     public bool Edit { get; set; }
+
+    [BsonElement("delete")]
     public bool Delete { get; set; }
 }
 
 public sealed class MasterDataPermissionsDto
 {
+    [BsonElement("copy")]
     public bool Copy { get; set; }
+
+    [BsonElement("view")]
     public bool View { get; set; }
+
+    [BsonElement("edit")]
     public bool Edit { get; set; }
+
+    [BsonElement("add")]
     public bool Add { get; set; }
+
+    [BsonElement("delete")]
     public bool Delete { get; set; }
 }
 

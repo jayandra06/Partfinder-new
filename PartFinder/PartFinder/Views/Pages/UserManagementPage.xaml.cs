@@ -25,7 +25,8 @@ public sealed partial class UserManagementPage : Page
         await access.RefreshAsync().ConfigureAwait(true);
         if (!access.Capabilities.CanAccessUserManagement)
         {
-            App.Services.GetRequiredService<INavigationService>().Navigate(AppPage.Parts);
+            NoPermissionOverlay.Message = "Only the organization creator can manage users. Contact them if you need user management access.";
+            NoPermissionOverlay.Visibility = Visibility.Visible;
             return;
         }
 

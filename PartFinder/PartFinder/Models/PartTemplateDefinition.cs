@@ -11,4 +11,6 @@ public sealed class PartTemplateDefinition
     public string? BaseTemplateId { get; init; }
 
     public required IReadOnlyList<TemplateFieldDefinition> Fields { get; init; }
+
+    public override string ToString() => Name;
 }

@@ -41,6 +41,7 @@ public sealed class SetupInviteLoginResponse
     public string? Message { get; set; }
     public string? Email { get; set; }
     public string? Role { get; set; }
+    public bool MustChangePassword { get; set; }
 }
 
 public static class SetupApiClient

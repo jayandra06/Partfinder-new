@@ -95,6 +95,38 @@ public sealed class MongoAuditService
             return 0;
         }
     }
+
+    /// <summary>Delete all audit logs.</summary>
+    public async Task<long> DeleteAllAsync(CancellationToken ct = default)
+    {
+        var coll = TryGetCollection();
+        if (coll is null) return 0;
+        try
+        {
+            var result = await coll.DeleteManyAsync(FilterDefinition<AuditDoc>.Empty, ct).ConfigureAwait(false);
+            return result.DeletedCount;
+        }
+        catch { return 0; }
+    }
+
+    /// <summary>Delete specific audit logs by their IDs.</summary>
+    public async Task<long> DeleteByIdsAsync(IReadOnlyList<string> ids, CancellationToken ct = default)
+    {
+        var coll = TryGetCollection();
+        if (coll is null) return 0;
+        try
+        {
+            var objectIds = ids
+                .Where(id => ObjectId.TryParse(id, out _))
+                .Select(id => ObjectId.Parse(id))
+                .ToList();
+            if (objectIds.Count == 0) return 0;
+            var filter = Builders<AuditDoc>.Filter.In(d => d.MongoId, objectIds);
+            var result = await coll.DeleteManyAsync(filter, ct).ConfigureAwait(false);
+            return result.DeletedCount;
+        }
+        catch { return 0; }
+    }
 }
 
 [BsonIgnoreExtraElements]

@@ -192,6 +192,16 @@ public sealed class MongoOrgUserDirectoryService : IOrgUserDirectoryService
             return false;
         }
 
+        // Use raw BsonValue fields because TemplatePermissions/MasterDataPermissions
+        // are [BsonIgnore] computed properties — the driver cannot build expressions for them.
+        BsonValue templatePermsBson = templatePermissions == null
+            ? BsonNull.Value
+            : templatePermissions.ToBsonDocument();
+
+        BsonValue masterPermsBson = masterDataPermissions == null
+            ? BsonNull.Value
+            : masterDataPermissions.ToBsonDocument();
+
         var update = Builders<OrgAppUserDoc>.Update
             .Set(x => x.Name, name.Trim())
             .Set(x => x.Role, role.Trim())
@@ -201,8 +211,8 @@ public sealed class MongoOrgUserDirectoryService : IOrgUserDirectoryService
                 .Select(s => s.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList())
-            .Set(x => x.TemplatePermissions, templatePermissions)
-            .Set(x => x.MasterDataPermissions, masterDataPermissions);
+            .Set(x => x.TemplatePermissionsRaw, templatePermsBson)
+            .Set(x => x.MasterDataPermissionsRaw, masterPermsBson);
 
         var result = await coll.UpdateOneAsync(
             x => x.Id == objectId,

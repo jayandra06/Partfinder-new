@@ -22,6 +22,8 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly IAppStateStore _appState;
     private readonly ILocalSetupContext _setupContext;
     private readonly MongoSessionService _sessionService;
+    private readonly IOrgUserDirectoryService _users;
+    private readonly ICurrentUserAccessService _access;
     private string? _pendingTwoFactorSecret;
 
     public SettingsViewModel(
@@ -31,7 +33,9 @@ public partial class SettingsViewModel : ViewModelBase
         ActivityLogger activityLogger,
         IAppStateStore appState,
         ILocalSetupContext setupContext,
-        MongoSessionService sessionService)
+        MongoSessionService sessionService,
+        IOrgUserDirectoryService users,
+        ICurrentUserAccessService access)
     {
         _security = security;
         _session = session;
@@ -40,6 +44,8 @@ public partial class SettingsViewModel : ViewModelBase
         _appState = appState;
         _setupContext = setupContext;
         _sessionService = sessionService;
+        _users = users;
+        _access = access;
         _setupContext.Refresh();
         RefreshAllState();
     }
@@ -98,6 +104,9 @@ public partial class SettingsViewModel : ViewModelBase
 
     [ObservableProperty]
     private string _profileName = string.Empty;
+
+    /// <summary>True when the user is allowed to edit their profile name (org creator only).</summary>
+    public bool CanEditProfileName => _access.Capabilities.CanAccessUserManagement;
 
     [ObservableProperty]
     private string _profileMessage = string.Empty;
@@ -381,7 +390,18 @@ public partial class SettingsViewModel : ViewModelBase
             emailToShow = TryReadAdminEmailFromSetup();
         }
         SessionEmailDisplay = string.IsNullOrWhiteSpace(emailToShow) ? "—" : emailToShow;
-        ProfileName = _profile.DisplayName ?? string.Empty;
+
+        // For invited users (not org creator), load profile name from database
+        var isOrgCreator = _access.Capabilities.CanAccessUserManagement;
+        if (!isOrgCreator && _setupContext.InvitedUserLogin && !string.IsNullOrWhiteSpace(emailToShow))
+        {
+            _ = LoadProfileFromDatabaseAsync(emailToShow);
+        }
+        else
+        {
+            ProfileName = _profile.DisplayName ?? string.Empty;
+        }
+
         ProfileDepartment = _profile.Department ?? string.Empty;
         _ = LoadAvatarAsync(_profile.AvatarPath);
         OnPropertyChanged(nameof(IsStartTwoFactorEnabled));
@@ -403,6 +423,14 @@ public partial class SettingsViewModel : ViewModelBase
     private void SaveProfile()
     {
         ProfileMessage = string.Empty;
+
+        // Only org creator can edit profile name
+        if (!_access.Capabilities.CanAccessUserManagement)
+        {
+            ProfileMessage = "Profile name is managed by your organization admin.";
+            return;
+        }
+
         var trimmed = ProfileName.Trim();
         if (trimmed.Length > 80)
         {
@@ -417,6 +445,27 @@ public partial class SettingsViewModel : ViewModelBase
             ? "Profile name cleared. Email will be shown."
             : "Profile name updated.";
         _activityLogger.LogUserAction("Profile Updated", $"Display name set to \"{ProfileName}\"");
+    }
+
+    private async Task LoadProfileFromDatabaseAsync(string email)
+    {
+        try
+        {
+            var record = await _users.FindByEmailAsync(email).ConfigureAwait(true);
+            if (record is not null)
+            {
+                ProfileName = record.Name;
+            }
+            else
+            {
+                ProfileName = _profile.DisplayName ?? string.Empty;
+            }
+        }
+        catch
+        {
+            ProfileName = _profile.DisplayName ?? string.Empty;
+        }
+        OnPropertyChanged(nameof(AvatarInitial));
     }
 
     [RelayCommand]

@@ -9,626 +9,154 @@
     <Page.Resources>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
 
-        <!-- ═══════════════════════════════════════════════════════════════
-             PAGE ENTRANCE  — fade + slide up (macOS-style, 300ms)
-        ════════════════════════════════════════════════════════════════ -->
         <Storyboard x:Name="PageEntranceStoryboard">
-            <DoubleAnimation
-                Storyboard.TargetName="PageRoot"
-                Storyboard.TargetProperty="Opacity"
+            <DoubleAnimation Storyboard.TargetName="PageRoot" Storyboard.TargetProperty="Opacity"
                 From="0" To="1" Duration="0:0:0.30">
                 <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
             </DoubleAnimation>
-            <DoubleAnimation
-                Storyboard.TargetName="PageSlideTransform"
-                Storyboard.TargetProperty="Y"
+            <DoubleAnimation Storyboard.TargetName="PageSlideTransform" Storyboard.TargetProperty="Y"
                 From="14" To="0" Duration="0:0:0.30">
                 <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
             </DoubleAnimation>
         </Storyboard>
 
-        <!-- ═══════════════════════════════════════════════════════════════
-             CONNECTOR PULSE  — subtle scale loop (2 s, macOS-style)
-        ════════════════════════════════════════════════════════════════ -->
-        <Storyboard x:Name="ConnectorPulseStoryboard" RepeatBehavior="Forever" AutoReverse="True">
-            <DoubleAnimation
-                Storyboard.TargetName="ConnectorTransform"
-                Storyboard.TargetProperty="ScaleX"
-                From="1.0" To="1.08" Duration="0:0:1.0">
-                <DoubleAnimation.EasingFunction><SineEase EasingMode="EaseInOut"/></DoubleAnimation.EasingFunction>
-            </DoubleAnimation>
-            <DoubleAnimation
-                Storyboard.TargetName="ConnectorTransform"
-                Storyboard.TargetProperty="ScaleY"
-                From="1.0" To="1.08" Duration="0:0:1.0">
-                <DoubleAnimation.EasingFunction><SineEase EasingMode="EaseInOut"/></DoubleAnimation.EasingFunction>
-            </DoubleAnimation>
-        </Storyboard>
-
-        <!-- ═══════════════════════════════════════════════════════════════
-             CHIP STRIP FADE IN
-        ════════════════════════════════════════════════════════════════ -->
-        <Storyboard x:Name="ChipStripFadeStoryboard">
-            <DoubleAnimation
-                Storyboard.TargetName="ChipStrip"
-                Storyboard.TargetProperty="Opacity"
-                From="0" To="1" Duration="0:0:0.20">
-                <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-            </DoubleAnimation>
-        </Storyboard>
-
-        <!-- ═══════════════════════════════════════════════════════════════
-             COLUMN ROW ITEM STYLE  — hover state
-        ════════════════════════════════════════════════════════════════ -->
-        <Style x:Key="ColumnRowBorderStyle" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource GridRowAltBackgroundBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderDefaultBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="8" />
-            <Setter Property="Padding" Value="10,8" />
-            <Setter Property="MinHeight" Value="44" />
-            <Setter Property="Margin" Value="0,0,8,0" />
-        </Style>
-
-        <!-- Badge styles -->
-        <Style x:Key="KeyBadgeStyle" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource AccentPrimaryBrush}" />
-            <Setter Property="CornerRadius" Value="10" />
-            <Setter Property="Padding" Value="7,3" />
-            <Setter Property="Margin" Value="4,0,0,0" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-        </Style>
-
-        <Style x:Key="DisplayBadgeStyle" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource SuccessBrush}" />
-            <Setter Property="CornerRadius" Value="10" />
-            <Setter Property="Padding" Value="7,3" />
-            <Setter Property="Margin" Value="4,0,0,0" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-        </Style>
-
-        <Style x:Key="BadgeLabelStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="White" />
-            <Setter Property="FontSize" Value="9" />
-            <Setter Property="CharacterSpacing" Value="60" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-        </Style>
-
-        <!-- Chip button style for relations strip -->
-        <Style x:Key="RelationChipStyle" TargetType="Button">
-            <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}" />
-            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderDefaultBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="20" />
-            <Setter Property="Padding" Value="14,6" />
-            <Setter Property="MinHeight" Value="32" />
-            <Setter Property="FontSize" Value="12" />
-        </Style>
-
-        <Style x:Key="RelationChipActiveStyle" TargetType="Button" BasedOn="{StaticResource RelationChipStyle}">
-            <Setter Property="BorderBrush" Value="{StaticResource AccentPrimaryBrush}" />
-            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-        </Style>
+        <Storyboard x:Name="ConnectorPulseStoryboard" />
+        <Storyboard x:Name="ChipStripFadeStoryboard" />
     </Page.Resources>
 
-    <!-- ═══════════════════════════════════════════════════════════════════
-         PAGE ROOT  — opacity + translate for entrance animation
-    ════════════════════════════════════════════════════════════════════ -->
-    <Grid
-        x:Name="PageRoot"
-        Opacity="0"
-        Padding="24"
-        RowSpacing="14"
-        Background="{StaticResource PageBackgroundBrush}">
+    <Grid x:Name="PageRoot" Opacity="0" Background="{StaticResource PageBackgroundBrush}">
         <Grid.RenderTransform>
             <TranslateTransform x:Name="PageSlideTransform" Y="14" />
         </Grid.RenderTransform>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- ═══════════════════════════════════════════════════════════════
-             ROW 0 — HEADER
-        ════════════════════════════════════════════════════════════════ -->
-        <Grid>
+        <!-- ═══ TOOLBAR ═══ -->
+        <Grid Grid.Row="0" Padding="24,16,24,12" ColumnSpacing="12">
             <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <StackPanel Spacing="3">
-                <TextBlock
-                    Text="LINK TEMPLATES"
-                    FontSize="10"
-                    Foreground="{StaticResource AccentPrimaryBrush}"
-                    CharacterSpacing="120"
-                    FontWeight="SemiBold" />
-                <TextBlock
-                    Text="Template Relationships"
-                    FontSize="22"
-                    FontWeight="SemiBold"
-                    Foreground="{StaticResource TextPrimaryBrush}" />
-                <TextBlock
-                    Text="Match on one or more shared columns, then choose which lookup fields appear in Explorer when you click a row."
-                    FontSize="12"
-                    Foreground="{StaticResource TextSecondaryBrush}"
-                    TextWrapping="WrapWholeWords" />
+            <TextBlock Text="Template Relationships" FontSize="22" FontWeight="SemiBold" VerticalAlignment="Center" />
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" HorizontalAlignment="Center">
+                <ProgressRing Width="14" Height="14" IsActive="{Binding IsLoading}" Foreground="{StaticResource AccentPrimaryBrush}" />
+                <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="{StaticResource SuccessBrush}" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding ErrorMessage}" FontSize="12" Foreground="{StaticResource DangerBrush}" VerticalAlignment="Center" />
             </StackPanel>
 
-            <StackPanel Grid.Column="1" VerticalAlignment="Top" Spacing="8">
-            <Border
-                Visibility="{Binding HasRelationHealthInsight, Converter={StaticResource BoolToVisibilityConverter}}"
-                Background="{StaticResource CardBackgroundBrush}"
-                BorderBrush="{StaticResource BorderDefaultBrush}"
-                BorderThickness="1"
-                CornerRadius="10"
-                Padding="10,8"
-                MaxWidth="320">
-                <StackPanel Spacing="4">
-                    <TextBlock
-                        Text="LINK HEALTH"
-                        FontSize="9"
-                        CharacterSpacing="80"
-                        FontWeight="SemiBold"
-                        Foreground="{StaticResource AccentPrimaryBrush}" />
-                    <TextBlock
-                        Text="{Binding RelationHealthInsight}"
-                        FontSize="11"
-                        Foreground="{StaticResource TextSecondaryBrush}"
-                        TextWrapping="WrapWholeWords" />
-                </StackPanel>
-            </Border>
-            <!-- Saved relations count badge (NEW) -->
-            <Border
-                Visibility="{Binding HasRelations, Converter={StaticResource BoolToVisibilityConverter}}"
-                Background="{StaticResource NavItemSelectedBrush}"
-                BorderBrush="{StaticResource AccentPrimaryBrush}"
-                BorderThickness="1"
-                CornerRadius="12"
-                Padding="10,4">
-                <StackPanel Orientation="Horizontal" Spacing="5">
-                    <FontIcon Glyph="&#xE71B;" FontSize="11" Foreground="{StaticResource AccentPrimaryBrush}" VerticalAlignment="Center" />
-                    <TextBlock
-                        FontSize="11"
-                        FontWeight="SemiBold"
-                        Foreground="{StaticResource AccentPrimaryBrush}"
-                        VerticalAlignment="Center">
-                        <Run Text="{Binding RelationCount}" /><Run Text=" saved" />
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                <Button Background="#101F7AE0" BorderBrush="#301F7AE0" BorderThickness="1"
+                        CornerRadius="16" Padding="12,5"
+                        Visibility="{Binding HasRelations, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <Button.Flyout>
+                        <Flyout Placement="Bottom">
+                            <StackPanel Spacing="8" MinWidth="220">
+                                <TextBlock Text="Saved Links" FontSize="13" FontWeight="SemiBold" />
+                                <Border Height="1" Background="{StaticResource BorderDefaultBrush}" />
+                                <ItemsControl ItemsSource="{Binding RelationChips}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="viewmodels:RelationChipItem">
+                                            <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                                    Background="Transparent" BorderThickness="0"
+                                                    Padding="8,10" CornerRadius="6"
+                                                    Command="{Binding ElementName=PageRoot, Path=DataContext.SelectRelationCommand}"
+                                                    CommandParameter="{Binding}">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <FontIcon Glyph="&#xE71B;" FontSize="12" Foreground="{StaticResource AccentPrimaryBrush}" />
+                                                    <TextBlock Text="{Binding Label}" FontSize="12" />
+                                                </StackPanel>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Flyout>
+                    </Button.Flyout>
+                    <TextBlock FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource AccentPrimaryBrush}">
+                        <Run Text="{Binding RelationCount}" /><Run Text=" Saved Links" />
                     </TextBlock>
-                </StackPanel>
-            </Border>
+                </Button>
+                <Button Style="{StaticResource GhostButtonStyle}" Content="Reset" FontSize="12"
+                        MinHeight="36" Padding="14,6" Command="{Binding ResetCommand}" />
+                <Button Style="{StaticResource PrimaryButtonStyle}" Content="Save Link" FontSize="12"
+                        MinHeight="36" MinWidth="100" Padding="14,6" Command="{Binding SaveCommand}" />
             </StackPanel>
         </Grid>
 
-        <!-- ═══════════════════════════════════════════════════════════════
-             ROW 1 — RELATIONS CHIP STRIP (NEW)
-             Horizontal scrollable list of saved relations
-        ════════════════════════════════════════════════════════════════ -->
-        <Border
-            x:Name="ChipStrip"
-            Grid.Row="1"
-            Opacity="0"
-            Visibility="{Binding HasRelations, Converter={StaticResource BoolToVisibilityConverter}}"
-            Background="{StaticResource CardBackgroundBrush}"
-            BorderBrush="{StaticResource BorderDefaultBrush}"
-            BorderThickness="1"
-            CornerRadius="10"
-            Padding="12,10"
-            Translation="0,0,16">
-            <Border.Shadow><ThemeShadow/></Border.Shadow>
-            <StackPanel Spacing="10">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <FontIcon Glyph="&#xE8FD;" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}" VerticalAlignment="Center" />
-                    <TextBlock
-                        Text="SAVED RELATIONS"
-                        FontSize="9"
-                        CharacterSpacing="80"
-                        FontWeight="SemiBold"
-                        Foreground="{StaticResource TextTertiaryBrush}"
-                        VerticalAlignment="Center" />
-                    <TextBlock
-                        Text="— click to load"
-                        FontSize="9"
-                        Foreground="{StaticResource TextTertiaryBrush}"
-                        VerticalAlignment="Center" />
-                </StackPanel>
-                <ScrollViewer
-                    HorizontalScrollMode="Auto"
-                    HorizontalScrollBarVisibility="Hidden"
-                    VerticalScrollMode="Disabled"
-                    VerticalScrollBarVisibility="Disabled">
-                    <ItemsControl ItemsSource="{Binding RelationChips}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <StackPanel Orientation="Horizontal" Spacing="8" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="viewmodels:RelationChipItem">
-                                <Button
-                                    Content="{Binding Label}"
-                                    Style="{StaticResource RelationChipStyle}"
-                                    Command="{Binding ElementName=PageRoot, Path=DataContext.SelectRelationCommand}"
-                                    CommandParameter="{Binding}" />
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
-            </StackPanel>
-        </Border>
-
-        <!-- ═══════════════════════════════════════════════════════════════
-             ROW 2 — TWO-PANEL LINKER
-        ════════════════════════════════════════════════════════════════ -->
-        <Grid Grid.Row="2" ColumnSpacing="14">
+        <!-- ═══ LINKER CONTENT ═══ -->
+        <Grid Grid.Row="1" Padding="24,0,24,16">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="200" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <!-- ── PRIMARY TEMPLATE CARD ─────────────────────────────── -->
-            <Border
-                Background="{StaticResource ElevatedCardBackgroundBrush}"
-                BorderBrush="{StaticResource BorderDefaultBrush}"
-                BorderThickness="1"
-                CornerRadius="10"
-                Padding="20"
-                Translation="0,0,32">
-                <Border.Shadow><ThemeShadow/></Border.Shadow>
-                <StackPanel Spacing="12">
+            <!-- LEFT: Primary Template columns -->
+            <Border x:Name="PrimaryPanel"
+                    BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1"
+                    Background="{StaticResource CardBackgroundBrush}" CornerRadius="8" Padding="16">
+                <Grid RowSpacing="12" Margin="0,0,8,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
 
-                    <!-- Card header -->
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Border
-                            Width="28" Height="28"
-                            CornerRadius="8"
-                            Background="{StaticResource NavItemSelectedBrush}">
-                            <FontIcon
-                                Glyph="&#xE80A;"
-                                FontSize="13"
-                                Foreground="{StaticResource AccentPrimaryBrush}"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center" />
-                        </Border>
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock
-                                Text="Primary Template"
-                                FontSize="13"
-                                FontWeight="SemiBold"
-                                Foreground="{StaticResource TextPrimaryBrush}" />
-                            <TextBlock
-                                Text="Match columns (one or more)"
-                                FontSize="10"
-                                Foreground="{StaticResource TextTertiaryBrush}" />
-                        </StackPanel>
-                    </StackPanel>
+                    <TextBlock Text="Primary Template" FontSize="14" FontWeight="SemiBold" />
 
-                    <!-- Divider -->
-                    <Border Height="1" Background="{StaticResource BorderDefaultBrush}" />
+                    <ComboBox Grid.Row="1" HorizontalAlignment="Stretch" FontSize="13" MinHeight="38"
+                              DisplayMemberPath="Name"
+                              ItemsSource="{Binding Templates}"
+                              SelectedItem="{Binding PrimaryTemplate, Mode=TwoWay}" />
 
-                    <!-- Template selector -->
-                    <ComboBox
-                        HorizontalAlignment="Stretch"
-                        FontSize="13"
-                        MinHeight="40"
-                        DisplayMemberPath="Name"
-                        ItemsSource="{Binding Templates}"
-                        SelectedItem="{Binding PrimaryTemplate, Mode=TwoWay}" />
-
-                    <TextBlock
-                        Text="{Binding SelectedMatchColumnHint}"
-                        FontSize="11"
-                        Foreground="{StaticResource TextSecondaryBrush}"
-                        TextWrapping="WrapWholeWords" />
-
-                    <Border
-                        Padding="10,8"
-                        CornerRadius="8"
-                        Background="{StaticResource NavItemSelectedBrush}"
-                        BorderBrush="{StaticResource AccentPrimaryBrush}"
-                        BorderThickness="1"
-                        Visibility="{Binding HasSharedColumns, Converter={StaticResource BoolToVisibilityConverter}}">
-                        <Grid ColumnSpacing="8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock
-                                Grid.Column="0"
-                                Text="{Binding SharedColumnSummary}"
-                                FontSize="11"
-                                Foreground="{StaticResource TextSecondaryBrush}"
-                                TextWrapping="WrapWholeWords"
-                                VerticalAlignment="Center" />
-                            <Button
-                                Grid.Column="1"
-                                Content="Match all shared"
-                                Style="{StaticResource PrimaryButtonStyle}"
-                                FontSize="11"
-                                MinHeight="32"
-                                Padding="12,6"
-                                Command="{Binding ApplySharedMatchKeysCommand}" />
-                        </Grid>
-                    </Border>
-
-                    <!-- Column chips — one row, scroll horizontally when needed -->
-                    <ScrollViewer
-                        HorizontalScrollMode="Auto"
-                        HorizontalScrollBarVisibility="Auto"
-                        VerticalScrollMode="Disabled"
-                        VerticalScrollBarVisibility="Disabled">
-                        <StackPanel>
-                            <!-- Empty state -->
-                            <StackPanel
-                                Spacing="6"
-                                HorizontalAlignment="Center"
-                                Margin="0,24"
-                                Visibility="{Binding DataContext.HasNoPrimaryColumns, ElementName=PageRoot, Converter={StaticResource BoolToVisibilityConverter}}">
-                                <FontIcon Glyph="&#xE8D2;" FontSize="28" Foreground="{StaticResource TextTertiaryBrush}" HorizontalAlignment="Center" />
-                                <TextBlock
-                                    Text="No columns"
-                                    FontSize="12"
-                                    Foreground="{StaticResource TextTertiaryBrush}"
-                                    HorizontalAlignment="Center" />
-                            </StackPanel>
-
-                            <ItemsControl ItemsSource="{Binding PrimaryColumns}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <StackPanel Orientation="Horizontal" Spacing="0" />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Style="{StaticResource ColumnRowBorderStyle}">
-                                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                                <CheckBox
-                                                    IsChecked="{Binding IsChecked, Mode=TwoWay}"
-                                                    VerticalAlignment="Center"
-                                                    MinWidth="0" />
-                                                <TextBlock
-                                                    Text="{Binding ColumnName}"
-                                                    VerticalAlignment="Center"
-                                                    FontSize="13"
-                                                    Foreground="{StaticResource TextPrimaryBrush}" />
-                                                <Border Style="{StaticResource KeyBadgeStyle}">
-                                                    <TextBlock Text="MATCH" Style="{StaticResource BadgeLabelStyle}" />
-                                                </Border>
-                                            </StackPanel>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                    <ScrollViewer x:Name="PrimaryScrollViewer" Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                        <StackPanel x:Name="PrimaryColumnList" Spacing="0">
+                            <!-- Populated in code-behind with port dots -->
                         </StackPanel>
                     </ScrollViewer>
-                </StackPanel>
+                </Grid>
             </Border>
 
-            <!-- ── CENTER CONNECTOR ──────────────────────────────────── -->
-            <StackPanel
-                Grid.Column="1"
-                VerticalAlignment="Center"
-                Spacing="8"
-                HorizontalAlignment="Center">
-                <Border
-                    Width="44" Height="44"
-                    CornerRadius="22"
-                    Background="{StaticResource AccentPrimaryBrush}"
-                    RenderTransformOrigin="0.5,0.5"
-                    Translation="0,0,8">
-                    <Border.Shadow><ThemeShadow/></Border.Shadow>
-                    <Border.RenderTransform>
-                        <CompositeTransform
-                            x:Name="ConnectorTransform"
-                            ScaleX="1.0"
-                            ScaleY="1.0" />
-                    </Border.RenderTransform>
-                    <FontIcon Glyph="&#xE72A;" FontSize="17" Foreground="White" />
-                </Border>
-                <TextBlock
-                    Text="MATCH"
-                    FontSize="9"
-                    HorizontalAlignment="Center"
-                    Foreground="{StaticResource TextTertiaryBrush}"
-                    CharacterSpacing="80"
-                    FontWeight="SemiBold" />
-            </StackPanel>
+            <!-- CENTER: Connection Canvas (lines drawn here) -->
+            <Canvas x:Name="ConnectionCanvas" Grid.Column="1"
+                    Background="Transparent"
+                    PointerMoved="OnConnectionCanvasPointerMoved"
+                    PointerReleased="OnConnectionCanvasPointerReleased"
+                    RightTapped="OnConnectionCanvasRightTapped" />
 
-            <!-- ── LOOKUP TEMPLATE CARD ──────────────────────────────── -->
-            <Border
-                Grid.Column="2"
-                Background="{StaticResource ElevatedCardBackgroundBrush}"
-                BorderBrush="{StaticResource BorderDefaultBrush}"
-                BorderThickness="1"
-                CornerRadius="10"
-                Padding="20"
-                Translation="0,0,32">
-                <Border.Shadow><ThemeShadow/></Border.Shadow>
-                <StackPanel Spacing="12">
+            <!-- RIGHT: Lookup Template columns -->
+            <Border x:Name="LookupPanel" Grid.Column="2"
+                    BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1"
+                    Background="{StaticResource CardBackgroundBrush}" CornerRadius="8" Padding="16">
+                <Grid RowSpacing="12" Margin="8,0,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
 
-                    <!-- Card header -->
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Border
-                            Width="28" Height="28"
-                            CornerRadius="8"
-                            Background="#1A2B3A">
-                            <FontIcon
-                                Glyph="&#xE721;"
-                                FontSize="13"
-                                Foreground="{StaticResource SuccessBrush}"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center" />
-                        </Border>
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock
-                                Text="Lookup Template"
-                                FontSize="13"
-                                FontWeight="SemiBold"
-                                Foreground="{StaticResource TextPrimaryBrush}" />
-                            <TextBlock
-                                Text="Columns to display"
-                                FontSize="10"
-                                Foreground="{StaticResource TextTertiaryBrush}" />
-                        </StackPanel>
-                    </StackPanel>
+                    <TextBlock Text="Lookup Template" FontSize="14" FontWeight="SemiBold" />
 
-                    <!-- Divider -->
-                    <Border Height="1" Background="{StaticResource BorderDefaultBrush}" />
+                    <ComboBox Grid.Row="1" HorizontalAlignment="Stretch" FontSize="13" MinHeight="38"
+                              DisplayMemberPath="Name"
+                              ItemsSource="{Binding Templates}"
+                              SelectedItem="{Binding LookupTemplate, Mode=TwoWay}" />
 
-                    <!-- Template selector -->
-                    <ComboBox
-                        HorizontalAlignment="Stretch"
-                        FontSize="13"
-                        MinHeight="40"
-                        DisplayMemberPath="Name"
-                        ItemsSource="{Binding Templates}"
-                        SelectedItem="{Binding LookupTemplate, Mode=TwoWay}" />
-
-                    <!-- DISPLAY indicator hint -->
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <Border Width="8" Height="8" CornerRadius="4" Background="{StaticResource SuccessBrush}" VerticalAlignment="Center" />
-                        <TextBlock
-                            Text="Check columns to show in results"
-                            FontSize="10"
-                            Foreground="{StaticResource TextTertiaryBrush}"
-                            VerticalAlignment="Center" />
-                    </StackPanel>
-
-                    <!-- Column chips — one row, scroll horizontally when needed -->
-                    <ScrollViewer
-                        HorizontalScrollMode="Auto"
-                        HorizontalScrollBarVisibility="Auto"
-                        VerticalScrollMode="Disabled"
-                        VerticalScrollBarVisibility="Disabled">
-                        <StackPanel>
-                            <!-- Empty state -->
-                            <StackPanel
-                                Spacing="6"
-                                HorizontalAlignment="Center"
-                                Margin="0,24"
-                                Visibility="{Binding DataContext.HasNoLookupColumns, ElementName=PageRoot, Converter={StaticResource BoolToVisibilityConverter}}">
-                                <FontIcon Glyph="&#xE8D2;" FontSize="28" Foreground="{StaticResource TextTertiaryBrush}" HorizontalAlignment="Center" />
-                                <TextBlock
-                                    Text="No columns"
-                                    FontSize="12"
-                                    Foreground="{StaticResource TextTertiaryBrush}"
-                                    HorizontalAlignment="Center" />
-                            </StackPanel>
-
-                            <ItemsControl ItemsSource="{Binding LookupColumns}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <StackPanel Orientation="Horizontal" Spacing="0" />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Style="{StaticResource ColumnRowBorderStyle}">
-                                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                                <CheckBox
-                                                    IsChecked="{Binding IsChecked, Mode=TwoWay}"
-                                                    IsEnabled="{Binding IsSelectable}"
-                                                    VerticalAlignment="Center"
-                                                    MinWidth="0" />
-                                                <TextBlock
-                                                    Text="{Binding ColumnName}"
-                                                    VerticalAlignment="Center"
-                                                    FontSize="13"
-                                                    Foreground="{StaticResource TextPrimaryBrush}" />
-                                                <Border Style="{StaticResource DisplayBadgeStyle}">
-                                                    <TextBlock Text="DISPLAY" Style="{StaticResource BadgeLabelStyle}" />
-                                                </Border>
-                                                <Border
-                                                    Style="{StaticResource KeyBadgeStyle}"
-                                                    Visibility="{Binding IsAutoMatchKey, Converter={StaticResource BoolToVisibilityConverter}}">
-                                                    <TextBlock Text="KEY" Style="{StaticResource BadgeLabelStyle}" />
-                                                </Border>
-                                            </StackPanel>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                    <ScrollViewer x:Name="LookupScrollViewer" Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                        <StackPanel x:Name="LookupColumnList" Spacing="0">
+                            <!-- Populated in code-behind with port dots -->
                         </StackPanel>
                     </ScrollViewer>
-                </StackPanel>
+                </Grid>
             </Border>
         </Grid>
 
-        <!-- ROW 3 — legend removed, moved into card footers below -->
-
-        <!-- ═══════════════════════════════════════════════════════════════
-             ROW 3 — ACTION BAR
-        ════════════════════════════════════════════════════════════════ -->
-        <Border
-            Grid.Row="3"
-            Background="{StaticResource CardBackgroundBrush}"
-            BorderBrush="{StaticResource BorderDefaultBrush}"
-            BorderThickness="1"
-            CornerRadius="8"
-            Padding="14,10"
-            Translation="0,0,16">
-            <Border.Shadow><ThemeShadow/></Border.Shadow>
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-
-                <!-- Status / error messages -->
-                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <ProgressRing
-                        Width="16" Height="16"
-                        IsActive="{Binding IsLoading}"
-                        Foreground="{StaticResource AccentPrimaryBrush}" />
-                    <TextBlock
-                        Text="{Binding StatusMessage}"
-                        FontSize="12"
-                        Foreground="{StaticResource SuccessBrush}"
-                        VerticalAlignment="Center" />
-                    <TextBlock
-                        Text="{Binding ErrorMessage}"
-                        FontSize="12"
-                        Foreground="{StaticResource DangerBrush}"
-                        VerticalAlignment="Center"
-                        TextWrapping="WrapWholeWords" />
-                </StackPanel>
-
-                <!-- Action buttons -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                    <!-- Delete button — only visible when a relation is loaded (NEW) -->
-                    <Button
-                        Style="{StaticResource DangerOutlinedButtonStyle}"
-                        Content="Delete"
-                        FontSize="12"
-                        MinHeight="40"
-                        Padding="16,8"
-                        Visibility="{Binding HasLoadedRelation, Converter={StaticResource BoolToVisibilityConverter}}"
-                        Command="{Binding DeleteCommand}" />
-
-                    <Button
-                        Style="{StaticResource GhostButtonStyle}"
-                        Content="Reset"
-                        FontSize="12"
-                        MinHeight="40"
-                        Padding="16,8"
-                        Command="{Binding ResetCommand}" />
-
-                    <Button
-                        Style="{StaticResource PrimaryButtonStyle}"
-                        Content="Save Link"
-                        FontSize="12"
-                        MinHeight="40"
-                        MinWidth="120"
-                        Padding="16,8"
-                        Command="{Binding SaveCommand}" />
-                </StackPanel>
-            </Grid>
-        </Border>
+        <!-- No Permission overlay -->
+        <components:NoPermissionView x:Name="NoPermissionOverlay" Grid.RowSpan="2" Visibility="Collapsed" />
     </Grid>
 </Page>

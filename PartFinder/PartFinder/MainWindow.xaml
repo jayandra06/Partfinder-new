@@ -931,7 +931,7 @@
                                                     <FontIcon Glyph="&#xE77B;" FontSize="16" Foreground="#1F7AE0" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                 </Border>
                                                 <StackPanel VerticalAlignment="Center" Spacing="2">
-                                                    <TextBlock Text="Admin Account" FontSize="12" Foreground="#7B8DA8" />
+                                                    <TextBlock x:Name="Step3AccountTypeText" Text="Admin Account" FontSize="12" Foreground="#7B8DA8" />
                                                     <TextBlock x:Name="Step3EmailText" FontSize="14" FontWeight="SemiBold" Foreground="#EAF2FF" />
                                                 </StackPanel>
                                             </StackPanel>

@@ -66,6 +66,16 @@ public sealed partial class TemplatesPage : Page
     {
         var vm = (TemplatesViewModel)DataContext;
 
+        // Permission check - show "No Permission" overlay if user can't view templates
+        var access = App.Services.GetRequiredService<ICurrentUserAccessService>();
+        await access.RefreshAsync().ConfigureAwait(true);
+        if (!access.Capabilities.CanViewTemplate)
+        {
+            NoPermissionOverlay.Message = "You don't have permission to view templates. Contact your organization admin to grant view access.";
+            NoPermissionOverlay.Visibility = Visibility.Visible;
+            return;
+        }
+
         // IMPORTANT: Load favourite store FIRST before loading templates
         await vm.LoadFavouriteStoreAsync().ConfigureAwait(true);
 
@@ -73,14 +83,8 @@ public sealed partial class TemplatesPage : Page
         await vm.LoadAsync().ConfigureAwait(true);
         vm.ExitTemplateEditor();
 
-        if (vm.Templates.Count == 0)
-        {
-            OnShowAllTemplatesClick(this, new RoutedEventArgs());
-        }
-        else
-        {
-            await FavouritesSubPageControl.ShowAsync(vm).ConfigureAwait(true);
-        }
+        // Always open All Templates view by default
+        OnShowAllTemplatesClick(this, new RoutedEventArgs());
 
         // Hook template save to log activity
         vm.PropertyChanged += (_, args) =>
@@ -110,13 +114,23 @@ public sealed partial class TemplatesPage : Page
         });
     }
 
-    private void OnCreateNewTemplateClick(object sender, RoutedEventArgs e)
+    private async void OnCreateNewTemplateClick(object sender, RoutedEventArgs e)
     {
+        if (DataContext is TemplatesViewModel vm && !vm.CanAddTemplate)
+        {
+            await PermissionToast.ShowAsync(XamlRoot).ConfigureAwait(true);
+            return;
+        }
         BeginCreateTemplateEditor();
     }
 
-    private void OnGalleryCreateTemplateRequested(object? sender, EventArgs e)
+    private async void OnGalleryCreateTemplateRequested(object? sender, EventArgs e)
     {
+        if (DataContext is TemplatesViewModel vm && !vm.CanAddTemplate)
+        {
+            await PermissionToast.ShowAsync(XamlRoot).ConfigureAwait(true);
+            return;
+        }
         BeginCreateTemplateEditor();
     }
 
@@ -165,15 +179,27 @@ public sealed partial class TemplatesPage : Page
         ViewFavouritesButton.Visibility = Visibility.Visible;
 
         // Update page indicator
-        PageIndicatorIcon.Glyph = "\uE8A5";
         PageIndicatorText.Text = "Your All Templates";
 
         BuildAllTemplatesList(vm);
     }
 
-    private void OnShowFavouritesClick(object sender, RoutedEventArgs e)
+    private async void OnShowFavouritesClick(object sender, RoutedEventArgs e)
     {
-        OnCloseAllTemplatesClick(sender, e);
+        if (DataContext is TemplatesViewModel vm)
+        {
+            AllTemplatesPanel.Visibility = Visibility.Collapsed;
+            FavouritesSubPageControl.Visibility = Visibility.Visible;
+
+            // Toggle buttons
+            ViewAllTemplatesButton.Visibility = Visibility.Visible;
+            ViewFavouritesButton.Visibility = Visibility.Collapsed;
+
+            // Update page indicator
+            PageIndicatorText.Text = "Your Favourite Templates";
+
+            await FavouritesSubPageControl.ShowAsync(vm).ConfigureAwait(true);
+        }
     }
 
     private void OnCloseAllTemplatesClick(object sender, RoutedEventArgs e)
@@ -186,7 +212,6 @@ public sealed partial class TemplatesPage : Page
         ViewFavouritesButton.Visibility = Visibility.Collapsed;
 
         // Update page indicator
-        PageIndicatorIcon.Glyph = "\uE735";
         PageIndicatorText.Text = "Your Favourite Templates";
     }
 
@@ -830,9 +855,11 @@ public sealed partial class TemplatesPage : Page
 
             if (targetIndex >= 0 && sourceIndex >= 0 && !IsPortOccupied(vm, targetIndex, targetSide))
             {
-                // Smart group merging: if either cell is already in a group, extend that group
-                var existingGroup = FindExistingGroupForCell(vm, sourceIndex, _connectionSourceSide)
-                                 ?? FindExistingGroupForCell(vm, targetIndex, targetSide);
+                // Group ownership belongs to the SOURCE cell (where drag started).
+                // If source is already in a group → new connection joins that group.
+                // If source is NOT in any group → create a new group name.
+                // Target cell's existing group is IGNORED.
+                var existingGroup = FindExistingGroupForCell(vm, sourceIndex, _connectionSourceSide);
 
                 var groupLabel = existingGroup ?? GenerateUniqueGroupName(vm);
 
@@ -1169,6 +1196,62 @@ public sealed partial class TemplatesPage : Page
     {
         ResetCanvasView();
         CenterCanvasContent();
+    }
+
+    private async void OnCanvasInfoClick(object sender, RoutedEventArgs e)
+    {
+        if (XamlRoot is null) return;
+
+        var content = new ScrollViewer
+        {
+            MaxHeight = 500,
+            Content = new TextBlock
+            {
+                Text = "TEMPLATE CANVAS — HOW TO USE\n\n" +
+                       "━━ COLUMNS ━━\n" +
+                       "• Hover the left/right edge of any cell and click + to insert a new column\n" +
+                       "• Click the trash icon (top-right of cell) to delete a column\n" +
+                       "• Drag a column to reorder it\n" +
+                       "• Press Delete key to remove the selected column\n\n" +
+                       "━━ COLUMN SETTINGS ━━\n" +
+                       "• Type the column name in the \"COLUMN NAME\" field\n" +
+                       "• Select a data type from the dropdown (Text, Number, Decimal, Date, Dropdown, Boolean, RecordLink)\n" +
+                       "• The hint at the bottom shows what the input will look like in Explorer\n\n" +
+                       "━━ CONNECTIONS (GROUPS) ━━\n" +
+                       "• Hover a cell to see blue dots on its edges (ports)\n" +
+                       "• Click and drag from one port to another cell's port to create a connection\n" +
+                       "• Connected columns form a \"Group\" (editable label)\n" +
+                       "• Right-click a connection line to Rename or Delete it\n" +
+                       "• If you start from an already-connected cell, the new connection joins the same group\n" +
+                       "• If you start from an unconnected cell, a new group is created\n\n" +
+                       "━━ CANVAS NAVIGATION ━━\n" +
+                       "• Scroll wheel → Zoom in/out (60% to 180%)\n" +
+                       "• Hold Space + drag → Pan the canvas\n" +
+                       "• Double-click canvas → Reset zoom and position\n" +
+                       "• Use − / + buttons in toolbar to zoom\n" +
+                       "• Use ⟳ button to reset view\n\n" +
+                       "━━ SAVING ━━\n" +
+                       "• Enter a template name in the text box\n" +
+                       "• Click \"Save Template\" to save to database\n" +
+                       "• Click \"Discard\" to cancel without saving\n" +
+                       "• The field count badge shows how many columns you have",
+                FontSize = 13,
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = (Brush)Application.Current.Resources["TextPrimaryBrush"],
+                LineHeight = 22,
+            },
+        };
+
+        var dialog = new ContentDialog
+        {
+            Title = "Template Canvas Guide",
+            Content = content,
+            CloseButtonText = "Got it",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = XamlRoot,
+        };
+
+        await dialog.ShowAsync();
     }
 
     private void OnAddDropdownOptionClick(object sender, RoutedEventArgs e)

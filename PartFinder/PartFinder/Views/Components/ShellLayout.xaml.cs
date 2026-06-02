@@ -73,11 +73,29 @@ public sealed partial class ShellLayout : UserControl
 
     private void OnMoreNavButtonClick(object sender, RoutedEventArgs e)
     {
-        if (sender is Button button && button.Flyout is not null)
+        if (sender is not Button button) return;
+
+        // Always rebuild so the menu reflects the latest nav items.
+        RebuildOverflowNavFlyout();
+
+        if (button.Flyout is not null)
         {
             button.Flyout.ShowAt(button);
         }
     }
+
+    private void OnMoreNavButtonPointerEntered(object sender, PointerRoutedEventArgs e)
+    {
+        // Hover behavior removed — flyout opens on click only.
+    }
+
+    private void OnMoreNavButtonPointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        // No-op
+    }
+
+    private void OnMoreFlyoutOpened(object? sender, object e) { }
+    private void OnMoreFlyoutClosed(object? sender, object e) { }
 
     private void RebuildOverflowNavFlyout()
     {
@@ -86,7 +104,13 @@ public sealed partial class ShellLayout : UserControl
             return;
         }
 
-        var flyout = new MenuFlyout();
+        var flyout = new MenuFlyout
+        {
+            // Light dismiss: clicking outside closes the menu, but it stays open while user
+            // moves cursor between items.
+            Placement = Microsoft.UI.Xaml.Controls.Primitives.FlyoutPlacementMode.Bottom,
+        };
+
         foreach (var item in vm.OverflowNavigationItems)
         {
             var page = item.Page;
@@ -94,6 +118,12 @@ public sealed partial class ShellLayout : UserControl
             {
                 Text = item.Label,
                 IsEnabled = item.IsEnabled,
+                Icon = new FontIcon
+                {
+                    Glyph = item.IconGlyph,
+                    FontSize = 14,
+                },
+                MinWidth = 180,
             };
             menuItem.Click += (_, _) => vm.NavigateToPage(page);
             flyout.Items.Add(menuItem);

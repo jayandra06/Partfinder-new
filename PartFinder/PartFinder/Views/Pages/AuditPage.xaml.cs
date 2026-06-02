@@ -1,11 +1,13 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using PartFinder.Helpers;
 using PartFinder.ViewModels;
 using Windows.Storage.Pickers;
 using System.Text;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace PartFinder.Views.Pages;
 
@@ -174,6 +176,100 @@ public sealed partial class AuditPage : Page
                 XamlRoot = XamlRoot,
             };
             await dialog.ShowAsync();
+        }
+    }
+
+    private async void OnDeleteAllClick(object sender, RoutedEventArgs e)
+    {
+        if (!ViewModel.CanDeleteLogs)
+        {
+            await Helpers.PermissionToast.ShowAsync(XamlRoot);
+            return;
+        }
+
+        var dialog = new ContentDialog
+        {
+            Title = "Delete All Activity Logs",
+            Content = new TextBlock
+            {
+                Text = "Are you sure you want to delete all audit logs? This action cannot be undone.",
+                FontSize = 13,
+                TextWrapping = TextWrapping.Wrap,
+            },
+            PrimaryButtonText = "Delete All",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = XamlRoot,
+        };
+
+        var result = await dialog.ShowAsync();
+        if (result != ContentDialogResult.Primary) return;
+
+        await ViewModel.DeleteAllLogsCommand.ExecuteAsync(null);
+        SelectAllCheckBox.IsChecked = false;
+    }
+
+    private async void OnDeleteSelectedClick(object sender, RoutedEventArgs e)
+    {
+        if (!ViewModel.CanDeleteLogs)
+        {
+            await Helpers.PermissionToast.ShowAsync(XamlRoot);
+            return;
+        }
+
+        var selectedIds = ViewModel.AuditLogs
+            .Where(x => x.IsSelected)
+            .Select(x => x.EventId)
+            .ToList();
+
+        if (selectedIds.Count == 0)
+        {
+            var info = new ContentDialog
+            {
+                Title = "No Selection",
+                Content = new TextBlock { Text = "Select one or more logs to delete.", FontSize = 13 },
+                CloseButtonText = "OK",
+                XamlRoot = XamlRoot,
+            };
+            await info.ShowAsync();
+            return;
+        }
+
+        var dialog = new ContentDialog
+        {
+            Title = "Delete Selected Logs",
+            Content = new TextBlock
+            {
+                Text = $"Delete {selectedIds.Count} selected log(s)? This cannot be undone.",
+                FontSize = 13,
+                TextWrapping = TextWrapping.Wrap,
+            },
+            PrimaryButtonText = "Delete",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = XamlRoot,
+        };
+
+        var result = await dialog.ShowAsync();
+        if (result != ContentDialogResult.Primary) return;
+
+        await ViewModel.DeleteSelectedLogsCommand.ExecuteAsync(selectedIds);
+        SelectAllCheckBox.IsChecked = false;
+    }
+
+    private void OnSelectAllChecked(object sender, RoutedEventArgs e)
+    {
+        foreach (var log in ViewModel.AuditLogs)
+        {
+            log.IsSelected = true;
+        }
+    }
+
+    private void OnSelectAllUnchecked(object sender, RoutedEventArgs e)
+    {
+        foreach (var log in ViewModel.AuditLogs)
+        {
+            log.IsSelected = false;
         }
     }
 }

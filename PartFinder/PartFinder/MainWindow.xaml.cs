@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.Extensions.DependencyInjection;
 using PartFinder.Services;
+using PartFinder.ViewModels;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text.Json;
@@ -24,6 +25,8 @@ public sealed partial class MainWindow : Window
     private string _workingOrgCode = "";
     private string? _cachedOrgDatabaseUri;
     private string? _resolvedSignedInEmail;
+    private string? _resolvedSignedInRole;
+    private bool _mustChangePassword = true;
     private SetupStatusResult? _lastStatus;
 
     private Microsoft.UI.Xaml.DispatcherTimer? _maintenanceTimer;
@@ -413,6 +416,22 @@ public sealed partial class MainWindow : Window
         StopMaintenanceTimer();
         RestoreNonShellTitleBarChrome();
         MaintenanceBlockedRoot.Visibility = Visibility.Collapsed;
+
+        // Clear ALL cached state from previous session
+        try
+        {
+            var adminSession = App.Services.GetRequiredService<AdminSessionStore>();
+            adminSession.Clear();
+        }
+        catch { }
+
+        try
+        {
+            var profile = App.Services.GetRequiredService<LocalProfileStore>();
+            profile.Clear();
+        }
+        catch { }
+
         try
         {
             if (File.Exists(_setupFilePath))
@@ -432,6 +451,8 @@ public sealed partial class MainWindow : Window
         _workingOrgCode = "";
         _cachedOrgDatabaseUri = null;
         _resolvedSignedInEmail = null;
+        _resolvedSignedInRole = null;
+        _mustChangePassword = true;
         _lastStatus = null;
         OrgCodeBox.Text = "";
         InviteLoginEmailBox.Text = "";
@@ -658,7 +679,7 @@ public sealed partial class MainWindow : Window
                     AppLockRoot.Visibility = Visibility.Collapsed;
                     ShellRoot.Visibility = Visibility.Visible;
                     ApplyShellExtendedTitleBar();
-                    LogAutoLoginIfSessionActive();
+                    await ReinitializeShellAsync();
                     return;
                 }
 
@@ -675,6 +696,15 @@ public sealed partial class MainWindow : Window
         AppLockRoot.Visibility = Visibility.Collapsed;
         ShellRoot.Visibility = Visibility.Visible;
         ApplyShellExtendedTitleBar();
+        await ReinitializeShellAsync();
+    }
+
+    private async Task ReinitializeShellAsync()
+    {
+        // Always re-initialize shell with fresh data (permissions, name, nav items)
+        // This ensures no stale data from previous user session.
+        var shellVm = App.Services.GetRequiredService<ShellViewModel>();
+        await shellVm.InitializeAsync().ConfigureAwait(true);
         LogAutoLoginIfSessionActive();
     }
 
@@ -802,7 +832,7 @@ public sealed partial class MainWindow : Window
                         return;
                     }
 
-                    var (okInviteLogin, inviteErr, _) = await SetupApiClient
+                    var (okInviteLogin, inviteErr, inviteLoginResponse) = await SetupApiClient
                         .ValidateInviteLoginAsync(trimmed, invitedEmail, tempPassword)
                         .ConfigureAwait(true);
                     if (!okInviteLogin)
@@ -812,6 +842,8 @@ public sealed partial class MainWindow : Window
                     }
 
                     _resolvedSignedInEmail = invitedEmail;
+                    _mustChangePassword = inviteLoginResponse?.MustChangePassword ?? true;
+                    _resolvedSignedInRole = inviteLoginResponse?.Role;
                 }
 
                 SaveProgressOrgCodeOnly(trimmed);
@@ -819,11 +851,22 @@ public sealed partial class MainWindow : Window
 
                 // If we can jump straight to Step 4 (org already fully configured),
                 // persist completed setup so the shell can load orgCode/adminEmail/dbUri.
+                // BUT: invited users MUST go through Step 3 (Change Password) first.
                 if (_step == 4 && !string.IsNullOrWhiteSpace(status.OrgDatabaseUri))
                 {
                     _cachedOrgDatabaseUri = status.OrgDatabaseUri;
                     SaveProgressAfterDatabase(trimmed, status.OrgDatabaseUri);
-                    SaveCompletedSetup();
+
+                    if (!string.IsNullOrWhiteSpace(_resolvedSignedInEmail) && _mustChangePassword)
+                    {
+                        // Invited user with temporary password — force password change step.
+                        _step = 3;
+                    }
+                    else
+                    {
+                        // Admin setup OR invited user who already changed password — complete.
+                        SaveCompletedSetup();
+                    }
                 }
             }
             finally
@@ -974,20 +1017,40 @@ public sealed partial class MainWindow : Window
             NextButton.IsEnabled = false;
             try
             {
-                var (ok, err, body) = await SetupApiClient.CreateOrgAdminAsync(
-                    _workingOrgCode,
-                    _resolvedSignedInEmail,
-                    CurrentPasswordBox.Password,
-                    NewPasswordBox.Password);
+                // Invited employees use ChangePassword; first org admin uses CreateOrgAdmin.
+                bool ok;
+                string? err;
+
+                if (_mustChangePassword && !string.Equals(_lastStatus?.OrgAdminStatus, "no", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Invited user (employee or returning admin) — use change-password endpoint
+                    (ok, err) = await SetupApiClient.ChangePasswordAsync(
+                        _workingOrgCode,
+                        _resolvedSignedInEmail,
+                        CurrentPasswordBox.Password,
+                        NewPasswordBox.Password);
+                }
+                else
+                {
+                    // First admin setup — use create-org-admin endpoint
+                    var (adminOk, adminErr, body) = await SetupApiClient.CreateOrgAdminAsync(
+                        _workingOrgCode,
+                        _resolvedSignedInEmail,
+                        CurrentPasswordBox.Password,
+                        NewPasswordBox.Password);
+                    ok = adminOk;
+                    err = adminErr;
+
+                    if (body?.Skipped == true)
+                    {
+                        ValidationText.Text = "An admin already exists for this organization. Continuing.";
+                    }
+                }
+
                 if (!ok)
                 {
                     ValidationText.Text = err ?? "Could not change password.";
                     return;
-                }
-
-                if (body?.Skipped == true)
-                {
-                    ValidationText.Text = "An admin already exists for this organization. Continuing.";
                 }
 
                 SaveCompletedSetup();
@@ -1167,6 +1230,11 @@ public sealed partial class MainWindow : Window
             Step3EmailText.Text = string.IsNullOrWhiteSpace(_resolvedSignedInEmail)
                 ? "Invited Email: —"
                 : $"Invited Email: {_resolvedSignedInEmail}";
+
+            var roleLabel = string.Equals(_resolvedSignedInRole, "Admin", StringComparison.OrdinalIgnoreCase)
+                ? "Admin Account"
+                : "Employee Account";
+            Step3AccountTypeText.Text = roleLabel;
         }
 
         NextButton.Content = _step == 3 ? "Change Password" : "Next";

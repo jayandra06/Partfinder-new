@@ -40,14 +40,38 @@ public sealed class CurrentUserAccessService : ICurrentUserAccessService
         var record = await _users.FindByEmailAsync(email, cancellationToken).ConfigureAwait(false);
         if (record is null)
         {
-            // Bootstrap org admin (not yet in org_app_users) — full access.
+            // No record in org_app_users means this is the org creator (in org_admins collection).
+            // Org creator gets full access including User Management.
             _capabilities = UserAccessCapabilities.FullAdmin;
             return;
         }
 
         if (string.Equals(record.Role, "Admin", StringComparison.OrdinalIgnoreCase))
         {
-            _capabilities = UserAccessCapabilities.FullAdmin;
+            // Invited admin — full access EXCEPT User Management (only org creator can manage users).
+            _capabilities = new UserAccessCapabilities
+            {
+                CanAccessMasterData = true,
+                CanAccessDashboard = true,
+                CanAccessParts = true,
+                CanAccessTemplates = true,
+                CanAccessSettings = true,
+                CanAccessUserManagement = false,
+
+                CanAddTemplate = true,
+                CanViewTemplate = true,
+                CanEditTemplate = true,
+                CanDeleteTemplate = true,
+
+                CanCopyMasterData = true,
+                CanViewMasterData = true,
+                CanEditMasterData = true,
+                CanAddMasterData = true,
+                CanDeleteMasterData = true,
+
+                PartsAllTemplates = true,
+                AllowedTemplateIds = Array.Empty<string>(),
+            };
             return;
         }
 
@@ -55,18 +79,22 @@ public sealed class CurrentUserAccessService : ICurrentUserAccessService
         {
             _capabilities = new UserAccessCapabilities
             {
-                CanAccessMasterData = record.MasterDataPermissions?.View ?? false,
-                CanAccessDashboard = false,
+                // Page-level access (navbar visibility) — Employee sees all standard pages.
+                // Granular permissions below decide what they can DO inside each page.
+                CanAccessMasterData = true,
+                CanAccessDashboard = true,
                 CanAccessParts = true,
-                CanAccessTemplates = record.TemplatePermissions?.View ?? false,
+                CanAccessTemplates = true,
                 CanAccessSettings = true,
                 CanAccessUserManagement = false,
 
+                // Granular template permissions (actual operations)
                 CanAddTemplate = record.TemplatePermissions?.Add ?? false,
                 CanViewTemplate = record.TemplatePermissions?.View ?? false,
                 CanEditTemplate = record.TemplatePermissions?.Edit ?? false,
                 CanDeleteTemplate = record.TemplatePermissions?.Delete ?? false,
 
+                // Granular master data permissions (actual operations)
                 CanCopyMasterData = record.MasterDataPermissions?.Copy ?? false,
                 CanViewMasterData = record.MasterDataPermissions?.View ?? false,
                 CanEditMasterData = record.MasterDataPermissions?.Edit ?? false,
@@ -79,6 +107,7 @@ public sealed class CurrentUserAccessService : ICurrentUserAccessService
             return;
         }
 
+        // Unknown role — default to FullAdmin for backward compatibility.
         _capabilities = UserAccessCapabilities.FullAdmin;
     }
 

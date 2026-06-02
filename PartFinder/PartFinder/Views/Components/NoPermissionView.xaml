@@ -1,0 +1,45 @@
+<UserControl
+    x:Class="PartFinder.Views.Components.NoPermissionView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid Background="{StaticResource PageBackgroundBrush}">
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="16" MaxWidth="480">
+
+            <!-- Lock icon -->
+            <Border Width="80" Height="80" CornerRadius="40"
+                    Background="#152ABD8F"
+                    BorderBrush="#352ABD8F"
+                    BorderThickness="1"
+                    HorizontalAlignment="Center">
+                <FontIcon Glyph="&#xE72E;" FontSize="36"
+                          Foreground="{StaticResource AccentPrimaryBrush}"
+                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+
+            <!-- Title -->
+            <TextBlock Text="Access Restricted"
+                       FontSize="22"
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource TextPrimaryBrush}"
+                       HorizontalAlignment="Center" />
+
+            <!-- Message -->
+            <TextBlock x:Name="MessageText"
+                       Text="You don't have permission to access this feature."
+                       FontSize="13"
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       HorizontalAlignment="Center"
+                       TextAlignment="Center"
+                       TextWrapping="Wrap" />
+
+            <!-- Hint -->
+            <TextBlock Text="Contact your organization admin if you need access."
+                       FontSize="12"
+                       Foreground="{StaticResource TextTertiaryBrush}"
+                       HorizontalAlignment="Center"
+                       TextAlignment="Center"
+                       Margin="0,8,0,0" />
+        </StackPanel>
+    </Grid>
+</UserControl>

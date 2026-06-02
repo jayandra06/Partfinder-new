@@ -5,7 +5,9 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Xaml.Shapes;
+using PartFinder.Helpers;
 using PartFinder.Models;
+using PartFinder.Services;
 using PartFinder.ViewModels;
 using System;
 using System.Collections.Generic;
@@ -204,22 +206,15 @@ public sealed partial class FavouritesSubPage : UserControl
             Name = "TopSection",
             Orientation = Orientation.Horizontal,
             Spacing = 10,
-            HorizontalAlignment = HorizontalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(20, 24, 20, 0),
+            Margin = new Thickness(20, 14, 20, 0),
         };
 
-        topSection.Children.Add(new FontIcon
-        {
-            Glyph = "\uE8A5",
-            FontSize = 20,
-            Foreground = new SolidColorBrush(accentColor),
-            VerticalAlignment = VerticalAlignment.Center,
-        });
         topSection.Children.Add(new TextBlock
         {
             Text = template.Name,
-            FontSize = 15,
+            FontSize = 14,
             FontWeight = Microsoft.UI.Text.FontWeights.Bold,
             Foreground = new SolidColorBrush(_textPrimary),
             VerticalAlignment = VerticalAlignment.Center,
@@ -299,39 +294,35 @@ public sealed partial class FavouritesSubPage : UserControl
         {
             Name = "ButtonStack",
             Orientation = Orientation.Horizontal,
-            Spacing = 10,
+            Spacing = 16,
             HorizontalAlignment = HorizontalAlignment.Center,
             Visibility = Visibility.Collapsed,
         };
 
         var editBtn = new Button
         {
-            Width = 100, Height = 36,
+            Width = 36, Height = 36, Padding = new Thickness(0),
             Background = new SolidColorBrush(_accentPrimary),
             BorderThickness = new Thickness(0),
             CornerRadius = new CornerRadius(8),
             Tag = template,
+            Content = new FontIcon { Glyph = "\uE70F", FontSize = 14, Foreground = new SolidColorBrush(Microsoft.UI.Colors.White) },
         };
+        ToolTipService.SetToolTip(editBtn, "Edit");
         editBtn.Click += OnCardEditClick;
-        var editContent = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5, VerticalAlignment = VerticalAlignment.Center };
-        editContent.Children.Add(new FontIcon { Glyph = "\uE70F", FontSize = 13, Foreground = new SolidColorBrush(Microsoft.UI.Colors.White) });
-        editContent.Children.Add(new TextBlock { Text = "Edit", FontSize = 13, Foreground = new SolidColorBrush(Microsoft.UI.Colors.White), FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-        editBtn.Content = editContent;
 
         var unstarBtn = new Button
         {
-            Width = 100, Height = 36,
+            Width = 36, Height = 36, Padding = new Thickness(0),
             Background = new SolidColorBrush(Color.FromArgb(0, 0, 0, 0)),
             BorderBrush = new SolidColorBrush(Color.FromArgb(255, 255, 193, 7)),
             BorderThickness = new Thickness(1.5),
             CornerRadius = new CornerRadius(8),
             Tag = template,
+            Content = new FontIcon { Glyph = "\uE735", FontSize = 14, Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 193, 7)) },
         };
+        ToolTipService.SetToolTip(unstarBtn, "Unstar");
         unstarBtn.Click += OnCardUnstarClick;
-        var unstarContent = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5, VerticalAlignment = VerticalAlignment.Center };
-        unstarContent.Children.Add(new FontIcon { Glyph = "\uE735", FontSize = 13, Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 193, 7)) });
-        unstarContent.Children.Add(new TextBlock { Text = "Unstar", FontSize = 13, Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 193, 7)), FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-        unstarBtn.Content = unstarContent;
 
         buttonStack.Children.Add(editBtn);
         buttonStack.Children.Add(unstarBtn);
@@ -398,14 +389,8 @@ public sealed partial class FavouritesSubPage : UserControl
     /// </summary>
     private (Color primary, Color secondary) GetCardAccentColors(int index)
     {
-        return (index % 4) switch
-        {
-            0 => (_accentCyan, _accentPrimary),
-            1 => (_accentPurple, _accentPink),
-            2 => (_accentPrimary, _accentCyan),
-            3 => (_accentPink, _accentPurple),
-            _ => (_accentPrimary, _accentCyan),
-        };
+        // Consistent theme color for all cards
+        return (_accentPrimary, _accentPrimary);
     }
 
     // ── Column-scroll helpers ─────────────────────────────────────────────────
@@ -422,17 +407,6 @@ public sealed partial class FavouritesSubPage : UserControl
         for (int fi = 0; fi < visibleCols; fi++)
         {
             var field = fields[offset + fi];
-            var typeIcon = field.Type switch
-            {
-                Models.TemplateFieldType.Text       => "\uE8D2", // Document — text content
-                Models.TemplateFieldType.Number     => "\uE8EF", // # Symbol — whole number
-                Models.TemplateFieldType.Decimal    => "\uEB50", // Decimal point — decimal values
-                Models.TemplateFieldType.Date       => "\uE787", // Calendar — date picker
-                Models.TemplateFieldType.Dropdown   => "\uE8B5", // List — dropdown selection
-                Models.TemplateFieldType.Boolean    => "\uE73E", // Checkmark — true/false
-                Models.TemplateFieldType.RecordLink => "\uE71B", // Link — record reference
-                _                                   => "\uE8D2",
-            };
 
             var cell = new Border
             {
@@ -445,7 +419,6 @@ public sealed partial class FavouritesSubPage : UserControl
                 HorizontalAlignment = HorizontalAlignment.Stretch,
             };
             var content = new StackPanel { Spacing = 3, HorizontalAlignment = HorizontalAlignment.Center };
-            content.Children.Add(new FontIcon { Glyph = typeIcon, FontSize = 13, Foreground = new SolidColorBrush(accent), HorizontalAlignment = HorizontalAlignment.Center });
             content.Children.Add(new TextBlock
             {
                 Text = field.Label, FontSize = 11,
@@ -500,36 +473,12 @@ public sealed partial class FavouritesSubPage : UserControl
                 HorizontalAlignment = HorizontalAlignment.Stretch,
             };
 
-            var typeIcon = field.Type switch
-            {
-                Models.TemplateFieldType.Text       => "\uE8D2", // Document/Text
-                Models.TemplateFieldType.Number     => "\uE8EF", // Number symbol
-                Models.TemplateFieldType.Decimal    => "\uEB50", // Decimal
-                Models.TemplateFieldType.Date       => "\uE787", // Calendar
-                Models.TemplateFieldType.Dropdown   => "\uE8FD", // List
-                Models.TemplateFieldType.Boolean    => "\uE73E", // Checkmark
-                Models.TemplateFieldType.RecordLink => "\uE71B", // Link
-                _                                   => "\uE8D2",
-            };
-
-            // Icon + label — icon left, text centered, spacer right for true centering
+            // Label only, no icon
             var headerContent = new Grid
             {
                 HorizontalAlignment = HorizontalAlignment.Stretch,
             };
-            headerContent.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             headerContent.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            headerContent.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-            var iconEl = new FontIcon
-            {
-                Glyph = typeIcon, FontSize = 14,
-                Foreground = new SolidColorBrush(accent),
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(2, 0, 6, 0),
-            };
-            Grid.SetColumn(iconEl, 0);
-            headerContent.Children.Add(iconEl);
 
             var labelEl = new TextBlock
             {
@@ -543,12 +492,8 @@ public sealed partial class FavouritesSubPage : UserControl
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 MaxLines = 1,
             };
-            Grid.SetColumn(labelEl, 1);
+            Grid.SetColumn(labelEl, 0);
             headerContent.Children.Add(labelEl);
-
-            var spacer = new Border { Width = 22 };
-            Grid.SetColumn(spacer, 2);
-            headerContent.Children.Add(spacer);
 
             headerCell.Child = headerContent;
             colStack.Children.Add(headerCell);
@@ -931,8 +876,14 @@ public sealed partial class FavouritesSubPage : UserControl
 
     // ── Card Actions ──────────────────────────────────────────────────────────
 
-    private void OnCardEditClick(object sender, RoutedEventArgs e)
+    private async void OnCardEditClick(object sender, RoutedEventArgs e)
     {
+        var access = App.Services.GetRequiredService<ICurrentUserAccessService>();
+        if (!access.Capabilities.CanEditTemplate)
+        {
+            await PermissionToast.ShowAsync(XamlRoot);
+            return;
+        }
         if (sender is Button btn && btn.Tag is FavouriteCardViewModel template && _vm is not null)
         {
             _vm.BeginEditTemplateCommand.Execute(template.Template.Id);

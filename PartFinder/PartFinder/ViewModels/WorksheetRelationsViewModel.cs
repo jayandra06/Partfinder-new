@@ -12,15 +12,18 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
     private readonly ITemplateSchemaService _templates;
     private readonly BackendApiClient _api;
     private readonly ExplorerNavigationCoordinator _explorerNav;
+    private readonly ICurrentUserAccessService _access;
 
     public WorksheetRelationsViewModel(
         ITemplateSchemaService templates,
         BackendApiClient api,
-        ExplorerNavigationCoordinator explorerNav)
+        ExplorerNavigationCoordinator explorerNav,
+        ICurrentUserAccessService access)
     {
         _templates = templates;
         _api = api;
         _explorerNav = explorerNav;
+        _access = access;
     }
 
     public ObservableCollection<PartTemplateDefinition> Templates { get; } = [];
@@ -87,8 +90,9 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
         try
         {
             var list = await _templates.GetTemplatesAsync(ct).ConfigureAwait(true);
+            var filtered = _access.FilterTemplatesForParts(list);
             Templates.Clear();
-            foreach (var item in list)
+            foreach (var item in filtered)
             {
                 Templates.Add(item);
             }
@@ -151,6 +155,15 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
 
     partial void OnPrimaryTemplateChanged(PartTemplateDefinition? value)
     {
+        // Prevent same template on both sides
+        if (value is not null && LookupTemplate is not null &&
+            string.Equals(value.Id, LookupTemplate.Id, StringComparison.OrdinalIgnoreCase))
+        {
+            ErrorMessage = "Primary and Lookup templates must be different.";
+            return;
+        }
+        ErrorMessage = string.Empty;
+
         BuildColumnLists();
         OnPropertyChanged(nameof(SharedColumnCount));
         OnPropertyChanged(nameof(HasSharedColumns));
@@ -161,6 +174,15 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
 
     partial void OnLookupTemplateChanged(PartTemplateDefinition? value)
     {
+        // Prevent same template on both sides
+        if (value is not null && PrimaryTemplate is not null &&
+            string.Equals(value.Id, PrimaryTemplate.Id, StringComparison.OrdinalIgnoreCase))
+        {
+            ErrorMessage = "Primary and Lookup templates must be different.";
+            return;
+        }
+        ErrorMessage = string.Empty;
+
         BuildColumnLists();
         OnPropertyChanged(nameof(SharedColumnCount));
         OnPropertyChanged(nameof(HasSharedColumns));

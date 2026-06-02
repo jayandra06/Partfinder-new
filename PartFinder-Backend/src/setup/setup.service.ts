@@ -390,11 +390,32 @@ export class SetupService {
       return { ok: false as const, message: 'Invalid invited credentials.' };
     }
 
-    const hash =
+    const tempHash =
       typeof doc.temporaryPasswordHash === 'string'
         ? doc.temporaryPasswordHash
         : '';
-    const valid = this.verifyTemporaryPassword(dto.temporaryPassword, hash);
+
+    // If temporaryPasswordHash is empty, user already changed their password.
+    // They should now use their permanent password (stored in passwordHash field).
+    if (!tempHash) {
+      const permanentHash = typeof doc.passwordHash === 'string' ? doc.passwordHash : '';
+      if (!permanentHash) {
+        return { ok: false as const, message: 'Invalid credentials.' };
+      }
+      const validPermanent = await bcrypt.compare(dto.temporaryPassword, permanentHash);
+      if (!validPermanent) {
+        return { ok: false as const, message: 'Invalid credentials.' };
+      }
+      return {
+        ok: true as const,
+        email: dto.email.trim().toLowerCase(),
+        role: typeof doc.role === 'string' ? doc.role : 'Employee',
+        mustChangePassword: false,
+      };
+    }
+
+    // User still has temporary password — verify it
+    const valid = this.verifyTemporaryPassword(dto.temporaryPassword, tempHash);
     if (!valid) {
       return { ok: false as const, message: 'Invalid invited credentials.' };
     }
@@ -403,6 +424,7 @@ export class SetupService {
       ok: true as const,
       email: dto.email.trim().toLowerCase(),
       role: typeof doc.role === 'string' ? doc.role : 'Employee',
+      mustChangePassword: true,
     };
   }
 
@@ -563,7 +585,7 @@ export class SetupService {
     if (isAppUser && userColl) {
       await userColl.updateOne(
         { emailNormalized: emailLower },
-        { $set: { temporaryPasswordHash: pbkdf2HashString } }
+        { $set: { temporaryPasswordHash: '', passwordHash: passwordHash } }
       );
     }
 

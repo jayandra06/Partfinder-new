@@ -29,6 +29,17 @@ public sealed class ConnectorRenderer
     {
         Clear();
 
+        // Group connections by label to assign stagger levels
+        var groupIndices = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var groupCounter = 0;
+        foreach (var conn in connections)
+        {
+            if (!groupIndices.ContainsKey(conn.Label))
+            {
+                groupIndices[conn.Label] = groupCounter++;
+            }
+        }
+
         foreach (var conn in connections)
         {
             if (conn.SourceCellIndex < 0 || conn.SourceCellIndex >= cellBounds.Count ||
@@ -41,7 +52,8 @@ public sealed class ConnectorRenderer
             var sourcePoint = GetPortPoint(sourceRect, conn.SourceSide);
             var targetPoint = GetPortPoint(targetRect, conn.TargetSide);
 
-            var visual = CreateConnectorVisual(conn, sourcePoint, targetPoint);
+            var groupLevel = groupIndices.TryGetValue(conn.Label, out var lvl) ? lvl : 0;
+            var visual = CreateConnectorVisual(conn, sourcePoint, targetPoint, groupLevel);
             _visuals.Add(visual);
         }
     }
@@ -167,25 +179,23 @@ public sealed class ConnectorRenderer
         };
     }
 
-    private ConnectorVisual CreateConnectorVisual(CellConnection conn, Point source, Point target)
+    private ConnectorVisual CreateConnectorVisual(CellConnection conn, Point source, Point target, int groupLevel = 0)
     {
         var accentBrush = new SolidColorBrush(ColorHelper.FromArgb(204, 31, 122, 224)); // 80% opacity
 
-        // Bracket-style lines: go UP from source, horizontal across, then DOWN to target
-        // Like a bracket/bridge connecting cells from the top
-        var heightOffset = 40.0; // How high the horizontal bar goes above the cells
+        // Each group gets a different vertical offset so lines don't overlap
+        var staggerOffset = groupLevel * 25.0;
 
-        // For top-to-top connections, use bracket style
-        // For other connections, use straight elbow lines
+        // Bracket-style lines: go UP from source, horizontal across, then DOWN to target
+        var heightOffset = 40.0 + staggerOffset;
+
         Shape pathShape;
         Point labelPos;
 
         if (conn.SourceSide == ConnectionPortSide.Top && conn.TargetSide == ConnectionPortSide.Top)
         {
-            // Bracket style: source up → horizontal → target down
-            // Calculate dynamic height based on how far apart the cells are
             var distance = Math.Abs(target.X - source.X);
-            heightOffset = Math.Max(30.0, Math.Min(60.0, distance * 0.15));
+            heightOffset = Math.Max(30.0, Math.Min(60.0, distance * 0.15)) + staggerOffset;
 
             var midY = Math.Min(source.Y, target.Y) - heightOffset;
 
@@ -216,7 +226,7 @@ public sealed class ConnectorRenderer
         {
             // Bottom bracket: source down → horizontal → target up
             var distance = Math.Abs(target.X - source.X);
-            heightOffset = Math.Max(30.0, Math.Min(60.0, distance * 0.15));
+            heightOffset = Math.Max(30.0, Math.Min(60.0, distance * 0.15)) + staggerOffset;
 
             var midY = Math.Max(source.Y, target.Y) + heightOffset;
 

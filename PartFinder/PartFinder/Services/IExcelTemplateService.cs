@@ -9,6 +9,12 @@ public interface IExcelTemplateService
         string destinationPath,
         CancellationToken cancellationToken = default);
 
+    Task ExportTemplateWithDataAsync(
+        PartTemplateDefinition template,
+        string destinationPath,
+        IReadOnlyList<IReadOnlyDictionary<string, string>> rows,
+        CancellationToken cancellationToken = default);
+
     Task<ExcelImportParseResult> ParseImportFileAsync(
         PartTemplateDefinition template,
         string sourcePath,

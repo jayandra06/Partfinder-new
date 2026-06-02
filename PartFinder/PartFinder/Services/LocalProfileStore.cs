@@ -122,6 +122,22 @@ public sealed class LocalProfileStore
         SaveProfile(value, Department);
     }
 
+    /// <summary>Clears all profile data (used on logout to prevent stale data for next user).</summary>
+    public void Clear()
+    {
+        DisplayName = null;
+        Department = null;
+        AvatarPath = null;
+        try
+        {
+            if (File.Exists(_filePath))
+            {
+                File.Delete(_filePath);
+            }
+        }
+        catch { }
+    }
+
     private void Persist()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);

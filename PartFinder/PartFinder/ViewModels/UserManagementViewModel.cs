@@ -246,17 +246,18 @@ public partial class UserManagementViewModel : ViewModelBase
         InvitePartsAllTemplates = user.PartsAllTemplates;
         TemplateChoices.Clear();
 
-        // Load permissions
-        InviteCanAddTemplate = user.TemplatePermissions?.Add ?? true;
-        InviteCanViewTemplate = user.TemplatePermissions?.View ?? true;
-        InviteCanEditTemplate = user.TemplatePermissions?.Edit ?? true;
-        InviteCanDeleteTemplate = user.TemplatePermissions?.Delete ?? true;
+        // Load permissions — default to FALSE when null (not true!)
+        // If permissions were never saved, the user should NOT have full access.
+        InviteCanAddTemplate = user.TemplatePermissions?.Add ?? false;
+        InviteCanViewTemplate = user.TemplatePermissions?.View ?? false;
+        InviteCanEditTemplate = user.TemplatePermissions?.Edit ?? false;
+        InviteCanDeleteTemplate = user.TemplatePermissions?.Delete ?? false;
 
-        InviteCanCopyMasterData = user.MasterDataPermissions?.Copy ?? true;
-        InviteCanViewMasterData = user.MasterDataPermissions?.View ?? true;
-        InviteCanEditMasterData = user.MasterDataPermissions?.Edit ?? true;
-        InviteCanAddMasterData = user.MasterDataPermissions?.Add ?? true;
-        InviteCanDeleteMasterData = user.MasterDataPermissions?.Delete ?? true;
+        InviteCanCopyMasterData = user.MasterDataPermissions?.Copy ?? false;
+        InviteCanViewMasterData = user.MasterDataPermissions?.View ?? false;
+        InviteCanEditMasterData = user.MasterDataPermissions?.Edit ?? false;
+        InviteCanAddMasterData = user.MasterDataPermissions?.Add ?? false;
+        InviteCanDeleteMasterData = user.MasterDataPermissions?.Delete ?? false;
 
         var all = await _templates.GetTemplatesAsync(cancellationToken).ConfigureAwait(true);
         foreach (var t in all.OrderBy(x => x.Name))

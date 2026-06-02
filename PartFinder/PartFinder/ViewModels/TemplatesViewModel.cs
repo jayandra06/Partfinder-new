@@ -495,8 +495,11 @@ public partial class TemplatesViewModel : ViewModelBase
             templates = Array.Empty<PartTemplateDefinition>();
         }
 
+        // Filter templates based on user's allowed template IDs (employee restriction)
+        var filtered = _access.FilterTemplatesForParts(templates);
+
         Templates.Clear();
-        foreach (var template in templates)
+        foreach (var template in filtered)
         {
             Templates.Add(template);
         }
@@ -758,6 +761,25 @@ public partial class TemplatesViewModel : ViewModelBase
         if (nonEmptyCount == 0)
         {
             FormError = "Add at least one column name.";
+            return;
+        }
+
+        // Check for duplicate column names
+        var columnNames = ColumnLabels
+            .Where(c => !string.IsNullOrWhiteSpace(c.Label))
+            .Select((c, idx) => (Name: c.Label.Trim(), Index: idx + 1))
+            .ToList();
+
+        var duplicates = columnNames
+            .GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Count() > 1)
+            .ToList();
+
+        if (duplicates.Count > 0)
+        {
+            var dup = duplicates.First();
+            var indices = string.Join(" and ", dup.Select(x => $"#{x.Index}"));
+            FormError = $"Column name \"{dup.Key}\" is used in columns {indices}. Each column must have a unique name.";
             return;
         }
 

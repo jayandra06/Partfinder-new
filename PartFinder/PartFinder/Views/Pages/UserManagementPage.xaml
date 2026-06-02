@@ -380,6 +380,11 @@
 
             </StackPanel>
         </ScrollViewer>
+
+        <!-- No Permission overlay -->
+        <components:NoPermissionView
+            x:Name="NoPermissionOverlay"
+            Visibility="Collapsed" />
     </Grid>
 </Page>
 

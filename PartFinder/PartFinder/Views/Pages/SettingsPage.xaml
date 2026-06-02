@@ -309,7 +309,7 @@
 
                                 <StackPanel Grid.Row="0" Grid.Column="0" Spacing="6">
                                     <TextBlock Text="Display Name" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
-                                    <TextBox Style="{StaticResource StandardTextBoxStyle}" Text="{Binding ProfileName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBox Style="{StaticResource StandardTextBoxStyle}" Text="{Binding ProfileName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanEditProfileName}" />
                                 </StackPanel>
 
                                 <StackPanel Grid.Row="0" Grid.Column="1" Spacing="6">
@@ -358,7 +358,8 @@
                         </Grid>
                     </Border>
 
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12" Margin="0,32,0,0">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12" Margin="0,32,0,0"
+                              Visibility="{Binding CanEditProfileName, Converter={StaticResource BoolToVisibilityConverter}}">
                         <TextBlock Text="{Binding ProfileMessage}" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,16,0" />
                         <Button Style="{StaticResource GhostButtonStyle}" Content="Discard" />
                         <Button Style="{StaticResource PrimaryButtonStyle}" Content="Save Changes" Command="{Binding SaveProfileCommand}" Padding="24,8" />

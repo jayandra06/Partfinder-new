@@ -59,11 +59,11 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- CENTER: Primary nav + More overflow -->
+                <!-- CENTER: Primary nav + More overflow (all icons together) -->
                 <StackPanel
                     Grid.Column="1"
                     Orientation="Horizontal"
-                    Spacing="12"
+                    Spacing="8"
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center">
                     <ItemsRepeater
@@ -99,15 +99,14 @@
                         Background="Transparent"
                         BorderBrush="{StaticResource BorderDefaultBrush}"
                         BorderThickness="1"
-                        ToolTipService.ToolTip="More"
                         Visibility="{Binding HasOverflowNavigation, Converter={StaticResource BoolToVisibilityConverter}}"
                         Click="OnMoreNavButtonClick">
                         <FontIcon Glyph="&#xE712;" FontSize="16" Foreground="{StaticResource TextSecondaryBrush}" />
                     </Button>
                 </StackPanel>
 
-                <!-- RIGHT: Profile only -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                <!-- RIGHT: Profile card (sticky right) -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" HorizontalAlignment="Right">
                     <Button Padding="8,4"
                             ToolTipService.ToolTip="Profile menu"
                             x:Name="ProfileMenuButton">

@@ -27,7 +27,7 @@
     <Grid x:Name="RootGrid" Padding="20" Background="{StaticResource PageBackgroundBrush}">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="320" />
+            <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -42,15 +42,15 @@
         <Grid Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,0,0,10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" MaxWidth="520" />
-                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" MaxWidth="520" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <Border
                 Grid.Column="0"
                 MinHeight="40"
-                Padding="4,0"
+                Padding="0"
                 CornerRadius="10"
-                Background="{StaticResource GridHeaderBackgroundBrush}"
+                Background="{StaticResource CardBackgroundBrush}"
                 BorderBrush="{StaticResource BorderDefaultBrush}"
                 BorderThickness="1"
                 VerticalAlignment="Center"
@@ -61,39 +61,80 @@
                     HorizontalAlignment="Stretch"
                     VerticalAlignment="Center"
                     FontSize="13"
-                    PlaceholderText="Search or choose a template..."
+                    PlaceholderText="Search anything here..."
                     QueryIcon="Find"
                     TextMemberPath="Name"
                     ItemsSource="{Binding FilteredDataTemplates}"
                     Text="{Binding TemplatePickerText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                     SuggestionChosen="OnExplorerTemplateSuggestionChosen"
-                    TextChanged="OnExplorerTemplateSuggestTextChanged" />
+                    TextChanged="OnExplorerTemplateSuggestTextChanged"
+                    Background="Transparent"
+                    Foreground="{StaticResource TextPrimaryBrush}"
+                    BorderThickness="0"
+                    Padding="12,8" />
+            </Border>
+            <!-- Column visibility filter -->
+            <Border
+                Grid.Column="1"
+                MinHeight="40"
+                Padding="0"
+                CornerRadius="10"
+                Background="{StaticResource CardBackgroundBrush}"
+                BorderBrush="{StaticResource BorderDefaultBrush}"
+                BorderThickness="1"
+                VerticalAlignment="Center"
+                Margin="0,0,0,0">
+                <Button
+                    x:Name="ColumnFilterButton"
+                    MinHeight="36"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Center"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    Padding="12,8"
+                    HorizontalContentAlignment="Stretch">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Filter columns..." FontSize="13" Foreground="{StaticResource TextTertiaryBrush}" VerticalAlignment="Center" />
+                        <FontIcon Grid.Column="1" Glyph="&#xE71C;" FontSize="13" Foreground="{StaticResource TextTertiaryBrush}" VerticalAlignment="Center" />
+                    </Grid>
+                    <Button.Flyout>
+                        <Flyout Placement="Bottom">
+                            <StackPanel x:Name="ColumnCheckboxPanel" Spacing="6" MinWidth="200" />
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
             </Border>
             <StackPanel
                 Grid.Column="2"
                 Orientation="Horizontal"
                 Spacing="8"
                 HorizontalAlignment="Right"
-                VerticalAlignment="Top">
+                VerticalAlignment="Center"
+                Margin="40,0,0,0">
                 <Button
                     x:Name="HeaderEditButton"
                     Style="{StaticResource MasterDataHeaderIconButtonStyle}"
-                    IsEnabled="{Binding CanEditMasterData}"
                     Visibility="{Binding IsEditMode, Converter={StaticResource InvertedBoolToVisibilityConverter}}"
-                    Click="OnToggleEditModeClicked">
+                    Click="OnToggleEditModeClicked"
+                    ToolTipService.ToolTip="Edit Data">
                     <FontIcon Glyph="&#xE70F;" FontSize="16" />
                 </Button>
                 <Button
                     x:Name="HeaderExportButton"
                     Style="{StaticResource MasterDataHeaderIconButtonStyle}"
-                    Click="OnExportTemplateClicked">
+                    Click="OnExportTemplateClicked"
+                    ToolTipService.ToolTip="Export to Excel">
                     <FontIcon Glyph="&#xE896;" FontSize="16" />
                 </Button>
                 <Button
                     x:Name="HeaderImportButton"
                     Style="{StaticResource MasterDataHeaderIconButtonStyle}"
                     Click="OnImportExcelClicked"
-                    IsEnabled="{Binding CanAddMasterData}">
+                    ToolTipService.ToolTip="Import from Excel">
                     <FontIcon Glyph="&#xE898;" FontSize="16" />
                 </Button>
             </StackPanel>
@@ -115,6 +156,15 @@
                     VerticalAlignment="Center"
                     TextWrapping="WrapWholeWords" />
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <Button
+                        Click="OnAddNewRowClicked"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        FontSize="12">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE710;" FontSize="12" />
+                            <TextBlock Text="Add New Row" FontSize="12" />
+                        </StackPanel>
+                    </Button>
                     <Button
                         Click="OnSaveGridClicked"
                         Style="{StaticResource PrimaryButtonStyle}"
@@ -151,70 +201,15 @@
                 Visibility="{Binding ShowNoDatabaseHint, Converter={StaticResource BoolToVisibilityConverter}}" />
         </StackPanel>
 
-        <!-- Explorer toolbar: search, link filter, columns, health -->
-        <Border
-            Grid.Row="3"
-            Grid.Column="0"
-            Grid.ColumnSpan="2"
-            Margin="0,4,0,4"
-            Padding="10,8"
-            CornerRadius="8"
-            Background="{StaticResource CardBackgroundBrush}"
-            BorderBrush="{StaticResource BorderDefaultBrush}"
-            BorderThickness="1">
-            <Grid ColumnSpacing="10" RowSpacing="6">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" MaxWidth="280" />
-                    <ColumnDefinition Width="160" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <TextBox
-                    x:Name="GridSearchBox"
-                    Grid.Column="0"
-                    PlaceholderText="Search rows (Ctrl+F)…"
-                    Text="{Binding GridSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                <ComboBox
-                    x:Name="RowMatchFilterCombo"
-                    Grid.Column="1"
-                    HorizontalAlignment="Stretch"
-                    SelectedIndex="0" />
-                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
-                    <Button
-                        x:Name="ColumnVisibilityButton"
-                        Style="{StaticResource GhostButtonStyle}"
-                        Content="Columns"
-                        Click="OnColumnVisibilityClick" />
-                    <Button
-                        Style="{StaticResource GhostButtonStyle}"
-                        Content="Clear"
-                        Command="{Binding ClearGridFiltersCommand}" />
-                    <ToggleButton
-                        Content="Pin"
-                        IsChecked="{Binding IsDrawerPinned, Mode=TwoWay}"
-                        ToolTipService.ToolTip="Keep details panel open" />
-                </StackPanel>
-                <StackPanel Grid.Column="3" VerticalAlignment="Center" HorizontalAlignment="Right" Spacing="2">
-                    <TextBlock
-                        Text="{Binding FilteredRowCountText}"
-                        FontSize="10"
-                        Foreground="{StaticResource TextTertiaryBrush}"
-                        HorizontalAlignment="Right" />
-                    <TextBlock
-                        Text="{Binding RelationHealthSummary}"
-                        FontSize="11"
-                        Foreground="{StaticResource TextSecondaryBrush}"
-                        TextWrapping="WrapWholeWords"
-                        HorizontalAlignment="Right" />
-                </StackPanel>
-            </Grid>
-        </Border>
+        <!-- Per-column filter bar is now inside the spreadsheet grid (synced scroll) -->
 
         <!-- Spreadsheet host -->
         <ContentControl
             x:Name="SpreadsheetHost"
             Grid.Row="4"
+            Grid.RowSpan="2"
             Grid.Column="0"
+            Grid.ColumnSpan="2"
             Margin="0,6,0,0"
             HorizontalContentAlignment="Stretch"
             VerticalContentAlignment="Stretch" />
@@ -535,6 +530,15 @@
                     Foreground="{StaticResource TextPrimaryBrush}" />
             </Border>
         </Popup>
+
+        <!-- No Permission overlay -->
+        <components:NoPermissionView
+            x:Name="NoPermissionOverlay"
+            Grid.Row="0"
+            Grid.RowSpan="99"
+            Grid.Column="0"
+            Grid.ColumnSpan="99"
+            Visibility="Collapsed" />
     </Grid>
 </Page>
 

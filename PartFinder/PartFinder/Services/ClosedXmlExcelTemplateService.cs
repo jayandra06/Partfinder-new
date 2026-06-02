@@ -10,12 +10,22 @@ public sealed class ClosedXmlExcelTemplateService : IExcelTemplateService
         string destinationPath,
         CancellationToken cancellationToken = default)
     {
+        return ExportTemplateWithDataAsync(template, destinationPath, Array.Empty<IReadOnlyDictionary<string, string>>(), cancellationToken);
+    }
+
+    public Task ExportTemplateWithDataAsync(
+        PartTemplateDefinition template,
+        string destinationPath,
+        IReadOnlyList<IReadOnlyDictionary<string, string>> rows,
+        CancellationToken cancellationToken = default)
+    {
         cancellationToken.ThrowIfCancellationRequested();
 
         using var workbook = new XLWorkbook();
         var sheet = workbook.Worksheets.Add("Data");
         var orderedFields = template.Fields.OrderBy(f => f.DisplayOrder).ToList();
 
+        // Header row
         for (var i = 0; i < orderedFields.Count; i++)
         {
             var field = orderedFields[i];
@@ -23,10 +33,19 @@ public sealed class ClosedXmlExcelTemplateService : IExcelTemplateService
             headerCell.Value = field.Label;
             headerCell.Style.Font.Bold = true;
             headerCell.Style.Fill.BackgroundColor = XLColor.FromHtml("#D0E8FC");
+        }
 
-            var hintCell = sheet.Cell(2, i + 1);
-            hintCell.Value = $"Type: {field.Type}";
-            hintCell.Style.Font.FontColor = XLColor.Gray;
+        // Data rows
+        for (var r = 0; r < rows.Count; r++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var rowData = rows[r];
+            for (var c = 0; c < orderedFields.Count; c++)
+            {
+                var field = orderedFields[c];
+                var value = rowData.TryGetValue(field.Key, out var v) ? v : string.Empty;
+                sheet.Cell(r + 2, c + 1).Value = value ?? string.Empty;
+            }
         }
 
         if (orderedFields.Count > 0)

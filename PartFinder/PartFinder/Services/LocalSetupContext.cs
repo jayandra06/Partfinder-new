@@ -13,16 +13,20 @@ public sealed class LocalSetupContext : ILocalSetupContext
     private string? _cachedUri;
     private string? _cachedOrgCode;
     private string? _cachedAdminEmail;
+    private bool _cachedInvitedUserLogin;
 
     public string? OrgCode => _cachedOrgCode;
 
     public string? AdminEmail => _cachedAdminEmail;
+
+    public bool InvitedUserLogin => _cachedInvitedUserLogin;
 
     public void Refresh()
     {
         _cachedUri = null;
         _cachedOrgCode = null;
         _cachedAdminEmail = null;
+        _cachedInvitedUserLogin = false;
         try
         {
             // Multiple setup-state.json copies can exist (LocalAppData vs Roaming, older builds).
@@ -69,6 +73,12 @@ public sealed class LocalSetupContext : ILocalSetupContext
                         _cachedAdminEmail = em;
                     }
                 }
+
+                if (root.TryGetProperty("invitedUserLogin", out var iul) &&
+                    iul.ValueKind == JsonValueKind.True)
+                {
+                    _cachedInvitedUserLogin = true;
+                }
             }
         }
         catch
@@ -76,6 +86,7 @@ public sealed class LocalSetupContext : ILocalSetupContext
             _cachedUri = null;
             _cachedOrgCode = null;
             _cachedAdminEmail = null;
+            _cachedInvitedUserLogin = false;
         }
     }
 

@@ -11,11 +11,13 @@ public partial class QrCodeManagerViewModel : ViewModelBase
 {
     private readonly ITemplateSchemaService _templateSchema;
     private readonly IPartsDataService _partsData;
+    private readonly ICurrentUserAccessService _access;
 
-    public QrCodeManagerViewModel(ITemplateSchemaService templateSchema, IPartsDataService partsData)
+    public QrCodeManagerViewModel(ITemplateSchemaService templateSchema, IPartsDataService partsData, ICurrentUserAccessService access)
     {
         _templateSchema = templateSchema;
         _partsData = partsData;
+        _access = access;
         Templates = [];
         Parts = [];
         GeneratedCodes = [];
@@ -46,8 +48,9 @@ public partial class QrCodeManagerViewModel : ViewModelBase
         try
         {
             var templates = await _templateSchema.GetTemplatesAsync().ConfigureAwait(true);
+            var filtered = _access.FilterTemplatesForParts(templates);
             Templates.Clear();
-            foreach (var t in templates)
+            foreach (var t in filtered)
             {
                 Templates.Add(t);
             }

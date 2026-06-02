@@ -18,6 +18,7 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
     private readonly AdminSessionStore _adminSession;
     private readonly LocalProfileStore _profile;
     private readonly MongoAlertsService _alertsService;
+    private readonly IOrgUserDirectoryService _users;
 
     private bool _suppressNavigation;
     private AppPage _lastSelectedPage = AppPage.Templates;
@@ -30,7 +31,8 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
         ICurrentUserAccessService access,
         AdminSessionStore adminSession,
         LocalProfileStore profile,
-        MongoAlertsService alertsService)
+        MongoAlertsService alertsService,
+        IOrgUserDirectoryService users)
     {
         _navigationService = navigationService;
         _setupContext = setupContext;
@@ -40,6 +42,7 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
         _adminSession = adminSession;
         _profile = profile;
         _alertsService = alertsService;
+        _users = users;
         _profile.ProfileChanged += OnProfileChanged;
         NavigationItems = new ObservableCollection<NavItemViewModel>();
         PrimaryNavigationItems = new ObservableCollection<NavItemViewModel>();
@@ -238,6 +241,24 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
         var hasMaster = await HasMasterDataTemplateAsync().ConfigureAwait(true);
         RebuildNavigationItems(hasMaster, _access.Capabilities);
 
+        // For invited users (not org creator), resolve display name from database
+        if (_setupContext.InvitedUserLogin && !_access.Capabilities.CanAccessUserManagement)
+        {
+            var email = _setupContext.AdminEmail?.Trim();
+            if (!string.IsNullOrWhiteSpace(email))
+            {
+                try
+                {
+                    var record = await _users.FindByEmailAsync(email).ConfigureAwait(true);
+                    if (record is not null && !string.IsNullOrWhiteSpace(record.Name))
+                    {
+                        CurrentUserName = record.Name;
+                    }
+                }
+                catch { /* best effort */ }
+            }
+        }
+
         var startPage = ResolveStartPage(hasMaster, _access.Capabilities);
         var startItem = NavigationItems.First(i => i.Page == startPage);
         _lastSelectedPage = startPage;
@@ -250,17 +271,18 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
 
     private static AppPage ResolveStartPage(bool hasMasterData, UserAccessCapabilities c)
     {
-        if (!c.CanAccessUserManagement)
+        // Dashboard is always the default start page if accessible
+        if (c.CanAccessDashboard)
+        {
+            return AppPage.Dashboard;
+        }
+
+        if (hasMasterData && (c.CanAccessMasterData || c.CanAccessParts))
         {
             return AppPage.MasterData;
         }
 
-        if (!hasMasterData)
-        {
-            return AppPage.Templates;
-        }
-
-        return AppPage.Dashboard;
+        return AppPage.Templates;
     }
 
     public async Task NotifyTemplatesChangedAsync(bool openMasterDataPage = false)
@@ -323,10 +345,9 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
             AddNavItem(isPrimary: false, "Alerts", "\uEA8F", AppPage.Alerts);
         }
 
-        if (c.CanAccessUserManagement)
-        {
-            AddNavItem(isPrimary: false, "Users", "\uE716", AppPage.UserManagement);
-        }
+        // Users nav item is always visible — UserManagementPage shows "Access Restricted" overlay
+        // when the user lacks CanAccessUserManagement permission.
+        AddNavItem(isPrimary: false, "Users", "\uE716", AppPage.UserManagement);
 
         if (c.CanAccessSettings)
         {

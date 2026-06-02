@@ -109,6 +109,40 @@ public sealed partial class MasterDataViewModel : ViewModelBase
     [ObservableProperty]
     private string gridSearchText = string.Empty;
 
+    // Per-column filters: key = field.Key, value = filter text
+    private readonly Dictionary<string, string> _columnFilters = new(StringComparer.OrdinalIgnoreCase);
+
+    public void SetColumnFilter(string fieldKey, string filterText)
+    {
+        if (string.IsNullOrWhiteSpace(filterText))
+            _columnFilters.Remove(fieldKey);
+        else
+            _columnFilters[fieldKey] = filterText.Trim();
+
+        GridFilterChanged?.Invoke();
+    }
+
+    public string GetColumnFilter(string fieldKey)
+    {
+        return _columnFilters.TryGetValue(fieldKey, out var val) ? val : string.Empty;
+    }
+
+    /// <summary>Get unique suggestions for a column based on typed text (3+ chars).</summary>
+    public IReadOnlyList<string> GetColumnSuggestions(string fieldKey, string query)
+    {
+        if (string.IsNullOrWhiteSpace(query) || query.Length < 3)
+            return Array.Empty<string>();
+
+        var lowerQuery = query.ToLowerInvariant();
+        return Rows
+            .Select(row => row.Cells.FirstOrDefault(c => c.FieldKey == fieldKey)?.Text ?? string.Empty)
+            .Where(val => !string.IsNullOrWhiteSpace(val) && val.ToLowerInvariant().Contains(lowerQuery))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+            .Take(10)
+            .ToList();
+    }
+
     [ObservableProperty]
     private ExplorerRowMatchFilter rowMatchFilter = ExplorerRowMatchFilter.All;
 
@@ -143,6 +177,9 @@ public sealed partial class MasterDataViewModel : ViewModelBase
     public bool CanEditMasterData => _access.Capabilities.CanEditMasterData;
     public bool CanAddMasterData => _access.Capabilities.CanAddMasterData;
     public bool CanCopyMasterData => _access.Capabilities.CanCopyMasterData;
+    public bool CanExportMasterData => _access.Capabilities.CanViewMasterData || _access.Capabilities.CanCopyMasterData;
+    public bool CanImportMasterData => _access.Capabilities.CanAddMasterData;
+    public bool ShowEditButton => CanEditMasterData && !IsEditMode;
     public bool CanDeleteMasterData => _access.Capabilities.CanDeleteMasterData;
 
     public IReadOnlyList<MasterDataRowViewModel> GetVisibleRows()
@@ -151,12 +188,38 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         var search = GridSearchText.Trim();
         return Rows
             .Where(row => RowMatchesSearch(row, search))
+            .Where(row => RowMatchesColumnFilters(row))
             .Where(row =>
             {
                 var matched = GetRowMatchBadge(row.RowId) == ExplorerCellMatchBadge.Matched;
                 return ExplorerGridFilter.RowMatchesLinkFilter(RowMatchFilter, hasRelations, matched);
             })
             .ToList();
+    }
+
+    private bool RowMatchesColumnFilters(MasterDataRowViewModel row)
+    {
+        if (_columnFilters.Count == 0) return true;
+
+        foreach (var (fieldKey, filterText) in _columnFilters)
+        {
+            var cell = row.Cells.FirstOrDefault(c => c.FieldKey == fieldKey);
+            var cellText = cell?.Text ?? string.Empty;
+            if (!cellText.Contains(filterText, StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+        return true;
+    }
+
+    /// <summary>Public check for a single row against all active filters — used for row
+    /// visibility toggling (no visual tree mutation = no flicker/dim).</summary>
+    public bool RowPassesAllFilters(MasterDataRowViewModel row)
+    {
+        var hasRelations = _worksheetRelations.Count > 0;
+        if (!RowMatchesSearch(row, GridSearchText.Trim())) return false;
+        if (!RowMatchesColumnFilters(row)) return false;
+        var matched = GetRowMatchBadge(row.RowId) == ExplorerCellMatchBadge.Matched;
+        return ExplorerGridFilter.RowMatchesLinkFilter(RowMatchFilter, hasRelations, matched);
     }
 
     public IReadOnlyList<TemplateFieldDefinition> GetVisibleColumns()
@@ -166,6 +229,21 @@ public sealed partial class MasterDataViewModel : ViewModelBase
             .Select(c => c.Key)
             .ToHashSet(StringComparer.Ordinal);
         return Columns.Where(c => !hidden.Contains(c.Key)).ToList();
+    }
+
+    public IReadOnlyList<IReadOnlyDictionary<string, string>> GetExportRows()
+    {
+        var result = new List<IReadOnlyDictionary<string, string>>();
+        foreach (var row in Rows)
+        {
+            var dict = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var cell in row.Cells)
+            {
+                dict[cell.FieldKey] = cell.Text ?? string.Empty;
+            }
+            result.Add(dict);
+        }
+        return result;
     }
 
     partial void OnGridSearchTextChanged(string value)
@@ -192,7 +270,10 @@ public sealed partial class MasterDataViewModel : ViewModelBase
     private void ClearGridFilters()
     {
         GridSearchText = string.Empty;
+        _columnFilters.Clear();
         RowMatchFilter = ExplorerRowMatchFilter.All;
+        OnPropertyChanged(nameof(FilteredRowCountText));
+        GridFilterChanged?.Invoke();
     }
 
     [RelayCommand]
@@ -357,6 +438,7 @@ public sealed partial class MasterDataViewModel : ViewModelBase
     partial void OnIsEditModeChanged(bool value)
     {
         OnPropertyChanged(nameof(EditModeButtonText));
+        OnPropertyChanged(nameof(ShowEditButton));
         EditModeBannerText = value
             ? "You are editing — save your changes or cancel to discard."
             : string.Empty;
@@ -385,13 +467,6 @@ public sealed partial class MasterDataViewModel : ViewModelBase
     {
         IsLoading = true;
         StatusMessage = null;
-        if (!_access.Capabilities.CanViewMasterData)
-        {
-            StatusMessage = "You do not have permission to view master data.";
-            IsLoading = false;
-            DataTemplates.Clear();
-            return;
-        }
         ShowNoTemplateHint = false;
         ShowNoDatabaseHint = false;
         ShowTemplatePicker = false;
@@ -402,9 +477,13 @@ public sealed partial class MasterDataViewModel : ViewModelBase
 
         try
         {
-            _cachedTemplates = await _templateSchema
+            var allTemplates = await _templateSchema
                 .GetTemplatesAsync(cancellationToken)
                 .ConfigureAwait(true);
+
+            // Filter templates based on user permissions (employee sees only allowed templates)
+            var filtered = _access.FilterTemplatesForParts(allTemplates);
+            _cachedTemplates = filtered;
 
             if (_cachedTemplates.Count == 0)
             {
@@ -420,8 +499,10 @@ public sealed partial class MasterDataViewModel : ViewModelBase
             ShowTemplatePicker = false;
             RefreshFilteredDataTemplates();
 
-            var master = _cachedTemplates.FirstOrDefault(
-                t => MongoTemplateSchemaService.IsExplorerTemplateName(t.Name));
+            var master = _access.Capabilities.CanAccessMasterData
+                ? _cachedTemplates.FirstOrDefault(
+                    t => MongoTemplateSchemaService.IsExplorerTemplateName(t.Name))
+                : null;
             var pick = master ?? DataTemplates[0];
 
             _suppressTemplateSelectionChange = true;
@@ -465,9 +546,10 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         {
             try
             {
-                _cachedTemplates = await _templateSchema
+                var allTemplates = await _templateSchema
                     .GetTemplatesAsync(cancellationToken)
                     .ConfigureAwait(true);
+                _cachedTemplates = _access.FilterTemplatesForParts(allTemplates);
             }
             catch
             {
