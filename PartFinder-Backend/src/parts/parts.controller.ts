@@ -49,4 +49,10 @@ export class PartsController {
     const data = await this.partsService.remove(orgId, id);
     return { data, success: true, message: 'Part deleted' };
   }
+
+  @Post('sync-search')
+  async syncToElasticsearch(@Headers('x-org-id') orgId: string) {
+    const data = await this.partsService.syncToElasticsearch(orgId);
+    return { data, success: true, message: `Synced ${data.synced} parts to Elasticsearch` };
+  }
 }

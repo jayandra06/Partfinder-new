@@ -12,6 +12,7 @@ import { DebugModule } from './debug/debug.module';
 import { ImportModule } from './import/import.module';
 import { LicenseModule } from './license/license.module';
 import { RedisModule } from './common/redis/redis.module';
+import { ElasticsearchModule } from './common/elasticsearch/elasticsearch.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { PartsModule } from './parts/parts.module';
 import { PlatformModule } from './platform/platform.module';
@@ -39,6 +40,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
       inject: [ConfigService],
     }),
     RedisModule,
+    ElasticsearchModule,
     UsersModule,
     AuthModule,
     OrganizationsModule,

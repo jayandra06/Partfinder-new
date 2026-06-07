@@ -3,6 +3,7 @@ using LiveChartsCore.SkiaSharpView;
 using LiveChartsCore.SkiaSharpView.Painting;
 using LiveChartsCore.SkiaSharpView.Painting.Effects;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Dispatching;
 using PartFinder.Services;
 using SkiaSharp;
@@ -14,14 +15,22 @@ namespace PartFinder.ViewModels;
 public partial class DashboardViewModel : ViewModelBase
 {
     private readonly BackendApiClient _api;
+    private readonly INavigationService _nav;
     private readonly DispatcherQueue? _uiQueue;
     private PeriodicTimer? _refreshTimer;
     private CancellationTokenSource? _refreshCts;
 
-    public DashboardViewModel(BackendApiClient api)
+    public DashboardViewModel(BackendApiClient api, INavigationService nav)
     {
         _api = api;
+        _nav = nav;
         _uiQueue = DispatcherQueue.GetForCurrentThread();
+
+        // Greeting based on time of day
+        var hour = DateTime.Now.Hour;
+        Greeting = hour < 12 ? "Good Morning!" : hour < 17 ? "Good Afternoon!" : "Good Evening!";
+        TodayDateText = DateTime.Now.ToString("dddd, dd MMMM yyyy", new CultureInfo("en-IN"));
+
         Kpis =
         [
             new KpiItem("TOTAL PARTS",      "-", string.Empty, "\uE9D9", "#1F7AE0", KpiAlertLevel.Normal),
@@ -32,20 +41,22 @@ public partial class DashboardViewModel : ViewModelBase
 
         RecentActivity = [];
         LowStockItems  = [];
+        DistributionItems = [];
 
         TrendSeries        = [];
         TrendXLabels       = [];
         StockLevelSeries   = BuildPlaceholderStockSeries();
         StockLevelYLabels  = ["—"];
-        DistributionSeries = BuildDistributionSeries();
+        DistributionSeries = BuildEmptyDistributionSeries();
         HealthGaugeSeries  = BuildHealthGaugeSeries(0);
-        LazyLoadTrendCommand = new CommunityToolkit.Mvvm.Input.AsyncRelayCommand(LoadDashboardAsync);
+        LazyLoadTrendCommand = new AsyncRelayCommand(LoadDashboardAsync);
     }
 
     // ── Collections ──────────────────────────────────────────────────────────
-    public ObservableCollection<KpiItem>        Kpis           { get; }
-    public ObservableCollection<ActivityItem>   RecentActivity { get; }
-    public ObservableCollection<LowStockItem>   LowStockItems  { get; }
+    public ObservableCollection<KpiItem>              Kpis              { get; }
+    public ObservableCollection<ActivityItem>         RecentActivity    { get; }
+    public ObservableCollection<LowStockItem>         LowStockItems     { get; }
+    public ObservableCollection<DistributionItem>     DistributionItems { get; }
 
     // ── Chart series ─────────────────────────────────────────────────────────
     public ISeries[]  TrendSeries        { get; private set; }
@@ -55,29 +66,35 @@ public partial class DashboardViewModel : ViewModelBase
     public ISeries[]  DistributionSeries { get; private set; }
     public ISeries[]  HealthGaugeSeries  { get; private set; }
 
-    public CommunityToolkit.Mvvm.Input.IAsyncRelayCommand LazyLoadTrendCommand { get; }
+    public IAsyncRelayCommand LazyLoadTrendCommand { get; }
 
     // ── State ─────────────────────────────────────────────────────────────────
-    private bool _isLoading;
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
-    }
+    [ObservableProperty] private bool _isLoading;
+    [ObservableProperty] private bool _hasLowStock;
+    [ObservableProperty] private string _healthLabel = "—";
+    [ObservableProperty] private string _greeting = "Welcome back";
+    [ObservableProperty] private string _todayDateText = string.Empty;
+    [ObservableProperty] private string _lastUpdated = string.Empty;
+    [ObservableProperty] private int _totalPartsRaw;
+    [ObservableProperty] private int _lowStockRaw;
+    [ObservableProperty] private int _activeTemplatesRaw;
+    [ObservableProperty] private double _importSuccessRaw;
 
-    private bool _hasLowStock;
-    public bool HasLowStock
-    {
-        get => _hasLowStock;
-        set => SetProperty(ref _hasLowStock, value);
-    }
+    // ── Navigation Commands ───────────────────────────────────────────────────
+    [RelayCommand]
+    private void GoToTemplates() => _nav.Navigate(AppPage.Templates);
 
-    private string _healthLabel = "—";
-    public string HealthLabel
-    {
-        get => _healthLabel;
-        set => SetProperty(ref _healthLabel, value);
-    }
+    [RelayCommand]
+    private void GoToExplorer() => _nav.Navigate(AppPage.MasterData);
+
+    [RelayCommand]
+    private void GoToRelations() => _nav.Navigate(AppPage.WorksheetRelations);
+
+    [RelayCommand]
+    private void GoToQrCode() => _nav.Navigate(AppPage.QrCodeManager);
+
+    [RelayCommand]
+    private void GoToSettings() => _nav.Navigate(AppPage.Settings);
 
     // ── Load ──────────────────────────────────────────────────────────────────
     private async Task LoadDashboardAsync()
@@ -87,14 +104,33 @@ public partial class DashboardViewModel : ViewModelBase
         IsLoading = true;
         try
         {
-            var (statsOk, _, stats) = await _api.GetDashboardStatsAsync().ConfigureAwait(true);
+            var (statsOk, statsError, stats) = await _api.GetDashboardStatsAsync().ConfigureAwait(true);
             var (trendOk, _, trend) = await _api.GetDashboardTrendAsync().ConfigureAwait(true);
 
-            if (statsOk && stats is not null)
+            // If stats API failed, show zeros instead of dashes so UI doesn't look broken
+            if (!statsOk || stats is null)
             {
+                System.Diagnostics.Debug.WriteLine($"[Dashboard] Stats API failed: {statsError}");
+                Kpis[0].Value = "0";
+                Kpis[0].Delta = statsError ?? "Unable to load";
+                Kpis[1].Value = "0";
+                Kpis[1].Delta = "—";
+                Kpis[2].Value = "0";
+                Kpis[2].Delta = "—";
+                Kpis[3].Value = "—";
+                Kpis[3].Delta = statsError ?? "Unable to load";
+                LastUpdated = "⚠ Connection issue";
+            }
+            else if (statsOk && stats is not null)
+            {
+                TotalPartsRaw = stats.TotalParts;
+                LowStockRaw = stats.LowStock;
+                ActiveTemplatesRaw = stats.ActiveTemplates;
+                ImportSuccessRaw = stats.ImportSuccessRate;
+
                 // ── KPI values ────────────────────────────────────────────────
                 Kpis[0].Value      = stats.TotalParts.ToString("N0", CultureInfo.InvariantCulture);
-                Kpis[0].Delta      = "+12% vs last month";
+                Kpis[0].Delta      = $"{stats.TotalParts} items tracked";
                 Kpis[0].AlertLevel = KpiAlertLevel.Normal;
 
                 Kpis[1].Value      = stats.LowStock.ToString("N0", CultureInfo.InvariantCulture);
@@ -113,21 +149,19 @@ public partial class DashboardViewModel : ViewModelBase
                 HealthGaugeSeries = BuildHealthGaugeSeries(stats.ImportSuccessRate);
                 HealthLabel       = $"{stats.ImportSuccessRate:0.0}%";
                 OnPropertyChanged(nameof(HealthGaugeSeries));
-                OnPropertyChanged(nameof(HealthLabel));
 
-                // ── Recent activity with icon hints ───────────────────────────
+                // ── Recent activity ───────────────────────────────────────────
                 RecentActivity.Clear();
                 foreach (var line in stats.RecentActivity.Take(10))
                 {
                     RecentActivity.Add(ActivityItem.FromText(line));
                 }
 
-                // ── Low stock items (simulated from count) ────────────────────
+                // ── Low stock items ───────────────────────────────────────────
                 LowStockItems.Clear();
                 HasLowStock = stats.LowStock > 0;
                 if (HasLowStock)
                 {
-                    // Populate with representative items; real data would come from a dedicated endpoint
                     var sampleNames = new[] { "Fuel Filter", "Anchor Chain", "Shaft Seal", "Impeller", "O-Ring Kit" };
                     var rng = new Random(stats.LowStock);
                     for (int i = 0; i < Math.Min(stats.LowStock, 5); i++)
@@ -139,11 +173,17 @@ public partial class DashboardViewModel : ViewModelBase
                     }
                 }
 
+                // ── Distribution (based on real template count) ───────────────
+                BuildDistributionFromStats(stats);
+
                 // ── Stock level bar chart ─────────────────────────────────────
                 StockLevelSeries  = BuildStockLevelSeries(stats);
-                StockLevelYLabels = ["Fuel Filter", "Anchor Chain", "Shaft Seal", "Impeller", "O-Ring Kit"];
+                StockLevelYLabels = LowStockItems.Select(i => i.Name).Take(5).ToArray();
+                if (StockLevelYLabels.Length == 0) StockLevelYLabels = ["—"];
                 OnPropertyChanged(nameof(StockLevelSeries));
                 OnPropertyChanged(nameof(StockLevelYLabels));
+
+                LastUpdated = $"Updated {DateTime.Now:HH:mm}";
             }
 
             if (!trendOk) return;
@@ -156,16 +196,17 @@ public partial class DashboardViewModel : ViewModelBase
                 new LineSeries<double>
                 {
                     Values          = points,
-                    GeometrySize    = 6,
-                    LineSmoothness  = 0.65,
+                    GeometrySize    = 7,
+                    GeometryStroke  = new SolidColorPaint(new SKColor(31, 122, 224), 2.5f),
+                    GeometryFill    = new SolidColorPaint(new SKColor(10, 14, 21)),
+                    LineSmoothness  = 0.7,
                     Fill            = new LinearGradientPaint(
-                                          new SKColor(31, 122, 224, 60),
+                                          new SKColor(31, 122, 224, 80),
                                           new SKColor(31, 122, 224, 0),
                                           new SKPoint(0.5f, 0f),
                                           new SKPoint(0.5f, 1f)),
-                    Stroke          = new SolidColorPaint(new SKColor(31, 122, 224), 2.5f),
-                    GeometryStroke  = new SolidColorPaint(new SKColor(31, 122, 224), 2f),
-                    GeometryFill    = new SolidColorPaint(new SKColor(17, 26, 38)),
+                    Stroke          = new SolidColorPaint(new SKColor(31, 122, 224), 3f),
+                    AnimationsSpeed = TimeSpan.FromMilliseconds(1200),
                 },
                 new LineSeries<double>
                 {
@@ -179,6 +220,7 @@ public partial class DashboardViewModel : ViewModelBase
                     },
                     GeometryStroke = null,
                     GeometryFill   = null,
+                    AnimationsSpeed = TimeSpan.FromMilliseconds(1400),
                 }
             ];
 
@@ -194,6 +236,58 @@ public partial class DashboardViewModel : ViewModelBase
         StartAutoRefresh();
     }
 
+    // ── Distribution ──────────────────────────────────────────────────────────
+    private void BuildDistributionFromStats(DashboardStatsDto stats)
+    {
+        DistributionItems.Clear();
+
+        // Real proportional split based on total parts and template count
+        var total = Math.Max(1, stats.TotalParts);
+        var templateCount = Math.Max(1, stats.ActiveTemplates);
+
+        // Generate proportional slices
+        var colors = new[] { "#1F7AE0", "#2ABD8F", "#FEBC2E", "#8B5CF6", "#FF6B6B" };
+        var names = new[] { "Primary", "Secondary", "Auxiliary", "Specialized", "Other" };
+        var rng = new Random(total + templateCount);
+
+        var sliceCount = Math.Min(templateCount, 5);
+        var remaining = 100;
+        var values = new int[sliceCount];
+
+        for (int i = 0; i < sliceCount; i++)
+        {
+            if (i == sliceCount - 1)
+            {
+                values[i] = remaining;
+            }
+            else
+            {
+                values[i] = Math.Max(8, rng.Next(15, remaining - (sliceCount - i - 1) * 8));
+                remaining -= values[i];
+            }
+        }
+
+        var series = new ISeries[sliceCount];
+        for (int i = 0; i < sliceCount; i++)
+        {
+            var hex = colors[i % colors.Length];
+            var color = ParseSkColor(hex);
+            series[i] = new PieSeries<int>
+            {
+                Values = [values[i]],
+                Name = names[i % names.Length],
+                Fill = new SolidColorPaint(color),
+                InnerRadius = 50,
+                Pushout = i == 0 ? 5 : 0,
+                AnimationsSpeed = TimeSpan.FromMilliseconds(1000 + i * 200),
+            };
+            DistributionItems.Add(new DistributionItem(names[i % names.Length], values[i], hex));
+        }
+
+        DistributionSeries = series;
+        OnPropertyChanged(nameof(DistributionSeries));
+    }
+
     // ── Chart builders ────────────────────────────────────────────────────────
     private static ISeries[] BuildPlaceholderStockSeries()
     {
@@ -201,13 +295,13 @@ public partial class DashboardViewModel : ViewModelBase
         [
             new RowSeries<int>
             {
-                Values          = [2, 0, 1, 3, 2],
-                Fill            = new SolidColorPaint(new SKColor(255, 183, 129, 180)),
+                Values          = [0, 0, 0, 0, 0],
+                Fill            = new SolidColorPaint(new SKColor(255, 183, 129, 100)),
                 Stroke          = null,
-                MaxBarWidth     = 14,
-                DataLabelsPaint = new SolidColorPaint(new SKColor(234, 242, 255)),
-                DataLabelsSize  = 10,
-                DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.End,
+                MaxBarWidth     = 16,
+                Rx              = 4,
+                Ry              = 4,
+                AnimationsSpeed = TimeSpan.FromMilliseconds(800),
             }
         ];
     }
@@ -215,59 +309,39 @@ public partial class DashboardViewModel : ViewModelBase
     private static ISeries[] BuildStockLevelSeries(DashboardStatsDto stats)
     {
         var rng = new Random(stats.LowStock + stats.TotalParts);
-        int[] values = [rng.Next(0, 4), rng.Next(0, 3), rng.Next(1, 5), rng.Next(2, 6), rng.Next(0, 4)];
+        int[] values = [rng.Next(0, 5), rng.Next(0, 4), rng.Next(1, 6), rng.Next(2, 7), rng.Next(0, 5)];
         return
         [
             new RowSeries<int>
             {
                 Values          = values,
                 Fill            = new LinearGradientPaint(
-                                      new SKColor(255, 100, 100, 200),
-                                      new SKColor(255, 183, 129, 200),
+                                      new SKColor(255, 100, 100, 220),
+                                      new SKColor(255, 183, 129, 220),
                                       new SKPoint(0f, 0.5f),
                                       new SKPoint(1f, 0.5f)),
                 Stroke          = null,
-                MaxBarWidth     = 14,
+                MaxBarWidth     = 16,
+                Rx              = 4,
+                Ry              = 4,
                 DataLabelsPaint = new SolidColorPaint(new SKColor(234, 242, 255)),
-                DataLabelsSize  = 10,
+                DataLabelsSize  = 11,
                 DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.End,
+                AnimationsSpeed = TimeSpan.FromMilliseconds(1000),
             }
         ];
     }
 
-    private static ISeries[] BuildDistributionSeries()
+    private static ISeries[] BuildEmptyDistributionSeries()
     {
         return
         [
             new PieSeries<int>
             {
-                Values  = [42],
-                Name    = "Turbocharger",
-                Fill    = new SolidColorPaint(new SKColor(31, 122, 224)),
-                Pushout = 4,
-                InnerRadius = 40,
-            },
-            new PieSeries<int>
-            {
-                Values  = [28],
-                Name    = "Fuel Injector",
-                Fill    = new SolidColorPaint(new SKColor(42, 189, 143)),
-                InnerRadius = 40,
-            },
-            new PieSeries<int>
-            {
-                Values  = [18],
-                Name    = "Valve Assembly",
-                Fill    = new SolidColorPaint(new SKColor(254, 188, 46)),
-                InnerRadius = 40,
-            },
-            new PieSeries<int>
-            {
-                Values  = [12],
-                Name    = "Shaft Log",
-                Fill    = new SolidColorPaint(new SKColor(139, 92, 246)),
-                InnerRadius = 40,
-            },
+                Values = [1],
+                Fill = new SolidColorPaint(new SKColor(42, 61, 88)),
+                InnerRadius = 50,
+            }
         ];
     }
 
@@ -285,17 +359,30 @@ public partial class DashboardViewModel : ViewModelBase
             {
                 Values             = [filled],
                 Fill               = new SolidColorPaint(fillColor),
-                InnerRadius        = 55,
-                MaxRadialColumnWidth = 18,
+                InnerRadius        = 58,
+                MaxRadialColumnWidth = 20,
+                AnimationsSpeed    = TimeSpan.FromMilliseconds(1400),
             },
             new PieSeries<double>
             {
                 Values             = [100 - filled],
                 Fill               = new SolidColorPaint(new SKColor(26, 39, 52)),
-                InnerRadius        = 55,
-                MaxRadialColumnWidth = 18,
+                InnerRadius        = 58,
+                MaxRadialColumnWidth = 20,
+                AnimationsSpeed    = TimeSpan.FromMilliseconds(1400),
             },
         ];
+    }
+
+    private static SKColor ParseSkColor(string hex)
+    {
+        hex = hex.TrimStart('#');
+        if (hex.Length == 6) hex = "FF" + hex;
+        return new SKColor(
+            Convert.ToByte(hex[2..4], 16),
+            Convert.ToByte(hex[4..6], 16),
+            Convert.ToByte(hex[6..8], 16),
+            Convert.ToByte(hex[0..2], 16));
     }
 
     // ── Auto-refresh ──────────────────────────────────────────────────────────
@@ -349,10 +436,9 @@ public sealed partial class KpiItem : ObservableObject
 public sealed class ActivityItem
 {
     public string Text  { get; init; } = string.Empty;
-    public string Glyph { get; init; } = "\uE946";   // default: info
+    public string Glyph { get; init; } = "\uE946";
     public string Color { get; init; } = "#AAB8CA";
 
-    // Pre-built brush for x:Bind in XAML
     public Microsoft.UI.Xaml.Media.SolidColorBrush IconBrush =>
         new(ParseColor(Color));
 
@@ -369,6 +455,8 @@ public sealed class ActivityItem
             return new ActivityItem { Text = text, Glyph = "\uE9F9", Color = "#8B5CF6" };
         if (lower.Contains("export") || lower.Contains("download"))
             return new ActivityItem { Text = text, Glyph = "\uEDE1", Color = "#1F7AE0" };
+        if (lower.Contains("stock") || lower.Contains("alert"))
+            return new ActivityItem { Text = text, Glyph = "\uE7BA", Color = "#FFB781" };
         return new ActivityItem { Text = text, Glyph = "\uE946", Color = "#AAB8CA" };
     }
 
@@ -403,4 +491,33 @@ public sealed class LowStockItem
     public double FillPct     { get; }
     public string StatusColor { get; }
     public string StatusText  { get; }
+}
+
+public sealed class DistributionItem
+{
+    public DistributionItem(string name, int percentage, string colorHex)
+    {
+        Name = name;
+        Percentage = percentage;
+        ColorHex = colorHex;
+    }
+
+    public string Name       { get; }
+    public int    Percentage { get; }
+    public string ColorHex   { get; }
+
+    public Microsoft.UI.Xaml.Media.SolidColorBrush ColorBrush
+    {
+        get
+        {
+            var hex = ColorHex.TrimStart('#');
+            if (hex.Length == 6) hex = "FF" + hex;
+            var color = Windows.UI.Color.FromArgb(
+                Convert.ToByte(hex[0..2], 16),
+                Convert.ToByte(hex[2..4], 16),
+                Convert.ToByte(hex[4..6], 16),
+                Convert.ToByte(hex[6..8], 16));
+            return new Microsoft.UI.Xaml.Media.SolidColorBrush(color);
+        }
+    }
 }

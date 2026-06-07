@@ -9,79 +9,16 @@
 
     <Page.Resources>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
-
-        <!-- Card hover style with glassmorphism elevation -->
-        <Style x:Key="HoverCardStyle" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderDefaultBrush}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="12"/>
-        </Style>
-
-        <!-- Quick action button style -->
-        <Style x:Key="ActionRowStyle" TargetType="Button">
-            <Setter Property="Background" Value="{StaticResource ElevatedCardBackgroundBrush}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderDefaultBrush}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="10"/>
-            <Setter Property="Padding" Value="10,9"/>
-            <Setter Property="HorizontalAlignment" Value="Stretch"/>
-            <Setter Property="HorizontalContentAlignment" Value="Left"/>
-        </Style>
     </Page.Resources>
 
-    <ScrollViewer Background="{StaticResource PageBackgroundBrush}" HorizontalScrollBarVisibility="Auto">
-        <Grid>
-            <VisualStateManager.VisualStateGroups>
-                <VisualStateGroup x:Name="AdaptiveStates">
-                    <VisualState x:Name="WideState">
-                        <VisualState.StateTriggers>
-                            <AdaptiveTrigger MinWindowWidth="1100" />
-                        </VisualState.StateTriggers>
-                    </VisualState>
-                    <VisualState x:Name="NarrowState">
-                        <VisualState.StateTriggers>
-                            <AdaptiveTrigger MinWindowWidth="0" />
-                        </VisualState.StateTriggers>
-                        <VisualState.Setters>
-                            <Setter Target="RootStack.Padding" Value="12,16,12,32" />
-                            
-                            <!-- Row 1 stacking -->
-                            <Setter Target="Row1Def2.Height" Value="Auto" />
-                            <Setter Target="Row1Col1.Width" Value="*" />
-                            <Setter Target="Row1Col2.Width" Value="0" />
-                            <Setter Target="Row1ChartBorder.(Grid.Row)" Value="0" />
-                            <Setter Target="Row1ChartBorder.(Grid.Column)" Value="0" />
-                            <Setter Target="Row1DonutBorder.(Grid.Row)" Value="1" />
-                            <Setter Target="Row1DonutBorder.(Grid.Column)" Value="0" />
-                            
-                            <!-- Row 2 stacking -->
-                            <Setter Target="Row2Def2.Height" Value="Auto" />
-                            <Setter Target="Row2Col1.Width" Value="*" />
-                            <Setter Target="Row2Col2.Width" Value="0" />
-                            <Setter Target="Row2BarBorder.(Grid.Row)" Value="0" />
-                            <Setter Target="Row2BarBorder.(Grid.Column)" Value="0" />
-                            <Setter Target="Row2HealthBorder.(Grid.Row)" Value="1" />
-                            <Setter Target="Row2HealthBorder.(Grid.Column)" Value="0" />
+    <ScrollViewer Background="{StaticResource PageBackgroundBrush}"
+                  VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
+        <StackPanel x:Name="RootStack" Padding="28,22,28,40" Spacing="20" MaxWidth="1440">
 
-                            <!-- Row 3 stacking -->
-                            <Setter Target="Row3Def2.Height" Value="Auto" />
-                            <Setter Target="Row3Col1.Width" Value="*" />
-                            <Setter Target="Row3Col2.Width" Value="0" />
-                            <Setter Target="Row3ActivityBorder.(Grid.Row)" Value="0" />
-                            <Setter Target="Row3ActivityBorder.(Grid.Column)" Value="0" />
-                            <Setter Target="Row3ActionsBorder.(Grid.Row)" Value="1" />
-                            <Setter Target="Row3ActionsBorder.(Grid.Column)" Value="0" />
-                        </VisualState.Setters>
-                    </VisualState>
-                </VisualStateGroup>
-            </VisualStateManager.VisualStateGroups>
-
-            <StackPanel x:Name="RootStack" Padding="24,20,24,36" Spacing="16" HorizontalAlignment="Stretch">
-
-            <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-            <!-- HEADER                                                         -->
-            <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+            <!-- ═══════════════════════════════════════════════════════════════
+                 HEADER — Welcome + Date + Quick Buttons
+            ════════════════════════════════════════════════════════════════ -->
             <Grid x:Name="HeaderGrid" Opacity="0">
                 <Grid.RenderTransform><TranslateTransform x:Name="HeaderSlide" Y="-10"/></Grid.RenderTransform>
                 <Grid.ColumnDefinitions>
@@ -90,492 +27,367 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Spacing="3">
-                    <TextBlock Text="OVERVIEW" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}"
-                               CharacterSpacing="80" FontWeight="SemiBold"/>
-                    <TextBlock Text="Inventory Dashboard" FontSize="26" FontWeight="Bold">
-                        <TextBlock.Foreground>
-                            <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
-                                <GradientStop Color="#4DA8FF" Offset="0"/>
-                                <GradientStop Color="#1F7AE0" Offset="0.4"/>
-                                <GradientStop Color="#8B5CF6" Offset="1"/>
-                            </LinearGradientBrush>
-                        </TextBlock.Foreground>
-                    </TextBlock>
-                    <TextBlock Text="Real-time overview of your parts inventory, templates, and system health."
-                               FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                    <TextBlock Text="{Binding Greeting, Mode=OneWay}" FontSize="22" FontWeight="Bold"
+                               Foreground="{StaticResource TextPrimaryBrush}"/>
+                    <TextBlock Text="{Binding TodayDateText, Mode=OneWay}" FontSize="12"
+                               Foreground="{StaticResource TextSecondaryBrush}"/>
                 </StackPanel>
 
-                <!-- Status badge with animated pulse dot + outer glow -->
-                <Grid Grid.Column="1" VerticalAlignment="Center">
-                    <!-- Outer pulsing glow halo -->
-                    <Border CornerRadius="24" Margin="-6,-4"
-                            Background="#082ABD8F" Opacity="0.5"
-                            IsHitTestVisible="False"/>
-                    <!-- Badge -->
-                    <Border CornerRadius="20"
-                            Padding="12,7" Background="#102ABD8F" BorderBrush="#302ABD8F" BorderThickness="1">
-                        <StackPanel Orientation="Horizontal" Spacing="7">
-                            <Grid Width="10" Height="10" VerticalAlignment="Center">
-                                <!-- Outer pulse ring -->
-                                <Ellipse x:Name="PulseRing" Width="10" Height="10"
-                                         Fill="Transparent"
-                                         Stroke="{StaticResource SuccessBrush}" StrokeThickness="1.5"
-                                         Opacity="0"/>
-                                <!-- Solid dot -->
-                                <Ellipse Width="6" Height="6" Fill="{StaticResource SuccessBrush}"
-                                         HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Grid>
-                            <TextBlock Text="SYSTEM ONLINE" FontSize="9" Foreground="{StaticResource SuccessBrush}"
-                                       CharacterSpacing="60" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                <!-- Top-right quick actions -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <Button CornerRadius="8" Padding="12,7"
+                            Background="{StaticResource CardBackgroundBrush}"
+                            BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1"
+                            Command="{Binding GoToTemplatesCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE8B5;" FontSize="13" Foreground="{StaticResource AccentPrimaryBrush}"/>
+                            <TextBlock Text="Import" FontSize="12" VerticalAlignment="Center"/>
                         </StackPanel>
-                    </Border>
-                </Grid>
+                    </Button>
+                    <Button CornerRadius="8" Padding="12,7"
+                            Background="{StaticResource CardBackgroundBrush}"
+                            BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1"
+                            Command="{Binding GoToSettingsCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE8CE;" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <TextBlock Text="Settings" FontSize="12" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
             </Grid>
 
-            <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-            <!-- LOW STOCK ALERT BANNER (visible only when HasLowStock = true)  -->
-            <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-            <Border x:Name="LowStockBanner"
-                    CornerRadius="12" Padding="16,12"
-                    Background="#0DFFB781"
-                    BorderThickness="1"
-                    Opacity="0"
-                    Visibility="{Binding HasLowStock, Converter={StaticResource BoolToVisibilityConverter}}">
-                <Border.BorderBrush>
-                    <SolidColorBrush x:Name="BannerBorderBrush" Color="#40FFB781"/>
-                </Border.BorderBrush>
+            <!-- ═══════════════════════════════════════════════════════════════
+                 KPI STAT CARDS (like the image: icon + big number + subtitle + delta)
+            ════════════════════════════════════════════════════════════════ -->
+            <Grid x:Name="KpiRow" ColumnSpacing="14" Opacity="0">
+                <Grid.RenderTransform><TranslateTransform x:Name="KpiSlide" Y="12"/></Grid.RenderTransform>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
 
-                <Grid ColumnSpacing="12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-
-                    <!-- Warning icon with glow -->
-                    <Border Grid.Column="0" Width="40" Height="40" CornerRadius="20"
-                            Background="#1AFFB781" VerticalAlignment="Center">
-                        <FontIcon x:Name="BannerIcon" Glyph="&#xE7BA;" FontSize="18"
-                                  Foreground="#FFB781" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
-
-                    <!-- Text + items -->
-                    <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBlock Text="LOW STOCK ALERT" FontSize="11" FontWeight="Bold"
-                                       Foreground="#FFB781" CharacterSpacing="40"/>
-                            <Border CornerRadius="4" Padding="5,1" Background="#20FFB781">
-                                <TextBlock Text="{Binding LowStockItems.Count}" FontSize="9"
-                                           FontWeight="Bold" Foreground="#FFB781"/>
+                <!-- Card 1: Total Parts -->
+                <Border Grid.Column="0" Background="{StaticResource CardBackgroundBrush}"
+                        BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1"
+                        CornerRadius="12" Padding="18,16">
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Border Width="34" Height="34" CornerRadius="8" Background="#151F7AE0">
+                                <FontIcon Glyph="&#xE9D9;" FontSize="15" Foreground="{StaticResource AccentPrimaryBrush}"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
+                            <TextBlock Text="{Binding Kpis[0].Value, Mode=OneWay}" FontSize="24" FontWeight="Bold"
+                                       VerticalAlignment="Center" Foreground="{StaticResource TextPrimaryBrush}"/>
                         </StackPanel>
+                        <TextBlock Text="Total Parts" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        <TextBlock Text="{Binding Kpis[0].Delta, Mode=OneWay}" FontSize="10" Foreground="{StaticResource SuccessBrush}"/>
+                    </StackPanel>
+                </Border>
 
-                        <!-- Low stock items as chips -->
-                        <ItemsControl ItemsSource="{Binding LowStockItems}">
+                <!-- Card 2: Low Stock -->
+                <Border Grid.Column="1" Background="{StaticResource CardBackgroundBrush}"
+                        BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1"
+                        CornerRadius="12" Padding="18,16">
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Border Width="34" Height="34" CornerRadius="8" Background="#15FFB781">
+                                <FontIcon Glyph="&#xE7BA;" FontSize="15" Foreground="#FFB781"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="{Binding Kpis[1].Value, Mode=OneWay}" FontSize="24" FontWeight="Bold"
+                                       VerticalAlignment="Center" Foreground="{StaticResource TextPrimaryBrush}"/>
+                        </StackPanel>
+                        <TextBlock Text="Low Stock" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        <TextBlock Text="{Binding Kpis[1].Delta, Mode=OneWay}" FontSize="10" Foreground="#FFB781"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Card 3: Active Templates -->
+                <Border Grid.Column="2" Background="{StaticResource CardBackgroundBrush}"
+                        BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1"
+                        CornerRadius="12" Padding="18,16">
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Border Width="34" Height="34" CornerRadius="8" Background="#152ABD8F">
+                                <FontIcon Glyph="&#xE9F9;" FontSize="15" Foreground="{StaticResource SuccessBrush}"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="{Binding Kpis[2].Value, Mode=OneWay}" FontSize="24" FontWeight="Bold"
+                                       VerticalAlignment="Center" Foreground="{StaticResource TextPrimaryBrush}"/>
+                        </StackPanel>
+                        <TextBlock Text="Active Templates" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        <TextBlock Text="{Binding Kpis[2].Delta, Mode=OneWay}" FontSize="10" Foreground="{StaticResource SuccessBrush}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Card 4: Import Success -->
+                <Border Grid.Column="3" Background="{StaticResource CardBackgroundBrush}"
+                        BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1"
+                        CornerRadius="12" Padding="18,16">
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Border Width="34" Height="34" CornerRadius="8" Background="#158B5CF6">
+                                <FontIcon Glyph="&#xE73E;" FontSize="15" Foreground="#8B5CF6"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="{Binding Kpis[3].Value, Mode=OneWay}" FontSize="24" FontWeight="Bold"
+                                       VerticalAlignment="Center" Foreground="{StaticResource TextPrimaryBrush}"/>
+                        </StackPanel>
+                        <TextBlock Text="Import Success" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        <TextBlock Text="{Binding Kpis[3].Delta, Mode=OneWay}" FontSize="10" Foreground="#8B5CF6"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- ═══════════════════════════════════════════════════════════════
+                 ROW 1: Donut + Bar Chart + Line Chart (3 columns like image)
+            ════════════════════════════════════════════════════════════════ -->
+            <Grid x:Name="Row1" ColumnSpacing="14" Opacity="0">
+                <Grid.RenderTransform><TranslateTransform x:Name="Row1Slide" Y="14"/></Grid.RenderTransform>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="1.3*"/>
+                    <ColumnDefinition Width="1.3*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Donut: Template Distribution -->
+                <Border Background="{StaticResource CardBackgroundBrush}"
+                        BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1"
+                        CornerRadius="12" Padding="18,16">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Parts by Template" FontSize="14" FontWeight="SemiBold"/>
+                        <Grid>
+                            <lvc:PieChart Height="170" Series="{Binding DistributionSeries, Mode=OneWay}"
+                                AnimationsSpeed="00:00:01.0" InitialRotation="-90"/>
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="0">
+                                <TextBlock Text="{Binding Kpis[0].Value, Mode=OneWay}" FontSize="20" FontWeight="Bold"
+                                           HorizontalAlignment="Center"/>
+                                <TextBlock Text="Total" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}"
+                                           HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+                        <!-- Legend -->
+                        <ItemsControl ItemsSource="{Binding DistributionItems, Mode=OneWay}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <StackPanel Orientation="Horizontal" Spacing="6"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="14"/>
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="viewModels:LowStockItem">
-                                    <Border CornerRadius="6" Padding="8,4" BorderThickness="1">
-                                        <Border.Background>
-                                            <SolidColorBrush Color="#15FFB781"/>
-                                        </Border.Background>
-                                        <Border.BorderBrush>
-                                            <SolidColorBrush Color="#30FFB781"/>
-                                        </Border.BorderBrush>
-                                        <StackPanel Orientation="Horizontal" Spacing="5">
-                                            <TextBlock Text="{x:Bind Name}" FontSize="10"
-                                                       Foreground="#FFB781" FontWeight="SemiBold"/>
-                                            <Border CornerRadius="3" Padding="4,1">
-                                                <Border.Background>
-                                                    <SolidColorBrush Color="#25FFB4AB"/>
-                                                </Border.Background>
-                                                <TextBlock Text="{x:Bind StatusText}" FontSize="8"
-                                                           Foreground="#FFB4AB" FontWeight="Bold"
-                                                           CharacterSpacing="30"/>
-                                            </Border>
+                                <DataTemplate x:DataType="viewModels:DistributionItem">
+                                    <StackPanel Spacing="2" HorizontalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" Spacing="4">
+                                            <Border Width="8" Height="8" CornerRadius="4"
+                                                    Background="{x:Bind ColorBrush}" VerticalAlignment="Center"/>
+                                            <TextBlock FontSize="13" FontWeight="Bold" VerticalAlignment="Center">
+                                                <Run Text="{x:Bind Percentage}"/>
+                                            </TextBlock>
                                         </StackPanel>
+                                        <TextBlock Text="{x:Bind Name}" FontSize="9"
+                                                   Foreground="{StaticResource TextTertiaryBrush}"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!-- Bar Chart: Stock Levels -->
+                <Border Grid.Column="1" Background="{StaticResource CardBackgroundBrush}"
+                        BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1"
+                        CornerRadius="12" Padding="18,16">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Stock Level Summary" FontSize="14" FontWeight="SemiBold"/>
+                        <lvc:CartesianChart Height="220" Series="{Binding StockLevelSeries, Mode=OneWay}"
+                            AnimationsSpeed="00:00:01.0" EasingFunction="{x:Null}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Line Chart: Parts Trend -->
+                <Border Grid.Column="2" Background="{StaticResource CardBackgroundBrush}"
+                        BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1"
+                        CornerRadius="12" Padding="18,16">
+                    <StackPanel Spacing="10">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Parts Growth" FontSize="14" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Column="1" Text="{Binding LastUpdated, Mode=OneWay}" FontSize="10"
+                                       Foreground="{StaticResource TextTertiaryBrush}" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid>
+                            <lvc:CartesianChart Height="220" Series="{Binding TrendSeries, Mode=OneWay}"
+                                AnimationsSpeed="00:00:01.2" EasingFunction="{x:Null}"/>
+                            <ProgressRing Width="20" Height="20" HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" IsActive="{Binding IsLoading, Mode=OneWay}"
+                                          Foreground="{StaticResource AccentPrimaryBrush}"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- ═══════════════════════════════════════════════════════════════
+                 ROW 2: Activity Table + Quick Actions (2 columns like image)
+            ════════════════════════════════════════════════════════════════ -->
+            <Grid x:Name="Row2" ColumnSpacing="14" Opacity="0">
+                <Grid.RenderTransform><TranslateTransform x:Name="Row2Slide" Y="14"/></Grid.RenderTransform>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.6*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Activity Table (like Payment vouchers in image) -->
+                <Border Background="{StaticResource CardBackgroundBrush}"
+                        BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1"
+                        CornerRadius="12" Padding="18,16">
+                    <StackPanel Spacing="14">
+                        <TextBlock Text="Recent Activity" FontSize="14" FontWeight="SemiBold"/>
+
+                        <!-- Table header -->
+                        <Grid Padding="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="30"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="100"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="#" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Column="1" Text="Event" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Column="2" Text="Status" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}" FontWeight="SemiBold"/>
+                        </Grid>
+                        <Border Height="1" Background="{StaticResource BorderDefaultBrush}"/>
+
+                        <!-- Activity rows -->
+                        <ItemsControl ItemsSource="{Binding RecentActivity, Mode=OneWay}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="viewModels:ActivityItem">
+                                    <Border Padding="0,8" BorderBrush="{StaticResource BorderDefaultBrush}"
+                                            BorderThickness="0,0,0,1">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="30"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="100"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Width="22" Height="22" CornerRadius="11" HorizontalAlignment="Left">
+                                                <Border.Background><SolidColorBrush Color="#10FFFFFF"/></Border.Background>
+                                                <FontIcon Glyph="{x:Bind Glyph}" FontSize="10"
+                                                          Foreground="{x:Bind IconBrush}"
+                                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                            <TextBlock Grid.Column="1" Text="{x:Bind Text}" FontSize="12"
+                                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                            <Border Grid.Column="2" CornerRadius="4" Padding="8,3"
+                                                    HorizontalAlignment="Left" VerticalAlignment="Center"
+                                                    Background="#102ABD8F">
+                                                <TextBlock Text="Completed" FontSize="10" Foreground="{StaticResource SuccessBrush}"/>
+                                            </Border>
+                                        </Grid>
                                     </Border>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </StackPanel>
+                </Border>
 
-                    <!-- View Parts button -->
-                    <Button Grid.Column="2" VerticalAlignment="Center"
-                            Content="View Parts â†’"
-                            FontSize="11" FontWeight="SemiBold"
-                            Foreground="#FFB781"
-                            Background="#15FFB781"
-                            BorderBrush="#30FFB781"
-                            BorderThickness="1"
-                            CornerRadius="8"
-                            Padding="12,6"/>
-                </Grid>
-            </Border>
-
-            <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-            <!-- KPI CARDS ROW                                                  -->
-            <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-            <ItemsControl x:Name="KpiRow" ItemsSource="{Binding Kpis}" Opacity="0">
-                <ItemsControl.RenderTransform><TranslateTransform x:Name="KpiSlide" Y="10"/></ItemsControl.RenderTransform>
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <ItemsWrapGrid Orientation="Horizontal" ItemWidth="270"/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="viewModels:KpiItem">
-                        <components:KpiCard
-                            Label="{x:Bind Label}"
-                            Value="{x:Bind Value, Mode=OneWay}"
-                            Delta="{x:Bind Delta, Mode=OneWay}"
-                            IconGlyph="{x:Bind Icon}"
-                            AccentHex="{x:Bind AccentHex}"
-                            AlertLevel="{x:Bind AlertLevel, Mode=OneWay}"/>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-
-            <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-            <!-- ROW 1: Trend Chart + Distribution Donut                        -->
-            <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-            <Grid x:Name="Row1" ColumnSpacing="14" Opacity="0">
-                <Grid.RenderTransform><TranslateTransform x:Name="Row1Slide" Y="12"/></Grid.RenderTransform>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition x:Name="Row1Def2" Height="0" />
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition x:Name="Row1Col1" Width="2.2*"/>
-                    <ColumnDefinition x:Name="Row1Col2" Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <!-- Parts Trend Chart -->
-                <Border x:Name="Row1ChartBorder" Grid.Column="0" Style="{StaticResource HoverCardStyle}" Padding="18,16">
-                    <Border.Shadow><ThemeShadow/></Border.Shadow>
+                <!-- Quick Actions Panel -->
+                <Border Grid.Column="1" Background="{StaticResource CardBackgroundBrush}"
+                        BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1"
+                        CornerRadius="12" Padding="18,16">
                     <StackPanel Spacing="12">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Spacing="2">
-                                <TextBlock Text="Parts Trend" FontSize="15" FontWeight="SemiBold"/>
-                                <TextBlock Text="Parts created over time with average baseline"
-                                           FontSize="11" Foreground="{StaticResource TextTertiaryBrush}"/>
-                            </StackPanel>
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                                <Border CornerRadius="6" Padding="8,3" Background="#101F7AE0">
-                                    <TextBlock Text="LAST 30 DAYS" FontSize="8" Foreground="{StaticResource AccentPrimaryBrush}"
-                                               CharacterSpacing="60" FontWeight="SemiBold"/>
-                                </Border>
-                                <Border CornerRadius="6" Padding="8,3" Background="#10FFFFFF">
-                                    <StackPanel Orientation="Horizontal" Spacing="4">
-                                        <Ellipse Width="5" Height="5" Fill="{StaticResource SuccessBrush}" VerticalAlignment="Center"/>
-                                        <TextBlock Text="LIVE" FontSize="8" Foreground="{StaticResource TextTertiaryBrush}"
-                                                   CharacterSpacing="60" FontWeight="SemiBold"/>
-                                    </StackPanel>
-                                </Border>
-                            </StackPanel>
-                        </Grid>
+                        <TextBlock Text="Quick Actions" FontSize="14" FontWeight="SemiBold"/>
+                        <StackPanel Spacing="8">
 
-                        <Grid>
-                            <lvc:CartesianChart
-                                Height="240"
-                                Series="{Binding TrendSeries}"
-                                AnimationsSpeed="00:00:00.8"
-                                EasingFunction="{x:Null}"/>
-                            <ProgressRing Width="24" Height="24"
-                                          HorizontalAlignment="Center" VerticalAlignment="Center"
-                                          IsActive="{Binding IsLoading}"/>
-                        </Grid>
-
-                        <!-- Legend -->
-                        <StackPanel Orientation="Horizontal" Spacing="18">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <Border Width="18" Height="3" CornerRadius="2" Background="#1F7AE0" VerticalAlignment="Center"/>
-                                <TextBlock Text="Trend" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}"/>
-                            </StackPanel>
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <Border Width="18" Height="1" CornerRadius="1" Background="#64647880" VerticalAlignment="Center"/>
-                                <TextBlock Text="Average" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}"/>
-                            </StackPanel>
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-
-                <!-- Template Distribution Donut -->
-                <Border x:Name="Row1DonutBorder" Grid.Column="1" Style="{StaticResource HoverCardStyle}" Padding="18,16">
-                    <Border.Shadow><ThemeShadow/></Border.Shadow>
-                    <StackPanel Spacing="10">
-                        <TextBlock Text="Template Distribution" FontSize="15" FontWeight="SemiBold"/>
-                        <TextBlock Text="Parts per schema category" FontSize="11"
-                                   Foreground="{StaticResource TextTertiaryBrush}"/>
-                        <lvc:PieChart
-                            Height="190"
-                            Series="{Binding DistributionSeries}"
-                            AnimationsSpeed="00:00:00.9"
-                            InitialRotation="-90"/>
-                        <!-- Legend -->
-                        <StackPanel Spacing="5">
-                            <StackPanel Orientation="Horizontal" Spacing="7">
-                                <Border Width="10" Height="10" CornerRadius="5" Background="#1F7AE0" VerticalAlignment="Center"/>
-                                <TextBlock Text="Turbocharger" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
-                                <TextBlock Text="42%" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
-                            </StackPanel>
-                            <StackPanel Orientation="Horizontal" Spacing="7">
-                                <Border Width="10" Height="10" CornerRadius="5" Background="#2ABD8F" VerticalAlignment="Center"/>
-                                <TextBlock Text="Fuel Injector" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
-                                <TextBlock Text="28%" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
-                            </StackPanel>
-                            <StackPanel Orientation="Horizontal" Spacing="7">
-                                <Border Width="10" Height="10" CornerRadius="5" Background="#FEBC2E" VerticalAlignment="Center"/>
-                                <TextBlock Text="Valve Assembly" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
-                                <TextBlock Text="18%" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
-                            </StackPanel>
-                            <StackPanel Orientation="Horizontal" Spacing="7">
-                                <Border Width="10" Height="10" CornerRadius="5" Background="#8B5CF6" VerticalAlignment="Center"/>
-                                <TextBlock Text="Shaft Log" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
-                                <TextBlock Text="12%" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-            </Grid>
-
-            <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-            <!-- ROW 2: Stock Level Bar Chart + Health Gauge                    -->
-            <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-            <Grid x:Name="Row2" ColumnSpacing="14" Opacity="0">
-                <Grid.RenderTransform><TranslateTransform x:Name="Row2Slide" Y="12"/></Grid.RenderTransform>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition x:Name="Row2Def2" Height="0" />
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition x:Name="Row2Col1" Width="1.6*"/>
-                    <ColumnDefinition x:Name="Row2Col2" Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <!-- Stock Level Bar Chart (NEW) -->
-                <Border x:Name="Row2BarBorder" Grid.Column="0" Style="{StaticResource HoverCardStyle}" Padding="18,16">
-                    <Border.Shadow><ThemeShadow/></Border.Shadow>
-                    <StackPanel Spacing="12">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Spacing="2">
-                                <TextBlock Text="Critical Stock Levels" FontSize="15" FontWeight="SemiBold"/>
-                                <TextBlock Text="Current quantity for low-stock parts"
-                                           FontSize="11" Foreground="{StaticResource TextTertiaryBrush}"/>
-                            </StackPanel>
-                            <Border Grid.Column="1" CornerRadius="6" Padding="8,3" Background="#10FFB781" VerticalAlignment="Top">
-                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                    <FontIcon Glyph="&#xE7BA;" FontSize="8" Foreground="#FFB781"/>
-                                    <TextBlock Text="NEEDS ATTENTION" FontSize="8" Foreground="#FFB781"
-                                               CharacterSpacing="40" FontWeight="SemiBold"/>
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-
-                        <lvc:CartesianChart
-                            Height="200"
-                            Series="{Binding StockLevelSeries}"
-                            AnimationsSpeed="00:00:00.9"
-                            EasingFunction="{x:Null}"/>
-
-                        <!-- Min stock threshold note -->
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Border Width="14" Height="3" CornerRadius="2" Background="#FFB781" VerticalAlignment="Center"/>
-                            <TextBlock Text="Current qty â€” below minimum threshold" FontSize="10"
-                                       Foreground="{StaticResource TextTertiaryBrush}"/>
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-
-                <!-- System Health Gauge -->
-                <Border x:Name="Row2HealthBorder" Grid.Column="1" Style="{StaticResource HoverCardStyle}" Padding="18,16">
-                    <Border.Shadow><ThemeShadow/></Border.Shadow>
-                    <StackPanel Spacing="10">
-                        <TextBlock Text="System Health" FontSize="15" FontWeight="SemiBold"/>
-                        <TextBlock Text="Import pipeline reliability" FontSize="11"
-                                   Foreground="{StaticResource TextTertiaryBrush}"/>
-                        <Grid>
-                            <lvc:PieChart
-                                Height="170"
-                                Series="{Binding HealthGaugeSeries}"
-                                AnimationsSpeed="00:00:01.1"
-                                InitialRotation="225"
-                                MaxAngle="270"/>
-                            <!-- Center overlay -->
-                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="1">
-                                <TextBlock Text="{Binding HealthLabel}" FontSize="22" FontWeight="Bold"
-                                           HorizontalAlignment="Center" Foreground="{StaticResource TextPrimaryBrush}"/>
-                                <TextBlock Text="Success" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}"
-                                           HorizontalAlignment="Center"/>
-                            </StackPanel>
-                        </Grid>
-                        <!-- Health indicators -->
-                        <StackPanel Spacing="5">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <Ellipse Width="7" Height="7" Fill="{StaticResource SuccessBrush}" VerticalAlignment="Center"/>
-                                <TextBlock Text="Schema validation" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}"/>
-                            </StackPanel>
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <Ellipse Width="7" Height="7" Fill="{StaticResource SuccessBrush}" VerticalAlignment="Center"/>
-                                <TextBlock Text="API connectivity" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}"/>
-                            </StackPanel>
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <Ellipse Width="7" Height="7" Fill="{StaticResource SuccessBrush}" VerticalAlignment="Center"/>
-                                <TextBlock Text="Database sync" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}"/>
-                            </StackPanel>
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-            </Grid>
-
-            <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-            <!-- ROW 3: Activity Feed + Quick Actions                           -->
-            <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-            <Grid x:Name="Row3" ColumnSpacing="14" Opacity="0">
-                <Grid.RenderTransform><TranslateTransform x:Name="Row3Slide" Y="12"/></Grid.RenderTransform>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition x:Name="Row3Def2" Height="0" />
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition x:Name="Row3Col1" Width="1.6*"/>
-                    <ColumnDefinition x:Name="Row3Col2" Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <!-- Recent Activity with icons -->
-                <Border x:Name="Row3ActivityBorder" Grid.Column="0" Style="{StaticResource HoverCardStyle}" Padding="18,16">
-                    <Border.Shadow><ThemeShadow/></Border.Shadow>
-                    <StackPanel Spacing="10">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Spacing="2">
-                                <TextBlock Text="Recent Activity" FontSize="15" FontWeight="SemiBold"/>
-                                <TextBlock Text="Latest operations and system events" FontSize="11"
-                                           Foreground="{StaticResource TextTertiaryBrush}"/>
-                            </StackPanel>
-                            <Border Grid.Column="1" CornerRadius="6" Padding="8,3" Background="#10FFFFFF" VerticalAlignment="Top">
-                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                    <Ellipse Width="5" Height="5" Fill="{StaticResource SuccessBrush}" VerticalAlignment="Center"/>
-                                    <TextBlock Text="AUTO-REFRESH 60S" FontSize="8" Foreground="{StaticResource TextTertiaryBrush}"
-                                               CharacterSpacing="40" FontWeight="SemiBold"/>
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-
-                        <Border Background="{StaticResource ElevatedCardBackgroundBrush}"
-                                CornerRadius="10" Padding="10"
-                                BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1"
-                                MinHeight="200">
-                            <ItemsControl ItemsSource="{Binding RecentActivity}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="viewModels:ActivityItem">
-                                        <Border Padding="8,7" Margin="0,0,0,2" CornerRadius="6">
-                                            <StackPanel Orientation="Horizontal" Spacing="10">
-                                                <!-- Colored icon per event type -->
-                                                <Border Width="26" Height="26" CornerRadius="13"
-                                                        VerticalAlignment="Center">
-                                                    <Border.Background>
-                                                        <SolidColorBrush Color="#15FFFFFF"/>
-                                                    </Border.Background>
-                                                    <FontIcon Glyph="{x:Bind Glyph}" FontSize="11"
-                                                              Foreground="{x:Bind IconBrush}"
-                                                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                </Border>
-                                                <TextBlock Text="{x:Bind Text}" FontSize="11"
-                                                           Foreground="{StaticResource TextSecondaryBrush}"
-                                                           TextTrimming="CharacterEllipsis"
-                                                           VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </Border>
-                    </StackPanel>
-                </Border>
-
-                <!-- Quick Actions (animated buttons) -->
-                <Border x:Name="Row3ActionsBorder" Grid.Column="1" Style="{StaticResource HoverCardStyle}" Padding="18,16">
-                    <Border.Shadow><ThemeShadow/></Border.Shadow>
-                    <StackPanel Spacing="12">
-                        <TextBlock Text="Quick Actions" FontSize="15" FontWeight="SemiBold"/>
-                        <TextBlock Text="Common workflows at a glance" FontSize="11"
-                                   Foreground="{StaticResource TextTertiaryBrush}"/>
-                        <StackPanel Spacing="7">
-
-                            <Button Style="{StaticResource ActionRowStyle}">
-                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <Border Width="32" Height="32" CornerRadius="8" Background="#151F7AE0">
-                                        <FontIcon Glyph="&#xE710;" FontSize="14" Foreground="{StaticResource AccentPrimaryBrush}"/>
+                            <!-- Navigate to Templates -->
+                            <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    CornerRadius="10" Padding="12,10"
+                                    Background="{StaticResource ElevatedCardBackgroundBrush}"
+                                    BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1"
+                                    Command="{Binding GoToTemplatesCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <Border Width="32" Height="32" CornerRadius="8" Background="#121F7AE0">
+                                        <FontIcon Glyph="&#xE710;" FontSize="14" Foreground="{StaticResource AccentPrimaryBrush}"
+                                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </Border>
                                     <StackPanel Spacing="1" VerticalAlignment="Center">
                                         <TextBlock Text="New Template" FontSize="12" FontWeight="SemiBold"/>
-                                        <TextBlock Text="Create schema" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}"/>
+                                        <TextBlock Text="Create schema" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}"/>
                                     </StackPanel>
-                                    <FontIcon Glyph="&#xE76C;" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}"
-                                              HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,0,0"/>
                                 </StackPanel>
                             </Button>
 
-                            <Button Style="{StaticResource ActionRowStyle}">
-                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <Border Width="32" Height="32" CornerRadius="8" Background="#152ABD8F">
-                                        <FontIcon Glyph="&#xE8B5;" FontSize="14" Foreground="{StaticResource SuccessBrush}"/>
+                            <!-- Navigate to MasterData (Explorer) -->
+                            <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    CornerRadius="10" Padding="12,10"
+                                    Background="{StaticResource ElevatedCardBackgroundBrush}"
+                                    BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1"
+                                    Command="{Binding GoToExplorerCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <Border Width="32" Height="32" CornerRadius="8" Background="#122ABD8F">
+                                        <FontIcon Glyph="&#xE8B5;" FontSize="14" Foreground="{StaticResource SuccessBrush}"
+                                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </Border>
                                     <StackPanel Spacing="1" VerticalAlignment="Center">
-                                        <TextBlock Text="Import Data" FontSize="12" FontWeight="SemiBold"/>
-                                        <TextBlock Text="CSV or Excel" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}"/>
+                                        <TextBlock Text="Explore Data" FontSize="12" FontWeight="SemiBold"/>
+                                        <TextBlock Text="Browse parts" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}"/>
                                     </StackPanel>
                                 </StackPanel>
                             </Button>
 
-                            <Button Style="{StaticResource ActionRowStyle}">
-                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <Border Width="32" Height="32" CornerRadius="8" Background="#15FEBC2E">
-                                        <FontIcon Glyph="&#xE8FA;" FontSize="14" Foreground="{StaticResource WarningBrush}"/>
+                            <!-- Navigate to Relations -->
+                            <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    CornerRadius="10" Padding="12,10"
+                                    Background="{StaticResource ElevatedCardBackgroundBrush}"
+                                    BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1"
+                                    Command="{Binding GoToRelationsCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <Border Width="32" Height="32" CornerRadius="8" Background="#12FEBC2E">
+                                        <FontIcon Glyph="&#xE71B;" FontSize="14" Foreground="{StaticResource WarningBrush}"
+                                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </Border>
                                     <StackPanel Spacing="1" VerticalAlignment="Center">
-                                        <TextBlock Text="Invite Member" FontSize="12" FontWeight="SemiBold"/>
-                                        <TextBlock Text="Team access" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}"/>
+                                        <TextBlock Text="Link Templates" FontSize="12" FontWeight="SemiBold"/>
+                                        <TextBlock Text="Manage relations" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}"/>
                                     </StackPanel>
                                 </StackPanel>
                             </Button>
 
-                            <Button Style="{StaticResource ActionRowStyle}">
-                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <Border Width="32" Height="32" CornerRadius="8" Background="#158B5CF6">
-                                        <FontIcon Glyph="&#xEDE1;" FontSize="14" Foreground="#8B5CF6"/>
-                                    </Border>
-                                    <StackPanel Spacing="1" VerticalAlignment="Center">
-                                        <TextBlock Text="Export Report" FontSize="12" FontWeight="SemiBold"/>
-                                        <TextBlock Text="Excel download" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </Button>
-
-                            <Button Style="{StaticResource ActionRowStyle}">
-                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <Border Width="32" Height="32" CornerRadius="8" Background="#15FFB4AB">
-                                        <FontIcon Glyph="&#xE9D9;" FontSize="14" Foreground="{StaticResource DangerBrush}"/>
+                            <!-- Navigate to QR Code -->
+                            <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    CornerRadius="10" Padding="12,10"
+                                    Background="{StaticResource ElevatedCardBackgroundBrush}"
+                                    BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1"
+                                    Command="{Binding GoToQrCodeCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <Border Width="32" Height="32" CornerRadius="8" Background="#128B5CF6">
+                                        <FontIcon Glyph="&#xE9D9;" FontSize="14" Foreground="#8B5CF6"
+                                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </Border>
                                     <StackPanel Spacing="1" VerticalAlignment="Center">
                                         <TextBlock Text="Scan QR Code" FontSize="12" FontWeight="SemiBold"/>
-                                        <TextBlock Text="Find part instantly" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}"/>
+                                        <TextBlock Text="Find part instantly" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Button>
+
+                            <!-- Navigate to Settings -->
+                            <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    CornerRadius="10" Padding="12,10"
+                                    Background="{StaticResource ElevatedCardBackgroundBrush}"
+                                    BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1"
+                                    Command="{Binding GoToSettingsCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <Border Width="32" Height="32" CornerRadius="8" Background="#12FFB4AB">
+                                        <FontIcon Glyph="&#xE8FA;" FontSize="14" Foreground="{StaticResource DangerBrush}"
+                                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <StackPanel Spacing="1" VerticalAlignment="Center">
+                                        <TextBlock Text="Invite Member" FontSize="12" FontWeight="SemiBold"/>
+                                        <TextBlock Text="Team settings" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}"/>
                                     </StackPanel>
                                 </StackPanel>
                             </Button>
@@ -585,10 +397,6 @@
                 </Border>
             </Grid>
 
-            </StackPanel>
-        </Grid>
+        </StackPanel>
     </ScrollViewer>
 </Page>
-
-
-

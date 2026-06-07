@@ -5,6 +5,7 @@ import { CreateRelationDto, UpdateRelationDto } from './dto/create-relation.dto'
 import { RelationDisplayColumn, RelationDisplayColumnDocument } from './schemas/relation-display-column.schema';
 import { RelationMatchKey, RelationMatchKeyDocument } from './schemas/relation-match-key.schema';
 import { WorksheetRelation, WorksheetRelationDocument } from './schemas/worksheet-relation.schema';
+import { RedisService } from '../common/redis/redis.service';
 
 @Injectable()
 export class RelationsService {
@@ -12,6 +13,7 @@ export class RelationsService {
     @InjectModel(WorksheetRelation.name) private readonly relations: Model<WorksheetRelationDocument>,
     @InjectModel(RelationMatchKey.name) private readonly matchKeys: Model<RelationMatchKeyDocument>,
     @InjectModel(RelationDisplayColumn.name) private readonly displayColumns: Model<RelationDisplayColumnDocument>,
+    private readonly redis: RedisService,
   ) {}
 
   async create(orgId: string, dto: CreateRelationDto) {
@@ -36,19 +38,39 @@ export class RelationsService {
       );
     }
 
+    await this.invalidateCache(orgId);
     return this.getOne(orgId, relationId);
   }
 
   async list(orgId: string) {
+    const cacheKey = this.cacheKey(orgId, 'list');
+    const cached = await this.redis.getJson<Array<Record<string, unknown>>>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const relations = await this.relations.find({ orgId }).sort({ createdAt: -1 }).lean();
-    return Promise.all(relations.map((r) => this.composeRelation(r._id.toString(), r)));
+    const result = await Promise.all(relations.map((r) => this.composeRelation(r._id.toString(), r)));
+
+    await this.redis.setJson(cacheKey, result, 60);
+    return result;
   }
 
   async getOne(orgId: string, id: string) {
     this.ensureObjectId(id, 'relation id');
+
+    const cacheKey = this.cacheKey(orgId, 'one', id);
+    const cached = await this.redis.getJson<Record<string, unknown>>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const relation = await this.relations.findOne({ _id: id, orgId }).lean();
     if (!relation) throw new NotFoundException('Relation not found');
-    return this.composeRelation(id, relation);
+    const result = await this.composeRelation(id, relation);
+
+    await this.redis.setJson(cacheKey, result, 60);
+    return result;
   }
 
   async update(orgId: string, id: string, dto: UpdateRelationDto) {
@@ -78,6 +100,7 @@ export class RelationsService {
       }
     }
 
+    await this.invalidateCache(orgId, id);
     return this.getOne(orgId, id);
   }
 
@@ -91,6 +114,7 @@ export class RelationsService {
       this.displayColumns.deleteMany({ relationId: id }),
     ]);
 
+    await this.invalidateCache(orgId, id);
     return { deleted: true };
   }
 
@@ -105,6 +129,19 @@ export class RelationsService {
       matchKeys: matchKeys.map((m) => ({ sourceColumn: m.sourceColumn, targetColumn: m.targetColumn })),
       displayColumns: displayColumns.map((d) => d.columnName),
     };
+  }
+
+  private cacheKey(orgId: string, scope: string, ...parts: string[]): string {
+    return ['pf', 'relations', orgId, scope, ...parts].join(':');
+  }
+
+  private async invalidateCache(orgId: string, relationId?: string): Promise<void> {
+    await this.redis.delete(this.cacheKey(orgId, 'list'));
+    if (relationId) {
+      await this.redis.delete(this.cacheKey(orgId, 'one', relationId));
+    }
+    // Also invalidate view-data cache since relations affect it
+    await this.redis.delete(['pf', 'view-data', orgId].join(':'));
   }
 
   private ensureObjectId(value: string, label: string) {

@@ -62,6 +62,49 @@ export class RedisService implements OnModuleDestroy {
     await client.del(key);
   }
 
+  /**
+   * Delete all keys matching a prefix pattern.
+   * Falls back to simple memory map iteration for in-memory mode.
+   */
+  async deleteByPrefix(prefix: string): Promise<number> {
+    const client = await this.getClient();
+    if (!client) {
+      let count = 0;
+      for (const key of this.memory.keys()) {
+        if (key.startsWith(prefix)) {
+          this.memory.delete(key);
+          count++;
+        }
+      }
+      return count;
+    }
+
+    let cursor = '0';
+    let deleted = 0;
+    do {
+      const result = await client.scan(cursor, { MATCH: `${prefix}*`, COUNT: 100 });
+      cursor = String(result.cursor);
+      if (result.keys.length) {
+        await client.del(result.keys as any);
+        deleted += result.keys.length;
+      }
+    } while (cursor !== '0');
+
+    return deleted;
+  }
+
+  /**
+   * Check if a key exists.
+   */
+  async exists(key: string): Promise<boolean> {
+    const client = await this.getClient();
+    if (!client) {
+      return this.memory.has(key);
+    }
+    const result = await client.exists(key);
+    return result === 1;
+  }
+
   async onModuleDestroy(): Promise<void> {
     if (this.client) {
       await this.client.quit();
