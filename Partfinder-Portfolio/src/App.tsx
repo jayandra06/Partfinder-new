@@ -55,30 +55,35 @@ function postLoginPath(pathname: string): string {
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<MarketingHomePage />} />
+      <Route path="/" element={<PublicDashboardPage />} />
+      <Route path="/dashboard" element={<PublicDashboardPage />} />
       <Route path="/admin/*" element={<AdminPortalPage />} />
-      <Route path="/home" element={<Navigate to="/" replace />} />
+      <Route path="/home" element={<Navigate to="/dashboard" replace />} />
       <Route path="/test" element={<R4a />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   )
 }
 
-function MarketingHomePage() {
+function PublicDashboardPage() {
   return (
     <main className="page">
       <header className="hero">
-        <p className="badge">PartFinder Platform</p>
-        <h1>Modern spare parts platform for vendors and manufacturers</h1>
+        <p className="badge">PartFinder Dashboard</p>
+        <h1>Everyone can view the live platform dashboard</h1>
         <p className="sub">
-          Manage parts, users, and organizations from one simple admin panel.
+          See the headline metrics and open the admin area when you need to manage the platform.
         </p>
         <div className="actions">
+          <Link to="/admin/dashboard" className="btn-primary">
+            Open Dashboard
+          </Link>
           <Link to="/admin" className="btn-primary">
-            Admin Panel
+            Admin Login
           </Link>
         </div>
       </header>
+      <DashboardSection />
     </main>
   )
 }
@@ -93,6 +98,9 @@ function AdminPortalPage() {
   const [loginPending, setLoginPending] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
+  const isPublicDashboardRoute =
+    location.pathname === '/admin/dashboard' ||
+    location.pathname === '/dashboard'
 
   const handleSessionExpired = useCallback(() => {
     window.localStorage.removeItem(ADMIN_TOKEN_KEY)
@@ -145,7 +153,7 @@ function AdminPortalPage() {
     }
   }
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated && !isPublicDashboardRoute) {
     return (
       <main className="auth-page">
         <section className="auth-card">
@@ -178,6 +186,24 @@ function AdminPortalPage() {
             </button>
           </form>
         </section>
+      </main>
+    )
+  }
+
+  if (!isAuthenticated && isPublicDashboardRoute) {
+    return (
+      <main className="page">
+        <header className="hero">
+          <p className="badge">Public Dashboard</p>
+          <h1>PartFinder platform overview</h1>
+          <p className="sub">This dashboard is visible to anyone without signing in.</p>
+          <div className="actions">
+            <Link to="/admin" className="btn-primary">
+              Admin Login
+            </Link>
+          </div>
+        </header>
+        <DashboardSection />
       </main>
     )
   }
