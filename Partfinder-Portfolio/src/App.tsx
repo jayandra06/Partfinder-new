@@ -7,7 +7,7 @@ const ADMIN_TOKEN_KEY = 'pf_admin_token'
 /** In dev, prefer same-origin `/api` (Vite proxy) unless VITE_API_URL is set — avoids stale SW/caches to :3000. */
 const apiBase =
   import.meta.env.VITE_API_URL?.replace(/\/$/, '') ??
-  (import.meta.env.DEV ? '' : 'http://localhost:3000')
+  (import.meta.env.DEV ? '' : 'https://partfinder-backend.vercel.app')
 
 function parseApiErrorMessage(body: unknown): string {
   if (!body || typeof body !== 'object') {

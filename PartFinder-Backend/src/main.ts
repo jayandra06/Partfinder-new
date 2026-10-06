@@ -12,8 +12,11 @@ async function bootstrap() {
   app.useLogger(new AggregatingLogger(debugLogs));
   const config = app.get(ConfigService);
 
-  const corsOrigin = config.get<string>('CORS_ORIGIN') ?? 'http://localhost:5173';
-  const origins = corsOrigin.split(',').map((o) => o.trim()).filter(Boolean);
+  const corsOrigin = config.get<string>('CORS_ORIGIN') ?? '';
+  const origins = corsOrigin
+    .split(',')
+    .map((o) => o.trim())
+    .filter((o) => Boolean(o) && o !== '*');
 
   app.enableCors({
     origin: origins.length ? origins : true,
