@@ -91,5 +91,10 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
+  },
+  "overrides": {
+    "casbin-mongodb-adapter": {
+      "mongodb": "$mongodb"
+    }
   }
 }
