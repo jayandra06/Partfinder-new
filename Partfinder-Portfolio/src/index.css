@@ -259,6 +259,17 @@ h3 {
   padding: 24px 24px;
   display: grid;
   gap: 14px;
+  align-content: start;
+}
+
+.admin-layout .card {
+  background: #14161d;
+  border-color: #232734;
+  color: #e5e7eb;
+}
+
+.admin-layout .card h3 {
+  color: #f3f4f6;
 }
 
 .admin-topbar {
@@ -292,20 +303,30 @@ h3 {
   color: #1e293b;
 }
 
+.admin-layout .kpi-value {
+  color: #f9fafb;
+}
+
 .admin-section p {
   margin: 0;
   color: #475569;
 }
 
+.admin-layout .admin-section p {
+  color: #9ca3af;
+}
+
 .organizations-section {
   display: grid;
   gap: 12px;
+  align-content: start;
   position: relative;
 }
 
 .org-toolbar {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 12px;
 }
 
@@ -887,6 +908,7 @@ h3 {
 
   .org-toolbar {
     flex-direction: column;
+    align-items: stretch;
   }
 
   .org-toolbar input {
