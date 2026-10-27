@@ -11,7 +11,20 @@ File: `PartFinder/Package.appxmanifest`
 | Publisher display | `Euroasiann Group` |
 | Package family (derived) | `EuroasiannGroup.partfinder_8gdvw9rseb738` |
 | Architecture | x64 |
-| Version (current submission) | `3.0.2.0` |
+| Version (current submission) | `3.0.3.0` (see MSIX version scheme below) |
+
+### MSIX version scheme (Partner Center)
+
+Each **new upload** must have a unique four-part `Identity Version`. Use:
+
+```powershell
+# First package on a line: set explicitly (e.g. after a duplicate-version error)
+powershell -File .\PartFinder\scripts\bump-store-msix-version.ps1 -Set 3.0.3.0
+# Each subsequent GitHub Store release: bump revision
+powershell -File .\PartFinder\scripts\bump-store-msix-version.ps1 -BumpRevision
+```
+
+Sequence: `3.0.3.0` → `3.0.3.1` → … → `3.0.3.9` → `3.0.4.0`. Rebuild with `build-msix-store.ps1` after every bump.
 
 ## Store upload package (preferred)
 
@@ -45,7 +58,7 @@ Produces an unsigned `_Test` MSIX for local manifest checks, not for Store uploa
 ## Validate identity
 
 ```powershell
-powershell -File .\PartFinder\scripts\validate-msix-identity.ps1 -MsixPath "path\to\PartFinder_3.0.2.0_x64.msix"
+powershell -File .\PartFinder\scripts\validate-msix-identity.ps1 -MsixPath "path\to\PartFinder_3.0.3.0_x64.msix"
 ```
 
 ## Visual Studio (alternative)
@@ -59,7 +72,7 @@ powershell -File .\PartFinder\scripts\validate-msix-identity.ps1 -MsixPath "path
 
 1. [Partner Center](https://partner.microsoft.com/dashboard) → **PartFinder** (existing app).
 2. **Update** submission (not a new product).
-3. **Packages** → upload `PartFinder_3.0.2.0_x64.msixupload` (version must exceed the last published package).
+3. **Packages** → upload `PartFinder_3.0.3.0_x64.msixupload` (unique four-part version; bump with `bump-store-msix-version.ps1` before each upload).
 4. Complete certification sections and submit.
 
 Leave existing **1.0.0** packages on disk unchanged; bump `Package.appxmanifest` / `version.json` only when Partner Center requires a higher version.

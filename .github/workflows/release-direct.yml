@@ -32,15 +32,26 @@ jobs:
 
       - name: Bump version files
         shell: pwsh
-        run: ./PartFinder/scripts/bump-version.ps1 -Bump ${{ inputs.bump }}
+        run: |
+          if ('${{ inputs.bump }}' -eq 'patch') {
+            ./PartFinder/scripts/bump-store-msix-version.ps1 -BumpRevision
+          } else {
+            ./PartFinder/scripts/bump-version.ps1 -Bump ${{ inputs.bump }}
+          }
 
       - name: Read new version
         id: ver
         shell: pwsh
         run: |
-          $v = (Get-Content ./.github/.release-please-manifest.json -Raw | ConvertFrom-Json).'.'
-          "version=$v" >> $env:GITHUB_OUTPUT
-          "tag=v$v" >> $env:GITHUB_OUTPUT
+          $vj = Get-Content ./version.json -Raw | ConvertFrom-Json
+          if ($vj.msixVersion) {
+            "version=$($vj.msixVersion)" >> $env:GITHUB_OUTPUT
+            "tag=v$($vj.msixVersion)" >> $env:GITHUB_OUTPUT
+          } else {
+            $v = (Get-Content ./.github/.release-please-manifest.json -Raw | ConvertFrom-Json).'.'
+            "version=$v" >> $env:GITHUB_OUTPUT
+            "tag=v$v" >> $env:GITHUB_OUTPUT
+          }
 
       - name: Commit version bump
         shell: bash

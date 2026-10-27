@@ -49,6 +49,18 @@ Run **Actions → Release Please** manually only after enabling PR permission (s
 | `PartFinder/PartFinder/Package.appxmanifest` | MSIX four-part version |
 | `CHANGELOG.md` | Release notes |
 
+## Microsoft Store MSIX version (Partner Center)
+
+Each upload needs a **unique** four-part manifest version. After a duplicate-version error, set a new line explicitly, then bump revision for each GitHub release:
+
+```powershell
+powershell -File .\PartFinder\scripts\bump-store-msix-version.ps1 -Set 3.0.3.0
+powershell -File .\PartFinder\scripts\bump-store-msix-version.ps1 -BumpRevision   # 3.0.3.1, … 3.0.3.9, 3.0.4.0
+powershell -ExecutionPolicy Bypass -File .\PartFinder\build-msix-store.ps1
+```
+
+Tag releases with the MSIX quad (e.g. `v3.0.3.0`) and attach `PartFinder_<quad>_x64.msixupload`.
+
 ## Manual MSIX only
 
 **Actions → Build MSIX and attach to Release** → enter an existing semver (e.g. `1.0.1`).

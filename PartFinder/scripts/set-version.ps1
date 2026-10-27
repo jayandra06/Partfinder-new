@@ -19,7 +19,8 @@ $versionFile = Join-Path $repoRoot "version.json"
 $manifest = Join-Path $repoRoot "PartFinder\PartFinder\Package.appxmanifest"
 
 @{
-  version = ($parts[0..2] -join '.')
+  version     = ($parts[0..2] -join '.')
+  msixVersion = $appxVersion
 } | ConvertTo-Json | Set-Content -Path $versionFile -Encoding utf8
 
 $xml = Get-Content -Path $manifest -Raw
