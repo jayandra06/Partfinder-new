@@ -5,14 +5,17 @@ namespace PartFinder.Services;
 
 public static class MongoConnectionTester
 {
-    public static async Task<bool> TryPingAsync(string connectionString, CancellationToken ct = default)
+    public static async Task<bool> TryPingAsync(
+        string connectionString,
+        string? orgCode = null,
+        CancellationToken ct = default)
     {
         try
         {
-            var cs = MongoConnectionStringUtil.Normalize(connectionString);
+            var cs = MongoConnectionStringUtil.Prepare(connectionString, orgCode);
             var client = new MongoClient(cs);
-            _ = await client.GetDatabase("admin")
-                .RunCommandAsync<BsonDocument>(new BsonDocument("ping", 1), cancellationToken: ct)
+            var db = MongoConnectionStringUtil.GetTenantDatabase(client, cs, orgCode);
+            _ = await db.RunCommandAsync<BsonDocument>(new BsonDocument("ping", 1), cancellationToken: ct)
                 .ConfigureAwait(true);
             return true;
         }

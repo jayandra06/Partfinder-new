@@ -16,7 +16,7 @@
     <!-- Root grid -->
     <Grid x:Name="RootGrid" Background="{ThemeResource AppBackgroundBrush}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="56" />
+            <RowDefinition Height="64" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -25,8 +25,9 @@
         <!-- ═══════════════════════════════════════════════════ -->
         <Border x:Name="ShellTitleBarRoot"
                 Grid.Row="0"
-                Background="#0A0E15"
-                BorderBrush="{ThemeResource AppBorderBrush}"
+                RequestedTheme="Light"
+                Background="#FFFFFF"
+                BorderBrush="#E5E7EB"
                 BorderThickness="0,0,0,1"
                 Padding="12,0,16,0">
             <Grid ColumnSpacing="12">
@@ -43,16 +44,16 @@
                       HorizontalAlignment="Stretch">
                     <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
                         <Border Width="50" Height="50" CornerRadius="20"
-                                Background="{StaticResource ElevatedCardBackgroundBrush}">
+                                Background="#F3F4F6">
                             <Image Source="ms-appx:///Assets/logo.png" Stretch="Uniform" Margin="5" />
                         </Border>
                         <StackPanel Spacing="2" VerticalAlignment="Center">
                             <TextBlock Text="PartFinder"
                                        FontSize="17" FontWeight="Bold"
-                                       Foreground="{StaticResource TextPrimaryBrush}" />
+                                       Foreground="#1F2937" />
                             <TextBlock Text="Inventory Management"
                                        FontSize="11"
-                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       Foreground="#4B5563"
                                        CharacterSpacing="12"
                                        TextWrapping="NoWrap" />
                         </StackPanel>
@@ -75,39 +76,55 @@
                         </ItemsRepeater.Layout>
                         <ItemsRepeater.ItemTemplate>
                             <DataTemplate x:DataType="viewModels:NavItemViewModel">
-                                <Grid Width="40" Height="40"
-                                      CornerRadius="8"
-                                      PointerEntered="OnNavItemPointerEntered"
-                                      PointerExited="OnNavItemPointerExited"
-                                      Tapped="OnNavItemTapped"
-                                      Tag="{x:Bind Label}">
-                                    <FontIcon
-                                        Glyph="{x:Bind IconGlyph}"
-                                        FontSize="20"
-                                        HorizontalAlignment="Center"
-                                        VerticalAlignment="Center" />
-                                </Grid>
+                                <Border Height="40"
+                                        Padding="10,0"
+                                        CornerRadius="8"
+                                        Background="Transparent"
+                                        PointerEntered="OnNavItemPointerEntered"
+                                        PointerExited="OnNavItemPointerExited"
+                                        Tapped="OnNavItemTapped"
+                                        Tag="{x:Bind Label}">
+                                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <FontIcon
+                                            Glyph="{x:Bind IconGlyph}"
+                                            FontSize="16"
+                                            Foreground="#111827"
+                                            VerticalAlignment="Center" />
+                                        <TextBlock
+                                            Text="{x:Bind Label}"
+                                            FontSize="13"
+                                            FontWeight="SemiBold"
+                                            Foreground="#111827"
+                                            VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Border>
                             </DataTemplate>
                         </ItemsRepeater.ItemTemplate>
                     </ItemsRepeater>
                     <Button
                         x:Name="MoreNavButton"
-                        Width="40"
                         Height="40"
-                        Padding="0"
+                        Padding="10,0"
                         CornerRadius="8"
                         Background="Transparent"
-                        BorderBrush="{StaticResource BorderDefaultBrush}"
+                        BorderBrush="#D1D5DB"
                         BorderThickness="1"
+                        Foreground="#111827"
                         Visibility="{Binding HasOverflowNavigation, Converter={StaticResource BoolToVisibilityConverter}}"
                         Click="OnMoreNavButtonClick">
-                        <FontIcon Glyph="&#xE712;" FontSize="16" Foreground="{StaticResource TextSecondaryBrush}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE712;" FontSize="16" Foreground="#111827" VerticalAlignment="Center" />
+                            <TextBlock Text="More" FontSize="13" FontWeight="SemiBold" Foreground="#111827" VerticalAlignment="Center" />
+                        </StackPanel>
                     </Button>
                 </StackPanel>
 
                 <!-- RIGHT: Profile card (sticky right) -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" HorizontalAlignment="Right">
                     <Button Padding="8,4"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Foreground="#1F2937"
                             ToolTipService.ToolTip="Profile menu"
                             x:Name="ProfileMenuButton">
                         <Button.Content>
@@ -119,9 +136,10 @@
                                            Stretch="UniformToFill" Width="28" Height="28" />
                                 </Border>
                                 <TextBlock VerticalAlignment="Center" FontSize="13"
+                                           Foreground="#1F2937"
                                            Text="{Binding CurrentUserName}"
                                            TextTrimming="CharacterEllipsis" MaxWidth="90" />
-                                <FontIcon VerticalAlignment="Center" Glyph="&#xE70D;" FontSize="11" />
+                                <FontIcon VerticalAlignment="Center" Glyph="&#xE70D;" FontSize="11" Foreground="#4B5563" />
                             </StackPanel>
                         </Button.Content>
                         <Button.Flyout>
@@ -154,8 +172,8 @@
                 Canvas.ZIndex="999">
             <Canvas>
                 <Border x:Name="NavTooltipBox"
-                        Background="#1E2D45"
-                        BorderBrush="#2A3D58"
+                        Background="#FFFFFF"
+                        BorderBrush="#D1D5DB"
                         BorderThickness="1"
                         CornerRadius="7"
                         Padding="12,7"
@@ -163,7 +181,7 @@
                     <TextBlock x:Name="NavTooltipLabel"
                                FontSize="13"
                                FontWeight="SemiBold"
-                               Foreground="#EAF2FF" />
+                               Foreground="#1F2937" />
                 </Border>
             </Canvas>
         </Border>

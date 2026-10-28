@@ -25,10 +25,9 @@ public class MongoInventoryService
         if (!_setupContext.TryGetTenantMongoUri(out var raw) || string.IsNullOrWhiteSpace(raw))
             return null;
 
-        var cs = MongoConnectionStringUtil.Normalize(raw);
-        var url = new MongoUrl(cs);
+        var cs = MongoConnectionStringUtil.Prepare(raw, _setupContext.OrgCode);
         var client = new MongoClient(cs);
-        var db = client.GetDatabase(url.DatabaseName ?? "admin");
+        var db = MongoConnectionStringUtil.GetTenantDatabase(client, cs, _setupContext.OrgCode);
         return db.GetCollection<InventoryDoc>(CollectionName);
     }
 

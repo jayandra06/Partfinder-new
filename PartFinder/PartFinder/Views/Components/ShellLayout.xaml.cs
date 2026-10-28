@@ -135,7 +135,7 @@ public sealed partial class ShellLayout : UserControl
     // ── Tooltip — rendered at root level, shows BELOW the nav icon ──────
     private void OnNavItemPointerEntered(object sender, PointerRoutedEventArgs e)
     {
-        if (sender is not Grid grid) return;
+        if (sender is not FrameworkElement grid) return;
 
         string label = grid.Tag as string ?? string.Empty;
         if (string.IsNullOrEmpty(label)) return;
@@ -162,7 +162,7 @@ public sealed partial class ShellLayout : UserControl
 
     private void OnNavItemTapped(object sender, TappedRoutedEventArgs e)
     {
-        if (sender is not Grid grid || DataContext is not ShellViewModel vm)
+        if (sender is not FrameworkElement grid || DataContext is not ShellViewModel vm)
         {
             return;
         }

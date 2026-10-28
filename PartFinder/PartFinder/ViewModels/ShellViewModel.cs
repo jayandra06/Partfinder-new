@@ -237,8 +237,25 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
         await LoadAvatarAsync(_profile.AvatarPath).ConfigureAwait(true);
         await RefreshAlertBadgeAsync().ConfigureAwait(true);
 
-        await _access.RefreshAsync().ConfigureAwait(true);
-        var hasMaster = await HasMasterDataTemplateAsync().ConfigureAwait(true);
+        try
+        {
+            await _access.RefreshAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            DebugLogClient.Post("warn", "ShellViewModel.InitializeAsync.RefreshAccess", ex.ToString());
+        }
+
+        var hasMaster = false;
+        try
+        {
+            hasMaster = await HasMasterDataTemplateAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            DebugLogClient.Post("warn", "ShellViewModel.InitializeAsync.HasMasterDataTemplate", ex.ToString());
+        }
+
         RebuildNavigationItems(hasMaster, _access.Capabilities);
 
         // For invited users (not org creator), resolve display name from database

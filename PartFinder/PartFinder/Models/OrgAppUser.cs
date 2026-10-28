@@ -57,4 +57,16 @@ public sealed class OrgAppUserSummary
             : PartsAllTemplates
                 ? "Parts (all part templates)"
                 : $"Parts ({AllowedTemplateIds.Count} template(s))";
+
+    /// <summary>First letter of the user's name for the avatar circle.</summary>
+    public string Initials =>
+        string.IsNullOrWhiteSpace(Name)
+            ? "?"
+            : Name.Trim()[..1].ToUpperInvariant();
+
+    /// <summary>Human-readable invited date.</summary>
+    public string InvitedAtDisplay =>
+        InvitedAtUtc == default
+            ? "—"
+            : InvitedAtUtc.ToLocalTime().ToString("dd MMM yyyy");
 }

@@ -1,3 +1,5 @@
+using MongoDB.Driver;
+
 namespace PartFinder.Services;
 
 /// <summary>
@@ -45,6 +47,105 @@ internal static class MongoConnectionStringUtil
 
         var sep = s.Contains('?') ? "&" : "?";
         return $"{s}{sep}tls=true";
+    }
+
+    /// <summary>
+    /// Resolves the database name for tenant operations.
+    /// Default provisioning stores each organization in a database named after its org code.
+    /// A missing path, or an explicit "admin" path, must never be used: Atlas tenant users
+    /// are not authorized to run application commands against the admin database.
+    /// </summary>
+    public static string ResolveDatabaseName(string? databaseName, string? orgCode = null)
+    {
+        if (!string.IsNullOrWhiteSpace(databaseName) &&
+            !string.Equals(databaseName.Trim(), "admin", StringComparison.OrdinalIgnoreCase))
+        {
+            return databaseName.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(orgCode))
+        {
+            return orgCode.Trim();
+        }
+
+        return "partfinder";
+    }
+
+    /// <summary>
+    /// Inserts <paramref name="defaultDbName"/> when the URI has no database path, or when that path is "admin".
+    /// Query parameters are preserved.
+    /// </summary>
+    public static string EnsureDatabase(string uri, string defaultDbName)
+    {
+        if (string.IsNullOrWhiteSpace(uri) || string.IsNullOrWhiteSpace(defaultDbName))
+        {
+            return uri ?? string.Empty;
+        }
+
+        var trimmed = uri.Trim();
+        var qIndex = trimmed.IndexOf('?');
+        var query = qIndex >= 0 ? trimmed[qIndex..] : string.Empty;
+        var withoutQuery = qIndex >= 0 ? trimmed[..qIndex] : trimmed;
+        var dbSegment = Uri.EscapeDataString(defaultDbName.Trim());
+
+        var schemeIdx = withoutQuery.IndexOf("//", StringComparison.Ordinal);
+        if (schemeIdx < 0)
+        {
+            return $"{trimmed}/{dbSegment}";
+        }
+
+        var pathStart = withoutQuery.IndexOf('/', schemeIdx + 2);
+        if (pathStart < 0)
+        {
+            return $"{withoutQuery}/{dbSegment}{query}";
+        }
+
+        var path = withoutQuery[(pathStart + 1)..].Trim().Trim('/');
+        if (string.IsNullOrWhiteSpace(path) ||
+            string.Equals(path, "admin", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"{withoutQuery[..pathStart]}/{dbSegment}{query}";
+        }
+
+        return trimmed;
+    }
+
+    /// <summary>
+    /// Normalizes TLS settings and guarantees the tenant database is present in the URI.
+    /// </summary>
+    public static string Prepare(string? connectionString, string? orgCode = null)
+    {
+        var normalized = Normalize(connectionString);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return normalized;
+        }
+
+        string? urlDatabaseName = null;
+        try
+        {
+            urlDatabaseName = new MongoUrl(normalized).DatabaseName;
+        }
+        catch (MongoConfigurationException)
+        {
+            return normalized;
+        }
+
+        var dbName = ResolveDatabaseName(urlDatabaseName, orgCode);
+        return EnsureDatabase(normalized, dbName);
+    }
+
+    /// <summary>
+    /// Returns the tenant database instance using normalized connection settings.
+    /// </summary>
+    public static IMongoDatabase GetTenantDatabase(
+        MongoClient client,
+        string connectionString,
+        string? orgCode = null)
+    {
+        var url = new MongoUrl(connectionString);
+        var dbName = ResolveDatabaseName(url.DatabaseName, orgCode);
+        return client.GetDatabase(dbName);
     }
 
     private static bool QueryHasTls(string uri)

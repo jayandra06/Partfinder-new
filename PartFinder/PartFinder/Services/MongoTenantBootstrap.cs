@@ -10,19 +10,13 @@ public static class MongoTenantBootstrap
 {
     public const string OrgAdminCollection = "org_admin_users";
 
-    public static async Task<bool> TryInitializeTenantAsync(string uri, CancellationToken ct = default)
+    public static async Task<bool> TryInitializeTenantAsync(string uri, string? orgCode = null, CancellationToken ct = default)
     {
         try
         {
-            var cs = MongoConnectionStringUtil.Normalize(uri);
-            var url = new MongoUrl(cs);
-            if (string.IsNullOrEmpty(url.DatabaseName))
-            {
-                return false;
-            }
-
+            var cs = MongoConnectionStringUtil.Prepare(uri, orgCode);
             var client = new MongoClient(cs);
-            var db = client.GetDatabase(url.DatabaseName);
+            var db = MongoConnectionStringUtil.GetTenantDatabase(client, cs, orgCode);
             var admins = db.GetCollection<BsonDocument>(OrgAdminCollection);
             var emailKey = Builders<BsonDocument>.IndexKeys.Ascending("email");
             await admins.Indexes.CreateOneAsync(
@@ -48,19 +42,13 @@ public static class MongoTenantBootstrap
         }
     }
 
-    public static async Task<long> CountOrgAdminsAsync(string uri, CancellationToken ct = default)
+    public static async Task<long> CountOrgAdminsAsync(string uri, string? orgCode = null, CancellationToken ct = default)
     {
         try
         {
-            var cs = MongoConnectionStringUtil.Normalize(uri);
-            var url = new MongoUrl(cs);
-            if (string.IsNullOrEmpty(url.DatabaseName))
-            {
-                return 0;
-            }
-
+            var cs = MongoConnectionStringUtil.Prepare(uri, orgCode);
             var client = new MongoClient(cs);
-            var db = client.GetDatabase(url.DatabaseName);
+            var db = MongoConnectionStringUtil.GetTenantDatabase(client, cs, orgCode);
             var coll = db.GetCollection<BsonDocument>(OrgAdminCollection);
             return await coll.CountDocumentsAsync(FilterDefinition<BsonDocument>.Empty, cancellationToken: ct)
                 .ConfigureAwait(true);

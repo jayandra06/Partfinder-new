@@ -93,7 +93,21 @@ public sealed class LocalSetupContext : ILocalSetupContext
     public bool TryGetTenantMongoUri([NotNullWhen(true)] out string? uri)
     {
         Refresh();
-        uri = _cachedUri;
+        if (string.IsNullOrWhiteSpace(_cachedUri))
+        {
+            uri = null;
+            return false;
+        }
+
+        try
+        {
+            uri = MongoConnectionStringUtil.Prepare(_cachedUri, _cachedOrgCode);
+        }
+        catch (ArgumentException)
+        {
+            uri = _cachedUri;
+        }
+
         return !string.IsNullOrWhiteSpace(uri);
     }
 }
