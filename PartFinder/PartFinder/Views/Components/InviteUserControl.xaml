@@ -14,102 +14,119 @@
             <Setter Property="FontSize" Value="11" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
-            <Setter Property="Margin" Value="0,0,0,6" />
+            <Setter Property="Margin" Value="0,0,0,4" />
             <Setter Property="CharacterSpacing" Value="60" />
         </Style>
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="600">
-        <StackPanel Spacing="16" Padding="0,0,12,0">
+        <StackPanel Spacing="14" Padding="0,0,12,0">
 
-            <!-- Email field -->
-            <StackPanel Spacing="6">
-                <TextBlock Text="EMAIL ADDRESS" Style="{StaticResource InviteFieldLabelStyle}" />
-                <TextBox
-                    PlaceholderText="name@company.com"
-                    FontSize="13"
-                    Padding="12,10"
-                    IsReadOnly="{Binding IsEditMode}"
-                    Text="{Binding InviteEmail, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-            </StackPanel>
+            <!-- Email + Full Name side by side -->
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
 
-            <!-- Full Name field -->
-            <StackPanel Spacing="6">
-                <TextBlock Text="FULL NAME" Style="{StaticResource InviteFieldLabelStyle}" />
-                <TextBox
-                    PlaceholderText="John Doe"
-                    FontSize="13"
-                    Padding="12,10"
-                    Text="{Binding InviteName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-            </StackPanel>
+                <StackPanel Grid.Column="0" Spacing="4">
+                    <TextBlock Text="EMAIL ADDRESS" Style="{StaticResource InviteFieldLabelStyle}" />
+                    <TextBox
+                        PlaceholderText="name@company.com"
+                        FontSize="13"
+                        Padding="10,8"
+                        IsReadOnly="{Binding IsEditMode}"
+                        Text="{Binding InviteEmail, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Spacing="4">
+                    <TextBlock Text="FULL NAME" Style="{StaticResource InviteFieldLabelStyle}" />
+                    <TextBox
+                        PlaceholderText="John Doe"
+                        FontSize="13"
+                        Padding="10,8"
+                        Text="{Binding InviteName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                </StackPanel>
+            </Grid>
 
             <!-- Role selector -->
-            <StackPanel Spacing="6">
+            <StackPanel Spacing="4">
                 <TextBlock Text="ROLE" Style="{StaticResource InviteFieldLabelStyle}" />
                 <ComboBox
                     ItemsSource="{Binding RoleOptions}"
                     PlaceholderText="Select role"
                     FontSize="13"
-                    Padding="12,10"
+                    Padding="10,8"
                     HorizontalAlignment="Stretch"
                     SelectedItem="{Binding InviteRole, Mode=TwoWay}" />
             </StackPanel>
 
             <!-- Role info tip -->
-            <Border Background="{StaticResource CardBackgroundBrush}" CornerRadius="8" Padding="12" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1">
-                <StackPanel Spacing="6">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <FontIcon Glyph="&#xE946;" FontSize="14" Foreground="{StaticResource AccentPrimaryBrush}" VerticalAlignment="Top" />
-                        <TextBlock
-                            Text="Admin: Full access to all features. Employee: Parts inventory only."
-                            FontSize="11"
-                            Foreground="{StaticResource TextSecondaryBrush}"
-                            TextWrapping="WrapWholeWords" />
-                    </StackPanel>
+            <Border Background="{StaticResource CardBackgroundBrush}" CornerRadius="6" Padding="10" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE946;" FontSize="14" Foreground="{StaticResource AccentPrimaryBrush}" VerticalAlignment="Top" />
+                    <TextBlock
+                        Text="Admin: Full access to all features. Employee: Parts inventory only."
+                        FontSize="11"
+                        Foreground="{StaticResource TextSecondaryBrush}"
+                        TextWrapping="WrapWholeWords" />
                 </StackPanel>
             </Border>
 
             <!-- Granular Permissions (Employee only) -->
-            <StackPanel Visibility="{Binding IsEmployeeRole, Converter={StaticResource BoolToVisibilityConverter}}" Spacing="12">
-                <TextBlock Text="TEMPLATE PERMISSIONS" Style="{StaticResource InviteFieldLabelStyle}" />
-                <ItemsControl>
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <VariableSizedWrapGrid Orientation="Horizontal" MaximumRowsOrColumns="4" ItemWidth="90" />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <CheckBox Content="Add" IsChecked="{Binding InviteCanAddTemplate, Mode=TwoWay}" FontSize="12" />
-                    <CheckBox Content="View" IsChecked="{Binding InviteCanViewTemplate, Mode=TwoWay}" FontSize="12" />
-                    <CheckBox Content="Edit" IsChecked="{Binding InviteCanEditTemplate, Mode=TwoWay}" FontSize="12" />
-                    <CheckBox Content="Delete" IsChecked="{Binding InviteCanDeleteTemplate, Mode=TwoWay}" FontSize="12" />
-                </ItemsControl>
+            <StackPanel Visibility="{Binding IsEmployeeRole, Converter={StaticResource BoolToVisibilityConverter}}" Spacing="10">
 
-                <TextBlock Text="EXPLORER PERMISSIONS" Style="{StaticResource InviteFieldLabelStyle}" Margin="0,4,0,0" />
-                <ItemsControl>
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <VariableSizedWrapGrid Orientation="Horizontal" MaximumRowsOrColumns="3" ItemWidth="110" />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <CheckBox Content="View" IsChecked="{Binding InviteCanViewMasterData, Mode=TwoWay}" FontSize="12" />
-                    <CheckBox Content="Edit" IsChecked="{Binding InviteCanEditMasterData, Mode=TwoWay}" FontSize="12" />
-                    <CheckBox Content="Add" IsChecked="{Binding InviteCanAddMasterData, Mode=TwoWay}" FontSize="12" />
-                    <CheckBox Content="Delete" IsChecked="{Binding InviteCanDeleteMasterData, Mode=TwoWay}" FontSize="12" />
-                    <CheckBox Content="Copy" IsChecked="{Binding InviteCanCopyMasterData, Mode=TwoWay}" FontSize="12" />
-                </ItemsControl>
+                <!-- Template Permissions -->
+                <StackPanel Spacing="4">
+                    <TextBlock Text="TEMPLATE PERMISSIONS" Style="{StaticResource InviteFieldLabelStyle}" />
+                    <Grid ColumnSpacing="0" RowSpacing="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <CheckBox Grid.Column="0" Content="Add" IsChecked="{Binding InviteCanAddTemplate, Mode=TwoWay}" FontSize="12" MinWidth="0" />
+                        <CheckBox Grid.Column="1" Content="View" IsChecked="{Binding InviteCanViewTemplate, Mode=TwoWay}" FontSize="12" MinWidth="0" />
+                        <CheckBox Grid.Column="2" Content="Edit" IsChecked="{Binding InviteCanEditTemplate, Mode=TwoWay}" FontSize="12" MinWidth="0" />
+                        <CheckBox Grid.Column="3" Content="Delete" IsChecked="{Binding InviteCanDeleteTemplate, Mode=TwoWay}" FontSize="12" MinWidth="0" />
+                    </Grid>
+                </StackPanel>
+
+                <!-- Master Data Permissions -->
+                <StackPanel Spacing="4">
+                    <TextBlock Text="MASTER DATA PERMISSIONS" Style="{StaticResource InviteFieldLabelStyle}" />
+                    <Grid ColumnSpacing="0" RowSpacing="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <CheckBox Grid.Row="0" Grid.Column="0" Content="View" IsChecked="{Binding InviteCanViewMasterData, Mode=TwoWay}" FontSize="12" MinWidth="0" />
+                        <CheckBox Grid.Row="0" Grid.Column="1" Content="Edit" IsChecked="{Binding InviteCanEditMasterData, Mode=TwoWay}" FontSize="12" MinWidth="0" />
+                        <CheckBox Grid.Row="0" Grid.Column="2" Content="Add" IsChecked="{Binding InviteCanAddMasterData, Mode=TwoWay}" FontSize="12" MinWidth="0" />
+                        <CheckBox Grid.Row="1" Grid.Column="0" Content="Delete" IsChecked="{Binding InviteCanDeleteMasterData, Mode=TwoWay}" FontSize="12" MinWidth="0" />
+                        <CheckBox Grid.Row="1" Grid.Column="1" Content="Copy" IsChecked="{Binding InviteCanCopyMasterData, Mode=TwoWay}" FontSize="12" MinWidth="0" />
+                    </Grid>
+                </StackPanel>
             </StackPanel>
 
             <!-- Template access (Employee only) -->
-            <StackPanel Visibility="{Binding IsEmployeeRole, Converter={StaticResource BoolToVisibilityConverter}}" Spacing="8">
-                <Border Background="{StaticResource ElevatedCardBackgroundBrush}" CornerRadius="8" Padding="12" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1">
-                    <StackPanel Spacing="8">
+            <StackPanel Visibility="{Binding IsEmployeeRole, Converter={StaticResource BoolToVisibilityConverter}}" Spacing="6">
+                <Border Background="{StaticResource ElevatedCardBackgroundBrush}" CornerRadius="6" Padding="10" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1">
+                    <StackPanel Spacing="6">
                         <CheckBox Content="Grant access to all templates" IsChecked="{Binding InvitePartsAllTemplates, Mode=TwoWay}" FontSize="12" />
                         <TextBlock
                             Foreground="{StaticResource TextTertiaryBrush}"
                             FontSize="10"
-                            Text="Uncheck to select specific templates" />
+                            Text="Uncheck to select specific templates"
+                            Margin="0,0,0,2" />
 
-                        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
                             <Button
                                 Content="Select All"
                                 FontSize="11"
@@ -127,13 +144,13 @@
                 </Border>
 
                 <ScrollViewer
-                    MaxHeight="160"
+                    MaxHeight="140"
                     VerticalScrollBarVisibility="Auto">
                     <ItemsControl ItemsSource="{Binding TemplateChoices}" IsEnabled="{Binding CanPickSpecificTemplates}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <CheckBox
-                                    Margin="0,4,0,4"
+                                    Margin="0,2,0,2"
                                     Content="{Binding Name}"
                                     IsChecked="{Binding IsSelected, Mode=TwoWay}"
                                     FontSize="12" />

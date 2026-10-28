@@ -27,46 +27,61 @@ public sealed class MongoOrgUserDirectoryService : IOrgUserDirectoryService
             return null;
         }
 
-        var cs = MongoConnectionStringUtil.Normalize(raw);
-        var url = new MongoUrl(cs);
+        var cs = MongoConnectionStringUtil.Prepare(raw, _setupContext.OrgCode);
         var client = new MongoClient(cs);
-        var db = client.GetDatabase(url.DatabaseName ?? "admin");
+        var db = MongoConnectionStringUtil.GetTenantDatabase(client, cs, _setupContext.OrgCode);
         return db.GetCollection<OrgAppUserDoc>(CollectionName);
     }
 
     public async Task<IReadOnlyList<OrgAppUserSummary>> ListUsersAsync(CancellationToken cancellationToken = default)
     {
-        var coll = TryGetCollection();
-        if (coll is null)
+        try
         {
+            var coll = TryGetCollection();
+            if (coll is null)
+            {
+                return Array.Empty<OrgAppUserSummary>();
+            }
+
+            var list = await coll.Find(FilterDefinition<OrgAppUserDoc>.Empty)
+                .SortByDescending(d => d.InvitedAtUtc)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+            return list.Select(Map).ToList();
+        }
+        catch (Exception ex)
+        {
+            DebugLogClient.Post("warn", "MongoOrgUserDirectoryService.ListUsersAsync", ex.Message);
             return Array.Empty<OrgAppUserSummary>();
         }
-
-        var list = await coll.Find(FilterDefinition<OrgAppUserDoc>.Empty)
-            .SortByDescending(d => d.InvitedAtUtc)
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-        return list.Select(Map).ToList();
     }
 
     public async Task<OrgAppUserSummary?> FindByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
-        var coll = TryGetCollection();
-        if (coll is null)
+        try
         {
+            var coll = TryGetCollection();
+            if (coll is null)
+            {
+                return null;
+            }
+
+            var em = email.Trim();
+            if (string.IsNullOrEmpty(em))
+            {
+                return null;
+            }
+
+            var doc = await coll.Find(x => x.EmailNormalized == NormalizeEmail(em))
+                .FirstOrDefaultAsync(cancellationToken)
+                .ConfigureAwait(false);
+            return doc is null ? null : Map(doc);
+        }
+        catch (Exception ex)
+        {
+            DebugLogClient.Post("warn", "MongoOrgUserDirectoryService.FindByEmailAsync", ex.Message);
             return null;
         }
-
-        var em = email.Trim();
-        if (string.IsNullOrEmpty(em))
-        {
-            return null;
-        }
-
-        var doc = await coll.Find(x => x.EmailNormalized == NormalizeEmail(em))
-            .FirstOrDefaultAsync(cancellationToken)
-            .ConfigureAwait(false);
-        return doc is null ? null : Map(doc);
     }
 
     public async Task<InviteUserResult> InviteUserAsync(

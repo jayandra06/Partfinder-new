@@ -78,17 +78,37 @@ public partial class UserManagementViewModel : ViewModelBase
         ApplyFilter();
     }
 
-    public int TotalUsersCount => _allUsers.Count;
-    public int ActiveUsersCount => _allUsers.Count(u => u.Status == "Active");
-    public int AdminUsersCount => _allUsers.Count(u => u.Role == "Admin");
-    public int PendingUsersCount => _allUsers.Count(u => u.Status == "Pending");
+    private int _totalUsersCount;
+    public int TotalUsersCount
+    {
+        get => _totalUsersCount;
+        private set => SetProperty(ref _totalUsersCount, value);
+    }
+    private int _activeUsersCount;
+    public int ActiveUsersCount
+    {
+        get => _activeUsersCount;
+        private set => SetProperty(ref _activeUsersCount, value);
+    }
+    private int _adminUsersCount;
+    public int AdminUsersCount
+    {
+        get => _adminUsersCount;
+        private set => SetProperty(ref _adminUsersCount, value);
+    }
+    private int _pendingUsersCount;
+    public int PendingUsersCount
+    {
+        get => _pendingUsersCount;
+        private set => SetProperty(ref _pendingUsersCount, value);
+    }
 
     private void NotifyKpiChanges()
     {
-        OnPropertyChanged(nameof(TotalUsersCount));
-        OnPropertyChanged(nameof(ActiveUsersCount));
-        OnPropertyChanged(nameof(AdminUsersCount));
-        OnPropertyChanged(nameof(PendingUsersCount));
+        TotalUsersCount = _allUsers.Count;
+        ActiveUsersCount = _allUsers.Count(u => u.Status == "Active");
+        AdminUsersCount = _allUsers.Count(u => u.Role == "Admin");
+        PendingUsersCount = _allUsers.Count(u => u.Status == "Pending");
     }
 
     partial void OnSearchQueryChanged(string value)

@@ -27,88 +27,96 @@ public sealed class CurrentUserAccessService : ICurrentUserAccessService
 
     public async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
-        _setupContext.Refresh();
-        _adminSession.Load();
-
-        var email = ResolveCurrentEmail();
-        if (string.IsNullOrWhiteSpace(email))
+        try
         {
-            _capabilities = UserAccessCapabilities.FullAdmin;
-            return;
-        }
+            _setupContext.Refresh();
+            _adminSession.Load();
 
-        var record = await _users.FindByEmailAsync(email, cancellationToken).ConfigureAwait(false);
-        if (record is null)
-        {
-            // No record in org_app_users means this is the org creator (in org_admins collection).
-            // Org creator gets full access including User Management.
-            _capabilities = UserAccessCapabilities.FullAdmin;
-            return;
-        }
-
-        if (string.Equals(record.Role, "Admin", StringComparison.OrdinalIgnoreCase))
-        {
-            // Invited admin — full access EXCEPT User Management (only org creator can manage users).
-            _capabilities = new UserAccessCapabilities
+            var email = ResolveCurrentEmail();
+            if (string.IsNullOrWhiteSpace(email))
             {
-                CanAccessMasterData = true,
-                CanAccessDashboard = true,
-                CanAccessParts = true,
-                CanAccessTemplates = true,
-                CanAccessSettings = true,
-                CanAccessUserManagement = false,
+                _capabilities = UserAccessCapabilities.FullAdmin;
+                return;
+            }
 
-                CanAddTemplate = true,
-                CanViewTemplate = true,
-                CanEditTemplate = true,
-                CanDeleteTemplate = true,
-
-                CanCopyMasterData = true,
-                CanViewMasterData = true,
-                CanEditMasterData = true,
-                CanAddMasterData = true,
-                CanDeleteMasterData = true,
-
-                PartsAllTemplates = true,
-                AllowedTemplateIds = Array.Empty<string>(),
-            };
-            return;
-        }
-
-        if (string.Equals(record.Role, "Employee", StringComparison.OrdinalIgnoreCase))
-        {
-            _capabilities = new UserAccessCapabilities
+            var record = await _users.FindByEmailAsync(email, cancellationToken).ConfigureAwait(false);
+            if (record is null)
             {
-                // Page-level access (navbar visibility) — Employee sees all standard pages.
-                // Granular permissions below decide what they can DO inside each page.
-                CanAccessMasterData = true,
-                CanAccessDashboard = true,
-                CanAccessParts = true,
-                CanAccessTemplates = true,
-                CanAccessSettings = true,
-                CanAccessUserManagement = false,
+                // No record in org_app_users means this is the org creator (in org_admins collection).
+                // Org creator gets full access including User Management.
+                _capabilities = UserAccessCapabilities.FullAdmin;
+                return;
+            }
 
-                // Granular template permissions (actual operations)
-                CanAddTemplate = record.TemplatePermissions?.Add ?? false,
-                CanViewTemplate = record.TemplatePermissions?.View ?? false,
-                CanEditTemplate = record.TemplatePermissions?.Edit ?? false,
-                CanDeleteTemplate = record.TemplatePermissions?.Delete ?? false,
+            if (string.Equals(record.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+            {
+                // Invited admin — full access EXCEPT User Management (only org creator can manage users).
+                _capabilities = new UserAccessCapabilities
+                {
+                    CanAccessMasterData = true,
+                    CanAccessDashboard = true,
+                    CanAccessParts = true,
+                    CanAccessTemplates = true,
+                    CanAccessSettings = true,
+                    CanAccessUserManagement = false,
 
-                // Granular master data permissions (actual operations)
-                CanCopyMasterData = record.MasterDataPermissions?.Copy ?? false,
-                CanViewMasterData = record.MasterDataPermissions?.View ?? false,
-                CanEditMasterData = record.MasterDataPermissions?.Edit ?? false,
-                CanAddMasterData = record.MasterDataPermissions?.Add ?? false,
-                CanDeleteMasterData = record.MasterDataPermissions?.Delete ?? false,
+                    CanAddTemplate = true,
+                    CanViewTemplate = true,
+                    CanEditTemplate = true,
+                    CanDeleteTemplate = true,
 
-                PartsAllTemplates = record.PartsAllTemplates,
-                AllowedTemplateIds = record.AllowedTemplateIds,
-            };
-            return;
+                    CanCopyMasterData = true,
+                    CanViewMasterData = true,
+                    CanEditMasterData = true,
+                    CanAddMasterData = true,
+                    CanDeleteMasterData = true,
+
+                    PartsAllTemplates = true,
+                    AllowedTemplateIds = Array.Empty<string>(),
+                };
+                return;
+            }
+
+            if (string.Equals(record.Role, "Employee", StringComparison.OrdinalIgnoreCase))
+            {
+                _capabilities = new UserAccessCapabilities
+                {
+                    // Page-level access (navbar visibility) — Employee sees all standard pages.
+                    // Granular permissions below decide what they can DO inside each page.
+                    CanAccessMasterData = true,
+                    CanAccessDashboard = true,
+                    CanAccessParts = true,
+                    CanAccessTemplates = true,
+                    CanAccessSettings = true,
+                    CanAccessUserManagement = false,
+
+                    // Granular template permissions (actual operations)
+                    CanAddTemplate = record.TemplatePermissions?.Add ?? false,
+                    CanViewTemplate = record.TemplatePermissions?.View ?? false,
+                    CanEditTemplate = record.TemplatePermissions?.Edit ?? false,
+                    CanDeleteTemplate = record.TemplatePermissions?.Delete ?? false,
+
+                    // Granular master data permissions (actual operations)
+                    CanCopyMasterData = record.MasterDataPermissions?.Copy ?? false,
+                    CanViewMasterData = record.MasterDataPermissions?.View ?? false,
+                    CanEditMasterData = record.MasterDataPermissions?.Edit ?? false,
+                    CanAddMasterData = record.MasterDataPermissions?.Add ?? false,
+                    CanDeleteMasterData = record.MasterDataPermissions?.Delete ?? false,
+
+                    PartsAllTemplates = record.PartsAllTemplates,
+                    AllowedTemplateIds = record.AllowedTemplateIds,
+                };
+                return;
+            }
+
+            // Unknown role — default to FullAdmin for backward compatibility.
+            _capabilities = UserAccessCapabilities.FullAdmin;
         }
-
-        // Unknown role — default to FullAdmin for backward compatibility.
-        _capabilities = UserAccessCapabilities.FullAdmin;
+        catch (Exception ex)
+        {
+            DebugLogClient.Post("warn", "CurrentUserAccessService.RefreshAsync", ex.Message);
+            _capabilities = UserAccessCapabilities.FullAdmin;
+        }
     }
 
     public IReadOnlyList<PartTemplateDefinition> FilterTemplatesForParts(IReadOnlyList<PartTemplateDefinition> templates)

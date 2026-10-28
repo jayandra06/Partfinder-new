@@ -177,7 +177,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        if (!await MongoConnectionTester.TryPingAsync(dbUri))
+        if (!await MongoConnectionTester.TryPingAsync(dbUri, orgCode))
         {
             ShowSubscriptionBlocked(
                 "Cannot reach your organization MongoDB from this PC. Check the network or MongoDB URI.");
@@ -368,7 +368,7 @@ public sealed partial class MainWindow : Window
                 return;
             }
 
-            if (!await MongoConnectionTester.TryPingAsync(dbUri))
+            if (!await MongoConnectionTester.TryPingAsync(dbUri, code))
             {
                 ShowSubscriptionBlocked(
                     "Cannot reach your organization MongoDB from this PC. Check the network or MongoDB URI.");
@@ -519,7 +519,15 @@ public sealed partial class MainWindow : Window
     {
         var st = LoadSetupState();
         st.orgCode = code;
-        st.dbUri = uri;
+        try
+        {
+            st.dbUri = MongoConnectionStringUtil.Prepare(uri, code);
+        }
+        catch (ArgumentException)
+        {
+            st.dbUri = uri;
+        }
+
         SaveSetupState(st);
     }
 
@@ -529,7 +537,20 @@ public sealed partial class MainWindow : Window
         var st = LoadSetupState();
         st.completed = true;
         st.orgCode = _workingOrgCode;
-        st.dbUri = _cachedOrgDatabaseUri;
+        var storedUri = _cachedOrgDatabaseUri;
+        if (!string.IsNullOrWhiteSpace(storedUri))
+        {
+            try
+            {
+                storedUri = MongoConnectionStringUtil.Prepare(storedUri, _workingOrgCode);
+            }
+            catch (ArgumentException)
+            {
+                // Keep the URI that was entered when it is not a Mongo connection string.
+            }
+        }
+
+        st.dbUri = storedUri;
         st.databaseMode = mode;
         st.adminName = "Organization Admin";
         st.adminEmail = string.IsNullOrWhiteSpace(_resolvedSignedInEmail)
@@ -574,20 +595,22 @@ public sealed partial class MainWindow : Window
             ExtendsContentIntoTitleBar = true;
             SetTitleBar(ShellRoot.ShellTitleBarDragTarget);
 
-            Windows.UI.Color bar = Windows.UI.Color.FromArgb(255, 10, 14, 21);
+            Windows.UI.Color bar = Windows.UI.Color.FromArgb(255, 255, 255, 255);
+            Windows.UI.Color text = Windows.UI.Color.FromArgb(255, 31, 41, 55);
+            Windows.UI.Color muted = Windows.UI.Color.FromArgb(255, 107, 114, 128);
             caption.BackgroundColor = bar;
             caption.InactiveBackgroundColor = bar;
-            caption.ForegroundColor = Windows.UI.Color.FromArgb(255, 234, 242, 255);
-            caption.InactiveForegroundColor = Windows.UI.Color.FromArgb(255, 127, 141, 168);
+            caption.ForegroundColor = text;
+            caption.InactiveForegroundColor = muted;
 
             caption.ButtonBackgroundColor = bar;
             caption.ButtonInactiveBackgroundColor = bar;
-            caption.ButtonForegroundColor = Windows.UI.Color.FromArgb(255, 234, 242, 255);
-            caption.ButtonInactiveForegroundColor = Windows.UI.Color.FromArgb(255, 120, 130, 150);
-            caption.ButtonHoverBackgroundColor = Windows.UI.Color.FromArgb(255, 30, 45, 70);
-            caption.ButtonHoverForegroundColor = Windows.UI.Color.FromArgb(255, 255, 255, 255);
-            caption.ButtonPressedBackgroundColor = Windows.UI.Color.FromArgb(255, 25, 38, 58);
-            caption.ButtonPressedForegroundColor = Windows.UI.Color.FromArgb(255, 255, 255, 255);
+            caption.ButtonForegroundColor = text;
+            caption.ButtonInactiveForegroundColor = muted;
+            caption.ButtonHoverBackgroundColor = Windows.UI.Color.FromArgb(255, 229, 231, 235);
+            caption.ButtonHoverForegroundColor = text;
+            caption.ButtonPressedBackgroundColor = Windows.UI.Color.FromArgb(255, 209, 213, 219);
+            caption.ButtonPressedForegroundColor = text;
 
             _shellTitleBarAppWindowChangedHandler = OnShellTitleBarAppWindowChanged;
             appWindow.Changed += _shellTitleBarAppWindowChangedHandler;
@@ -934,7 +957,7 @@ public sealed partial class MainWindow : Window
                         return;
                     }
 
-                    if (!await MongoConnectionTester.TryPingAsync(customUri))
+                    if (!await MongoConnectionTester.TryPingAsync(customUri, _workingOrgCode))
                     {
                         ValidationText.Text = "Cannot reach this MongoDB from this PC.";
                         return;
@@ -944,7 +967,7 @@ public sealed partial class MainWindow : Window
                         await SetupApiClient.SaveCustomDatabaseAsync(_workingOrgCode, customUri, false);
                     if (!ok)
                     {
-                        if (!await MongoTenantBootstrap.TryInitializeTenantAsync(customUri))
+                        if (!await MongoTenantBootstrap.TryInitializeTenantAsync(customUri, _workingOrgCode))
                         {
                             ValidationText.Text = err ?? "Server could not save database URI.";
                             return;
@@ -1162,7 +1185,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        var ok = await MongoConnectionTester.TryPingAsync(MongoUriBox.Text.Trim());
+        var ok = await MongoConnectionTester.TryPingAsync(MongoUriBox.Text.Trim(), _workingOrgCode);
         if (!ok)
         {
             ValidationText.Text = "Cannot ping this MongoDB URI from this PC.";
