@@ -9,10 +9,11 @@
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
                 <ResourceDictionary Source="Styles/Colors.xaml" />
-                <ResourceDictionary Source="Styles/FluentControlLightOverrides.xaml" />
                 <ResourceDictionary Source="Styles/Typography.xaml" />
                 <ResourceDictionary Source="Styles/Spacing.xaml" />
                 <ResourceDictionary Source="Styles/Controls.xaml" />
+                <ResourceDictionary Source="Styles/FluentControlLightOverrides.xaml" />
+                <ResourceDictionary Source="Styles/CanvasFluentLightInputBrushes.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

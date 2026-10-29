@@ -1290,9 +1290,15 @@ public sealed partial class TemplatesPage : Page
     private void OnCanvasCellBorderLoaded(object sender, RoutedEventArgs e)
     {
         if (sender is Border border)
+        {
+            ApplyCanvasCellLightChrome(border);
             ApplyCanvasCellEdgeStyling(border);
+        }
+
         if (DataContext is TemplatesViewModel vm)
+        {
             RefreshCanvasUiState(vm);
+        }
     }
 
     private void RefreshAllCanvasCellBorders()
@@ -1301,8 +1307,42 @@ public sealed partial class TemplatesPage : Page
         {
             if (Equals(border.Tag, "canvas-cell-shell"))
             {
+                ApplyCanvasCellLightChrome(border);
                 ApplyCanvasCellEdgeStyling(border);
             }
+        }
+    }
+
+    /// <summary>
+    /// WinUI Fluent templates can keep dark fill even when XAML sets Light theme; force at runtime.
+    /// </summary>
+    private static void ApplyCanvasCellLightChrome(Border shell)
+    {
+        shell.RequestedTheme = ElementTheme.Light;
+        shell.Background = new SolidColorBrush(Microsoft.UI.Colors.White);
+
+        foreach (var textBox in FindVisualChildren<TextBox>(shell))
+        {
+            UiResourceHelper.WirePersistentLightTextBox(textBox);
+        }
+
+        foreach (var combo in FindVisualChildren<ComboBox>(shell))
+        {
+            UiResourceHelper.WirePersistentLightComboBox(combo);
+        }
+
+        var previewFill = new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 249, 250, 251));
+        var previewBorder = new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 209, 213, 219));
+        foreach (var preview in FindVisualChildren<Border>(shell))
+        {
+            if (!Equals(preview.Tag, "canvas-type-preview"))
+            {
+                continue;
+            }
+
+            preview.RequestedTheme = ElementTheme.Light;
+            preview.Background = previewFill;
+            preview.BorderBrush = previewBorder;
         }
     }
 

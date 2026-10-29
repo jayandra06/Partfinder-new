@@ -481,20 +481,36 @@ export class SetupService {
     role: string,
     temporaryPassword: string,
   ) {
-    const host = this.config.get<string>('INVITE_SMTP_HOST')?.trim() ?? '';
-    const port = Number(this.config.get<string>('INVITE_SMTP_PORT') ?? '587');
-    const user = this.config.get<string>('INVITE_SMTP_USER')?.trim() ?? '';
-    const pass = this.config.get<string>('INVITE_SMTP_PASS') ?? '';
-    const from = this.config.get<string>('INVITE_FROM_EMAIL')?.trim() ?? '';
+    const host =
+      this.config.get<string>('INVITE_SMTP_HOST')?.trim() ||
+      this.config.get<string>('EMAIL_HOST')?.trim() ||
+      '';
+    const port = Number(
+      this.config.get<string>('INVITE_SMTP_PORT') ??
+        this.config.get<string>('EMAIL_PORT') ??
+        '587',
+    );
+    const user =
+      this.config.get<string>('INVITE_SMTP_USER')?.trim() ||
+      this.config.get<string>('EMAIL_USER')?.trim() ||
+      '';
+    const pass =
+      this.config.get<string>('INVITE_SMTP_PASS') ??
+      this.config.get<string>('EMAIL_PASS') ??
+      '';
+    const from =
+      this.config.get<string>('INVITE_FROM_EMAIL')?.trim() ||
+      this.config.get<string>('SMTP_FROM')?.trim() ||
+      '';
     const fromName =
       this.config.get<string>('INVITE_FROM_NAME')?.trim() || 'PartFinder';
     const downloadLink =
       this.config.get<string>('INVITE_DOWNLOAD_LINK')?.trim() ||
       'https://shipspan.com';
-    const secure =
-      (this.config.get<string>('INVITE_SMTP_SECURE') ?? 'false')
-        .toLowerCase()
-        .trim() === 'true';
+    const secureEnv =
+      this.config.get<string>('INVITE_SMTP_SECURE') ??
+      (port === 465 ? 'true' : 'false');
+    const secure = secureEnv.toLowerCase().trim() === 'true';
 
     if (!host || !user || !pass || !from) {
       return { sent: false, error: 'SMTP invite configuration is missing.' };

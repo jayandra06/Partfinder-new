@@ -321,6 +321,7 @@ h3 {
   padding: 24px 24px;
   display: grid;
   gap: 14px;
+  align-content: start;
 }
 
 .admin-topbar {
@@ -362,12 +363,14 @@ h3 {
 .organizations-section {
   display: grid;
   gap: 12px;
+  align-content: start;
   position: relative;
 }
 
 .org-toolbar {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 12px;
 }
 
@@ -949,6 +952,7 @@ h3 {
 
   .org-toolbar {
     flex-direction: column;
+    align-items: stretch;
   }
 
   .org-toolbar input {
