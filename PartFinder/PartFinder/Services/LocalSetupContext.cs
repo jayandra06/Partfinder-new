@@ -29,56 +29,47 @@ public sealed class LocalSetupContext : ILocalSetupContext
         _cachedInvitedUserLogin = false;
         try
         {
-            // Multiple setup-state.json copies can exist (LocalAppData vs Roaming, older builds).
-            // The first file found on disk is not always the one that contains dbUri. Merge all
-            // completed setups so org code and Mongo URI resolve consistently with the shell UI.
-            foreach (var path in SetupPaths.SetupStateCandidatePaths)
+            SetupPaths.MigrateToCanonicalSetupStateIfNeeded();
+            var path = SetupPaths.GetAuthoritativeSetupStatePath();
+            if (!File.Exists(path))
             {
-                if (!File.Exists(path))
-                {
-                    continue;
-                }
+                return;
+            }
 
-                using var doc = JsonDocument.Parse(File.ReadAllText(path));
-                var root = doc.RootElement;
-                var isCompleted = root.TryGetProperty("completed", out var completed) &&
-                                  completed.ValueKind == JsonValueKind.True;
+            using var doc = JsonDocument.Parse(File.ReadAllText(path));
+            var root = doc.RootElement;
 
-                // Last non-empty wins so a complete Roaming copy can override an incomplete Local copy.
-                if (isCompleted &&
-                    root.TryGetProperty("dbUri", out var db) &&
-                    db.ValueKind == JsonValueKind.String)
+            if (root.TryGetProperty("dbUri", out var db) && db.ValueKind == JsonValueKind.String)
+            {
+                var u = db.GetString()?.Trim();
+                if (!string.IsNullOrEmpty(u))
                 {
-                    var u = db.GetString()?.Trim();
-                    if (!string.IsNullOrEmpty(u))
-                    {
-                        _cachedUri = u;
-                    }
+                    _cachedUri = u;
                 }
+            }
 
-                if (root.TryGetProperty("orgCode", out var oc) && oc.ValueKind == JsonValueKind.String)
+            if (root.TryGetProperty("orgCode", out var oc) && oc.ValueKind == JsonValueKind.String)
+            {
+                var code = oc.GetString()?.Trim();
+                if (!string.IsNullOrEmpty(code))
                 {
-                    var code = oc.GetString()?.Trim();
-                    if (!string.IsNullOrEmpty(code))
-                    {
-                        _cachedOrgCode = code;
-                    }
+                    _cachedOrgCode = code;
                 }
+            }
 
-                if (root.TryGetProperty("adminEmail", out var ae) && ae.ValueKind == JsonValueKind.String)
+            if (root.TryGetProperty("adminEmail", out var ae) && ae.ValueKind == JsonValueKind.String)
+            {
+                var em = ae.GetString()?.Trim();
+                if (!string.IsNullOrEmpty(em))
                 {
-                    var em = ae.GetString()?.Trim();
-                    if (!string.IsNullOrEmpty(em))
-                    {
-                        _cachedAdminEmail = em;
-                    }
+                    _cachedAdminEmail = em;
                 }
+            }
 
-                if (root.TryGetProperty("invitedUserLogin", out var iul) &&
-                    iul.ValueKind == JsonValueKind.True)
-                {
-                    _cachedInvitedUserLogin = true;
-                }
+            if (root.TryGetProperty("invitedUserLogin", out var iul) &&
+                iul.ValueKind == JsonValueKind.True)
+            {
+                _cachedInvitedUserLogin = true;
             }
         }
         catch

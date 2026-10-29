@@ -21,32 +21,53 @@ public sealed class MongoMasterDataRecordsService : IMasterDataRecordsService
 
     private IMongoCollection<MasterDataRowDoc>? TryGetCollection()
     {
-        if (!_setupContext.TryGetTenantMongoUri(out var raw) || string.IsNullOrWhiteSpace(raw))
+        try
         {
+            if (!_setupContext.TryGetTenantMongoUri(out var raw) || string.IsNullOrWhiteSpace(raw))
+            {
+                return null;
+            }
+
+            var cs = MongoConnectionStringUtil.Prepare(raw, _setupContext.OrgCode);
+            var client = new MongoClient(cs);
+            var db = MongoConnectionStringUtil.GetTenantDatabase(client, cs, _setupContext.OrgCode);
+            if (string.Equals(db.DatabaseNamespace.DatabaseName, "admin", StringComparison.OrdinalIgnoreCase))
+            {
+                var targetDb = !string.IsNullOrWhiteSpace(_setupContext.OrgCode) ? _setupContext.OrgCode.Trim() : "partfinder";
+                db = client.GetDatabase(targetDb);
+            }
+            return db.GetCollection<MasterDataRowDoc>(CollectionName);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MongoMasterDataRecordsService] TryGetCollection failed: {ex.Message}");
             return null;
         }
-
-        var cs = MongoConnectionStringUtil.Prepare(raw, _setupContext.OrgCode);
-        var client = new MongoClient(cs);
-        var db = MongoConnectionStringUtil.GetTenantDatabase(client, cs, _setupContext.OrgCode);
-        return db.GetCollection<MasterDataRowDoc>(CollectionName);
     }
 
     public async Task<IReadOnlyList<MasterDataRowRecord>> GetRowsAsync(
         string templateId,
         CancellationToken cancellationToken = default)
     {
-        var coll = TryGetCollection();
-        if (coll is null)
+        try
         {
+            var coll = TryGetCollection();
+            if (coll is null)
+            {
+                return Array.Empty<MasterDataRowRecord>();
+            }
+
+            var docs = await coll.Find(d => d.TemplateId == templateId)
+                .SortBy(d => d.RowOrder)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+            return docs.Select(Map).ToList();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MongoMasterDataRecordsService] GetRowsAsync failed: {ex.Message}");
             return Array.Empty<MasterDataRowRecord>();
         }
-
-        var docs = await coll.Find(d => d.TemplateId == templateId)
-            .SortBy(d => d.RowOrder)
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-        return docs.Select(Map).ToList();
     }
 
     public async Task<IReadOnlyList<MasterDataRowRecord>> GetRowsByIdsAsync(

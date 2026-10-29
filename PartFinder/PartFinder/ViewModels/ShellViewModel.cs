@@ -118,7 +118,11 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
     }
 
     public string CurrentUserInitial => string.IsNullOrWhiteSpace(CurrentUserName)
-        ? "?"
+        ? (!string.IsNullOrWhiteSpace(_adminSession.Email)
+            ? _adminSession.Email.Trim()[0].ToString().ToUpperInvariant()
+            : (!string.IsNullOrWhiteSpace(_setupContext.AdminEmail)
+                ? _setupContext.AdminEmail.Trim()[0].ToString().ToUpperInvariant()
+                : "?"))
         : CurrentUserName.Trim()[0].ToString().ToUpperInvariant();
 
     private string _currentUserDepartment = string.Empty;
@@ -437,6 +441,8 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
     private void SignOutSession()
     {
         _adminSession.Clear();
+        _profile.Clear();
+        CurrentUserAvatarSource = null;
         // Do NOT delete setup-state.json — it holds orgCode/dbUri needed after re-login
         _setupContext.Refresh();
         CurrentUserName = ResolveDisplayUser();
@@ -493,22 +499,10 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
                 CurrentUserAvatarSource = bitmap;
                 return;
             }
-            catch { /* fall through to default */ }
+            catch { /* fall through to null */ }
         }
 
-        // No custom photo — load default Assets/profile.jpg via stream so it's fully loaded before binding
-        try
-        {
-            var defaultFile = await StorageFile.GetFileFromApplicationUriAsync(
-                new Uri("ms-appx:///Assets/profile.jpg"));
-            using var defaultStream = await defaultFile.OpenReadAsync();
-            var defaultBitmap = new BitmapImage();
-            await defaultBitmap.SetSourceAsync(defaultStream);
-            CurrentUserAvatarSource = defaultBitmap;
-        }
-        catch
-        {
-            CurrentUserAvatarSource = null;
-        }
+        // No custom photo — keep null so initials fallback is rendered
+        CurrentUserAvatarSource = null;
     }
 }

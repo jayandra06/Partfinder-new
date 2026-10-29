@@ -27,6 +27,7 @@ public sealed partial class MainWindow : Window
     private string? _resolvedSignedInEmail;
     private string? _resolvedSignedInRole;
     private bool _mustChangePassword = true;
+    private bool _signedInThisSession;
     private SetupStatusResult? _lastStatus;
 
     private Microsoft.UI.Xaml.DispatcherTimer? _maintenanceTimer;
@@ -45,12 +46,6 @@ public sealed partial class MainWindow : Window
         ExtendsContentIntoTitleBar = false;
         BackButton.IsEnabled = false;
 
-
-        if (IsSetupCompleted())
-        {
-            RootGrid.Loaded += OnRootGridLoadedPostSetupValidate;
-            return;
-        }
 
         RootGrid.Loaded += OnRootGridLoadedResumeWizard;
         UpdateStepUi();
@@ -90,6 +85,7 @@ public sealed partial class MainWindow : Window
     {
         Directory.CreateDirectory(Path.GetDirectoryName(_setupFilePath)!);
         File.WriteAllText(_setupFilePath, JsonSerializer.Serialize(state, SetupJson));
+        SetupPaths.PurgeLegacySetupStateFiles();
     }
 
     private bool IsSetupCompleted()
@@ -106,42 +102,99 @@ public sealed partial class MainWindow : Window
     {
         RootGrid.Loaded -= OnRootGridLoadedResumeWizard;
 
+        _signedInThisSession = false;
+
         var saved = LoadSetupState();
-        if (saved.invitedUserLogin && !string.IsNullOrWhiteSpace(saved.adminEmail))
-        {
-            _resolvedSignedInEmail = saved.adminEmail.Trim();
-        }
+        // Do not pre-fill email — user must sign in each app session.
 
         var code = TryReadOrgCodeFromSetup();
-        if (string.IsNullOrWhiteSpace(code))
+        if (!string.IsNullOrWhiteSpace(code))
         {
-            return;
+            OrgCodeBox.Text = code;
+            _workingOrgCode = code;
+
+            try
+            {
+                var (status, _) = await SetupApiClient.StatusAsync(_workingOrgCode);
+                if (status is not null && status.Valid)
+                {
+                    _lastStatus = status;
+                    _cachedOrgDatabaseUri = status.OrgDatabaseUri;
+                    UpdateLicenseSummary(status);
+                }
+            }
+            catch { /* best effort */ }
         }
 
-        OrgCodeBox.Text = code;
-        _workingOrgCode = code;
-
-        var (status, _) = await SetupApiClient.StatusAsync(_workingOrgCode);
-        if (status is null || !status.Valid)
-        {
-            return;
-        }
-
-        _lastStatus = status;
-        _cachedOrgDatabaseUri = status.OrgDatabaseUri;
-        UpdateLicenseSummary(status);
-        _step = ResolveTargetStep(status);
+        InviteLoginEmailBox.Text = string.Empty;
+        InviteLoginPasswordBox.Password = string.Empty;
+        _step = 1;
+        SetupRoot.Visibility = Visibility.Visible;
+        ShellRoot.Visibility = Visibility.Collapsed;
         UpdateStepUi();
+    }
+
+    private async void OnOrgCodeBoxTextChanged(object sender, TextChangedEventArgs e)
+    {
+        var text = OrgCodeBox.Text.Trim();
+        var previousOrg = LoadSetupState().orgCode?.Trim();
+        if (!string.IsNullOrEmpty(previousOrg) &&
+            text.Length == 6 &&
+            !string.Equals(previousOrg, text, StringComparison.Ordinal))
+        {
+            _resolvedSignedInEmail = null;
+            _resolvedSignedInRole = null;
+            _mustChangePassword = true;
+            InviteLoginPasswordBox.Password = string.Empty;
+        }
+
+        if (text.Length == 6 && text.All(char.IsDigit))
+        {
+            try
+            {
+                var (status, _) = await SetupApiClient.StatusAsync(text);
+                if (status is not null && status.Valid)
+                {
+                    _lastStatus = status;
+                    _cachedOrgDatabaseUri = status.OrgDatabaseUri;
+                    _workingOrgCode = text;
+                    UpdateLicenseSummary(status);
+                    return;
+                }
+            }
+            catch { }
+        }
+
+        LicenseSummaryPanel.Visibility = Visibility.Collapsed;
     }
 
     private async void OnRootGridLoadedPostSetupValidate(object sender, RoutedEventArgs e)
     {
         RootGrid.Loaded -= OnRootGridLoadedPostSetupValidate;
+        // Never open the shell without an explicit sign-in this session.
+        if (!_signedInThisSession)
+        {
+            _step = 1;
+            SetupRoot.Visibility = Visibility.Visible;
+            ShellRoot.Visibility = Visibility.Collapsed;
+            UpdateStepUi();
+            return;
+        }
+
         await ValidateAndShowShellAsync().ConfigureAwait(true);
     }
 
     private async Task ValidateAndShowShellAsync()
     {
+        if (!_signedInThisSession)
+        {
+            _step = 1;
+            SetupRoot.Visibility = Visibility.Visible;
+            ShellRoot.Visibility = Visibility.Collapsed;
+            UpdateStepUi();
+            return;
+        }
+
         var orgCode = TryReadOrgCodeFromSetup();
         if (string.IsNullOrWhiteSpace(orgCode))
         {
@@ -432,16 +485,7 @@ public sealed partial class MainWindow : Window
         }
         catch { }
 
-        try
-        {
-            if (File.Exists(_setupFilePath))
-            {
-                File.Delete(_setupFilePath);
-            }
-        }
-        catch
-        {
-        }
+        SetupPaths.ClearAllSetupStateFiles();
 
         SubscriptionBlockedRoot.Visibility = Visibility.Collapsed;
         SetupRoot.Visibility = Visibility.Visible;
@@ -453,6 +497,7 @@ public sealed partial class MainWindow : Window
         _resolvedSignedInEmail = null;
         _resolvedSignedInRole = null;
         _mustChangePassword = true;
+        _signedInThisSession = false;
         _lastStatus = null;
         OrgCodeBox.Text = "";
         InviteLoginEmailBox.Text = "";
@@ -501,6 +546,15 @@ public sealed partial class MainWindow : Window
     private void SaveProgressOrgCodeOnly(string code)
     {
         var st = LoadSetupState();
+        if (!string.Equals(st.orgCode?.Trim(), code.Trim(), StringComparison.Ordinal))
+        {
+            st.dbUri = null;
+            st.completed = false;
+            st.databaseMode = null;
+            st.adminName = null;
+            _cachedOrgDatabaseUri = null;
+        }
+
         st.orgCode = code;
         if (!string.IsNullOrWhiteSpace(_resolvedSignedInEmail))
         {
@@ -679,6 +733,15 @@ public sealed partial class MainWindow : Window
 
     private async void ShowShell()
     {
+        if (!_signedInThisSession)
+        {
+            _step = 1;
+            SetupRoot.Visibility = Visibility.Visible;
+            ShellRoot.Visibility = Visibility.Collapsed;
+            UpdateStepUi();
+            return;
+        }
+
         try
         {
             RestoreNonShellTitleBarChrome();
@@ -877,28 +940,42 @@ public sealed partial class MainWindow : Window
                     _resolvedSignedInEmail = invitedEmail;
                     _mustChangePassword = inviteLoginResponse?.MustChangePassword ?? true;
                     _resolvedSignedInRole = inviteLoginResponse?.Role;
+                    _signedInThisSession = true;
                 }
 
                 SaveProgressOrgCodeOnly(trimmed);
                 _step = ResolveTargetStep(status);
 
-                // If we can jump straight to Step 4 (org already fully configured),
-                // persist completed setup so the shell can load orgCode/adminEmail/dbUri.
-                // BUT: invited users MUST go through Step 3 (Change Password) first.
+                // Configured org: require successful sign-in above; never open shell from Step 1.
                 if (_step == 4 && !string.IsNullOrWhiteSpace(status.OrgDatabaseUri))
                 {
                     _cachedOrgDatabaseUri = status.OrgDatabaseUri;
                     SaveProgressAfterDatabase(trimmed, status.OrgDatabaseUri);
 
-                    if (!string.IsNullOrWhiteSpace(_resolvedSignedInEmail) && _mustChangePassword)
+                    if (string.IsNullOrWhiteSpace(_resolvedSignedInEmail))
+                    {
+                        ValidationText.Text =
+                            "This organization requires sign-in. Enter your email and password.";
+                        _step = 1;
+                        return;
+                    }
+
+                    if (_mustChangePassword)
                     {
                         // Invited user with temporary password — force password change step.
                         _step = 3;
                     }
                     else
                     {
-                        // Admin setup OR invited user who already changed password — complete.
                         SaveCompletedSetup();
+                        var appState = App.Services.GetRequiredService<IAppStateStore>();
+                        appState.OrgDisplayName = !string.IsNullOrWhiteSpace(status.OrganizationName)
+                            ? status.OrganizationName
+                            : trimmed;
+                        appState.OrgPlan = !string.IsNullOrWhiteSpace(status.Plan) ? status.Plan : string.Empty;
+                        appState.OrgType = !string.IsNullOrWhiteSpace(status.OrgType) ? status.OrgType : string.Empty;
+                        _step = 4;
+                        return;
                     }
                 }
             }
@@ -1086,6 +1163,7 @@ public sealed partial class MainWindow : Window
                     return;
                 }
 
+                _signedInThisSession = true;
                 SaveCompletedSetup();
                 _step = 4;
             }
@@ -1114,6 +1192,16 @@ public sealed partial class MainWindow : Window
 
     private async void OnLetsGoClicked(object sender, RoutedEventArgs e)
     {
+        if (!_signedInThisSession && string.IsNullOrWhiteSpace(_resolvedSignedInEmail))
+        {
+            ValidationText.Text = "Sign in on Step 1 before launching PartFinder.";
+            _step = 1;
+            UpdateStepUi();
+            return;
+        }
+
+        _signedInThisSession = true;
+
         // Fetch and store org display name + plan before showing shell
         // so Settings page ORGANIZATION section is never blank after login.
         var orgCode = TryReadOrgCodeFromSetup();

@@ -497,20 +497,8 @@ public partial class SettingsViewModel : ViewModelBase
             catch { /* fall through to default */ }
         }
 
-        // No custom photo — load default Assets/profile.jpg via stream so it's fully loaded before binding
-        try
-        {
-            var defaultFile = await StorageFile.GetFileFromApplicationUriAsync(
-                new Uri("ms-appx:///Assets/profile.jpg"));
-            using var defaultStream = await defaultFile.OpenReadAsync();
-            var defaultBitmap = new BitmapImage();
-            await defaultBitmap.SetSourceAsync(defaultStream);
-            AvatarImageSource = defaultBitmap;
-        }
-        catch
-        {
-            AvatarImageSource = null;
-        }
+        // No custom photo — keep null so initials fallback is rendered
+        AvatarImageSource = null;
     }
 
     [RelayCommand]
@@ -879,8 +867,20 @@ public partial class SettingsViewModel : ViewModelBase
             return;
         }
 
+        _setupContext.Refresh();
         var orgCode = _setupContext.OrgCode?.Trim();
-        var email = _setupContext.AdminEmail?.Trim();
+        var email = _session.Email?.Trim();
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            email = _setupContext.AdminEmail?.Trim();
+        }
+
+        if (string.IsNullOrWhiteSpace(email) &&
+            !string.IsNullOrWhiteSpace(SessionEmailDisplay) &&
+            SessionEmailDisplay != "—")
+        {
+            email = SessionEmailDisplay.Trim();
+        }
 
         if (string.IsNullOrWhiteSpace(orgCode) || string.IsNullOrWhiteSpace(email))
         {
@@ -1352,20 +1352,23 @@ public partial class SettingsViewModel : ViewModelBase
     {
         try
         {
-            foreach (var path in SetupPaths.SetupStateCandidatePaths)
+            SetupPaths.MigrateToCanonicalSetupStateIfNeeded();
+            var path = SetupPaths.GetAuthoritativeSetupStatePath();
+            if (!File.Exists(path))
             {
-                if (!File.Exists(path))
-                    continue;
+                return null;
+            }
 
-                using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(path));
-                var root = doc.RootElement;
+            using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(path));
+            var root = doc.RootElement;
 
-                if (root.TryGetProperty("adminEmail", out var ae) &&
-                    ae.ValueKind == System.Text.Json.JsonValueKind.String)
+            if (root.TryGetProperty("adminEmail", out var ae) &&
+                ae.ValueKind == System.Text.Json.JsonValueKind.String)
+            {
+                var email = ae.GetString()?.Trim();
+                if (!string.IsNullOrWhiteSpace(email))
                 {
-                    var email = ae.GetString()?.Trim();
-                    if (!string.IsNullOrWhiteSpace(email))
-                        return email;
+                    return email;
                 }
             }
         }

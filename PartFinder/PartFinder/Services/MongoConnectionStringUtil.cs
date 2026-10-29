@@ -63,7 +63,8 @@ internal static class MongoConnectionStringUtil
             return databaseName.Trim();
         }
 
-        if (!string.IsNullOrWhiteSpace(orgCode))
+        if (!string.IsNullOrWhiteSpace(orgCode) &&
+            !string.Equals(orgCode.Trim(), "admin", StringComparison.OrdinalIgnoreCase))
         {
             return orgCode.Trim();
         }
@@ -137,6 +138,7 @@ internal static class MongoConnectionStringUtil
 
     /// <summary>
     /// Returns the tenant database instance using normalized connection settings.
+    /// Never returns the "admin" database for tenant operations.
     /// </summary>
     public static IMongoDatabase GetTenantDatabase(
         MongoClient client,
@@ -145,6 +147,10 @@ internal static class MongoConnectionStringUtil
     {
         var url = new MongoUrl(connectionString);
         var dbName = ResolveDatabaseName(url.DatabaseName, orgCode);
+        if (string.Equals(dbName, "admin", StringComparison.OrdinalIgnoreCase))
+        {
+            dbName = !string.IsNullOrWhiteSpace(orgCode) ? orgCode.Trim() : "partfinder";
+        }
         return client.GetDatabase(dbName);
     }
 

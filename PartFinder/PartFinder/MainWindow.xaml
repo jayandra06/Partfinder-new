@@ -115,7 +115,7 @@
         </Style>
     </Grid.Resources>
         <!-- Shell (main app, shown after setup) -->
-        <components:ShellLayout x:Name="ShellRoot" Visibility="Collapsed" />
+        <components:ShellLayout x:Name="ShellRoot" Visibility="Collapsed" RequestedTheme="Light" />
 
         <!-- ===================================================== -->
         <!-- APP LOCK SCREEN                                       -->
@@ -742,6 +742,7 @@
                                             PlaceholderText="6-digit code"
                                             InputScope="Number"
                                             Style="{StaticResource DarkInputStyle}"
+                                            TextChanged="OnOrgCodeBoxTextChanged"
                                             Margin="0,0,0,20" />
 
                                         <!-- License summary card (shown when org code is validated) -->
