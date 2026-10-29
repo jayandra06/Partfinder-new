@@ -6,7 +6,13 @@
     xmlns:converters="using:PartFinder.Converters"
     xmlns:viewmodels="using:PartFinder.ViewModels">
     <Page.Resources>
-        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="ms-appx:///Styles/Colors.xaml" />
+                <ResourceDictionary Source="ms-appx:///Styles/Controls.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+        </ResourceDictionary>
     </Page.Resources>
 
     <Grid Background="{StaticResource PageBackgroundBrush}">
@@ -276,7 +282,7 @@
                                         <Border Grid.Column="5" CornerRadius="6" Padding="8,4" VerticalAlignment="Center" HorizontalAlignment="Left">
                                             <TextBlock Text="{x:Bind Status}" FontSize="9" FontWeight="SemiBold"/>
                                         </Border>
-                                        <Button Grid.Column="6" Style="{StaticResource GhostButtonStyle}" FontSize="10" Padding="6,2">
+                                        <Button Grid.Column="6" Style="{StaticResource GhostButtonStyle}" FontSize="10" Padding="6,2" Click="OnEditInventoryClick">
                                             <StackPanel Orientation="Horizontal" Spacing="3">
                                                 <FontIcon Glyph="&#xE70F;" FontSize="10"/>
                                                 <TextBlock Text="Edit" FontSize="10"/>

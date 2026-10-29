@@ -32,14 +32,14 @@ public sealed partial class FavouritesSubPage : UserControl
     private const double PEEK_WIDTH_MAX = 130.0;
     private const double PEEK_WIDTH_RATIO = 0.13; // 13 % of canvas width
 
-    // Theme colors — pulled from Colors.xaml
-    private static readonly Color _cardBg = Color.FromArgb(255, 17, 26, 38);         // #111A26
-    private static readonly Color _elevatedBg = Color.FromArgb(255, 23, 35, 52);     // #172334
+    // Theme colors — light theme
+    private static readonly Color _cardBg = Color.FromArgb(255, 255, 255, 255);       // #FFFFFF
+    private static readonly Color _elevatedBg = Color.FromArgb(255, 249, 250, 251);   // #F9FAFB
     private static readonly Color _accentPrimary = Color.FromArgb(255, 31, 122, 224); // #1F7AE0
-    private static readonly Color _borderDefault = Color.FromArgb(255, 42, 61, 88);  // #2A3D58
-    private static readonly Color _textPrimary = Color.FromArgb(255, 234, 242, 255);  // #EAF2FF
-    private static readonly Color _textSecondary = Color.FromArgb(255, 170, 184, 202);// #AAB8CA
-    private static readonly Color _textTertiary = Color.FromArgb(255, 123, 141, 168); // #7B8DA8
+    private static readonly Color _borderDefault = Color.FromArgb(255, 229, 231, 235); // #E5E7EB
+    private static readonly Color _textPrimary = Color.FromArgb(255, 31, 41, 55);      // #1F2937
+    private static readonly Color _textSecondary = Color.FromArgb(255, 75, 85, 99);    // #4B5563
+    private static readonly Color _textTertiary = Color.FromArgb(255, 107, 114, 128);  // #6B7280
 
     // Accent gradient colors for card decorative elements
     private static readonly Color _accentCyan = Color.FromArgb(255, 56, 189, 248);    // cyan glow

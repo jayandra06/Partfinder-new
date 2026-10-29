@@ -10,16 +10,15 @@ public sealed class LocalProfileStore
         WriteIndented = true,
     };
 
-    private readonly string _filePath;
-    private readonly string _avatarDir;
+    private readonly ILocalSetupContext? _setupContext;
+    private readonly string _baseDir;
 
-    public LocalProfileStore()
+    public LocalProfileStore(ILocalSetupContext? setupContext = null)
     {
-        var dir = Path.Combine(
+        _setupContext = setupContext;
+        _baseDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "PartFinder");
-        _filePath = Path.Combine(dir, "profile-state.json");
-        _avatarDir = Path.Combine(dir, "avatars");
     }
 
     public string? DisplayName { get; private set; }
@@ -32,11 +31,41 @@ public sealed class LocalProfileStore
 
     public event Action? ProfileChanged;
 
+    private (string filePath, string avatarDir) GetPaths()
+    {
+        var org = _setupContext?.OrgCode?.Trim();
+        var email = _setupContext?.AdminEmail?.Trim();
+
+        string folder;
+        if (!string.IsNullOrWhiteSpace(org))
+        {
+            var userSegment = !string.IsNullOrWhiteSpace(email) ? SanitizeSegment(email) : "default";
+            folder = Path.Combine(_baseDir, "profiles", SanitizeSegment(org), userSegment);
+        }
+        else
+        {
+            folder = Path.Combine(_baseDir, "profiles", "global");
+        }
+
+        return (
+            Path.Combine(folder, "profile-state.json"),
+            Path.Combine(folder, "avatars")
+        );
+    }
+
+    private static string SanitizeSegment(string input)
+    {
+        var invalid = Path.GetInvalidFileNameChars();
+        var chars = input.Select(c => invalid.Contains(c) ? '_' : c).ToArray();
+        return new string(chars);
+    }
+
     public void Load()
     {
         try
         {
-            if (!File.Exists(_filePath))
+            var (filePath, _) = GetPaths();
+            if (!File.Exists(filePath))
             {
                 DisplayName = null;
                 Department = null;
@@ -44,7 +73,7 @@ public sealed class LocalProfileStore
                 return;
             }
 
-            var dto = JsonSerializer.Deserialize<ProfileState>(File.ReadAllText(_filePath), Json);
+            var dto = JsonSerializer.Deserialize<ProfileState>(File.ReadAllText(filePath), Json);
 
             DisplayName = dto?.DisplayName?.Trim();
             if (string.IsNullOrWhiteSpace(DisplayName)) DisplayName = null;
@@ -88,17 +117,18 @@ public sealed class LocalProfileStore
         {
             if (!File.Exists(sourceFilePath)) return null;
 
-            Directory.CreateDirectory(_avatarDir);
+            var (_, avatarDir) = GetPaths();
+            Directory.CreateDirectory(avatarDir);
 
             // Use a stable per-user filename so old files are replaced automatically
             var ext = Path.GetExtension(sourceFilePath).ToLowerInvariant();
             if (ext is not (".png" or ".jpg" or ".jpeg" or ".bmp" or ".gif" or ".webp"))
                 return null;
 
-            var destPath = Path.Combine(_avatarDir, $"avatar{ext}");
+            var destPath = Path.Combine(avatarDir, $"avatar{ext}");
 
             // Remove any previous avatar files with different extensions
-            foreach (var old in Directory.GetFiles(_avatarDir, "avatar.*"))
+            foreach (var old in Directory.GetFiles(avatarDir, "avatar.*"))
             {
                 if (!string.Equals(old, destPath, StringComparison.OrdinalIgnoreCase))
                     File.Delete(old);
@@ -130,9 +160,10 @@ public sealed class LocalProfileStore
         AvatarPath = null;
         try
         {
-            if (File.Exists(_filePath))
+            var (filePath, _) = GetPaths();
+            if (File.Exists(filePath))
             {
-                File.Delete(_filePath);
+                File.Delete(filePath);
             }
         }
         catch { }
@@ -140,9 +171,10 @@ public sealed class LocalProfileStore
 
     private void Persist()
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
+        var (filePath, _) = GetPaths();
+        Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
         File.WriteAllText(
-            _filePath,
+            filePath,
             JsonSerializer.Serialize(
                 new ProfileState
                 {

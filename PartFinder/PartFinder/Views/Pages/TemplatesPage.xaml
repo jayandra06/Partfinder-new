@@ -7,6 +7,7 @@
     xmlns:converters="using:PartFinder.Converters"
     xmlns:viewmodels="using:PartFinder.ViewModels"
     xmlns:models="using:PartFinder.Models"
+    RequestedTheme="Light"
     KeyDown="OnPageKeyDown"
     KeyUp="OnPageKeyUp">
     <Page.Resources>
@@ -26,31 +27,52 @@
             <Setter Property="Padding" Value="20" />
         </Style>
         <Style x:Key="GlowButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
-            <Setter Property="Background" Value="#13096e" />
+            <Setter Property="Background" Value="{StaticResource AccentPrimaryBrush}" />
             <Setter Property="Foreground" Value="White" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="CornerRadius" Value="8" />
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
         <Style x:Key="ModernOutlineButtonStyle" TargetType="Button" BasedOn="{StaticResource OutlinedButtonStyle}">
-            <Setter Property="BorderBrush" Value="#13096e" />
-            <Setter Property="Foreground" Value="#AAB8CA" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderDefaultBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="8" />
             <Setter Property="FontWeight" Value="Normal" />
         </Style>
         <!-- Floating iOS-style chrome for canvas toolbar -->
         <Style x:Key="CanvasFloatingPillStyle" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource ElevatedCardBackgroundBrush}" />
-            <Setter Property="BorderBrush" Value="#18FFFFFF" />
+            <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderDefaultBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="20" />
         </Style>
         <!-- Template name — borderless frosted shell (no boxed outline on focus) -->
         <Style x:Key="CanvasNameInputShellStyle" TargetType="Border">
-            <Setter Property="Background" Value="#1AFFFFFF" />
-            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="22" />
+        </Style>
+        <Style x:Key="CanvasFieldTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource StandardTextBoxStyle}">
+            <Setter Property="RequestedTheme" Value="Light" />
+            <Setter Property="Background" Value="#FFFFFFFF" />
+            <Setter Property="Foreground" Value="#FF111827" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderDefaultBrush}" />
+            <Setter Property="PlaceholderForeground" Value="#FF9CA3AF" />
+        </Style>
+        <Style x:Key="CanvasFieldComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="RequestedTheme" Value="Light" />
+            <Setter Property="Background" Value="#FFFFFFFF" />
+            <Setter Property="Foreground" Value="#FF111827" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+        </Style>
+        <Style x:Key="CanvasToolbarIconButtonStyle" TargetType="Button" BasedOn="{StaticResource GhostButtonStyle}">
+            <Setter Property="RequestedTheme" Value="Light" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
         </Style>
         <Style x:Key="CanvasNameTextBoxStyle" TargetType="TextBox">
             <Setter Property="BorderThickness" Value="0" />
@@ -63,6 +85,7 @@
             <Setter Property="PlaceholderForeground" Value="{StaticResource TextTertiaryBrush}" />
         </Style>
         <Style x:Key="CanvasToolbarGhostButtonStyle" TargetType="Button" BasedOn="{StaticResource GhostButtonStyle}">
+            <Setter Property="RequestedTheme" Value="Light" />
             <Setter Property="MinHeight" Value="34" />
             <Setter Property="Padding" Value="16,6" />
             <Setter Property="CornerRadius" Value="18" />
@@ -70,6 +93,7 @@
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
         <Style x:Key="CanvasToolbarPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+            <Setter Property="RequestedTheme" Value="Light" />
             <Setter Property="MinHeight" Value="34" />
             <Setter Property="Padding" Value="18,6" />
             <Setter Property="CornerRadius" Value="18" />
@@ -163,7 +187,9 @@
             <StackPanel Spacing="4" Margin="0,0,0,2">
                 <!-- Header with info button -->
                 <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,12">
-                    <TextBlock Text="Template Canvas" FontSize="24" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <TextBlock Text="Template Canvas" FontSize="24" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimaryBrush}"
+                               VerticalAlignment="Center" />
                     <Button Width="28" Height="28" Padding="0"
                             Background="Transparent" BorderThickness="0" CornerRadius="14"
                             VerticalAlignment="Center"
@@ -198,9 +224,12 @@
                             <TextBox x:Name="TemplateNameTextBox"
                                      MinHeight="36"
                                      FontSize="13"
+                                     RequestedTheme="Light"
                                      PlaceholderText="Template name (e.g. Spare Parts)"
                                      VerticalAlignment="Center"
                                      Background="Transparent"
+                                     Foreground="{StaticResource TextPrimaryBrush}"
+                                     PlaceholderForeground="{StaticResource TextTertiaryBrush}"
                                      BorderThickness="0"
                                      Padding="12,8,28,8"
                                      Text="{Binding NewTemplateName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
@@ -261,7 +290,7 @@
                                     <FontIcon Glyph="&#xE738;" FontSize="11"
                                               Foreground="{StaticResource TextSecondaryBrush}" />
                                 </Button>
-                                <Border Background="#12000000" CornerRadius="10" Padding="10,4"
+                                <Border Background="#F3F4F6" CornerRadius="10" Padding="10,4"
                                         VerticalAlignment="Center">
                                     <TextBlock x:Name="ZoomLevelText"
                                                Text="100%"
@@ -278,7 +307,7 @@
                                               Foreground="{StaticResource TextSecondaryBrush}" />
                                 </Button>
                                 <Border Width="1" Height="18"
-                                        Background="#20FFFFFF"
+                                        Background="{StaticResource BorderDefaultBrush}"
                                         VerticalAlignment="Center"
                                         Margin="2,0" />
                                 <Button Width="28" Height="28" Padding="0"
@@ -326,6 +355,7 @@
             <ScrollViewer
                 x:Name="TemplateCanvasScrollViewer"
                 Grid.Row="1"
+                RequestedTheme="Light"
                 Background="Transparent"
                 HorizontalScrollBarVisibility="Hidden"
                 VerticalScrollBarVisibility="Disabled"
@@ -412,17 +442,9 @@
                                                     VerticalAlignment="Center"
                                                     FontSize="13"
                                                     FontWeight="SemiBold"
-                                                    BorderThickness="1"
-                                                    Background="#0A1929"
-                                                    BorderBrush="#2A3D58"
-                                                    CornerRadius="8"
+                                                    Style="{StaticResource CanvasFieldTextBoxStyle}"
                                                     PlaceholderText="e.g. Part Number"
-                                                    Foreground="#FFFFFF"
-                                                    Text="{Binding Label, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-                                                    <TextBox.PlaceholderForeground>
-                                                        <SolidColorBrush Color="#FFFFFF" Opacity="0.4" />
-                                                    </TextBox.PlaceholderForeground>
-                                                </TextBox>
+                                                    Text="{Binding Label, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                             </Grid>
                                         </Border>
                                         <!-- Section 2: Field Type selector -->
@@ -442,7 +464,7 @@
                                                         Text="DATA TYPE"
                                                         FontSize="10"
                                                         FontWeight="SemiBold"
-                                                        Foreground="#FFFFFF"
+                                                        Foreground="{StaticResource TextSecondaryBrush}"
                                                         CharacterSpacing="40" />
                                                 </StackPanel>
                                                 <ComboBox
@@ -451,11 +473,7 @@
                                                     HorizontalAlignment="Stretch"
                                                     FontSize="12"
                                                     Padding="10,0,20,0"
-                                                    Background="#0A1929"
-                                                    BorderBrush="#2A3D58"
-                                                    BorderThickness="1"
-                                                    CornerRadius="8"
-                                                    Foreground="#EAF2FF"
+                                                    Style="{StaticResource CanvasFieldComboBoxStyle}"
                                                     DisplayMemberPath="Label"
                                                     ItemsSource="{Binding DataContext.FieldTypeOptions, ElementName=TemplatesPageRoot}"
                                                     SelectedValue="{Binding FieldType, Mode=TwoWay}"
@@ -471,71 +489,71 @@
                                                 <Border
                                                     MinHeight="32"
                                                     Padding="10,7"
-                                                    Background="#08131F"
-                                                    BorderBrush="#1E3250"
+                                                    Background="#F9FAFB"
+                                                    BorderBrush="{StaticResource BorderDefaultBrush}"
                                                     BorderThickness="1"
                                                     CornerRadius="8"
                                                     Visibility="{Binding FieldType, Converter={StaticResource TemplateFieldTypeEqualsToVisibilityConverter}, ConverterParameter=Text}">
                                                     <TextBlock
                                                         Text="Free text input"
                                                         FontSize="11" FontStyle="Italic"
-                                                        Foreground="#7A9AB0"
+                                                        Foreground="{StaticResource TextSecondaryBrush}"
                                                         VerticalAlignment="Center" />
                                                 </Border>
                                                 <Border
                                                     MinHeight="32"
                                                     Padding="10,7"
-                                                    Background="#08131F"
-                                                    BorderBrush="#1E3250"
+                                                    Background="#F9FAFB"
+                                                    BorderBrush="{StaticResource BorderDefaultBrush}"
                                                     BorderThickness="1"
                                                     CornerRadius="8"
                                                     Visibility="{Binding FieldType, Converter={StaticResource TemplateFieldTypeEqualsToVisibilityConverter}, ConverterParameter=Number}">
                                                     <TextBlock
                                                         Text="Whole numbers only"
                                                         FontSize="11" FontStyle="Italic"
-                                                        Foreground="#7A9AB0"
+                                                        Foreground="{StaticResource TextSecondaryBrush}"
                                                         VerticalAlignment="Center" />
                                                 </Border>
                                                 <Border
                                                     MinHeight="32"
                                                     Padding="10,7"
-                                                    Background="#08131F"
-                                                    BorderBrush="#1E3250"
+                                                    Background="#F9FAFB"
+                                                    BorderBrush="{StaticResource BorderDefaultBrush}"
                                                     BorderThickness="1"
                                                     CornerRadius="8"
                                                     Visibility="{Binding FieldType, Converter={StaticResource TemplateFieldTypeEqualsToVisibilityConverter}, ConverterParameter=Decimal}">
                                                     <TextBlock
                                                         Text="Decimal numbers"
                                                         FontSize="11" FontStyle="Italic"
-                                                        Foreground="#7A9AB0"
+                                                        Foreground="{StaticResource TextSecondaryBrush}"
                                                         VerticalAlignment="Center" />
                                                 </Border>
                                                 <Border
                                                     MinHeight="32"
                                                     Padding="10,7"
-                                                    Background="#08131F"
-                                                    BorderBrush="#1E3250"
+                                                    Background="#F9FAFB"
+                                                    BorderBrush="{StaticResource BorderDefaultBrush}"
                                                     BorderThickness="1"
                                                     CornerRadius="8"
                                                     Visibility="{Binding FieldType, Converter={StaticResource TemplateFieldTypeEqualsToVisibilityConverter}, ConverterParameter=Date}">
                                                     <TextBlock
                                                         Text="Date selection"
                                                         FontSize="11" FontStyle="Italic"
-                                                        Foreground="#7A9AB0"
+                                                        Foreground="{StaticResource TextSecondaryBrush}"
                                                         VerticalAlignment="Center" />
                                                 </Border>
                                                 <Border
                                                     MinHeight="32"
                                                     Padding="10,7"
-                                                    Background="#08131F"
-                                                    BorderBrush="#1E3250"
+                                                    Background="#F9FAFB"
+                                                    BorderBrush="{StaticResource BorderDefaultBrush}"
                                                     BorderThickness="1"
                                                     CornerRadius="8"
                                                     Visibility="{Binding FieldType, Converter={StaticResource TemplateFieldTypeEqualsToVisibilityConverter}, ConverterParameter=Boolean}">
                                                     <TextBlock
                                                         Text="Yes / No toggle"
                                                         FontSize="11" FontStyle="Italic"
-                                                        Foreground="#7A9AB0"
+                                                        Foreground="{StaticResource TextSecondaryBrush}"
                                                         VerticalAlignment="Center" />
                                                 </Border>
                                                 <Grid
@@ -549,14 +567,14 @@
                                                         Grid.Row="0"
                                                         MinHeight="32"
                                                         Padding="10,7"
-                                                        Background="#08131F"
-                                                        BorderBrush="#1E3250"
+                                                        Background="#F9FAFB"
+                                                        BorderBrush="{StaticResource BorderDefaultBrush}"
                                                         BorderThickness="1"
                                                         CornerRadius="8">
                                                         <TextBlock
                                                             Text="Dropdown list"
                                                             FontSize="11" FontStyle="Italic"
-                                                            Foreground="#7A9AB0"
+                                                            Foreground="{StaticResource TextSecondaryBrush}"
                                                             VerticalAlignment="Center" />
                                                     </Border>
                                                     <Grid Grid.Row="1" ColumnSpacing="6" Margin="0,8,0,0">
@@ -569,9 +587,7 @@
                                                             Height="30"
                                                             VerticalAlignment="Center"
                                                             FontSize="12"
-                                                            BorderThickness="1"
-                                                            Background="#0A1929"
-                                                            BorderBrush="#2A3D58"
+                                                            Style="{StaticResource CanvasFieldTextBoxStyle}"
                                                             CornerRadius="6"
                                                             PlaceholderText="Add option"
                                                             Text="{Binding PendingDropdownOption, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
@@ -602,13 +618,13 @@
                                                             <ItemsControl.ItemTemplate>
                                                                 <DataTemplate>
                                                                     <Border
-                                                                        Background="#16273A"
-                                                                        BorderBrush="#355983"
+                                                                        Background="#F3F4F6"
+                                                                        BorderBrush="{StaticResource BorderDefaultBrush}"
                                                                         BorderThickness="1"
                                                                         CornerRadius="6"
                                                                         Padding="6,4">
                                                                         <StackPanel Orientation="Horizontal" Spacing="4">
-                                                                            <TextBlock Text="{Binding}" FontSize="10" VerticalAlignment="Center" />
+                                                                            <TextBlock Text="{Binding}" FontSize="10" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
                                                                             <Button
                                                                                 Width="14" Height="14"
                                                                                 Padding="0"
@@ -616,6 +632,7 @@
                                                                                 Background="Transparent"
                                                                                 BorderThickness="0"
                                                                                 FontSize="10"
+                                                                                Foreground="{StaticResource TextSecondaryBrush}"
                                                                                 Click="OnRemoveDropdownOptionClick" />
                                                                         </StackPanel>
                                                                     </Border>
@@ -627,7 +644,7 @@
                                                 <ComboBox
                                                     Height="34"
                                                     VerticalAlignment="Center"
-                                                    CornerRadius="8"
+                                                    Style="{StaticResource CanvasFieldComboBoxStyle}"
                                                     PlaceholderText="Select template"
                                                     DisplayMemberPath="Name"
                                                     SelectedValuePath="Id"
@@ -650,14 +667,15 @@
                                         Opacity="1"
                                         VerticalAlignment="Center"
                                         HorizontalAlignment="Center"
+                                        RequestedTheme="Light"
                                         Background="Transparent"
                                         BorderThickness="0"
                                         Click="OnCanvasInsertLeftClick"
                                         IsHitTestVisible="True">
                                         <Border Width="20" Height="20" CornerRadius="10"
-                                                BorderBrush="#355983" BorderThickness="1"
-                                                Background="#18283C">
-                                            <FontIcon Glyph="&#xE710;" FontSize="10" Foreground="#A4C9FF"
+                                                BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1"
+                                                Background="#FFFFFF">
+                                            <FontIcon Glyph="&#xE710;" FontSize="10" Foreground="{StaticResource AccentPrimaryBrush}"
                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
                                         </Border>
                                     </Button>
@@ -674,14 +692,15 @@
                                         Opacity="1"
                                         VerticalAlignment="Center"
                                         HorizontalAlignment="Center"
+                                        RequestedTheme="Light"
                                         Background="Transparent"
                                         BorderThickness="0"
                                         Click="OnCanvasInsertRightClick"
                                         IsHitTestVisible="True">
                                         <Border Width="20" Height="20" CornerRadius="10"
-                                                BorderBrush="#355983" BorderThickness="1"
-                                                Background="#18283C">
-                                            <FontIcon Glyph="&#xE710;" FontSize="10" Foreground="#A4C9FF"
+                                                BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1"
+                                                Background="#FFFFFF">
+                                            <FontIcon Glyph="&#xE710;" FontSize="10" Foreground="{StaticResource AccentPrimaryBrush}"
                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
                                         </Border>
                                     </Button>

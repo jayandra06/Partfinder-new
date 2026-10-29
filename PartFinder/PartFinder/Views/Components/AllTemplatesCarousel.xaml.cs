@@ -291,13 +291,13 @@ public sealed partial class AllTemplatesCarousel : UserControl
             {
                 finalX = peekWidth - cardWidth - CARD_GAP; finalY = 0;
                 opacity = 1.0; zIndex = 90;
-                card.BorderBrush = new SolidColorBrush(Color.FromArgb(160, 42, 61, 88));
+                card.BorderBrush = new SolidColorBrush(Color.FromArgb(255, 229, 231, 235));
             }
             else if (isRight)
             {
                 finalX = peekWidth + cardWidth + CARD_GAP; finalY = 0;
                 opacity = 1.0; zIndex = 90;
-                card.BorderBrush = new SolidColorBrush(Color.FromArgb(160, 42, 61, 88));
+                card.BorderBrush = new SolidColorBrush(Color.FromArgb(255, 229, 231, 235));
             }
             else
             {
@@ -393,8 +393,8 @@ public sealed partial class AllTemplatesCarousel : UserControl
         {
             Width = 300, Height = 400,
             CornerRadius    = new CornerRadius(20),
-            Background      = new SolidColorBrush(Color.FromArgb(255, 17, 26, 38)),
-            BorderBrush     = new SolidColorBrush(Color.FromArgb(160, 42, 61, 88)),
+            Background      = new SolidColorBrush(Color.FromArgb(255, 255, 255, 255)),
+            BorderBrush     = new SolidColorBrush(Color.FromArgb(255, 229, 231, 235)),
             BorderThickness = new Thickness(1.5),
             Padding         = new Thickness(0),
             Translation     = new System.Numerics.Vector3(0, 0, 32),
@@ -439,7 +439,7 @@ public sealed partial class AllTemplatesCarousel : UserControl
         {
             Text = template.Name, FontSize = 14,
             FontWeight = Microsoft.UI.Text.FontWeights.Bold,
-            Foreground = new SolidColorBrush(Color.FromArgb(255, 234, 242, 255)),
+            Foreground = new SolidColorBrush(Color.FromArgb(255, 31, 41, 55)),
             VerticalAlignment = VerticalAlignment.Center,
             TextWrapping = TextWrapping.NoWrap,
             TextTrimming = TextTrimming.CharacterEllipsis,
@@ -499,7 +499,7 @@ public sealed partial class AllTemplatesCarousel : UserControl
         {
             Text = $"{template.Fields.Count} column{(template.Fields.Count == 1 ? "" : "s")}",
             FontSize = 14,
-            Foreground = new SolidColorBrush(Color.FromArgb(255, 123, 141, 168)),
+            Foreground = new SolidColorBrush(Color.FromArgb(255, 107, 114, 128)),
             HorizontalAlignment = HorizontalAlignment.Center, CharacterSpacing = 20,
         });
 
@@ -673,7 +673,7 @@ public sealed partial class AllTemplatesCarousel : UserControl
             {
                 Text = field.Label, FontSize = 11,
                 FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                Foreground = new SolidColorBrush(Color.FromArgb(255, 234, 242, 255)),
+                Foreground = new SolidColorBrush(Color.FromArgb(255, 31, 41, 55)),
                 HorizontalAlignment = HorizontalAlignment.Center,
                 TextAlignment = TextAlignment.Center,
                 TextWrapping = TextWrapping.Wrap, MaxLines = 2,
