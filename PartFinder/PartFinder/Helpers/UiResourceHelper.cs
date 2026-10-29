@@ -34,6 +34,16 @@ internal static class UiResourceHelper
         box.PlaceholderForeground = new SolidColorBrush(ColorHelper.FromArgb(255, 156, 163, 175));
     }
 
+    public static void ApplyLightComboBox(ComboBox box)
+    {
+        box.RequestedTheme = ElementTheme.Light;
+        box.Background = new SolidColorBrush(Colors.White);
+        box.Foreground = new SolidColorBrush(ColorHelper.FromArgb(255, 17, 24, 39));
+        box.BorderBrush = new SolidColorBrush(ColorHelper.FromArgb(255, 209, 213, 219));
+        box.BorderThickness = new Thickness(1);
+        box.PlaceholderForeground = new SolidColorBrush(ColorHelper.FromArgb(255, 156, 163, 175));
+    }
+
     public static TextBlock CreateDialogLabel(string text)
     {
         return new TextBlock
