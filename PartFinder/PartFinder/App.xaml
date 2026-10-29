@@ -13,6 +13,7 @@
                 <ResourceDictionary Source="Styles/Spacing.xaml" />
                 <ResourceDictionary Source="Styles/Controls.xaml" />
                 <ResourceDictionary Source="Styles/FluentControlLightOverrides.xaml" />
+                <ResourceDictionary Source="Styles/CanvasFluentLightInputBrushes.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

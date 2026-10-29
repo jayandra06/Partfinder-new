@@ -1323,12 +1323,12 @@ public sealed partial class TemplatesPage : Page
 
         foreach (var textBox in FindVisualChildren<TextBox>(shell))
         {
-            UiResourceHelper.ApplyLightDialogTextBox(textBox);
+            UiResourceHelper.WirePersistentLightTextBox(textBox);
         }
 
         foreach (var combo in FindVisualChildren<ComboBox>(shell))
         {
-            UiResourceHelper.ApplyLightComboBox(combo);
+            UiResourceHelper.WirePersistentLightComboBox(combo);
         }
 
         var previewFill = new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 249, 250, 251));
