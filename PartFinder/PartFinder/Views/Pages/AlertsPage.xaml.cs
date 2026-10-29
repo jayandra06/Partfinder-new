@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using PartFinder.Helpers;
 using PartFinder.Services;
 using PartFinder.ViewModels;
 
@@ -37,17 +38,26 @@ public sealed partial class AlertsPage : Page
 
     private async void OnConfigureAlertsClick(object sender, RoutedEventArgs e)
     {
+        if (XamlRoot is null)
+        {
+            return;
+        }
+
         var content = new StackPanel { Spacing = 14, MinWidth = 400 };
         content.Children.Add(new TextBlock { Text = "Alert Thresholds", FontSize = 14, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
 
         var lowStockPanel = new StackPanel { Spacing = 6 };
-        lowStockPanel.Children.Add(new TextBlock { Text = "LOW STOCK THRESHOLD (units)", FontSize = 11, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Foreground = (Microsoft.UI.Xaml.Media.Brush)Resources["TextSecondaryBrush"] });
-        lowStockPanel.Children.Add(new TextBox { Text = "50", FontSize = 13, Padding = new Thickness(12, 10, 12, 10) });
+        lowStockPanel.Children.Add(UiResourceHelper.CreateDialogLabel("LOW STOCK THRESHOLD (units)"));
+        var lowStockBox = new TextBox { Text = "50", FontSize = 13, Padding = new Thickness(12, 10, 12, 10) };
+        UiResourceHelper.ApplyLightDialogTextBox(lowStockBox);
+        lowStockPanel.Children.Add(lowStockBox);
         content.Children.Add(lowStockPanel);
 
         var criticalPanel = new StackPanel { Spacing = 6 };
-        criticalPanel.Children.Add(new TextBlock { Text = "CRITICAL STOCK THRESHOLD (units)", FontSize = 11, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Foreground = (Microsoft.UI.Xaml.Media.Brush)Resources["TextSecondaryBrush"] });
-        criticalPanel.Children.Add(new TextBox { Text = "10", FontSize = 13, Padding = new Thickness(12, 10, 12, 10) });
+        criticalPanel.Children.Add(UiResourceHelper.CreateDialogLabel("CRITICAL STOCK THRESHOLD (units)"));
+        var criticalBox = new TextBox { Text = "10", FontSize = 13, Padding = new Thickness(12, 10, 12, 10) };
+        UiResourceHelper.ApplyLightDialogTextBox(criticalBox);
+        criticalPanel.Children.Add(criticalBox);
         content.Children.Add(criticalPanel);
 
         content.Children.Add(new ToggleSwitch { Header = "Email notifications", IsOn = true });
@@ -69,11 +79,30 @@ public sealed partial class AlertsPage : Page
 
     private async void OnResolveAlertClick(object sender, RoutedEventArgs e)
     {
+        if (XamlRoot is null)
+        {
+            return;
+        }
+
         if (sender is Button btn && btn.DataContext is AlertItem alert)
         {
             var content = new StackPanel { Spacing = 12, MinWidth = 380 };
-            content.Children.Add(new TextBlock { Text = "Add a resolution note (optional):", FontSize = 12, Foreground = (Microsoft.UI.Xaml.Media.Brush)Resources["TextSecondaryBrush"] });
-            var notesBox = new TextBox { PlaceholderText = "Describe how this was resolved...", FontSize = 13, Padding = new Thickness(12, 10, 12, 10), AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 80 };
+            content.Children.Add(new TextBlock
+            {
+                Text = "Add a resolution note (optional):",
+                FontSize = 12,
+                Foreground = UiResourceHelper.TryAppBrush("TextSecondaryBrush", "#4B5563"),
+            });
+            var notesBox = new TextBox
+            {
+                PlaceholderText = "Describe how this was resolved...",
+                FontSize = 13,
+                Padding = new Thickness(12, 10, 12, 10),
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.Wrap,
+                MinHeight = 80,
+            };
+            UiResourceHelper.ApplyLightDialogTextBox(notesBox);
             content.Children.Add(notesBox);
 
             var dialog = new ContentDialog

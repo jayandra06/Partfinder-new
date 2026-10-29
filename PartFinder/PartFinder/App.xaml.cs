@@ -66,8 +66,8 @@ namespace PartFinder
             services.AddSingleton<IAppStateStore, AppStateStore>();
             services.AddSingleton<LocalUserSecurityStore>();
             services.AddSingleton<AdminSessionStore>();
-            services.AddSingleton<LocalProfileStore>();
             services.AddSingleton<ILocalSetupContext, LocalSetupContext>();
+            services.AddSingleton<LocalProfileStore>();
             services.AddSingleton<BackendApiClient>();
             services.AddSingleton<IOrgUserDirectoryService, MongoOrgUserDirectoryService>();
             services.AddSingleton<ICurrentUserAccessService, CurrentUserAccessService>();

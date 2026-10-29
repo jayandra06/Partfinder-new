@@ -17,7 +17,18 @@
     <EnableMsixTooling>true</EnableMsixTooling>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- App is not Native AOT; suppress MVVM Toolkit WinRT/AOT advisory on [ObservableProperty] fields. -->
+    <NoWarn>$(NoWarn);MVVMTK0045</NoWarn>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Page Update="Views\Components\InventoryItemFormPanel.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Compile Update="Views\Components\InventoryItemFormPanel.xaml.cs">
+      <DependentUpon>InventoryItemFormPanel.xaml</DependentUpon>
+    </Compile>
+  </ItemGroup>
 
   <ItemGroup>
     <None Update="appsettings.json">
@@ -75,6 +86,7 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.5" />
     <PackageReference Include="MongoDB.Driver" Version="2.28.0" />
     <PackageReference Include="QRCoder" Version="1.6.0" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
   </ItemGroup>
 
   <!--
