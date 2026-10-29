@@ -11,6 +11,10 @@
     KeyDown="OnPageKeyDown"
     KeyUp="OnPageKeyUp">
     <Page.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="ms-appx:///Styles/FluentControlLightOverrides.xaml" />
+            </ResourceDictionary.MergedDictionaries>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
         <converters:InvertedBoolToVisibilityConverter x:Key="InvertedBoolToVisibilityConverter" />
         <converters:BoolToStarGlyphConverter x:Key="BoolToStarGlyphConverter" />
@@ -54,18 +58,21 @@
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="22" />
         </Style>
-        <Style x:Key="CanvasFieldTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource StandardTextBoxStyle}">
+        <Style x:Key="CanvasFieldTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource DefaultTextBoxStyle}">
             <Setter Property="RequestedTheme" Value="Light" />
             <Setter Property="Background" Value="#FFFFFFFF" />
             <Setter Property="Foreground" Value="#FF111827" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="#FFD1D5DB" />
+            <Setter Property="BorderThickness" Value="1" />
             <Setter Property="PlaceholderForeground" Value="#FF9CA3AF" />
+            <Setter Property="SelectionHighlightColor" Value="#401F7AE0" />
+            <Setter Property="Padding" Value="10,6" />
         </Style>
-        <Style x:Key="CanvasFieldComboBoxStyle" TargetType="ComboBox">
+        <Style x:Key="CanvasFieldComboBoxStyle" TargetType="ComboBox" BasedOn="{StaticResource DefaultComboBoxStyle}">
             <Setter Property="RequestedTheme" Value="Light" />
             <Setter Property="Background" Value="#FFFFFFFF" />
             <Setter Property="Foreground" Value="#FF111827" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="#FFD1D5DB" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="8" />
         </Style>
@@ -100,6 +107,7 @@
             <Setter Property="FontSize" Value="12" />
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
+        </ResourceDictionary>
     </Page.Resources>
     <Grid x:Name="TemplatesRootGrid" Padding="24,24,24,8" Background="{StaticResource PageBackgroundBrush}">
         <Grid.RowDefinitions>
@@ -389,10 +397,11 @@
                                 <Border
                                     Tag="canvas-cell-shell"
                                     Loaded="OnCanvasCellBorderLoaded"
+                                    RequestedTheme="Light"
                                     CornerRadius="12"
                                     BorderBrush="{StaticResource BorderDefaultBrush}"
                                     BorderThickness="1"
-                                    Background="{StaticResource CardBackgroundBrush}"
+                                    Background="#FFFFFFFF"
                                     VerticalAlignment="Center">
                                     <Grid RowSpacing="0">
                                         <Grid.RowDefinitions>
@@ -487,9 +496,10 @@
                                                 Padding="12,10,12,12">
                                             <Grid>
                                                 <Border
+                                                    Tag="canvas-type-preview"
                                                     MinHeight="32"
                                                     Padding="10,7"
-                                                    Background="#F9FAFB"
+                                                    Background="#FFF9FAFB"
                                                     BorderBrush="{StaticResource BorderDefaultBrush}"
                                                     BorderThickness="1"
                                                     CornerRadius="8"
@@ -501,9 +511,10 @@
                                                         VerticalAlignment="Center" />
                                                 </Border>
                                                 <Border
+                                                    Tag="canvas-type-preview"
                                                     MinHeight="32"
                                                     Padding="10,7"
-                                                    Background="#F9FAFB"
+                                                    Background="#FFF9FAFB"
                                                     BorderBrush="{StaticResource BorderDefaultBrush}"
                                                     BorderThickness="1"
                                                     CornerRadius="8"
@@ -515,9 +526,10 @@
                                                         VerticalAlignment="Center" />
                                                 </Border>
                                                 <Border
+                                                    Tag="canvas-type-preview"
                                                     MinHeight="32"
                                                     Padding="10,7"
-                                                    Background="#F9FAFB"
+                                                    Background="#FFF9FAFB"
                                                     BorderBrush="{StaticResource BorderDefaultBrush}"
                                                     BorderThickness="1"
                                                     CornerRadius="8"
@@ -529,9 +541,10 @@
                                                         VerticalAlignment="Center" />
                                                 </Border>
                                                 <Border
+                                                    Tag="canvas-type-preview"
                                                     MinHeight="32"
                                                     Padding="10,7"
-                                                    Background="#F9FAFB"
+                                                    Background="#FFF9FAFB"
                                                     BorderBrush="{StaticResource BorderDefaultBrush}"
                                                     BorderThickness="1"
                                                     CornerRadius="8"
@@ -543,9 +556,10 @@
                                                         VerticalAlignment="Center" />
                                                 </Border>
                                                 <Border
+                                                    Tag="canvas-type-preview"
                                                     MinHeight="32"
                                                     Padding="10,7"
-                                                    Background="#F9FAFB"
+                                                    Background="#FFF9FAFB"
                                                     BorderBrush="{StaticResource BorderDefaultBrush}"
                                                     BorderThickness="1"
                                                     CornerRadius="8"
@@ -565,9 +579,10 @@
                                                     </Grid.RowDefinitions>
                                                     <Border
                                                         Grid.Row="0"
+                                                        Tag="canvas-type-preview"
                                                         MinHeight="32"
                                                         Padding="10,7"
-                                                        Background="#F9FAFB"
+                                                        Background="#FFF9FAFB"
                                                         BorderBrush="{StaticResource BorderDefaultBrush}"
                                                         BorderThickness="1"
                                                         CornerRadius="8">

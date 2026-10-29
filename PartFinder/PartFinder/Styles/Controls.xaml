@@ -36,10 +36,12 @@
         <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}" />
     </Style>
 
-    <Style x:Key="StandardTextBoxStyle" TargetType="TextBox">
-        <Setter Property="Background" Value="{StaticResource InputBackgroundBrush}" />
-        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-        <Setter Property="BorderBrush" Value="{StaticResource BorderDefaultBrush}" />
+    <Style x:Key="StandardTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource DefaultTextBoxStyle}">
+        <Setter Property="RequestedTheme" Value="Light" />
+        <Setter Property="Background" Value="#FFFFFFFF" />
+        <Setter Property="Foreground" Value="#FF111827" />
+        <Setter Property="BorderBrush" Value="#FFD1D5DB" />
+        <Setter Property="PlaceholderForeground" Value="#FF9CA3AF" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="{StaticResource RadiusM}" />
         <Setter Property="MinHeight" Value="40" />
