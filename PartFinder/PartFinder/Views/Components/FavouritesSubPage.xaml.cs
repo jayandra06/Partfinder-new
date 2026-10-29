@@ -52,8 +52,22 @@ public sealed partial class FavouritesSubPage : UserControl
     public FavouritesSubPage()
     {
         InitializeComponent();
+        EnsureViewModelDataContext();
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
+    }
+
+    /// <summary>
+    /// Bind to <see cref="FavouritesViewModel"/> immediately so XAML does not inherit
+    /// <see cref="TemplatesViewModel"/> from <see cref="Pages.TemplatesPage"/> (binding failures).
+    /// </summary>
+    private void EnsureViewModelDataContext()
+    {
+        _vm ??= App.Services.GetRequiredService<FavouritesViewModel>();
+        if (!ReferenceEquals(DataContext, _vm))
+        {
+            DataContext = _vm;
+        }
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
@@ -62,10 +76,9 @@ public sealed partial class FavouritesSubPage : UserControl
     {
         _templatesVm = templatesVm;
 
-        _vm = App.Services.GetRequiredService<FavouritesViewModel>();
-        DataContext = _vm;
+        EnsureViewModelDataContext();
 
-        _vm.PropertyChanged -= OnVmPropertyChanged; // Avoid duplicates
+        _vm!.PropertyChanged -= OnVmPropertyChanged; // Avoid duplicates
         _vm.PropertyChanged += OnVmPropertyChanged;
         _vm.EditTemplateRequested -= OnEditTemplateRequested;
         _vm.EditTemplateRequested += OnEditTemplateRequested;
