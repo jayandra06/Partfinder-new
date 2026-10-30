@@ -2,6 +2,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Animation;
+using PartFinder.Helpers;
+using PartFinder.Services;
 using PartFinder.ViewModels;
 
 namespace PartFinder.Views.Pages;
@@ -9,43 +11,123 @@ namespace PartFinder.Views.Pages;
 public sealed partial class DashboardPage : Page
 {
     private readonly DashboardViewModel _viewModel;
+    private readonly IThemeService _themeService;
 
     public DashboardPage()
     {
         InitializeComponent();
         _viewModel = App.Services.GetRequiredService<DashboardViewModel>();
+        _themeService = App.Services.GetRequiredService<IThemeService>();
         DataContext = _viewModel;
         Loaded += OnLoaded;
+        Unloaded += OnUnloaded;
+        _themeService.ThemeChanged += OnAppThemeChanged;
+        _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+    }
+
+    private void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        _themeService.ThemeChanged -= OnAppThemeChanged;
+        _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+    }
+
+    private void OnAppThemeChanged(object? sender, EventArgs e) => ApplyChartChrome();
+
+    private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(DashboardViewModel.ChartDrawMarginFrame)
+            or nameof(DashboardViewModel.ChartXAxes)
+            or nameof(DashboardViewModel.ChartYAxes)
+            or nameof(DashboardViewModel.TrendXAxes)
+            or nameof(DashboardViewModel.TrendSeries)
+            or nameof(DashboardViewModel.StockLevelSeries))
+        {
+            ApplyChartBindings();
+        }
+    }
+
+    private void ApplyChartChrome()
+    {
+        try
+        {
+            ApplyChartBindings();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[DashboardPage] ApplyChartChrome failed: {ex}");
+        }
+    }
+
+    private void ApplyChartBindings()
+    {
+        try
+        {
+            var frame = _viewModel.ChartDrawMarginFrame;
+            TrendChart.DrawMarginFrame = frame;
+            StockLevelChart.DrawMarginFrame = frame;
+
+            TrendChart.XAxes = _viewModel.TrendXAxes is { Length: > 0 }
+                ? _viewModel.TrendXAxes
+                : _viewModel.ChartXAxes;
+            TrendChart.YAxes = _viewModel.ChartYAxes;
+            StockLevelChart.XAxes = _viewModel.ChartXAxes;
+            StockLevelChart.YAxes = _viewModel.ChartYAxes;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[DashboardPage] ApplyChartBindings failed: {ex}");
+        }
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
-        // Staggered entrance animations
-        PlayEntrance(HeaderGrid,    HeaderSlide,  delay: 0);
-        PlayEntrance(KpiRow,        KpiSlide,     delay: 80);
-        PlayEntrance(Row1,          Row1Slide,    delay: 160);
-        PlayEntrance(Row2,          Row2Slide,    delay: 240);
-        PlayEntrance(Row3,          Row3Slide,    delay: 320);
-
-        // Pulse the online dot forever
-        StartPulseDot();
-
-        // Load data
-        if (_viewModel.LazyLoadTrendCommand.CanExecute(null))
+        try
         {
-            await _viewModel.LazyLoadTrendCommand.ExecuteAsync(null);
-        }
+            ApplyChartChrome();
 
-        // Animate banner in if low stock
-        if (_viewModel.HasLowStock)
-            AnimateBannerIn();
+            PlayEntrance(HeaderGrid, HeaderSlide, delay: 0);
+            PlayEntrance(KpiRow, KpiSlide, delay: 80);
+            PlayEntrance(Row1, Row1Slide, delay: 160);
+            PlayEntrance(Row2, Row2Slide, delay: 240);
+            PlayEntrance(Row3, Row3Slide, delay: 320);
 
-        // Watch for HasLowStock changes after data loads
-        _viewModel.PropertyChanged += (_, args) =>
-        {
-            if (args.PropertyName == nameof(DashboardViewModel.HasLowStock) && _viewModel.HasLowStock)
+            StartPulseDot();
+
+            if (_viewModel.LazyLoadTrendCommand.CanExecute(null))
+            {
+                await _viewModel.LazyLoadTrendCommand.ExecuteAsync(null);
+            }
+
+            if (_viewModel.HasLowStock)
+            {
                 AnimateBannerIn();
-        };
+            }
+
+            _viewModel.PropertyChanged += OnHasLowStockChanged;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[DashboardPage] OnLoaded failed: {ex}");
+            EnsureDashboardVisible();
+        }
+    }
+
+    private void OnHasLowStockChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName == nameof(DashboardViewModel.HasLowStock) && _viewModel.HasLowStock)
+        {
+            AnimateBannerIn();
+        }
+    }
+
+    private void EnsureDashboardVisible()
+    {
+        HeaderGrid.Opacity = 1;
+        KpiRow.Opacity = 1;
+        Row1.Opacity = 1;
+        Row2.Opacity = 1;
+        Row3.Opacity = 1;
+        LowStockBanner.Opacity = _viewModel.HasLowStock ? 1 : 0;
     }
 
     // ── Entrance slide-fade ───────────────────────────────────────────────────
@@ -74,13 +156,19 @@ public sealed partial class DashboardPage : Page
         var sb = new Storyboard();
         sb.Children.Add(fadeIn);
         sb.Children.Add(slideUp);
+        sb.Completed += (_, _) =>
+        {
+            if (element.Opacity < 0.99)
+            {
+                element.Opacity = 1;
+            }
+        };
         sb.Begin();
     }
 
     // ── Pulsing online dot ────────────────────────────────────────────────────
     private void StartPulseDot()
     {
-        // Scale pulse ring out and fade
         var scaleX = new DoubleAnimation { From = 0.4, To = 1.8, Duration = TimeSpan.FromSeconds(2.1) };
         var scaleY = new DoubleAnimation { From = 0.4, To = 1.8, Duration = TimeSpan.FromSeconds(2.1) };
         var fade   = new DoubleAnimation { From = 0.7, To = 0,   Duration = TimeSpan.FromSeconds(2.1) };
@@ -116,7 +204,6 @@ public sealed partial class DashboardPage : Page
         Storyboard.SetTarget(fadeIn, LowStockBanner);
         Storyboard.SetTargetProperty(fadeIn, "Opacity");
 
-        // Pulsing border glow on banner
         var borderPulse = new ColorAnimation
         {
             From = Windows.UI.Color.FromArgb(40, 255, 183, 129),
@@ -129,7 +216,6 @@ public sealed partial class DashboardPage : Page
         Storyboard.SetTarget(borderPulse, BannerBorderBrush);
         Storyboard.SetTargetProperty(borderPulse, "Color");
 
-        // Icon bounce
         var iconBounce = new DoubleAnimationUsingKeyFrames
         {
             RepeatBehavior = RepeatBehavior.Forever,

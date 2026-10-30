@@ -24,6 +24,7 @@ import { SetupChangePasswordDto } from './dto/setup-change-password.dto';
 import { replaceMongoDatabasePath } from './org-database-uri.util';
 import { TenantMongoService } from './tenant-mongo.service';
 import { CasbinService } from '../casbin/casbin.service';
+import { JwtService } from '@nestjs/jwt';
 
 const BCRYPT_ROUNDS = 10;
 
@@ -35,7 +36,13 @@ export class SetupService {
     private readonly dbClusters: DbClustersService,
     private readonly config: ConfigService,
     private readonly casbin: CasbinService,
+    private readonly jwtService: JwtService,
   ) {}
+
+  private async issueInviteAccessToken(email: string): Promise<string> {
+    const normalized = email.trim().toLowerCase();
+    return this.jwtService.signAsync({ sub: normalized, email: normalized });
+  }
 
   @OnEvent('admin.password.changed')
   async handleAdminPasswordChanged(payload: { email: string; targetEmail?: string; plainPassword: string }) {
@@ -363,6 +370,8 @@ export class SetupService {
         ok: true as const,
         email: reqEmail,
         role: 'Admin',
+        mustChangePassword: true,
+        accessToken: await this.issueInviteAccessToken(reqEmail),
       };
     }
 
@@ -378,10 +387,13 @@ export class SetupService {
       orgAdmin.passwordHash &&
       (await bcrypt.compare(dto.temporaryPassword, orgAdmin.passwordHash))
     ) {
+      const adminEmail = dto.email.trim().toLowerCase();
       return {
         ok: true as const,
-        email: dto.email.trim().toLowerCase(),
+        email: adminEmail,
         role: 'Admin',
+        mustChangePassword: false,
+        accessToken: await this.issueInviteAccessToken(adminEmail),
       };
     }
 
@@ -406,11 +418,13 @@ export class SetupService {
       if (!validPermanent) {
         return { ok: false as const, message: 'Invalid credentials.' };
       }
+      const employeeEmail = dto.email.trim().toLowerCase();
       return {
         ok: true as const,
-        email: dto.email.trim().toLowerCase(),
+        email: employeeEmail,
         role: typeof doc.role === 'string' ? doc.role : 'Employee',
         mustChangePassword: false,
+        accessToken: await this.issueInviteAccessToken(employeeEmail),
       };
     }
 
@@ -420,11 +434,13 @@ export class SetupService {
       return { ok: false as const, message: 'Invalid invited credentials.' };
     }
 
+    const pendingEmail = dto.email.trim().toLowerCase();
     return {
       ok: true as const,
-      email: dto.email.trim().toLowerCase(),
+      email: pendingEmail,
       role: typeof doc.role === 'string' ? doc.role : 'Employee',
       mustChangePassword: true,
+      accessToken: await this.issueInviteAccessToken(pendingEmail),
     };
   }
 

@@ -19,6 +19,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <!-- App is not Native AOT; suppress MVVM Toolkit WinRT/AOT advisory on [ObservableProperty] fields. -->
     <NoWarn>$(NoWarn);MVVMTK0045</NoWarn>
+    <!-- Stop VS breaking in App.g.i.cs on XAML exceptions we already handle in App.xaml.cs -->
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_BREAK_ON_UNHANDLED_EXCEPTION</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

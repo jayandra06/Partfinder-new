@@ -284,16 +284,24 @@
                             </StackPanel>
                         </Grid>
 
-                        <Grid>
-                            <lvc:CartesianChart
-                                Height="240"
-                                Series="{Binding TrendSeries}"
-                                AnimationsSpeed="00:00:00.8"
-                                EasingFunction="{x:Null}"/>
-                            <ProgressRing Width="24" Height="24"
-                                          HorizontalAlignment="Center" VerticalAlignment="Center"
-                                          IsActive="{Binding IsLoading}"/>
-                        </Grid>
+                        <Border CornerRadius="14"
+                                Padding="8"
+                                Background="{StaticResource ChartSurfaceBackgroundBrush}"
+                                BorderBrush="{StaticResource GlassStrokeBrush}"
+                                BorderThickness="1">
+                            <Grid>
+                                <lvc:CartesianChart
+                                    x:Name="TrendChart"
+                                    Height="240"
+                                    Background="Transparent"
+                                    Series="{Binding TrendSeries}"
+                                    AnimationsSpeed="00:00:00.8"
+                                    EasingFunction="{x:Null}"/>
+                                <ProgressRing Width="24" Height="24"
+                                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              IsActive="{Binding IsLoading}"/>
+                            </Grid>
+                        </Border>
 
                         <!-- Legend -->
                         <StackPanel Orientation="Horizontal" Spacing="18">
@@ -316,11 +324,19 @@
                         <TextBlock Text="Template Distribution" FontSize="15" FontWeight="SemiBold"/>
                         <TextBlock Text="Parts per schema category" FontSize="11"
                                    Foreground="{StaticResource TextTertiaryBrush}"/>
-                        <lvc:PieChart
-                            Height="190"
-                            Series="{Binding DistributionSeries}"
-                            AnimationsSpeed="00:00:00.9"
-                            InitialRotation="-90"/>
+                        <Border CornerRadius="14"
+                                Padding="8"
+                                Background="{StaticResource ChartSurfaceBackgroundBrush}"
+                                BorderBrush="{StaticResource GlassStrokeBrush}"
+                                BorderThickness="1">
+                            <lvc:PieChart
+                                x:Name="DistributionChart"
+                                Height="190"
+                                Background="Transparent"
+                                Series="{Binding DistributionSeries}"
+                                AnimationsSpeed="00:00:00.9"
+                                InitialRotation="-90"/>
+                        </Border>
                         <!-- Legend -->
                         <StackPanel Spacing="5">
                             <StackPanel Orientation="Horizontal" Spacing="7">
@@ -385,11 +401,19 @@
                             </Border>
                         </Grid>
 
-                        <lvc:CartesianChart
-                            Height="200"
-                            Series="{Binding StockLevelSeries}"
-                            AnimationsSpeed="00:00:00.9"
-                            EasingFunction="{x:Null}"/>
+                        <Border CornerRadius="14"
+                                Padding="8"
+                                Background="{StaticResource ChartSurfaceBackgroundBrush}"
+                                BorderBrush="{StaticResource GlassStrokeBrush}"
+                                BorderThickness="1">
+                            <lvc:CartesianChart
+                                x:Name="StockLevelChart"
+                                Height="200"
+                                Background="Transparent"
+                                Series="{Binding StockLevelSeries}"
+                                AnimationsSpeed="00:00:00.9"
+                                EasingFunction="{x:Null}"/>
+                        </Border>
 
                         <!-- Min stock threshold note -->
                         <StackPanel Orientation="Horizontal" Spacing="8">
@@ -408,12 +432,20 @@
                         <TextBlock Text="Import pipeline reliability" FontSize="11"
                                    Foreground="{StaticResource TextTertiaryBrush}"/>
                         <Grid>
-                            <lvc:PieChart
-                                Height="170"
-                                Series="{Binding HealthGaugeSeries}"
-                                AnimationsSpeed="00:00:01.1"
-                                InitialRotation="225"
-                                MaxAngle="270"/>
+                            <Border CornerRadius="14"
+                                    Padding="8"
+                                    Background="{StaticResource ChartSurfaceBackgroundBrush}"
+                                    BorderBrush="{StaticResource GlassStrokeBrush}"
+                                    BorderThickness="1">
+                                <lvc:PieChart
+                                    x:Name="HealthGaugeChart"
+                                    Height="170"
+                                    Background="Transparent"
+                                    Series="{Binding HealthGaugeSeries}"
+                                    AnimationsSpeed="00:00:01.1"
+                                    InitialRotation="225"
+                                    MaxAngle="270"/>
+                            </Border>
                             <!-- Center overlay -->
                             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="1">
                                 <TextBlock Text="{Binding HealthLabel}" FontSize="22" FontWeight="Bold"

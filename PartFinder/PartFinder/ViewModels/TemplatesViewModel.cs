@@ -19,6 +19,7 @@ public partial class TemplatesViewModel : ViewModelBase
     private readonly Microsoft.UI.Dispatching.DispatcherQueue _dispatcherQueue;
 
     private readonly ICurrentUserAccessService _access;
+    private readonly BulkTemplateImportService _bulkImport;
 
     public TemplatesViewModel(
         ITemplateSchemaService templateSchema,
@@ -27,7 +28,8 @@ public partial class TemplatesViewModel : ViewModelBase
         IContextActionsService contextActions,
         ActivityLogger activityLogger,
         IFavouriteStore favouriteStore,
-        ICurrentUserAccessService access)
+        ICurrentUserAccessService access,
+        BulkTemplateImportService bulkImport)
     {
         _templateSchema = templateSchema;
         _shellNav = shellNav;
@@ -36,6 +38,7 @@ public partial class TemplatesViewModel : ViewModelBase
         _activityLogger = activityLogger;
         _favouriteStore = favouriteStore;
         _access = access;
+        _bulkImport = bulkImport;
         _dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
         
         ColumnLabels.Add(new ColumnLabelDraft());
@@ -88,6 +91,31 @@ public partial class TemplatesViewModel : ViewModelBase
     public event EventHandler? AllTemplatesViewRequested;
 
     public bool IsAllTemplatesGalleryEmpty => Templates.Count == 0;
+
+    public async Task<BulkTemplateImportResult> ImportBulkTemplatesFromExcelAsync(string filePath)
+    {
+        if (!_access.Capabilities.CanAddTemplate)
+        {
+            return new BulkTemplateImportResult
+            {
+                Errors = ["You do not have permission to add templates."],
+            };
+        }
+
+        var result = await _bulkImport.ImportFromExcelAsync(filePath).ConfigureAwait(true);
+        if (result.CreatedCount > 0)
+        {
+            _activityLogger.LogTemplateChange(
+                "Bulk Template Import",
+                $"Imported {result.CreatedCount} template(s) from Excel.");
+            await LoadAsync().ConfigureAwait(true);
+            await _shellNav.NotifyTemplatesChangedAsync().ConfigureAwait(true);
+            OnPropertyChanged(nameof(IsAllTemplatesGalleryEmpty));
+            AllTemplatesViewRequested?.Invoke(this, EventArgs.Empty);
+        }
+
+        return result;
+    }
 
     [RelayCommand]
     private async Task DeleteTemplateAsync(string templateId)

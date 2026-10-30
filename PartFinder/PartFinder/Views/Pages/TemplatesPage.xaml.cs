@@ -104,6 +104,48 @@ public sealed partial class TemplatesPage : Page
         RefreshCanvasUiState(vm);
     }
 
+    private async void OnBulkUploadClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not TemplatesViewModel vm || XamlRoot is null || App.MainAppWindow is null)
+        {
+            return;
+        }
+
+        var picker = new FileOpenPicker();
+        picker.FileTypeFilter.Add(".xlsx");
+        picker.FileTypeFilter.Add(".xlsm");
+        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainAppWindow));
+        var file = await picker.PickSingleFileAsync();
+        if (file is null)
+        {
+            return;
+        }
+
+        var result = await vm.ImportBulkTemplatesFromExcelAsync(file.Path).ConfigureAwait(true);
+        var summary = result.CreatedCount > 0
+            ? $"Created {result.CreatedCount} template(s)."
+            : "No templates were created.";
+        if (result.SkippedCount > 0)
+        {
+            summary += $" Skipped {result.SkippedCount}.";
+        }
+
+        if (result.Errors.Count > 0)
+        {
+            var detail = string.Join("\n", result.Errors.Take(8));
+            if (result.Errors.Count > 8)
+            {
+                detail += $"\n…and {result.Errors.Count - 8} more.";
+            }
+
+            await ShowSimpleDialogAsync($"{summary}\n\n{detail}", XamlRoot).ConfigureAwait(true);
+            return;
+        }
+
+        await ShowSimpleDialogAsync(summary, XamlRoot).ConfigureAwait(true);
+        OnShowAllTemplatesClick(sender, e);
+    }
+
     private async void OnShowFavouritesInlineClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is TemplatesViewModel vm)

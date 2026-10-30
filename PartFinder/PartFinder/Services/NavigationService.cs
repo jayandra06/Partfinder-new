@@ -24,6 +24,8 @@ public sealed class NavigationService : INavigationService
 
     private Frame? _frame;
 
+    public bool IsFrameReady => _frame is not null;
+
     public bool CanGoBack => _frame?.CanGoBack ?? false;
 
     public void Initialize(Frame frame)

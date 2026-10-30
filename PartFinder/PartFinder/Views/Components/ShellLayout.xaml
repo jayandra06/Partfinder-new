@@ -106,7 +106,7 @@
         <Border
                 x:Name="TitleBarDragStrip"
                 Grid.Row="0"
-                Background="#08000000"
+                Background="{StaticResource HeaderBarBackgroundBrush}"
                 BorderBrush="Transparent"
                 BorderThickness="0"
                 CornerRadius="0" />
@@ -114,9 +114,9 @@
         <Border x:Name="AppTitleBar"
                 Grid.Row="1"
                 Margin="0"
-                Background="#08000000"
-                BorderBrush="Transparent"
-                BorderThickness="0"
+                Background="{StaticResource HeaderBarBackgroundBrush}"
+                BorderBrush="{StaticResource GlassStrokeBrush}"
+                BorderThickness="0,0,0,1"
                 CornerRadius="0">
             <Grid x:Name="AppTitleBarLayout" Height="56">
                 <Grid.ColumnDefinitions>
@@ -177,6 +177,13 @@
                             <ItemsRepeater.ItemTemplate>
                                 <DataTemplate x:DataType="viewModels:NavItemViewModel">
                                     <Grid Width="48" Height="44">
+                                        <Border
+                                            Margin="3,5"
+                                            CornerRadius="12"
+                                            Background="{StaticResource NavItemSelectedBrush}"
+                                            BorderBrush="{StaticResource NavItemSelectedBorderBrush}"
+                                            BorderThickness="1"
+                                            Visibility="{x:Bind IsSelected, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
                                         <Border
                                             Height="2"
                                             Margin="10,0"
@@ -251,6 +258,18 @@
                     Spacing="6"
                     VerticalAlignment="Center"
                     Margin="0,0,8,0">
+                    <Button
+                        Width="36"
+                        Height="36"
+                        Padding="0"
+                        Style="{StaticResource HeaderActionButtonStyle}"
+                        Command="{Binding ToggleThemeCommand}"
+                        ToolTipService.ToolTip="{Binding ThemeToggleTooltip, Mode=OneWay}">
+                        <FontIcon
+                            Glyph="{Binding ThemeToggleGlyph, Mode=OneWay}"
+                            FontSize="17"
+                            Foreground="{StaticResource TextPrimaryBrush}" />
+                    </Button>
                     <Grid>
                         <Button
                             Width="36"
@@ -259,7 +278,7 @@
                             Style="{StaticResource HeaderActionButtonStyle}"
                             ToolTipService.ToolTip="Alerts"
                             Click="OnBellClicked">
-                            <FontIcon Glyph="&#xEA8F;" FontSize="18" />
+                            <FontIcon Glyph="&#xEA8F;" FontSize="18" Foreground="{StaticResource TextPrimaryBrush}" />
                         </Button>
                         <Border
                             Width="8"
@@ -300,13 +319,16 @@
                                 <TextBlock
                                     VerticalAlignment="Center"
                                     FontSize="13"
+                                    FontWeight="SemiBold"
+                                    Foreground="{StaticResource TextPrimaryBrush}"
                                     Text="{Binding CurrentUserName}"
                                     TextTrimming="CharacterEllipsis"
                                     MaxWidth="90" />
                                 <FontIcon
                                     VerticalAlignment="Center"
                                     Glyph="&#xE70D;"
-                                    FontSize="11" />
+                                    FontSize="11"
+                                    Foreground="{StaticResource TextSecondaryBrush}" />
                             </StackPanel>
                         </Button.Content>
                         <Button.Flyout>
@@ -324,8 +346,8 @@
         <Border Grid.Row="2"
                 Margin="12,8,12,12"
                 CornerRadius="28"
-                Background="#08000000"
-                BorderBrush="{StaticResource GlassHighlightBrush}"
+                Background="{StaticResource ContentShellBackgroundBrush}"
+                BorderBrush="{StaticResource GlassStrokeBrush}"
                 BorderThickness="1">
             <Frame x:Name="ContentFrame"
                    Background="Transparent"

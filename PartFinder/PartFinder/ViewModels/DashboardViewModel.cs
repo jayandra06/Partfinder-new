@@ -2,9 +2,11 @@ using LiveChartsCore;
 using LiveChartsCore.SkiaSharpView;
 using LiveChartsCore.SkiaSharpView.Painting;
 using LiveChartsCore.SkiaSharpView.Painting.Effects;
+using LiveChartsCore.Themes;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Dispatching;
+using PartFinder.Helpers;
 using PartFinder.Services;
 using SkiaSharp;
 using System.Collections.ObjectModel;
@@ -16,14 +18,26 @@ public partial class DashboardViewModel : ViewModelBase
 {
     private readonly BackendApiClient _api;
     private readonly INavigationService _nav;
+    private readonly IThemeService _themeService;
+    private readonly ITemplateSchemaService _templateSchema;
+    private readonly IMasterDataRecordsService _masterData;
     private readonly DispatcherQueue? _uiQueue;
     private PeriodicTimer? _refreshTimer;
     private CancellationTokenSource? _refreshCts;
+    private double _lastImportSuccessRate;
 
-    public DashboardViewModel(BackendApiClient api, INavigationService nav)
+    public DashboardViewModel(
+        BackendApiClient api,
+        INavigationService nav,
+        IThemeService themeService,
+        ITemplateSchemaService templateSchema,
+        IMasterDataRecordsService masterData)
     {
         _api = api;
         _nav = nav;
+        _themeService = themeService;
+        _templateSchema = templateSchema;
+        _masterData = masterData;
         _uiQueue = DispatcherQueue.GetForCurrentThread();
 
         // Greeting based on time of day
@@ -50,8 +64,15 @@ public partial class DashboardViewModel : ViewModelBase
         DistributionSeries = BuildEmptyDistributionSeries();
         HealthGaugeSeries  = BuildHealthGaugeSeries(0);
         LazyLoadTrendCommand = new AsyncRelayCommand(LoadDashboardAsync);
+
+        _themeService.ThemeChanged += (_, _) => OnAppThemeChanged();
+        RefreshChartAppearance();
     }
 
+    public DrawMarginFrame ChartDrawMarginFrame { get; private set; } = new();
+    public Axis[] ChartXAxes { get; private set; } = [];
+    public Axis[] ChartYAxes { get; private set; } = [];
+    public Axis[] TrendXAxes { get; private set; } = [];
     // ── Collections ──────────────────────────────────────────────────────────
     public ObservableCollection<KpiItem>              Kpis              { get; }
     public ObservableCollection<ActivityItem>         RecentActivity    { get; }
@@ -60,7 +81,7 @@ public partial class DashboardViewModel : ViewModelBase
 
     // ── Chart series ─────────────────────────────────────────────────────────
     public ISeries[]  TrendSeries        { get; private set; }
-    public string[]   TrendXLabels       { get; private set; }
+    public string[]   TrendXLabels       { get; private set; } = [];
     public ISeries[]  StockLevelSeries   { get; private set; }
     public string[]   StockLevelYLabels  { get; private set; }
     public ISeries[]  DistributionSeries { get; private set; }
@@ -107,21 +128,26 @@ public partial class DashboardViewModel : ViewModelBase
             var (statsOk, statsError, stats) = await _api.GetDashboardStatsAsync().ConfigureAwait(true);
             var (trendOk, _, trend) = await _api.GetDashboardTrendAsync().ConfigureAwait(true);
 
-            // If stats API failed, show zeros instead of dashes so UI doesn't look broken
             if (!statsOk || stats is null)
             {
                 System.Diagnostics.Debug.WriteLine($"[Dashboard] Stats API failed: {statsError}");
-                Kpis[0].Value = "0";
-                Kpis[0].Delta = statsError ?? "Unable to load";
-                Kpis[1].Value = "0";
-                Kpis[1].Delta = "—";
-                Kpis[2].Value = "0";
-                Kpis[2].Delta = "—";
-                Kpis[3].Value = "—";
-                Kpis[3].Delta = statsError ?? "Unable to load";
-                LastUpdated = "⚠ Connection issue";
+                stats = await BuildLocalStatsAsync().ConfigureAwait(true);
+                if (stats is null)
+                {
+                    var friendly = ApiErrorFormatter.ToUserMessage(statsError);
+                    Kpis[0].Value = "0";
+                    Kpis[0].Delta = friendly;
+                    Kpis[1].Value = "0";
+                    Kpis[1].Delta = "—";
+                    Kpis[2].Value = "0";
+                    Kpis[2].Delta = "—";
+                    Kpis[3].Value = "—";
+                    Kpis[3].Delta = friendly;
+                    LastUpdated = "⚠ Offline summary";
+                }
             }
-            else if (statsOk && stats is not null)
+
+            if (stats is not null)
             {
                 TotalPartsRaw = stats.TotalParts;
                 LowStockRaw = stats.LowStock;
@@ -146,6 +172,7 @@ public partial class DashboardViewModel : ViewModelBase
                 Kpis[3].AlertLevel = stats.ImportSuccessRate < 80 ? KpiAlertLevel.Danger : KpiAlertLevel.Normal;
 
                 // ── Health gauge ──────────────────────────────────────────────
+                _lastImportSuccessRate = stats.ImportSuccessRate;
                 HealthGaugeSeries = BuildHealthGaugeSeries(stats.ImportSuccessRate);
                 HealthLabel       = $"{stats.ImportSuccessRate:0.0}%";
                 OnPropertyChanged(nameof(HealthGaugeSeries));
@@ -177,7 +204,7 @@ public partial class DashboardViewModel : ViewModelBase
                 BuildDistributionFromStats(stats);
 
                 // ── Stock level bar chart ─────────────────────────────────────
-                StockLevelSeries  = BuildStockLevelSeries(stats);
+                StockLevelSeries  = BuildStockLevelSeries(stats, !_themeService.IsDark);
                 StockLevelYLabels = LowStockItems.Select(i => i.Name).Take(5).ToArray();
                 if (StockLevelYLabels.Length == 0) StockLevelYLabels = ["—"];
                 OnPropertyChanged(nameof(StockLevelSeries));
@@ -198,7 +225,7 @@ public partial class DashboardViewModel : ViewModelBase
                     Values          = points,
                     GeometrySize    = 7,
                     GeometryStroke  = new SolidColorPaint(new SKColor(31, 122, 224), 2.5f),
-                    GeometryFill    = new SolidColorPaint(new SKColor(10, 14, 21)),
+                    GeometryFill    = new SolidColorPaint(DashboardChartAppearance.LinePointFill(!_themeService.IsDark)),
                     LineSmoothness  = 0.7,
                     Fill            = new LinearGradientPaint(
                                           new SKColor(31, 122, 224, 80),
@@ -225,8 +252,10 @@ public partial class DashboardViewModel : ViewModelBase
             ];
 
             TrendXLabels = trend.Select(t => t.Label).ToArray();
+            TrendXAxes = DashboardChartAppearance.BuildTrendXAxes(TrendXLabels, _themeService.IsDark);
             OnPropertyChanged(nameof(TrendSeries));
             OnPropertyChanged(nameof(TrendXLabels));
+            OnPropertyChanged(nameof(TrendXAxes));
         }
         finally
         {
@@ -306,10 +335,11 @@ public partial class DashboardViewModel : ViewModelBase
         ];
     }
 
-    private static ISeries[] BuildStockLevelSeries(DashboardStatsDto stats)
+    private static ISeries[] BuildStockLevelSeries(DashboardStatsDto stats, bool isLight)
     {
         var rng = new Random(stats.LowStock + stats.TotalParts);
         int[] values = [rng.Next(0, 5), rng.Next(0, 4), rng.Next(1, 6), rng.Next(2, 7), rng.Next(0, 5)];
+        var labelColor = isLight ? new SKColor(75, 95, 119) : new SKColor(234, 242, 255);
         return
         [
             new RowSeries<int>
@@ -324,7 +354,7 @@ public partial class DashboardViewModel : ViewModelBase
                 MaxBarWidth     = 16,
                 Rx              = 4,
                 Ry              = 4,
-                DataLabelsPaint = new SolidColorPaint(new SKColor(234, 242, 255)),
+                DataLabelsPaint = new SolidColorPaint(labelColor),
                 DataLabelsSize  = 11,
                 DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.End,
                 AnimationsSpeed = TimeSpan.FromMilliseconds(1000),
@@ -345,7 +375,7 @@ public partial class DashboardViewModel : ViewModelBase
         ];
     }
 
-    private static ISeries[] BuildHealthGaugeSeries(double rate)
+    private ISeries[] BuildHealthGaugeSeries(double rate)
     {
         var filled = Math.Min(100, Math.Max(0, rate));
         var fillColor = filled >= 90
@@ -353,6 +383,7 @@ public partial class DashboardViewModel : ViewModelBase
             : filled >= 70
                 ? new SKColor(254, 188, 46)
                 : new SKColor(255, 100, 100);
+        var trackColor = DashboardChartAppearance.GaugeTrackColor(_themeService.IsDark);
         return
         [
             new PieSeries<double>
@@ -366,12 +397,64 @@ public partial class DashboardViewModel : ViewModelBase
             new PieSeries<double>
             {
                 Values             = [100 - filled],
-                Fill               = new SolidColorPaint(new SKColor(26, 39, 52)),
+                Fill               = new SolidColorPaint(trackColor),
                 InnerRadius        = 58,
                 MaxRadialColumnWidth = 20,
                 AnimationsSpeed    = TimeSpan.FromMilliseconds(1400),
             },
         ];
+    }
+
+    private async Task<DashboardStatsDto?> BuildLocalStatsAsync()
+    {
+        try
+        {
+            var templates = await _templateSchema.GetTemplatesAsync().ConfigureAwait(true);
+            var activeTemplates = templates.Count;
+            var totalParts = 0;
+            foreach (var template in templates.Take(12))
+            {
+                var rows = await _masterData.GetRowsAsync(template.Id).ConfigureAwait(true);
+                totalParts += rows.Count;
+            }
+
+            return new DashboardStatsDto
+            {
+                TotalParts = totalParts,
+                LowStock = 0,
+                ActiveTemplates = activeTemplates,
+                ImportSuccessRate = 100,
+                RecentActivity = ["Local database summary"],
+            };
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private void RefreshChartAppearance()
+    {
+        var appearance = DashboardChartAppearance.ForLightMode(_themeService.IsDark);
+        ChartDrawMarginFrame = appearance.DrawMarginFrame;
+        ChartXAxes = appearance.XAxes;
+        ChartYAxes = appearance.YAxes;
+        if (TrendXLabels is { Length: > 0 })
+        {
+            TrendXAxes = DashboardChartAppearance.BuildTrendXAxes(TrendXLabels, _themeService.IsDark);
+            OnPropertyChanged(nameof(TrendXAxes));
+        }
+
+        OnPropertyChanged(nameof(ChartDrawMarginFrame));
+        OnPropertyChanged(nameof(ChartXAxes));
+        OnPropertyChanged(nameof(ChartYAxes));
+    }
+
+    private void OnAppThemeChanged()
+    {
+        RefreshChartAppearance();
+        HealthGaugeSeries = BuildHealthGaugeSeries(_lastImportSuccessRate);
+        OnPropertyChanged(nameof(HealthGaugeSeries));
     }
 
     private static SKColor ParseSkColor(string hex)

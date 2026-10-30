@@ -1,3 +1,5 @@
+using LiveChartsCore;
+using LiveChartsCore.SkiaSharpView;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using PartFinder.Services;
@@ -14,6 +16,10 @@ namespace PartFinder
 
         public App()
         {
+            // Required for WinUI: default Theme has no tooltip/legend until configured (otherwise Chart.Load throws).
+            LiveCharts.Configure(config =>
+                config.AddSkiaSharp().AddDefaultMappers().AddDefaultTheme());
+
             InitializeComponent();
             Services = ConfigureServices();
 
@@ -22,6 +28,7 @@ namespace PartFinder
                 e.Handled = true;
                 try
                 {
+                    System.Diagnostics.Debug.WriteLine($"[PartFinder] XAML unhandled: {e.Exception}");
                     DebugLogClient.Post("error", "XamlUnhandledException", e.Exception?.ToString() ?? e.Message);
                     var logDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PartFinder", "Logs");
                     Directory.CreateDirectory(logDir);
@@ -64,6 +71,7 @@ namespace PartFinder
 
             services.AddSingleton<INavigationService, NavigationService>();
             services.AddSingleton<IAppStateStore, AppStateStore>();
+            services.AddSingleton<IThemeService, ThemeService>();
             services.AddSingleton<LocalUserSecurityStore>();
             services.AddSingleton<AdminSessionStore>();
             services.AddSingleton<ILocalSetupContext, LocalSetupContext>();
@@ -72,6 +80,7 @@ namespace PartFinder
             services.AddSingleton<IOrgUserDirectoryService, MongoOrgUserDirectoryService>();
             services.AddSingleton<ICurrentUserAccessService, CurrentUserAccessService>();
             services.AddSingleton<ITemplateSchemaService, MongoTemplateSchemaService>();
+            services.AddSingleton<BulkTemplateImportService>();
             services.AddSingleton<IMasterDataRecordsService, MongoMasterDataRecordsService>();
             services.AddSingleton<IContextActionsService, MongoContextActionsService>();
             services.AddSingleton<IPartsDataService, MongoPartsDataService>();

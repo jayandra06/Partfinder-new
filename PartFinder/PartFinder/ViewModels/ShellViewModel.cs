@@ -18,9 +18,10 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
     private readonly AdminSessionStore _adminSession;
     private readonly LocalProfileStore _profile;
     private readonly MongoAlertsService _alertsService;
+    private readonly IThemeService _themeService;
 
     private bool _suppressNavigation;
-    private AppPage _lastSelectedPage = AppPage.Templates;
+    private AppPage _lastSelectedPage = AppPage.Dashboard;
 
     public ShellViewModel(
         INavigationService navigationService,
@@ -30,7 +31,8 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
         ICurrentUserAccessService access,
         AdminSessionStore adminSession,
         LocalProfileStore profile,
-        MongoAlertsService alertsService)
+        MongoAlertsService alertsService,
+        IThemeService themeService)
     {
         _navigationService = navigationService;
         _setupContext = setupContext;
@@ -40,9 +42,20 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
         _adminSession = adminSession;
         _profile = profile;
         _alertsService = alertsService;
+        _themeService = themeService;
+        _themeService.ThemeChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(ThemeToggleGlyph));
+            OnPropertyChanged(nameof(ThemeToggleTooltip));
+        };
         _profile.ProfileChanged += OnProfileChanged;
         NavigationItems = new ObservableCollection<NavItemViewModel>();
     }
+
+    public string ThemeToggleGlyph => _themeService.IsDark ? "\uE706" : "\uE708";
+
+    public string ThemeToggleTooltip =>
+        _themeService.IsDark ? "Switch to light theme" : "Switch to dark theme";
 
     public ObservableCollection<NavItemViewModel> NavigationItems { get; }
 
@@ -210,25 +223,78 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
         RebuildNavigationItems(hasMaster, _access.Capabilities);
 
         var startPage = ResolveStartPage(hasMaster, _access.Capabilities);
-        var startItem = NavigationItems.First(i => i.Page == startPage);
+        var startItem = NavigationItems.FirstOrDefault(i => i.Page == startPage)
+                        ?? NavigationItems.FirstOrDefault();
+        if (startItem is null)
+        {
+            return;
+        }
+
+        startPage = startItem.Page;
         _lastSelectedPage = startPage;
 
-        _suppressNavigation = true;
-        SelectedNavigationItem = startItem;
-        _suppressNavigation = false;
-        _navigationService.Navigate(startPage);
+        for (var attempt = 0; attempt < 40 && !_navigationService.IsFrameReady; attempt++)
+        {
+            await Task.Delay(50).ConfigureAwait(true);
+        }
+
+        if (!_navigationService.IsFrameReady)
+        {
+            System.Diagnostics.Debug.WriteLine("[ShellViewModel] Content frame not ready; home navigation skipped.");
+            return;
+        }
+
+        ApplyNavigationSelection(startItem, navigate: true);
+    }
+
+    /// <summary>Top-nav click: always updates selection and navigates (even if already selected).</summary>
+    public void NavigateFromNavItem(NavItemViewModel item)
+    {
+        if (!item.IsEnabled)
+        {
+            return;
+        }
+
+        ApplyNavigationSelection(item, navigate: true);
+    }
+
+    private void ApplyNavigationSelection(NavItemViewModel item, bool navigate)
+    {
+        foreach (var navItem in NavigationItems)
+        {
+            navItem.IsSelected = ReferenceEquals(navItem, item);
+        }
+
+        _selectedNavigationItem = item;
+        OnPropertyChanged(nameof(SelectedNavigationItem));
+        _lastSelectedPage = item.Page;
+
+        if (navigate && !_suppressNavigation)
+        {
+            _navigationService.Navigate(item.Page);
+        }
     }
 
     private static AppPage ResolveStartPage(bool hasMasterData, UserAccessCapabilities c)
     {
-        if (!c.CanAccessUserManagement)
+        if (c.CanAccessDashboard)
+        {
+            return AppPage.Dashboard;
+        }
+
+        if (c.CanAccessTemplates)
+        {
+            return AppPage.Templates;
+        }
+
+        if ((c.CanAccessMasterData || c.CanAccessParts) && hasMasterData)
         {
             return AppPage.MasterData;
         }
 
-        if (!hasMasterData)
+        if (c.CanAccessSettings)
         {
-            return AppPage.Templates;
+            return AppPage.Settings;
         }
 
         return AppPage.Dashboard;
@@ -272,7 +338,7 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
             NavigationItems.Add(
                 new NavItemViewModel
                 {
-                    Label = "Dashboard",
+                    Label = "Home",
                     IconGlyph = "\uE80F",
                     Page = AppPage.Dashboard,
                     IsEnabled = true,
@@ -396,6 +462,9 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
 
     [RelayCommand]
     private void GoBack() => _navigationService.GoBack();
+
+    [RelayCommand]
+    private void ToggleTheme() => _themeService.Toggle();
 
     [RelayCommand]
     private void OpenAccountSettings() => _navigationService.Navigate(AppPage.Settings);

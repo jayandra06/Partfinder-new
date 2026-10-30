@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text;
+using PartFinder.Helpers;
 
 namespace PartFinder.Services;
 
@@ -237,7 +238,7 @@ public sealed class BackendApiClient
         var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(true);
         if (!resp.IsSuccessStatusCode)
         {
-            return (false, string.IsNullOrWhiteSpace(text) ? "Request failed." : text, default);
+            return (false, ApiErrorFormatter.ToUserMessage(text), default);
         }
 
         try
@@ -295,7 +296,7 @@ public sealed class BackendApiClient
         var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(true);
         if (!resp.IsSuccessStatusCode)
         {
-            return (false, string.IsNullOrWhiteSpace(text) ? "Request failed." : text, default);
+            return (false, ApiErrorFormatter.ToUserMessage(text), default);
         }
 
         try

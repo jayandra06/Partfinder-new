@@ -3,6 +3,38 @@
     <BuildProjectReferences>true</BuildProjectReferences>
   </PropertyGroup>
 
+  <!--
+    WinUI/MSIX define GetLatestMSVCVersion; on some VS installs Exists(MSVC) passes but enumeration throws.
+    This repo imports Directory.Build.targets last, so this task replaces the stock implementation.
+  -->
+  <UsingTask TaskName="GetLatestMSVCVersion"
+             TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <MSVCDirectoryPath ParameterType="System.String" Required="true" />
+      <LatestMSVCVersion ParameterType="System.String" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Linq" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+LatestMSVCVersion = string.Empty;
+try
+{
+  if (!string.IsNullOrWhiteSpace(MSVCDirectoryPath) && Directory.Exists(MSVCDirectoryPath))
+  {
+    var lastDir = Directory.EnumerateDirectories(MSVCDirectoryPath).LastOrDefault();
+    LatestMSVCVersion = lastDir != null ? new DirectoryInfo(lastDir).Name : string.Empty;
+  }
+}
+catch
+{
+  LatestMSVCVersion = string.Empty;
+}
+]]></Code>
+    </Task>
+  </UsingTask>
+
   <!-- Copy MSIX MSBuild task binaries + System.Security.Permissions for Store .msixupload creation on dotnet SDK. -->
   <Target Name="PartFinderStageMsixTaskDependencies"
           BeforeTargets="PrepareForBuild;PrepareMsixPackage"
@@ -36,45 +68,17 @@
   </Target>
 
   <!--
-    Workaround for WindowsAppSDK / MSIX BuildTools bug where GetLatestMSVCVersion throws
-    DirectoryNotFoundException when Visual Studio is installed without the C++ (MSVC) workload.
+    WinUI imports a target also named GetVCInstallPath; MSBuild merges duplicate targets.
+    When VS has no C++ workload, GetLatestMSVCVersion throws on a missing MSVC folder.
+    Set sentinel paths so the merged WinUI target skips MSVC probing (managed WinUI app).
   -->
-  <Target Name="GetVCInstallPath" Condition="'$(VCInstallPath32)' == '' and '$(VCInstallPath64)' == '' and Exists('$(VsInstallRoot)\VC\Tools\MSVC')">
-    <GetLatestMSVCVersion MSVCDirectoryPath="$(VsInstallRoot)\VC\Tools\MSVC" Condition="'$(VCToolsInstallDir)' == '' and '$(VsInstallRoot)' != ''">
-      <Output TaskParameter="LatestMSVCVersion" PropertyName="LatestMSVCVersion" />
-    </GetLatestMSVCVersion>
-    <PropertyGroup Condition="'$(VCToolsInstallDir)' == '' and '$(VsInstallRoot)' != '' and '$(LatestMSVCVersion)' != ''">
-      <VCToolsInstallDir>$(VsInstallRoot)\VC\Tools\MSVC\$(LatestMSVCVersion)\</VCToolsInstallDir>
-    </PropertyGroup>
-    <PropertyGroup Condition="'$(VCToolsInstallDir)' != ''">
-      <_VCInstallPathHostArchitecture Condition="'$(PROCESSOR_ARCHITECTURE)' == 'x86'">X86</_VCInstallPathHostArchitecture>
-      <_VCInstallPathHostArchitecture Condition="'$(PROCESSOR_ARCHITECTURE)' != 'x86'">X64</_VCInstallPathHostArchitecture>
-      <VCInstallPath32>$(VCToolsInstallDir)bin\Host$(_VCInstallPathHostArchitecture)\x86\vcmeta.dll</VCInstallPath32>
-      <VCInstallPath64>$(VCToolsInstallDir)bin\Host$(_VCInstallPathHostArchitecture)\x64\vcmeta.dll</VCInstallPath64>
-    </PropertyGroup>
-  </Target>
-
-  <Target Name="_EnsurePdbCmfExeFullPath" Condition="'$(MsPdbCmfExeFullpath)' == ''">
-    <GetLatestMSVCVersion MSVCDirectoryPath="$(VsInstallRoot)\VC\Tools\MSVC" Condition="'$(VCToolsInstallDir)' == '' and '$(VsInstallRoot)' != '' and Exists('$(VsInstallRoot)\VC\Tools\MSVC')">
-      <Output TaskParameter="LatestMSVCVersion" PropertyName="LatestMSVCVersion" />
-    </GetLatestMSVCVersion>
-    <PropertyGroup Condition="'$(VCToolsInstallDir)' == '' and '$(VsInstallRoot)' != '' and '$(LatestMSVCVersion)' != ''">
-      <VCToolsInstallDir>$(VsInstallRoot)\VC\Tools\MSVC\$(LatestMSVCVersion)\</VCToolsInstallDir>
-    </PropertyGroup>
-    <PropertyGroup Condition="'$(VCToolsInstallDir)' != ''">
-      <_VCInstallPathHostArchitecture Condition="'$(PROCESSOR_ARCHITECTURE)' == 'x86'">X86</_VCInstallPathHostArchitecture>
-      <_VCInstallPathHostArchitecture Condition="'$(PROCESSOR_ARCHITECTURE)' != 'x86'">X64</_VCInstallPathHostArchitecture>
-      <PdbCmfx86ExeFullPath>$(VCToolsInstallDir)bin\Host$(_VCInstallPathHostArchitecture)\x86\mspdbcmf.exe</PdbCmfx86ExeFullPath>
-      <PdbCmfx64ExeFullPath>$(VCToolsInstallDir)bin\Host$(_VCInstallPathHostArchitecture)\x64\mspdbcmf.exe</PdbCmfx64ExeFullPath>
-    </PropertyGroup>
-    <PropertyGroup Condition="'$(PdbCmfx86ExeFullPath)' == '' or '$(PdbCmfx64ExeFullPath)' == ''">
-      <AppxMSBuildToolsPath Condition="'$(AppxMSBuildToolsPath)' == ''">$(MSBuildExtensionsPath)\Microsoft\VisualStudio\v$(VisualStudioVersion)\AppxPackage\</AppxMSBuildToolsPath>
-      <PdbCmfx86ExeFullPath Condition="'$(PdbCmfx86ExeFullPath)' == ''">$(AppxMSBuildToolsPath)\x86\mspdbcmf.exe</PdbCmfx86ExeFullPath>
-      <PdbCmfx64ExeFullPath Condition="'$(PdbCmfx64ExeFullPath)' == ''">$(AppxMSBuildToolsPath)\x64\mspdbcmf.exe</PdbCmfx64ExeFullPath>
-    </PropertyGroup>
+  <Target Name="PartFinderBypassVcInstallWhenNoMsvc"
+          BeforeTargets="GetVCInstallPath;_EnsurePdbCmfExeFullPath"
+          Condition="'$(VsInstallRoot)' != '' and !Exists('$(VsInstallRoot)\VC\Tools\MSVC')">
     <PropertyGroup>
-      <MsPdbCmfExeFullpath Condition="'$(MSBuildExtensionsPath64)' != ''">$(PdbCmfx64ExeFullPath)</MsPdbCmfExeFullpath>
-      <MsPdbCmfExeFullpath Condition="'$(MSBuildExtensionsPath64)' == ''">$(PdbCmfx86ExeFullPath)</MsPdbCmfExeFullpath>
+      <VCInstallPath32 Condition="'$(VCInstallPath32)' == ''">PartFinderNoMsvc</VCInstallPath32>
+      <VCInstallPath64 Condition="'$(VCInstallPath64)' == ''">PartFinderNoMsvc</VCInstallPath64>
+      <MsPdbCmfExeFullpath Condition="'$(MsPdbCmfExeFullpath)' == ''">PartFinderNoMsvc</MsPdbCmfExeFullpath>
     </PropertyGroup>
   </Target>
 </Project>

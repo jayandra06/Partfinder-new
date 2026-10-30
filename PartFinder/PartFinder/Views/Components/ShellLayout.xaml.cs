@@ -26,10 +26,24 @@ public sealed partial class ShellLayout : UserControl
 
     public UIElement TitleBarDragElement => TitleBarDragStrip;
 
+    /// <summary>Legacy name used by older MainWindow title-bar code paths.</summary>
+    public UIElement ShellTitleBarDragTarget => TitleBarDragElement;
+
     public void UpdateTitleBarInsets(double leftInset, double rightInset)
     {
         TitleBarLeftInsetColumn.Width = new GridLength(Math.Max(0, leftInset));
         TitleBarRightInsetColumn.Width = new GridLength(Math.Max(0, rightInset));
+    }
+
+    public void ResetShellTitleBarCaptionInsets() => UpdateTitleBarInsets(0, 0);
+
+    public void UpdateShellTitleBarCaptionInsets(
+        double leftInset,
+        double rightInset,
+        double rasterizationScale)
+    {
+        var scale = rasterizationScale > 0 ? rasterizationScale : 1.0;
+        UpdateTitleBarInsets(leftInset / scale, rightInset / scale);
     }
 
     public RectInt32[] GetTitleBarPassthroughRects()
@@ -116,7 +130,7 @@ public sealed partial class ShellLayout : UserControl
 
         if (DataContext is ShellViewModel vm)
         {
-            vm.SelectedNavigationItem = item;
+            vm.NavigateFromNavItem(item);
         }
         else
         {
@@ -142,21 +156,19 @@ public sealed partial class ShellLayout : UserControl
         _ = navigation.Navigate(page);
     }
 
-    private async void OnShellLayoutLoaded(object sender, RoutedEventArgs e)
+    private void OnShellLayoutLoaded(object sender, RoutedEventArgs e)
     {
         Loaded -= OnShellLayoutLoaded;
+
+        var themeService = App.Services.GetRequiredService<IThemeService>();
+        themeService.AttachShell(this);
+
         if (Resources["AmbientDriftStoryboard"] is Storyboard ambientStoryboard)
         {
             ambientStoryboard.Begin();
         }
 
-        var navigationService = App.Services.GetRequiredService<INavigationService>();
-        navigationService.Initialize(ContentFrame);
-
-        if (DataContext is ShellViewModel shellViewModel)
-        {
-            await shellViewModel.InitializeAsync().ConfigureAwait(true);
-        }
+        App.Services.GetRequiredService<INavigationService>().Initialize(ContentFrame);
 
         NotifyTitleBarRegionsChanged();
     }

@@ -60,19 +60,32 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <!-- Left: Create New Template -->
-            <Button
-                Grid.Column="0"
-                Style="{StaticResource GlowButtonStyle}"
-                Height="40"
-                Padding="14,0"
-                Click="OnCreateNewTemplateClick"
-                IsEnabled="{Binding CanAddTemplate}">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <FontIcon Glyph="&#xE710;" FontSize="14" />
-                    <TextBlock Text="Create New Template" FontSize="13" />
-                </StackPanel>
-            </Button>
+            <!-- Left: Create / bulk upload -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                <Button
+                    Style="{StaticResource GlowButtonStyle}"
+                    Height="40"
+                    Padding="14,0"
+                    Click="OnCreateNewTemplateClick"
+                    IsEnabled="{Binding CanAddTemplate}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE710;" FontSize="14" />
+                        <TextBlock Text="Create New Template" FontSize="13" />
+                    </StackPanel>
+                </Button>
+                <Button
+                    Style="{StaticResource ModernOutlineButtonStyle}"
+                    Height="40"
+                    Padding="14,0"
+                    Click="OnBulkUploadClick"
+                    IsEnabled="{Binding CanAddTemplate}"
+                    ToolTipService.ToolTip="Import many templates from one Excel workbook (one sheet per template, row 1 = column names)">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE8B5;" FontSize="14" />
+                        <TextBlock Text="Bulk Upload" FontSize="13" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
 
             <!-- Center: Page heading -->
             <StackPanel Grid.Column="1"

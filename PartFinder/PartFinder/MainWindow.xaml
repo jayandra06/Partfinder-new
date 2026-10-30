@@ -15,51 +15,27 @@
 
     
 
-    <Grid x:Name="RootGrid" Background="Transparent">
+    <Grid x:Name="RootGrid" Background="#0A0E15">
         <Grid.Resources>
-        <!-- ===== FADE-IN STORYBOARD FOR SETUP ROOT ===== -->
-        <Storyboard x:Key="SetupFadeIn">
-            <DoubleAnimation
-                Storyboard.TargetName="SetupRoot"
-                Storyboard.TargetProperty="Opacity"
-                From="0" To="1" Duration="0:0:0.5" />
-        </Storyboard>
-
-        <!-- Step panel slide-up + fade-in -->
-        <Storyboard x:Key="StepPanelEntrance">
-            <DoubleAnimation
-                Storyboard.TargetName="FormContentArea"
-                Storyboard.TargetProperty="Opacity"
-                From="0" To="1" Duration="0:0:0.35" />
-            <DoubleAnimation
-                Storyboard.TargetName="FormSlideTransform"
-                Storyboard.TargetProperty="Y"
-                From="18" To="0" Duration="0:0:0.35">
-                <DoubleAnimation.EasingFunction>
-                    <CubicEase EasingMode="EaseOut" />
-                </DoubleAnimation.EasingFunction>
-            </DoubleAnimation>
-        </Storyboard>
-
         <!-- ===== INPUT STYLE ===== -->
         <Style x:Key="DarkInputStyle" TargetType="TextBox">
-            <Setter Property="Background" Value="{StaticResource InputBackgroundBrush}" />
-            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource GlassStrokeBrush}" />
+            <Setter Property="Background" Value="#0B1320" />
+            <Setter Property="Foreground" Value="#EAF2FF" />
+            <Setter Property="BorderBrush" Value="#2A3D58" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="CornerRadius" Value="8" />
             <Setter Property="Padding" Value="12,10" />
             <Setter Property="FontSize" Value="14" />
-            <Setter Property="PlaceholderForeground" Value="{StaticResource TextTertiaryBrush}" />
+            <Setter Property="PlaceholderForeground" Value="#7B8DA8" />
             <Setter Property="MinHeight" Value="44" />
         </Style>
 
         <Style x:Key="DarkPasswordStyle" TargetType="PasswordBox">
-            <Setter Property="Background" Value="{StaticResource InputBackgroundBrush}" />
-            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource GlassStrokeBrush}" />
+            <Setter Property="Background" Value="#0B1320" />
+            <Setter Property="Foreground" Value="#EAF2FF" />
+            <Setter Property="BorderBrush" Value="#2A3D58" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="CornerRadius" Value="8" />
             <Setter Property="Padding" Value="12,10,44,10" />
             <Setter Property="FontSize" Value="14" />
             <Setter Property="MinHeight" Value="44" />
@@ -70,11 +46,10 @@
 
         <!-- ===== PRIMARY BUTTON STYLE ===== -->
         <Style x:Key="PrimaryButtonStyle" TargetType="Button">
-            <Setter Property="Background" Value="{StaticResource AccentHeroBrush}" />
+            <Setter Property="Background" Value="#1F7AE0" />
             <Setter Property="Foreground" Value="#FFFFFF" />
-            <Setter Property="BorderBrush" Value="{StaticResource AccentPrimaryBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="10" />
             <Setter Property="Padding" Value="20,12" />
             <Setter Property="FontSize" Value="14" />
             <Setter Property="FontWeight" Value="SemiBold" />
@@ -85,11 +60,11 @@
 
         <!-- ===== GHOST BUTTON STYLE ===== -->
         <Style x:Key="GhostButtonStyle" TargetType="Button">
-            <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}" />
-            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource GlassStrokeBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#AAB8CA" />
+            <Setter Property="BorderBrush" Value="#2A3D58" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="CornerRadius" Value="10" />
             <Setter Property="Padding" Value="20,12" />
             <Setter Property="FontSize" Value="14" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
@@ -99,7 +74,7 @@
 
         <!-- ===== LABEL STYLE ===== -->
         <Style x:Key="FieldLabelStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+            <Setter Property="Foreground" Value="#AAB8CA" />
             <Setter Property="FontSize" Value="12" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Margin" Value="0,0,0,6" />
@@ -108,10 +83,10 @@
 
         <!-- ===== BLOCKED CARD STYLE ===== -->
         <Style x:Key="BlockedCardStyle" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource ElevatedCardBackgroundBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource GlassStrongStrokeBrush}" />
+            <Setter Property="Background" Value="#111A26" />
+            <Setter Property="BorderBrush" Value="#2A3D58" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="22" />
+            <Setter Property="CornerRadius" Value="16" />
             <Setter Property="Padding" Value="40" />
         </Style>
     </Grid.Resources>
@@ -121,17 +96,17 @@
         <!-- ===================================================== -->
         <!-- APP LOCK SCREEN                                       -->
         <!-- ===================================================== -->
-        <Grid x:Name="AppLockRoot" Visibility="Collapsed" Background="Transparent">
+        <Grid x:Name="AppLockRoot" Visibility="Collapsed" Background="#0A0E15">
 
             <!-- Centered lock card -->
             <Border
                 Width="380"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
-                Background="{StaticResource ElevatedCardBackgroundBrush}"
-                BorderBrush="{StaticResource GlassStrongStrokeBrush}"
+                Background="#111A26"
+                BorderBrush="#2A3D58"
                 BorderThickness="1"
-                CornerRadius="24"
+                CornerRadius="20"
                 Padding="40,36">
                 <StackPanel Spacing="0">
 
@@ -336,22 +311,73 @@
             HorizontalAlignment="Stretch"
             VerticalAlignment="Stretch"
             Opacity="1">
-            <Border.Triggers>
-                <EventTrigger RoutedEvent="Border.Loaded">
-                    <BeginStoryboard>
-                        <Storyboard>
-                            <DoubleAnimation
-                                Storyboard.TargetName="SetupRoot"
-                                Storyboard.TargetProperty="Opacity"
-                                From="0" To="1" Duration="0:0:0.55">
-                                <DoubleAnimation.EasingFunction>
-                                    <CubicEase EasingMode="EaseOut" />
-                                </DoubleAnimation.EasingFunction>
-                            </DoubleAnimation>
-                        </Storyboard>
-                    </BeginStoryboard>
-                </EventTrigger>
-            </Border.Triggers>
+            <Border.Resources>
+                <ResourceDictionary>
+                    <!-- Login fields are dark. App theme brushes paint text near-black, so override them here. -->
+                    <ResourceDictionary.ThemeDictionaries>
+                        <ResourceDictionary x:Key="Default">
+                            <SolidColorBrush x:Key="TextControlBackground" Color="#FF0B1320" />
+                            <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#FF101A2C" />
+                            <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#FF0B1320" />
+                            <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="#FF0B1320" />
+                            <SolidColorBrush x:Key="TextControlForeground" Color="#FFEAF2FF" />
+                            <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#FFEAF2FF" />
+                            <SolidColorBrush x:Key="TextControlForegroundFocused" Color="#FFEAF2FF" />
+                            <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="#FF7B8DA8" />
+                            <SolidColorBrush x:Key="TextControlBorderBrush" Color="#FF2A3D58" />
+                            <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#FF3D5678" />
+                            <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#FF1F7AE0" />
+                            <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#FF7B8DA8" />
+                            <SolidColorBrush x:Key="TextControlPlaceholderForegroundPointerOver" Color="#FF7B8DA8" />
+                            <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="#FF7B8DA8" />
+                            <SolidColorBrush x:Key="TextControlButtonForeground" Color="#FFAAB8CA" />
+                            <SolidColorBrush x:Key="TextControlButtonForegroundPointerOver" Color="#FFEAF2FF" />
+                            <SolidColorBrush x:Key="TextControlButtonBackground" Color="Transparent" />
+                            <SolidColorBrush x:Key="TextControlButtonBackgroundPointerOver" Color="#FF1A2740" />
+                        </ResourceDictionary>
+                        <ResourceDictionary x:Key="Light">
+                            <SolidColorBrush x:Key="TextControlBackground" Color="#FF0B1320" />
+                            <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#FF101A2C" />
+                            <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#FF0B1320" />
+                            <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="#FF0B1320" />
+                            <SolidColorBrush x:Key="TextControlForeground" Color="#FFEAF2FF" />
+                            <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#FFEAF2FF" />
+                            <SolidColorBrush x:Key="TextControlForegroundFocused" Color="#FFEAF2FF" />
+                            <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="#FF7B8DA8" />
+                            <SolidColorBrush x:Key="TextControlBorderBrush" Color="#FF2A3D58" />
+                            <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#FF3D5678" />
+                            <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#FF1F7AE0" />
+                            <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#FF7B8DA8" />
+                            <SolidColorBrush x:Key="TextControlPlaceholderForegroundPointerOver" Color="#FF7B8DA8" />
+                            <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="#FF7B8DA8" />
+                            <SolidColorBrush x:Key="TextControlButtonForeground" Color="#FFAAB8CA" />
+                            <SolidColorBrush x:Key="TextControlButtonForegroundPointerOver" Color="#FFEAF2FF" />
+                            <SolidColorBrush x:Key="TextControlButtonBackground" Color="Transparent" />
+                            <SolidColorBrush x:Key="TextControlButtonBackgroundPointerOver" Color="#FF1A2740" />
+                        </ResourceDictionary>
+                        <ResourceDictionary x:Key="Dark">
+                            <SolidColorBrush x:Key="TextControlBackground" Color="#FF0B1320" />
+                            <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#FF101A2C" />
+                            <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#FF0B1320" />
+                            <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="#FF0B1320" />
+                            <SolidColorBrush x:Key="TextControlForeground" Color="#FFEAF2FF" />
+                            <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#FFEAF2FF" />
+                            <SolidColorBrush x:Key="TextControlForegroundFocused" Color="#FFEAF2FF" />
+                            <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="#FF7B8DA8" />
+                            <SolidColorBrush x:Key="TextControlBorderBrush" Color="#FF2A3D58" />
+                            <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#FF3D5678" />
+                            <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#FF1F7AE0" />
+                            <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#FF7B8DA8" />
+                            <SolidColorBrush x:Key="TextControlPlaceholderForegroundPointerOver" Color="#FF7B8DA8" />
+                            <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="#FF7B8DA8" />
+                            <SolidColorBrush x:Key="TextControlButtonForeground" Color="#FFAAB8CA" />
+                            <SolidColorBrush x:Key="TextControlButtonForegroundPointerOver" Color="#FFEAF2FF" />
+                            <SolidColorBrush x:Key="TextControlButtonBackground" Color="Transparent" />
+                            <SolidColorBrush x:Key="TextControlButtonBackgroundPointerOver" Color="#FF1A2740" />
+                        </ResourceDictionary>
+                    </ResourceDictionary.ThemeDictionaries>
+                </ResourceDictionary>
+            </Border.Resources>
 
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -708,7 +734,7 @@
                         </Border>
 
                         <!-- Scrollable form content -->
-                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ScrollViewer x:Name="SetupFormScrollViewer" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <Grid x:Name="FormContentArea" Margin="64,52,64,52">
                                 <Grid.RenderTransform>
                                     <TranslateTransform x:Name="FormSlideTransform" Y="0" />
@@ -743,6 +769,7 @@
                                             PlaceholderText="6-digit code"
                                             InputScope="Number"
                                             Style="{StaticResource DarkInputStyle}"
+                                            TextChanged="OnOrgCodeBoxTextChanged"
                                             Margin="0,0,0,20" />
 
                                         <!-- License summary card (shown when org code is validated) -->
@@ -932,7 +959,7 @@
                                                     <FontIcon Glyph="&#xE77B;" FontSize="16" Foreground="#1F7AE0" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                 </Border>
                                                 <StackPanel VerticalAlignment="Center" Spacing="2">
-                                                    <TextBlock Text="Admin Account" FontSize="12" Foreground="#7B8DA8" />
+                                                    <TextBlock x:Name="Step3AccountTypeText" Text="Admin Account" FontSize="12" Foreground="#7B8DA8" />
                                                     <TextBlock x:Name="Step3EmailText" FontSize="14" FontWeight="SemiBold" Foreground="#EAF2FF" />
                                                 </StackPanel>
                                             </StackPanel>
