@@ -4,7 +4,6 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
-using PartFinder.Helpers;
 using PartFinder.Models;
 using PartFinder.Services;
 using PartFinder.ViewModels;
@@ -25,8 +24,6 @@ public sealed partial class AllTemplatesCarousel : UserControl
 
     // Per-card column scroll offset
     private readonly Dictionary<Border, int> _cardColOffset = new();
-    // Per-card loaded records
-    private readonly Dictionary<Border, IReadOnlyList<MasterDataRowRecord>> _cardRecords = new();
 
     // Same peek constants as FavouritesSubPage
     private const double PEEK_RATIO = 0.13;
@@ -36,25 +33,16 @@ public sealed partial class AllTemplatesCarousel : UserControl
 
     private static readonly Color[] _accents = new[]
     {
-        Color.FromArgb(255, 31,  122, 224),
-        Color.FromArgb(255, 31,  122, 224),
-        Color.FromArgb(255, 31,  122, 224),
-        Color.FromArgb(255, 31,  122, 224),
-        Color.FromArgb(255, 31,  122, 224),
+        Color.FromArgb(255, 94, 162, 255),
+        Color.FromArgb(255, 176, 108, 255),
+        Color.FromArgb(255, 88, 214, 255),
+        Color.FromArgb(255, 244, 114, 182),
     };
-
-    /// <summary>User tapped Create New Template on the empty gallery state.</summary>
-    public event EventHandler? CreateTemplateRequested;
 
     public AllTemplatesCarousel()
     {
         InitializeComponent();
         _records = App.Services.GetRequiredService<IMasterDataRecordsService>();
-    }
-
-    private void OnEmptyCreateTemplateClick(object sender, RoutedEventArgs e)
-    {
-        CreateTemplateRequested?.Invoke(this, EventArgs.Empty);
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
@@ -67,19 +55,9 @@ public sealed partial class AllTemplatesCarousel : UserControl
         CarouselCanvas.Children.Clear();
         _cards.Clear();
         _cardColOffset.Clear();
-        _cardRecords.Clear();
 
         var templates = vm.Templates.ToList();
-        var isEmpty = templates.Count == 0;
-        EmptyStatePanel.Visibility = isEmpty ? Visibility.Visible : Visibility.Collapsed;
-        CarouselCanvas.Visibility = isEmpty ? Visibility.Collapsed : Visibility.Visible;
-        BottomNavBar.Visibility = isEmpty ? Visibility.Collapsed : Visibility.Visible;
-
-        if (isEmpty)
-        {
-            return;
-        }
-
+        
         // Create cards immediately without data (fast UI response)
         for (int i = 0; i < templates.Count; i++)
         {
@@ -118,28 +96,20 @@ public sealed partial class AllTemplatesCarousel : UserControl
                 rows = Array.Empty<MasterDataRowRecord>(); 
             }
 
-            // Capture index for closure
-            var cardIndex = i;
-
             // Update card with data on UI thread
             DispatcherQueue.TryEnqueue(() =>
             {
-                if (cardIndex < _cards.Count)
+                if (i < _cards.Count)
                 {
-                    var card = _cards[cardIndex];
+                    var card = _cards[i];
                     UpdateCardWithData(card, template, rows);
                 }
             });
-
-            // Small delay to avoid overwhelming the UI thread
-            await Task.Delay(30).ConfigureAwait(true);
         }
     }
 
     private void UpdateCardWithData(Border card, PartTemplateDefinition template, IReadOnlyList<MasterDataRowRecord> rows)
     {
-        // Store records for this card so column navigation can use them
-        _cardRecords[card] = rows;
         if (card.Child is not Grid mainGrid) return;
 
         var index     = _cards.IndexOf(card);
@@ -291,13 +261,13 @@ public sealed partial class AllTemplatesCarousel : UserControl
             {
                 finalX = peekWidth - cardWidth - CARD_GAP; finalY = 0;
                 opacity = 1.0; zIndex = 90;
-                card.BorderBrush = new SolidColorBrush(Color.FromArgb(255, 229, 231, 235));
+                card.BorderBrush = new SolidColorBrush(Color.FromArgb(160, 42, 61, 88));
             }
             else if (isRight)
             {
                 finalX = peekWidth + cardWidth + CARD_GAP; finalY = 0;
                 opacity = 1.0; zIndex = 90;
-                card.BorderBrush = new SolidColorBrush(Color.FromArgb(255, 229, 231, 235));
+                card.BorderBrush = new SolidColorBrush(Color.FromArgb(160, 42, 61, 88));
             }
             else
             {
@@ -306,7 +276,7 @@ public sealed partial class AllTemplatesCarousel : UserControl
                 card.BorderBrush = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
             }
 
-            ApplyCardContent(card, isCenter);
+            ApplyCardContent(card, isCenter, isLeft, isRight);
             card.IsHitTestVisible = Math.Abs(distance) <= 1;
             card.RenderTransform = null;
 
@@ -317,7 +287,7 @@ public sealed partial class AllTemplatesCarousel : UserControl
         }
     }
 
-    private static void ApplyCardContent(Border card, bool isCenter)
+    private static void ApplyCardContent(Border card, bool isCenter, bool isLeft, bool isRight)
     {
         if (card.Child is not Grid grid) return;
         foreach (var child in grid.Children)
@@ -325,7 +295,35 @@ public sealed partial class AllTemplatesCarousel : UserControl
             if (child is not FrameworkElement fe) continue;
             switch (fe.Name)
             {
-                case "TopSection":    fe.Opacity = 1.0; break;
+                case "TopSection":
+                    fe.Opacity = 1.0;
+                    if (fe is Grid topGrid)
+                    {
+                        foreach (var topChild in topGrid.Children)
+                        {
+                            if (topChild is FrameworkElement topElement && topElement.Name == "ButtonStack")
+                                topElement.Visibility = isCenter ? Visibility.Visible : Visibility.Collapsed;
+                            else if (topChild is StackPanel titleStack && titleStack.Name == "TitleStack")
+                            {
+                                titleStack.HorizontalAlignment = isCenter
+                                    ? HorizontalAlignment.Center
+                                    : isLeft
+                                        ? HorizontalAlignment.Right
+                                        : HorizontalAlignment.Left;
+
+                                if (titleStack.Children.Count > 0 && titleStack.Children[0] is FontIcon icon)
+                                    icon.Visibility = isCenter ? Visibility.Visible : Visibility.Collapsed;
+
+                                if (titleStack.Children.Count > 1 && titleStack.Children[1] is TextBlock title)
+                                {
+                                    title.FontSize = isCenter ? 15 : 13;
+                                    title.MaxWidth = isCenter ? 240 : 90;
+                                    title.TextAlignment = isLeft ? TextAlignment.Right : TextAlignment.Left;
+                                }
+                            }
+                        }
+                    }
+                    break;
                 case "FieldsSection": fe.Visibility = Visibility.Visible; fe.Opacity = 1.0; break;
                 case "BottomSection" when fe is Grid bottomGrid:
                     foreach (var gc in bottomGrid.Children)
@@ -335,8 +333,6 @@ public sealed partial class AllTemplatesCarousel : UserControl
                             foreach (var cc in centerStack.Children)
                             {
                                 if (cc is TextBlock t) t.Opacity = 1.0;
-                                else if (cc is StackPanel s && s.Name == "ButtonStack")
-                                    s.Visibility = isCenter ? Visibility.Visible : Visibility.Collapsed;
                             }
                         }
                     }
@@ -392,9 +388,9 @@ public sealed partial class AllTemplatesCarousel : UserControl
         var card = new Border
         {
             Width = 300, Height = 400,
-            CornerRadius    = new CornerRadius(20),
-            Background      = new SolidColorBrush(Color.FromArgb(255, 255, 255, 255)),
-            BorderBrush     = new SolidColorBrush(Color.FromArgb(255, 229, 231, 235)),
+            CornerRadius    = new CornerRadius(24),
+            Background      = new SolidColorBrush(Color.FromArgb(224, 20, 29, 42)),
+            BorderBrush     = new SolidColorBrush(Color.FromArgb(156, 104, 132, 168)),
             BorderThickness = new Thickness(1.5),
             Padding         = new Thickness(0),
             Translation     = new System.Numerics.Vector3(0, 0, 32),
@@ -419,31 +415,135 @@ public sealed partial class AllTemplatesCarousel : UserControl
         // Glass top edge
         mainGrid.Children.Add(new Border
         {
-            CornerRadius = new CornerRadius(20, 20, 0, 0), Height = 1,
+            CornerRadius = new CornerRadius(24, 24, 0, 0), Height = 1,
             VerticalAlignment = VerticalAlignment.Top, IsHitTestVisible = false,
-            Opacity = 0.08, Background = new SolidColorBrush(Microsoft.UI.Colors.White),
+            Opacity = 0.16, Background = new SolidColorBrush(Microsoft.UI.Colors.White),
             Margin = new Thickness(1, 0, 1, 0),
         });
 
-        // Row 0: icon + name centered at top
-        var topSection = new StackPanel
+        // Row 0: centered title + top-right actions
+        var topSection = new Grid
         {
             Name = "TopSection",
+            Margin = new Thickness(20, 24, 20, 0),
+        };
+        topSection.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(118) });
+        topSection.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        topSection.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(118) });
+
+        var titleStack = new StackPanel
+        {
+            Name = "TitleStack",
             Orientation = Orientation.Horizontal,
             Spacing = 10,
-            HorizontalAlignment = HorizontalAlignment.Left,
+            HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(20, 14, 20, 0),
         };
-        topSection.Children.Add(new TextBlock
+        titleStack.Children.Add(new FontIcon
         {
-            Text = template.Name, FontSize = 14,
+            Glyph = "\uE8A5", FontSize = 20,
+            Foreground = new SolidColorBrush(accent),
+            VerticalAlignment = VerticalAlignment.Center,
+        });
+        titleStack.Children.Add(new TextBlock
+        {
+            Text = template.Name, FontSize = 15,
             FontWeight = Microsoft.UI.Text.FontWeights.Bold,
-            Foreground = new SolidColorBrush(Color.FromArgb(255, 31, 41, 55)),
+            Foreground = new SolidColorBrush(Color.FromArgb(255, 234, 242, 255)),
             VerticalAlignment = VerticalAlignment.Center,
             TextWrapping = TextWrapping.NoWrap,
             TextTrimming = TextTrimming.CharacterEllipsis,
+            MaxWidth = 240,
         });
+        Grid.SetColumn(titleStack, 1);
+        topSection.Children.Add(titleStack);
+
+        var buttonStack = new StackPanel
+        {
+            Name = "ButtonStack",
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center,
+            Visibility = Visibility.Collapsed,
+        };
+
+        var starIcon = new FontIcon { Glyph = isFav ? "\uE735" : "\uE734", FontSize = 14, Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 193, 7)) };
+        var starBtn = new Button
+        {
+            Width = 34, Height = 34, Padding = new Thickness(0),
+            Background = new SolidColorBrush(Color.FromArgb(10, 255, 193, 7)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(180, 255, 193, 7)),
+            BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10),
+            Content = starIcon,
+        };
+        ToolTipService.SetToolTip(starBtn, isFav ? "Remove from favourites" : "Add to favourites");
+        starBtn.Click += async (_, _) =>
+        {
+            starBtn.IsEnabled = false;
+            try
+            {
+                await vm.ToggleFavouritePublicAsync(template.Id);
+                var nowFav = vm.IsFavouriteFor(template.Id);
+                starIcon.Glyph = nowFav ? "\uE735" : "\uE734";
+                ToolTipService.SetToolTip(starBtn, nowFav ? "Remove from favourites" : "Add to favourites");
+            }
+            finally { starBtn.IsEnabled = true; }
+        };
+
+        var editBtn = new Button
+        {
+            Width = 34, Height = 34, Padding = new Thickness(0),
+            Background = new SolidColorBrush(Color.FromArgb(28, 31, 122, 224)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(120, 31, 122, 224)),
+            BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10),
+            Content = new FontIcon { Glyph = "\uE70F", FontSize = 14, Foreground = new SolidColorBrush(Microsoft.UI.Colors.White) },
+        };
+        ToolTipService.SetToolTip(editBtn, "Edit template");
+        editBtn.Click += (_, _) => { vm.SelectedTemplate = template; vm.BeginEditSelectedTemplateCommand.Execute(null); };
+
+        var deleteBtn = new Button
+        {
+            Width = 34, Height = 34, Padding = new Thickness(0),
+            Background = new SolidColorBrush(Color.FromArgb(14, 224, 82, 82)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(170, 224, 82, 82)),
+            BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10),
+            Content = new FontIcon { Glyph = "\uE74D", FontSize = 14, Foreground = new SolidColorBrush(Color.FromArgb(255, 224, 82, 82)) },
+        };
+        ToolTipService.SetToolTip(deleteBtn, "Delete template");
+        deleteBtn.Click += async (_, _) =>
+        {
+            var xamlRoot = XamlRoot;
+            if (xamlRoot is null) return;
+            var dlg = new ContentDialog
+            {
+                Title = "Delete Template",
+                Content = $"Are you sure you want to delete \"{template.Name}\"? This cannot be undone.",
+                PrimaryButtonText = "Delete", CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Close, XamlRoot = xamlRoot,
+            };
+            if (await dlg.ShowAsync() != ContentDialogResult.Primary) return;
+            try
+            {
+                await vm.DeleteTemplateCommand.ExecuteAsync(template.Id);
+                if (_cards.Contains(card))
+                {
+                    _cards.Remove(card);
+                    _cardColOffset.Remove(card);
+                    CarouselCanvas.Children.Remove(card);
+                    if (_activeIndex >= _cards.Count && _activeIndex > 0) _activeIndex--;
+                    UpdateLayout(animate: true);
+                    UpdateNav();
+                }
+            }
+            catch { /* ignore */ }
+        };
+
+        buttonStack.Children.Add(starBtn);
+        buttonStack.Children.Add(editBtn);
+        buttonStack.Children.Add(deleteBtn);
+        Grid.SetColumn(buttonStack, 2);
+        topSection.Children.Add(buttonStack);
         Grid.SetRow(topSection, 0);
         mainGrid.Children.Add(topSection);
 
@@ -478,7 +578,7 @@ public sealed partial class AllTemplatesCarousel : UserControl
         Grid.SetRow(fieldsSection, 1);
         mainGrid.Children.Add(fieldsSection);
 
-        // Row 2: [<]  [field count + Edit/Star/Delete]  [>]
+        // Row 2: [<]  [field count]  [>]
         var bottomGrid = new Grid
         {
             Name = "BottomSection",
@@ -488,7 +588,7 @@ public sealed partial class AllTemplatesCarousel : UserControl
         bottomGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         bottomGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        // Center: field count + buttons
+        // Center: field count only
         var centerStack = new StackPanel
         {
             Spacing = 12,
@@ -499,101 +599,9 @@ public sealed partial class AllTemplatesCarousel : UserControl
         {
             Text = $"{template.Fields.Count} column{(template.Fields.Count == 1 ? "" : "s")}",
             FontSize = 14,
-            Foreground = new SolidColorBrush(Color.FromArgb(255, 107, 114, 128)),
+            Foreground = new SolidColorBrush(Color.FromArgb(255, 123, 141, 168)),
             HorizontalAlignment = HorizontalAlignment.Center, CharacterSpacing = 20,
         });
-
-        var buttonStack = new StackPanel
-        {
-            Name = "ButtonStack", Orientation = Orientation.Horizontal,
-            Spacing = 16, HorizontalAlignment = HorizontalAlignment.Center,
-            Visibility = Visibility.Collapsed,
-        };
-
-        // Star button
-        var starIcon = new FontIcon { Glyph = isFav ? "\uE735" : "\uE734", FontSize = 14, Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 193, 7)) };
-        var starBtn = new Button
-        {
-            Width = 36, Height = 36, Padding = new Thickness(0),
-            Background = new SolidColorBrush(Color.FromArgb(0, 0, 0, 0)),
-            BorderBrush = new SolidColorBrush(Color.FromArgb(255, 255, 193, 7)),
-            BorderThickness = new Thickness(1.5), CornerRadius = new CornerRadius(8),
-            Content = starIcon,
-        };
-        ToolTipService.SetToolTip(starBtn, isFav ? "Unstar" : "Star");
-        starBtn.Click += async (_, _) =>
-        {
-            starBtn.IsEnabled = false;
-            try
-            {
-                await vm.ToggleFavouritePublicAsync(template.Id);
-                var nowFav = vm.IsFavouriteFor(template.Id);
-                starIcon.Glyph = nowFav ? "\uE735" : "\uE734";
-                ToolTipService.SetToolTip(starBtn, nowFav ? "Unstar" : "Star");
-            }
-            finally { starBtn.IsEnabled = true; }
-        };
-
-        // Edit button
-        var editBtn = new Button
-        {
-            Width = 36, Height = 36, Padding = new Thickness(0),
-            Background = new SolidColorBrush(Color.FromArgb(255, 31, 122, 224)),
-            BorderThickness = new Thickness(0), CornerRadius = new CornerRadius(8),
-            Content = new FontIcon { Glyph = "\uE70F", FontSize = 14, Foreground = new SolidColorBrush(Microsoft.UI.Colors.White) },
-        };
-        ToolTipService.SetToolTip(editBtn, "Edit");
-        editBtn.Click += async (_, _) =>
-        {
-            var access = App.Services.GetRequiredService<ICurrentUserAccessService>();
-            if (!access.Capabilities.CanEditTemplate)
-            {
-                await PermissionToast.ShowAsync(XamlRoot);
-                return;
-            }
-            vm.SelectedTemplate = template;
-            vm.BeginEditSelectedTemplateCommand.Execute(null);
-        };
-
-        // Delete button
-        var deleteBtn = new Button
-        {
-            Width = 36, Height = 36, Padding = new Thickness(0),
-            Background = new SolidColorBrush(Color.FromArgb(0, 0, 0, 0)),
-            BorderBrush = new SolidColorBrush(Color.FromArgb(255, 224, 82, 82)),
-            BorderThickness = new Thickness(1.5), CornerRadius = new CornerRadius(8),
-            Content = new FontIcon { Glyph = "\uE74D", FontSize = 14, Foreground = new SolidColorBrush(Color.FromArgb(255, 224, 82, 82)) },
-        };
-        ToolTipService.SetToolTip(deleteBtn, "Delete");
-        deleteBtn.Click += async (_, _) =>
-        {
-            var access = App.Services.GetRequiredService<ICurrentUserAccessService>();
-            if (!access.Capabilities.CanDeleteTemplate)
-            {
-                await PermissionToast.ShowAsync(XamlRoot);
-                return;
-            }
-            var xamlRoot = XamlRoot;
-            if (xamlRoot is null) return;
-            var dlg = new ContentDialog
-            {
-                Title = "Delete Template",
-                Content = $"Are you sure you want to delete \"{template.Name}\"? This cannot be undone.",
-                PrimaryButtonText = "Delete", CloseButtonText = "Cancel",
-                DefaultButton = ContentDialogButton.Close, XamlRoot = xamlRoot,
-            };
-            if (await dlg.ShowAsync() != ContentDialogResult.Primary) return;
-            try
-            {
-                await vm.DeleteTemplateCommand.ExecuteAsync(template.Id);
-            }
-            catch { /* ignore */ }
-        };
-
-        buttonStack.Children.Add(starBtn);
-        buttonStack.Children.Add(editBtn);
-        buttonStack.Children.Add(deleteBtn);
-        centerStack.Children.Add(buttonStack);
         Grid.SetColumn(centerStack, 1);
         bottomGrid.Children.Add(centerStack);
 
@@ -634,8 +642,8 @@ public sealed partial class AllTemplatesCarousel : UserControl
         Grid.SetColumn(colNextBtn, 2);
         bottomGrid.Children.Add(colNextBtn);
 
-        colPrevBtn.Click += (_, _) => ShiftCardColumns(card, fieldList, accent, colPrevBtn, colNextBtn, -1);
-        colNextBtn.Click += (_, _) => ShiftCardColumns(card, fieldList, accent, colPrevBtn, colNextBtn, +1);
+        colPrevBtn.Click += (_, _) => ShiftCardColumns(card, fieldList, accent, headersClip, colPrevBtn, colNextBtn, -1, allRecords, allRecords.Count);
+        colNextBtn.Click += (_, _) => ShiftCardColumns(card, fieldList, accent, headersClip, colPrevBtn, colNextBtn, +1, allRecords, allRecords.Count);
 
         Grid.SetRow(bottomGrid, 2);
         mainGrid.Children.Add(bottomGrid);
@@ -658,6 +666,17 @@ public sealed partial class AllTemplatesCarousel : UserControl
         for (int fi = 0; fi < visibleCols; fi++)
         {
             var field = fields[offset + fi];
+            var typeIcon = field.Type switch
+            {
+                Models.TemplateFieldType.Text       => "\uE8D2", // Document — text content
+                Models.TemplateFieldType.Number     => "\uE8EF", // # Symbol — whole number
+                Models.TemplateFieldType.Decimal    => "\uEB50", // Decimal point — decimal values
+                Models.TemplateFieldType.Date       => "\uE787", // Calendar — date picker
+                Models.TemplateFieldType.Dropdown   => "\uE8B5", // List — dropdown selection
+                Models.TemplateFieldType.Boolean    => "\uE73E", // Checkmark — true/false
+                Models.TemplateFieldType.RecordLink => "\uE71B", // Link — record reference
+                _                                   => "\uE8D2",
+            };
             var cell = new Border
             {
                 Background      = new SolidColorBrush(Color.FromArgb(40, accent.R, accent.G, accent.B)),
@@ -669,11 +688,12 @@ public sealed partial class AllTemplatesCarousel : UserControl
                 HorizontalAlignment = HorizontalAlignment.Stretch,
             };
             var content = new StackPanel { Spacing = 3, HorizontalAlignment = HorizontalAlignment.Center };
+            content.Children.Add(new FontIcon { Glyph = typeIcon, FontSize = 13, Foreground = new SolidColorBrush(accent), HorizontalAlignment = HorizontalAlignment.Center });
             content.Children.Add(new TextBlock
             {
                 Text = field.Label, FontSize = 11,
                 FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                Foreground = new SolidColorBrush(Color.FromArgb(255, 31, 41, 55)),
+                Foreground = new SolidColorBrush(Color.FromArgb(255, 234, 242, 255)),
                 HorizontalAlignment = HorizontalAlignment.Center,
                 TextAlignment = TextAlignment.Center,
                 TextWrapping = TextWrapping.Wrap, MaxLines = 2,
@@ -721,12 +741,36 @@ public sealed partial class AllTemplatesCarousel : UserControl
                 HorizontalAlignment = HorizontalAlignment.Stretch,
             };
 
-            // Label only, no icon
+            var headerTypeIcon = field.Type switch
+            {
+                Models.TemplateFieldType.Text       => "\uE8D2", // Document
+                Models.TemplateFieldType.Number     => "\uE8EF", // Number
+                Models.TemplateFieldType.Decimal    => "\uEB50", // Decimal
+                Models.TemplateFieldType.Date       => "\uE787", // Calendar
+                Models.TemplateFieldType.Dropdown   => "\uE8FD", // List
+                Models.TemplateFieldType.Boolean    => "\uE73E", // Checkmark
+                Models.TemplateFieldType.RecordLink => "\uE71B", // Link
+                _                                   => "\uE8D2",
+            };
+
+            // Icon left, label center, same vertical alignment
             var headerContent = new Grid
             {
                 HorizontalAlignment = HorizontalAlignment.Stretch,
             };
+            headerContent.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             headerContent.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            headerContent.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var iconEl = new FontIcon
+            {
+                Glyph = headerTypeIcon, FontSize = 14,
+                Foreground = new SolidColorBrush(accent),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(2, 0, 6, 0),
+            };
+            Grid.SetColumn(iconEl, 0);
+            headerContent.Children.Add(iconEl);
 
             var labelEl = new TextBlock
             {
@@ -740,8 +784,13 @@ public sealed partial class AllTemplatesCarousel : UserControl
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 MaxLines = 1,
             };
-            Grid.SetColumn(labelEl, 0);
+            Grid.SetColumn(labelEl, 1);
             headerContent.Children.Add(labelEl);
+
+            // Spacer same width as icon to keep text truly centered
+            var spacer = new Border { Width = 22 };
+            Grid.SetColumn(spacer, 2);
+            headerContent.Children.Add(spacer);
 
             headerCell.Child = headerContent;
             colStack.Children.Add(headerCell);
@@ -808,19 +857,13 @@ public sealed partial class AllTemplatesCarousel : UserControl
         Border card,
         List<TemplateFieldDefinition> fields,
         Color accent,
+        Border headersClip,
         Button prevBtn, Button nextBtn,
-        int direction)
+        int direction,
+        IReadOnlyList<MasterDataRowRecord> records,
+        int maxRows)
     {
         if (!_cardColOffset.TryGetValue(card, out var currentOffset)) return;
-
-        // Get records from stored dictionary
-        _cardRecords.TryGetValue(card, out var records);
-        records ??= Array.Empty<MasterDataRowRecord>();
-        var maxRows = records.Count;
-
-        // Find the current headersClip dynamically from the card
-        var headersClip = FindChildByName<Border>(card, "HeadersClip");
-        if (headersClip is null) return;
 
         int newOffset = currentOffset + direction * 4;
         newOffset = Math.Max(0, Math.Min(newOffset, fields.Count - 1));
@@ -873,18 +916,5 @@ public sealed partial class AllTemplatesCarousel : UserControl
             headersClip.Child = newGrid;
         };
         sb.Begin();
-    }
-
-    private static T? FindChildByName<T>(DependencyObject parent, string name) where T : FrameworkElement
-    {
-        var count = VisualTreeHelper.GetChildrenCount(parent);
-        for (int i = 0; i < count; i++)
-        {
-            var child = VisualTreeHelper.GetChild(parent, i);
-            if (child is T fe && fe.Name == name) return fe;
-            var result = FindChildByName<T>(child, name);
-            if (result is not null) return result;
-        }
-        return null;
     }
 }

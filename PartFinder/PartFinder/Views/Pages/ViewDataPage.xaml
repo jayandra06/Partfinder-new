@@ -9,7 +9,7 @@
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
     </Page.Resources>
 
-    <Grid Padding="20" ColumnSpacing="14" Background="{StaticResource PageBackgroundBrush}">
+    <Grid Padding="20" ColumnSpacing="14" Background="Transparent" Transitions="{StaticResource LuxuryPanelTransitions}">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="300" />
@@ -45,7 +45,7 @@
                 <TextBlock Foreground="{StaticResource DangerBrush}" Text="{Binding ErrorMessage}" FontSize="12" TextWrapping="WrapWholeWords" />
 
                 <!-- Rows list -->
-                <Border Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="0" Translation="0,0,32">
+                <Border Background="{StaticResource ElevatedCardBackgroundBrush}" BorderBrush="{StaticResource GlassStrokeBrush}" BorderThickness="1" CornerRadius="18" Padding="0" Translation="0,0,32">
                             <Border.Shadow><ThemeShadow/></Border.Shadow>
                             <Grid>
                         <ListView
@@ -131,9 +131,9 @@
             PointerEntered="OnDetailsPanelPointerEntered"
             PointerExited="OnDetailsPanelPointerExited"
             Background="{StaticResource ElevatedCardBackgroundBrush}"
-            BorderBrush="{StaticResource BorderDefaultBrush}"
+            BorderBrush="{StaticResource GlassStrongStrokeBrush}"
             BorderThickness="1"
-            CornerRadius="4"
+            CornerRadius="18"
             Padding="14"
             Visibility="{Binding IsFlyoutOpen, Converter={StaticResource BoolToVisibilityConverter}}">
             <Border.RenderTransform>

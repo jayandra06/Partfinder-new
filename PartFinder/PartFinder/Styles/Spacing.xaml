@@ -6,12 +6,13 @@
     <x:Double x:Key="SpacingM">12</x:Double>
     <x:Double x:Key="SpacingL">16</x:Double>
     <x:Double x:Key="SpacingXL">20</x:Double>
-    <x:Double x:Key="SpacingXXL">24</x:Double>
-    <x:Double x:Key="SpacingSection">32</x:Double>
-    <x:Double x:Key="RadiusS">4</x:Double>
-    <x:Double x:Key="RadiusM">8</x:Double>
-    <x:Double x:Key="RadiusL">10</x:Double>
-    <x:Double x:Key="RadiusPill">20</x:Double>
+    <x:Double x:Key="SpacingXXL">28</x:Double>
+    <x:Double x:Key="SpacingSection">36</x:Double>
+    <x:Double x:Key="RadiusS">6</x:Double>
+    <x:Double x:Key="RadiusM">10</x:Double>
+    <x:Double x:Key="RadiusL">16</x:Double>
+    <x:Double x:Key="RadiusXL">22</x:Double>
+    <x:Double x:Key="RadiusPill">999</x:Double>
 
     <x:Double x:Key="Space4">4</x:Double>
     <x:Double x:Key="Space8">8</x:Double>
@@ -20,6 +21,8 @@
     <x:Double x:Key="Space24">24</x:Double>
     <x:Double x:Key="Space32">32</x:Double>
 
-    <Thickness x:Key="PagePadding">24</Thickness>
-    <Thickness x:Key="CardPadding">20</Thickness>
+    <Thickness x:Key="PagePadding">28</Thickness>
+    <Thickness x:Key="CardPadding">22</Thickness>
+    <Thickness x:Key="GlassCardPadding">20</Thickness>
+    <Thickness x:Key="ShellChromePadding">18,14</Thickness>
 </ResourceDictionary>

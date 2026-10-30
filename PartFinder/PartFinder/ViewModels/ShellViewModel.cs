@@ -18,7 +18,6 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
     private readonly AdminSessionStore _adminSession;
     private readonly LocalProfileStore _profile;
     private readonly MongoAlertsService _alertsService;
-    private readonly IOrgUserDirectoryService _users;
 
     private bool _suppressNavigation;
     private AppPage _lastSelectedPage = AppPage.Templates;
@@ -31,8 +30,7 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
         ICurrentUserAccessService access,
         AdminSessionStore adminSession,
         LocalProfileStore profile,
-        MongoAlertsService alertsService,
-        IOrgUserDirectoryService users)
+        MongoAlertsService alertsService)
     {
         _navigationService = navigationService;
         _setupContext = setupContext;
@@ -42,20 +40,11 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
         _adminSession = adminSession;
         _profile = profile;
         _alertsService = alertsService;
-        _users = users;
         _profile.ProfileChanged += OnProfileChanged;
         NavigationItems = new ObservableCollection<NavItemViewModel>();
-        PrimaryNavigationItems = new ObservableCollection<NavItemViewModel>();
-        OverflowNavigationItems = new ObservableCollection<NavItemViewModel>();
     }
 
     public ObservableCollection<NavItemViewModel> NavigationItems { get; }
-
-    public ObservableCollection<NavItemViewModel> PrimaryNavigationItems { get; }
-
-    public ObservableCollection<NavItemViewModel> OverflowNavigationItems { get; }
-
-    public bool HasOverflowNavigation => OverflowNavigationItems.Count > 0;
 
     private NavItemViewModel? _selectedNavigationItem;
     public NavItemViewModel? SelectedNavigationItem
@@ -73,10 +62,20 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
                 return;
             }
 
+            foreach (var item in NavigationItems)
+            {
+                item.IsSelected = ReferenceEquals(item, value);
+            }
+
             _lastSelectedPage = value.Page;
             if (!_suppressNavigation)
             {
+                System.Diagnostics.Debug.WriteLine($"[ShellViewModel] Navigating to {value.Page}");
                 _navigationService.Navigate(value.Page);
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"[ShellViewModel] Navigation to {value.Page} suppressed by flag.");
             }
         }
     }
@@ -118,11 +117,7 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
     }
 
     public string CurrentUserInitial => string.IsNullOrWhiteSpace(CurrentUserName)
-        ? (!string.IsNullOrWhiteSpace(_adminSession.Email)
-            ? _adminSession.Email.Trim()[0].ToString().ToUpperInvariant()
-            : (!string.IsNullOrWhiteSpace(_setupContext.AdminEmail)
-                ? _setupContext.AdminEmail.Trim()[0].ToString().ToUpperInvariant()
-                : "?"))
+        ? "?"
         : CurrentUserName.Trim()[0].ToString().ToUpperInvariant();
 
     private string _currentUserDepartment = string.Empty;
@@ -181,37 +176,6 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
         }
     }
 
-    private bool _isSidebarCollapsed;
-    public bool IsSidebarCollapsed
-    {
-        get => _isSidebarCollapsed;
-        set
-        {
-            if (SetProperty(ref _isSidebarCollapsed, value))
-            {
-                OnPropertyChanged(nameof(SidebarToggleGlyph));
-            }
-        }
-    }
-
-    /// <summary>Chevron left when expanded (collapse); chevron right when collapsed (expand).</summary>
-    public string SidebarToggleGlyph => IsSidebarCollapsed ? "\uE76B" : "\uE76C";
-
-    [RelayCommand]
-    private void ToggleSidebar()
-    {
-        IsSidebarCollapsed = !IsSidebarCollapsed;
-        SyncNavItemLabelsWithSidebar();
-    }
-
-    private void SyncNavItemLabelsWithSidebar()
-    {
-        foreach (var item in NavigationItems)
-        {
-            item.ShowNavLabel = !IsSidebarCollapsed;
-        }
-    }
-
     public async Task InitializeAsync()
     {
         _setupContext.Refresh();
@@ -241,72 +205,33 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
         await LoadAvatarAsync(_profile.AvatarPath).ConfigureAwait(true);
         await RefreshAlertBadgeAsync().ConfigureAwait(true);
 
-        try
-        {
-            await _access.RefreshAsync().ConfigureAwait(true);
-        }
-        catch (Exception ex)
-        {
-            DebugLogClient.Post("warn", "ShellViewModel.InitializeAsync.RefreshAccess", ex.ToString());
-        }
-
-        var hasMaster = false;
-        try
-        {
-            hasMaster = await HasMasterDataTemplateAsync().ConfigureAwait(true);
-        }
-        catch (Exception ex)
-        {
-            DebugLogClient.Post("warn", "ShellViewModel.InitializeAsync.HasMasterDataTemplate", ex.ToString());
-        }
-
+        await _access.RefreshAsync().ConfigureAwait(true);
+        var hasMaster = await HasMasterDataTemplateAsync().ConfigureAwait(true);
         RebuildNavigationItems(hasMaster, _access.Capabilities);
 
-        // For invited users (not org creator), resolve display name from database
-        if (_setupContext.InvitedUserLogin && !_access.Capabilities.CanAccessUserManagement)
-        {
-            var email = _setupContext.AdminEmail?.Trim();
-            if (!string.IsNullOrWhiteSpace(email))
-            {
-                try
-                {
-                    var record = await _users.FindByEmailAsync(email).ConfigureAwait(true);
-                    if (record is not null && !string.IsNullOrWhiteSpace(record.Name))
-                    {
-                        CurrentUserName = record.Name;
-                    }
-                }
-                catch { /* best effort */ }
-            }
-        }
-
         var startPage = ResolveStartPage(hasMaster, _access.Capabilities);
-        var startItem = NavigationItems.FirstOrDefault(i => i.Page == startPage)
-                     ?? NavigationItems.FirstOrDefault();
-        if (startItem is not null)
-        {
-            _lastSelectedPage = startItem.Page;
-            _suppressNavigation = true;
-            SelectedNavigationItem = startItem;
-            _suppressNavigation = false;
-            _navigationService.Navigate(startItem.Page);
-        }
+        var startItem = NavigationItems.First(i => i.Page == startPage);
+        _lastSelectedPage = startPage;
+
+        _suppressNavigation = true;
+        SelectedNavigationItem = startItem;
+        _suppressNavigation = false;
+        _navigationService.Navigate(startPage);
     }
 
     private static AppPage ResolveStartPage(bool hasMasterData, UserAccessCapabilities c)
     {
-        // Dashboard is always the default start page if accessible
-        if (c.CanAccessDashboard)
-        {
-            return AppPage.Dashboard;
-        }
-
-        if (hasMasterData && (c.CanAccessMasterData || c.CanAccessParts))
+        if (!c.CanAccessUserManagement)
         {
             return AppPage.MasterData;
         }
 
-        return AppPage.Templates;
+        if (!hasMasterData)
+        {
+            return AppPage.Templates;
+        }
+
+        return AppPage.Dashboard;
     }
 
     public async Task NotifyTemplatesChangedAsync(bool openMasterDataPage = false)
@@ -341,81 +266,115 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
     private void RebuildNavigationItems(bool hasMasterData, UserAccessCapabilities c)
     {
         NavigationItems.Clear();
-        PrimaryNavigationItems.Clear();
-        OverflowNavigationItems.Clear();
 
         if (c.CanAccessDashboard)
         {
-            AddNavItem(isPrimary: true, "Home", "\uE80F", AppPage.Dashboard);
+            NavigationItems.Add(
+                new NavItemViewModel
+                {
+                    Label = "Dashboard",
+                    IconGlyph = "\uE80F",
+                    Page = AppPage.Dashboard,
+                    IsEnabled = true,
+                });
+        }
+
+        if (c.CanAccessTemplates)
+        {
+            NavigationItems.Add(
+                new NavItemViewModel
+                {
+                    Label = "Inventory",
+                    IconGlyph = "\uE179",
+                    Page = AppPage.Inventory,
+                    IsEnabled = true,
+                });
         }
 
         if ((c.CanAccessMasterData || c.CanAccessParts) && hasMasterData)
         {
-            AddNavItem(isPrimary: true, "Explorer", "\uE721", AppPage.MasterData);
+            NavigationItems.Add(
+                new NavItemViewModel
+                {
+                    Label = "Master Data",
+                    IconGlyph = "\uF0E2",
+                    Page = AppPage.MasterData,
+                    IsEnabled = true,
+                });
         }
 
         if (c.CanAccessTemplates)
         {
-            AddNavItem(isPrimary: true, "Templates", "\uE8A5", AppPage.Templates);
-            AddNavItem(isPrimary: true, "Links", "\uE71B", AppPage.WorksheetRelations);
+            NavigationItems.Add(
+                new NavItemViewModel
+                {
+                    Label = "Templates",
+                    IconGlyph = "\uE8A5",
+                    Page = AppPage.Templates,
+                    IsEnabled = true,
+                });
+
+            NavigationItems.Add(
+                new NavItemViewModel
+                {
+                    Label = "Link Templates",
+                    IconGlyph = "\uE71B",
+                    Page = AppPage.WorksheetRelations,
+                    IsEnabled = true,
+                });
+
+            NavigationItems.Add(
+                new NavItemViewModel
+                {
+                    Label = "QR Codes",
+                    IconGlyph = "\uED14",
+                    Page = AppPage.QrCodeManager,
+                    IsEnabled = true,
+                });
+
+            NavigationItems.Add(
+                new NavItemViewModel
+                {
+                    Label = "Alerts",
+                    IconGlyph = "\uEA8F",
+                    Page = AppPage.Alerts,
+                    IsEnabled = true,
+                });
+
+            NavigationItems.Add(
+                new NavItemViewModel
+                {
+                    Label = "Activities",
+                    IconGlyph = "\uE81C",
+                    Page = AppPage.Audit,
+                    IsEnabled = true,
+                });
         }
 
-        if (c.CanAccessTemplates)
+        if (c.CanAccessUserManagement)
         {
-            AddNavItem(isPrimary: false, "Inventory", "\uE179", AppPage.Inventory);
-            AddNavItem(isPrimary: false, "View Data", "\uE8F1", AppPage.ViewData);
-            AddNavItem(isPrimary: false, "QR Codes", "\uED14", AppPage.QrCodeManager);
-            AddNavItem(isPrimary: false, "Activity", "\uE81C", AppPage.Audit);
-            AddNavItem(isPrimary: false, "Alerts", "\uEA8F", AppPage.Alerts);
+            NavigationItems.Add(
+                new NavItemViewModel
+                {
+                    Label = "User Management",
+                    IconGlyph = "\uE716",
+                    Page = AppPage.UserManagement,
+                    IsEnabled = true,
+                });
         }
-
-        // Users nav item is always visible — UserManagementPage shows "Access Restricted" overlay
-        // when the user lacks CanAccessUserManagement permission.
-        AddNavItem(isPrimary: false, "Users", "\uE716", AppPage.UserManagement);
 
         if (c.CanAccessSettings)
         {
-            AddNavItem(isPrimary: false, "Settings", "\uE713", AppPage.Settings);
+            NavigationItems.Add(
+                new NavItemViewModel
+                {
+                    Label = "Settings",
+                    IconGlyph = "\uE713",
+                    Page = AppPage.Settings,
+                    IsEnabled = true,
+                });
         }
 
-        OnPropertyChanged(nameof(HasOverflowNavigation));
-        SyncNavItemLabelsWithSidebar();
-    }
-
-    private void AddNavItem(bool isPrimary, string label, string iconGlyph, AppPage page)
-    {
-        var item = new NavItemViewModel
-        {
-            Label = label,
-            IconGlyph = iconGlyph,
-            Page = page,
-            IsEnabled = true,
-        };
-
-        NavigationItems.Add(item);
-        if (isPrimary)
-        {
-            PrimaryNavigationItems.Add(item);
-        }
-        else
-        {
-            OverflowNavigationItems.Add(item);
-        }
-    }
-
-    public void NavigateToPage(AppPage page)
-    {
-        var pick = NavigationItems.FirstOrDefault(i => i.Page == page);
-        if (pick is null)
-        {
-            return;
-        }
-
-        _suppressNavigation = true;
-        SelectedNavigationItem = pick;
-        _suppressNavigation = false;
-        _lastSelectedPage = page;
-        _navigationService.Navigate(page);
     }
 
     private async Task<bool> HasMasterDataTemplateAsync()
@@ -423,7 +382,11 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
         try
         {
             var list = await _templateSchema.GetTemplatesAsync().ConfigureAwait(false);
-            return list.Any(t => MongoTemplateSchemaService.IsExplorerTemplateName(t.Name));
+            return list.Any(
+                t => string.Equals(
+                    t.Name,
+                    MongoTemplateSchemaService.MasterDataTemplateName,
+                    StringComparison.OrdinalIgnoreCase));
         }
         catch
         {
@@ -441,8 +404,6 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
     private void SignOutSession()
     {
         _adminSession.Clear();
-        _profile.Clear();
-        CurrentUserAvatarSource = null;
         // Do NOT delete setup-state.json — it holds orgCode/dbUri needed after re-login
         _setupContext.Refresh();
         CurrentUserName = ResolveDisplayUser();
@@ -499,10 +460,22 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
                 CurrentUserAvatarSource = bitmap;
                 return;
             }
-            catch { /* fall through to null */ }
+            catch { /* fall through to default */ }
         }
 
-        // No custom photo — keep null so initials fallback is rendered
-        CurrentUserAvatarSource = null;
+        // No custom photo — load default Assets/profile.jpg via stream so it's fully loaded before binding
+        try
+        {
+            var defaultFile = await StorageFile.GetFileFromApplicationUriAsync(
+                new Uri("ms-appx:///Assets/profile.jpg"));
+            using var defaultStream = await defaultFile.OpenReadAsync();
+            var defaultBitmap = new BitmapImage();
+            await defaultBitmap.SetSourceAsync(defaultStream);
+            CurrentUserAvatarSource = defaultBitmap;
+        }
+        catch
+        {
+            CurrentUserAvatarSource = null;
+        }
     }
 }

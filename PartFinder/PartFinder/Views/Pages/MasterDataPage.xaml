@@ -3,214 +3,169 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:components="using:PartFinder.Views.Components"
-    xmlns:converters="using:PartFinder.Converters"
-    xmlns:viewmodels="using:PartFinder.ViewModels">
+    xmlns:converters="using:PartFinder.Converters">
     <Page.Resources>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
         <converters:InvertedBoolToVisibilityConverter x:Key="InvertedBoolToVisibilityConverter" />
         <converters:StringToVisibilityConverter x:Key="StringToVisibilityConverter" />
-
-        <Style x:Key="MasterDataHeaderIconButtonStyle" TargetType="Button" BasedOn="{StaticResource GhostButtonStyle}">
+        <Style x:Key="ToolbarSegmentButtonStyle" TargetType="Button" BasedOn="{StaticResource GhostButtonStyle}">
             <Setter Property="Width" Value="40" />
             <Setter Property="Height" Value="40" />
-            <Setter Property="MinWidth" Value="40" />
             <Setter Property="MinHeight" Value="40" />
             <Setter Property="Padding" Value="0" />
-            <Setter Property="CornerRadius" Value="10" />
-            <Setter Property="Background" Value="{StaticResource GridHeaderBackgroundBrush}" />
-            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderDefaultBrush}" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+        </Style>
+        <Style x:Key="ToolbarConfirmButtonStyle" TargetType="Button" BasedOn="{StaticResource ToolbarSegmentButtonStyle}">
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Background" Value="{StaticResource SuccessBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextOnAccentBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource SuccessBrush}" />
             <Setter Property="BorderThickness" Value="1" />
         </Style>
     </Page.Resources>
 
-    <Grid x:Name="RootGrid" Padding="20" Background="{StaticResource PageBackgroundBrush}">
+    <Grid x:Name="RootGrid" Padding="20" Background="Transparent" Transitions="{StaticResource LuxuryPanelTransitions}">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="320" />
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Header: searchable template picker left, actions top-right -->
-        <Grid Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,0,0,10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" MaxWidth="520" />
-                <ColumnDefinition Width="*" MaxWidth="520" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <Border
-                Grid.Column="0"
-                MinHeight="40"
-                Padding="0"
-                CornerRadius="10"
-                Background="{StaticResource CardBackgroundBrush}"
-                BorderBrush="{StaticResource BorderDefaultBrush}"
-                BorderThickness="1"
-                VerticalAlignment="Center"
-                Margin="0,0,12,0">
-                <AutoSuggestBox
-                    x:Name="ExplorerTemplateSuggestBox"
-                    MinHeight="36"
-                    HorizontalAlignment="Stretch"
-                    VerticalAlignment="Center"
-                    FontSize="13"
-                    PlaceholderText="Search anything here..."
-                    QueryIcon="Find"
-                    TextMemberPath="Name"
-                    ItemsSource="{Binding FilteredDataTemplates}"
-                    Text="{Binding TemplatePickerText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                    SuggestionChosen="OnExplorerTemplateSuggestionChosen"
-                    TextChanged="OnExplorerTemplateSuggestTextChanged"
-                    Background="Transparent"
-                    Foreground="{StaticResource TextPrimaryBrush}"
-                    BorderThickness="0"
-                    Padding="12,8" />
-            </Border>
-            <!-- Column visibility filter -->
-            <Border
-                Grid.Column="1"
-                MinHeight="40"
-                Padding="0"
-                CornerRadius="10"
-                Background="{StaticResource CardBackgroundBrush}"
-                BorderBrush="{StaticResource BorderDefaultBrush}"
-                BorderThickness="1"
-                VerticalAlignment="Center"
-                Margin="0,0,0,0">
-                <Button
-                    x:Name="ColumnFilterButton"
-                    MinHeight="36"
-                    HorizontalAlignment="Stretch"
-                    VerticalAlignment="Center"
-                    Background="Transparent"
-                    BorderThickness="0"
-                    Padding="12,8"
-                    HorizontalContentAlignment="Stretch">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Filter columns..." FontSize="13" Foreground="{StaticResource TextTertiaryBrush}" VerticalAlignment="Center" />
-                        <FontIcon Grid.Column="1" Glyph="&#xE71C;" FontSize="13" Foreground="{StaticResource TextTertiaryBrush}" VerticalAlignment="Center" />
-                    </Grid>
-                    <Button.Flyout>
-                        <Flyout Placement="Bottom">
-                            <StackPanel x:Name="ColumnCheckboxPanel" Spacing="6" MinWidth="200" />
-                        </Flyout>
-                    </Button.Flyout>
-                </Button>
-            </Border>
-            <StackPanel
-                Grid.Column="2"
-                Orientation="Horizontal"
-                Spacing="8"
-                HorizontalAlignment="Right"
-                VerticalAlignment="Center"
-                Margin="40,0,0,0">
-                <Button
-                    x:Name="HeaderEditButton"
-                    Style="{StaticResource MasterDataHeaderIconButtonStyle}"
-                    Visibility="{Binding IsEditMode, Converter={StaticResource InvertedBoolToVisibilityConverter}}"
-                    Click="OnToggleEditModeClicked"
-                    ToolTipService.ToolTip="Edit Data">
-                    <FontIcon Glyph="&#xE70F;" FontSize="16" />
-                </Button>
-                <Button
-                    x:Name="HeaderExportButton"
-                    Style="{StaticResource MasterDataHeaderIconButtonStyle}"
-                    Click="OnExportTemplateClicked"
-                    ToolTipService.ToolTip="Export to Excel">
-                    <FontIcon Glyph="&#xE896;" FontSize="16" />
-                </Button>
-                <Button
-                    x:Name="HeaderImportButton"
-                    Style="{StaticResource MasterDataHeaderIconButtonStyle}"
-                    Click="OnImportExcelClicked"
-                    ToolTipService.ToolTip="Import from Excel">
-                    <FontIcon Glyph="&#xE898;" FontSize="16" />
-                </Button>
-            </StackPanel>
-        </Grid>
-
-        <!-- Edit controls (save/cancel while editing) -->
-        <Border Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,0,0,0" Padding="14,10" CornerRadius="4" Background="#221F7AE0" BorderBrush="#401F7AE0" BorderThickness="1"
-                Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibilityConverter}}">
-            <Grid ColumnSpacing="12">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock
-                    Grid.Column="0"
-                    Text="{Binding EditModeBannerText}"
-                    FontSize="12"
-                    Foreground="{StaticResource TextPrimaryBrush}"
-                    VerticalAlignment="Center"
-                    TextWrapping="WrapWholeWords" />
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                    <Button
-                        Click="OnAddNewRowClicked"
-                        Style="{StaticResource PrimaryButtonStyle}"
-                        FontSize="12">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <FontIcon Glyph="&#xE710;" FontSize="12" />
-                            <TextBlock Text="Add New Row" FontSize="12" />
-                        </StackPanel>
-                    </Button>
-                    <Button
-                        Click="OnSaveGridClicked"
-                        Style="{StaticResource PrimaryButtonStyle}"
-                        Content="Save"
-                        FontSize="12" />
-                    <Button
-                        Click="OnCancelEditClicked"
-                        Style="{StaticResource OutlinedButtonStyle}"
-                        Content="Cancel"
-                        FontSize="12" />
-                </StackPanel>
-            </Grid>
+        <Border
+            Grid.Row="0"
+            Grid.Column="0"
+            HorizontalAlignment="Left"
+            Margin="0,0,0,8"
+            Padding="10,8"
+            Background="{StaticResource ElevatedCardBackgroundBrush}"
+            BorderBrush="{StaticResource GlassStrokeBrush}"
+            BorderThickness="1"
+            CornerRadius="16"
+            Visibility="{Binding ShowTemplatePicker, Converter={StaticResource BoolToVisibilityConverter}}">
+            <ComboBox
+                MinWidth="260"
+                HorizontalAlignment="Left"
+                FontSize="12"
+                DisplayMemberPath="Name"
+                ItemsSource="{Binding DataTemplates}"
+                PlaceholderText="Choose templateâ€¦"
+                SelectedItem="{Binding SelectedDataTemplate, Mode=TwoWay}" />
         </Border>
 
-        <!-- Status messages -->
-        <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,6,0,6" Spacing="4">
-            <TextBlock
-                Foreground="{StaticResource TextSecondaryBrush}"
-                Text="{Binding StatusMessage}"
-                FontSize="11"
-                TextWrapping="Wrap"
-                Visibility="{Binding StatusMessage, Converter={StaticResource StringToVisibilityConverter}}" />
-            <TextBlock
-                Foreground="{StaticResource TextSecondaryBrush}"
-                FontSize="11"
-                Text="Create and save an Explorer template under Templates to see columns here."
-                TextWrapping="Wrap"
-                Visibility="{Binding ShowNoTemplateHint, Converter={StaticResource BoolToVisibilityConverter}}" />
-            <TextBlock
-                Foreground="{StaticResource TextSecondaryBrush}"
-                FontSize="11"
-                Text="No tenant database is configured. Complete setup with a valid organization and database connection."
-                TextWrapping="Wrap"
-                Visibility="{Binding ShowNoDatabaseHint, Converter={StaticResource BoolToVisibilityConverter}}" />
-        </StackPanel>
+        <Border
+            Grid.Row="0"
+            Grid.Column="1"
+            HorizontalAlignment="Right"
+            Margin="0,0,0,8"
+            Padding="0"
+            Background="Transparent"
+            BorderBrush="Transparent"
+            BorderThickness="0"
+            Visibility="{Binding IsEditMode, Converter={StaticResource InvertedBoolToVisibilityConverter}}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+                <Button
+                    Style="{StaticResource ToolbarSegmentButtonStyle}"
+                    Foreground="{StaticResource AccentPrimaryBrush}"
+                    IsEnabled="{Binding CanEditMasterData}"
+                    Click="OnToggleEditModeClicked"
+                    ToolTipService.ToolTip="Edit master data">
+                    <SymbolIcon Symbol="Edit" />
+                </Button>
 
-        <!-- Per-column filter bar is now inside the spreadsheet grid (synced scroll) -->
+                <Button
+                    Style="{StaticResource ToolbarSegmentButtonStyle}"
+                    Click="OnExportTemplateClicked"
+                    ToolTipService.ToolTip="Export Excel">
+                    <SymbolIcon Symbol="Upload" />
+                </Button>
+
+                <Button
+                    Style="{StaticResource ToolbarSegmentButtonStyle}"
+                    Click="OnImportExcelClicked"
+                    IsEnabled="{Binding CanAddMasterData}"
+                    ToolTipService.ToolTip="Import Excel">
+                    <SymbolIcon Symbol="Download" />
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <Border
+            Grid.Row="0"
+            Grid.Column="1"
+            HorizontalAlignment="Right"
+            Margin="0,0,0,8"
+            Padding="0"
+            Background="Transparent"
+            BorderBrush="Transparent"
+            BorderThickness="0"
+            Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibilityConverter}}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+                <Button
+                    Style="{StaticResource ToolbarConfirmButtonStyle}"
+                    Click="OnSaveGridClicked"
+                    ToolTipService.ToolTip="Save changes">
+                    <SymbolIcon Symbol="Accept" />
+                </Button>
+
+                <Button
+                    Style="{StaticResource ToolbarSegmentButtonStyle}"
+                    Click="OnCancelEditClicked"
+                    ToolTipService.ToolTip="Cancel editing">
+                    <SymbolIcon Symbol="Cancel" />
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,0,6" Spacing="6">
+            <!-- Status messages -->
+            <StackPanel Spacing="4">
+                <TextBlock
+                    Foreground="{StaticResource TextSecondaryBrush}"
+                    FontSize="11"
+                    Text="Loading..."
+                    Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}" />
+                <TextBlock
+                    Foreground="{StaticResource TextSecondaryBrush}"
+                    Text="{Binding StatusMessage}"
+                    FontSize="11"
+                    TextWrapping="Wrap"
+                    Visibility="{Binding StatusMessage, Converter={StaticResource StringToVisibilityConverter}}" />
+                <TextBlock
+                    Foreground="{StaticResource TextSecondaryBrush}"
+                    FontSize="11"
+                    Text="Choose a template from the header. Edit, export and import from the right."
+                    Visibility="{Binding IsEditMode, Converter={StaticResource InvertedBoolToVisibilityConverter}}" />
+                <TextBlock
+                    Foreground="{StaticResource TextSecondaryBrush}"
+                    FontSize="11"
+                    Text="Edit mode enabled. Use the top-right tick to save or the cancel button to discard."
+                    Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibilityConverter}}" />
+                <TextBlock
+                    Foreground="{StaticResource TextSecondaryBrush}"
+                    FontSize="11"
+                    Text="Create and save a Master Data template under Templates to see columns here."
+                    TextWrapping="Wrap"
+                    Visibility="{Binding ShowNoTemplateHint, Converter={StaticResource BoolToVisibilityConverter}}" />
+                <TextBlock
+                    Foreground="{StaticResource TextSecondaryBrush}"
+                    FontSize="11"
+                    Text="No tenant database is configured. Complete setup with a valid organization and database connection."
+                    TextWrapping="Wrap"
+                    Visibility="{Binding ShowNoDatabaseHint, Converter={StaticResource BoolToVisibilityConverter}}" />
+            </StackPanel>
+        </StackPanel>
 
         <!-- Spreadsheet host -->
         <ContentControl
             x:Name="SpreadsheetHost"
-            Grid.Row="4"
-            Grid.RowSpan="2"
+            Grid.Row="2"
             Grid.Column="0"
-            Grid.ColumnSpan="2"
-            Margin="0,6,0,0"
+            Margin="0,4,0,0"
             HorizontalContentAlignment="Stretch"
             VerticalContentAlignment="Stretch" />
 
@@ -218,229 +173,23 @@
         <Rectangle
             x:Name="ActionResultsOverlay"
             Grid.Column="0"
-            Grid.RowSpan="5"
+            Grid.RowSpan="3"
             Fill="Black"
             Opacity="0.3"
             Visibility="Collapsed"
             Tapped="OnActionOverlayTapped" />
 
-        <!-- Details drawer (row + linked templates) -->
-        <Border
-            x:Name="LinkedInfoPanel"
-            Grid.Column="1"
-            Grid.Row="4"
-            Grid.RowSpan="2"
-            Width="360"
-            Padding="14"
-            CornerRadius="4"
-            Background="{StaticResource ElevatedCardBackgroundBrush}"
-            BorderBrush="{StaticResource BorderDefaultBrush}"
-            BorderThickness="1"
-            Visibility="{Binding ShowLinkedInfoPanel, Converter={StaticResource BoolToVisibilityConverter}}">
-            <Border.Shadow>
-                <ThemeShadow />
-            </Border.Shadow>
-            <Grid RowSpacing="10">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-                <StackPanel Spacing="8">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Spacing="4">
-                            <TextBlock
-                                Text="DETAILS"
-                                FontSize="9"
-                                CharacterSpacing="80"
-                                FontWeight="SemiBold"
-                                Foreground="{StaticResource AccentPrimaryBrush}" />
-                            <TextBlock
-                                Text="{Binding LinkedPanelTitle}"
-                                FontSize="14"
-                                FontWeight="SemiBold"
-                                TextWrapping="WrapWholeWords" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
-                            <ToggleButton
-                                Width="32"
-                                Height="32"
-                                Padding="0"
-                                IsChecked="{Binding IsDrawerPinned, Mode=TwoWay}"
-                                ToolTipService.ToolTip="Pin panel">
-                                <FontIcon Glyph="&#xE718;" FontSize="12" />
-                            </ToggleButton>
-                            <Button
-                                Style="{StaticResource GhostButtonStyle}"
-                                Width="32"
-                                Height="32"
-                                Padding="0"
-                                VerticalAlignment="Top"
-                                Command="{Binding CloseDetailsPanelCommand}"
-                                ToolTipService.ToolTip="Close panel">
-                                <FontIcon Glyph="&#xE711;" FontSize="12" />
-                            </Button>
-                        </StackPanel>
-                    </Grid>
-                    <TextBlock
-                        FontSize="10"
-                        Foreground="{StaticResource TextTertiaryBrush}"
-                        Text="Left-click a cell or right-click for Copy, Edit, and View details."
-                        TextWrapping="WrapWholeWords" />
-                    <Border
-                        Padding="8,6"
-                        CornerRadius="6"
-                        Background="{StaticResource NavItemSelectedBrush}"
-                        BorderBrush="{StaticResource AccentPrimaryBrush}"
-                        BorderThickness="1"
-                        Visibility="{Binding SelectedCellSummary, Converter={StaticResource StringToVisibilityConverter}}">
-                        <TextBlock
-                            Text="{Binding SelectedCellSummary}"
-                            FontSize="11"
-                            FontWeight="SemiBold"
-                            TextWrapping="WrapWholeWords" />
-                    </Border>
-                </StackPanel>
-                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                    <StackPanel Spacing="12">
-                        <StackPanel Spacing="6">
-                            <TextBlock
-                                Text="THIS ROW"
-                                FontSize="9"
-                                CharacterSpacing="80"
-                                FontWeight="SemiBold"
-                                Foreground="{StaticResource TextTertiaryBrush}" />
-                            <ItemsControl ItemsSource="{Binding LinkedPrimaryDetails}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="viewmodels:DisplayPair">
-                                        <TextBlock
-                                            FontSize="11"
-                                            Foreground="{StaticResource TextSecondaryBrush}"
-                                            Text="{Binding DisplayText}"
-                                            TextWrapping="WrapWholeWords"
-                                            Margin="0,0,0,4" />
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                        <ItemsControl ItemsSource="{Binding LinkedRelationSections}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="viewmodels:RelationDetailSection">
-                                    <Border
-                                        Padding="10"
-                                        CornerRadius="8"
-                                        Background="{StaticResource CardBackgroundBrush}"
-                                        BorderBrush="{StaticResource BorderDefaultBrush}"
-                                        BorderThickness="1">
-                                        <StackPanel Spacing="6">
-                                            <StackPanel Spacing="6">
-                                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                                    <TextBlock
-                                                        Text="{Binding Title}"
-                                                        FontWeight="SemiBold"
-                                                        FontSize="12" />
-                                                    <Border
-                                                        Padding="6,2"
-                                                        CornerRadius="8"
-                                                        Background="{StaticResource GridHeaderBackgroundBrush}">
-                                                        <TextBlock
-                                                            Text="{Binding MatchLabel}"
-                                                            FontSize="9"
-                                                            Foreground="{StaticResource TextSecondaryBrush}" />
-                                                    </Border>
-                                                </StackPanel>
-                                                <Button
-                                                    Style="{StaticResource GhostButtonStyle}"
-                                                    FontSize="11"
-                                                    MinHeight="28"
-                                                    HorizontalAlignment="Left"
-                                                    Content="Open lookup in Explorer"
-                                                    Visibility="{Binding CanOpenLookup, Converter={StaticResource BoolToVisibilityConverter}}"
-                                                    Command="{Binding DataContext.OpenLookupTemplateCommand, ElementName=RootGrid}"
-                                                    CommandParameter="{Binding}" />
-                                            </StackPanel>
-                                            <ItemsControl ItemsSource="{Binding MatchGroups}">
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate x:DataType="viewmodels:RelationMatchGroup">
-                                                        <Border
-                                                            Margin="0,6,0,0"
-                                                            Padding="8"
-                                                            CornerRadius="6"
-                                                            Background="{StaticResource GridRowAltBackgroundBrush}"
-                                                            BorderBrush="{StaticResource BorderDefaultBrush}"
-                                                            BorderThickness="1">
-                                                            <StackPanel Spacing="4">
-                                                                <TextBlock
-                                                                    Text="{Binding Title}"
-                                                                    FontSize="10"
-                                                                    FontWeight="SemiBold"
-                                                                    Foreground="{StaticResource TextSecondaryBrush}" />
-                                                                <ItemsControl ItemsSource="{Binding Details}">
-                                                                    <ItemsControl.ItemTemplate>
-                                                                        <DataTemplate x:DataType="viewmodels:DisplayPair">
-                                                                            <TextBlock
-                                                                                FontSize="11"
-                                                                                Foreground="{StaticResource TextSecondaryBrush}"
-                                                                                Text="{Binding DisplayText}"
-                                                                                TextWrapping="WrapWholeWords" />
-                                                                        </DataTemplate>
-                                                                    </ItemsControl.ItemTemplate>
-                                                                </ItemsControl>
-                                                            </StackPanel>
-                                                        </Border>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-                                        </StackPanel>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <TextBlock
-                            x:Name="LinkedPanelEmptyHint"
-                            FontSize="11"
-                            Foreground="{StaticResource TextTertiaryBrush}"
-                            Text="No linked fields for this row. Configure links under Links in the top navigation."
-                            TextWrapping="WrapWholeWords"
-                            Visibility="Collapsed" />
-                    </StackPanel>
-                </ScrollViewer>
-            </Grid>
-        </Border>
-
-        <!-- Toast -->
-        <Border
-            x:Name="ToastBar"
-            Grid.Row="0"
-            Grid.Column="0"
-            Grid.ColumnSpan="2"
-            HorizontalAlignment="Center"
-            VerticalAlignment="Top"
-            Margin="0,4,0,0"
-            Padding="12,8"
-            CornerRadius="8"
-            Background="{StaticResource ElevatedCardBackgroundBrush}"
-            BorderBrush="{StaticResource AccentPrimaryBrush}"
-            BorderThickness="1"
-            Visibility="{Binding ToastMessage, Converter={StaticResource StringToVisibilityConverter}}">
-            <TextBlock Text="{Binding ToastMessage}" FontSize="12" />
-        </Border>
-
         <!-- Action results slide panel -->
         <Border
             x:Name="ActionResultsPanel"
             Grid.Column="1"
-            Grid.Row="4"
-            Grid.RowSpan="2"
+            Grid.RowSpan="3"
             Width="320"
             Padding="14"
             Visibility="Collapsed"
-            CornerRadius="4"
+            CornerRadius="20"
             Background="{StaticResource ElevatedCardBackgroundBrush}"
-            BorderBrush="{StaticResource BorderDefaultBrush}"
+            BorderBrush="{StaticResource GlassStrongStrokeBrush}"
             BorderThickness="1">
             <Border.RenderTransform>
                 <TranslateTransform x:Name="ActionResultsTransform" X="320" />
@@ -466,7 +215,7 @@
                     Grid.Row="0"
                     Grid.Column="1"
                     Style="{StaticResource GhostButtonStyle}"
-                    Content="&#x2715;"
+                    Content="âœ•"
                     FontSize="12"
                     Click="OnCloseActionPanelClick" />
 
@@ -509,36 +258,6 @@
                 </ListView>
             </Grid>
         </Border>
-
-        <!-- Instant hover labels (WinUI ToolTipService has no InitialShowDelay) -->
-        <Popup
-            x:Name="HeaderActionTipPopup"
-            Grid.RowSpan="5"
-            Grid.ColumnSpan="2"
-            IsLightDismissEnabled="True"
-            ShouldConstrainToRootBounds="True">
-            <Border
-                x:Name="HeaderActionTipHost"
-                Padding="10,6"
-                Background="{StaticResource ElevatedCardBackgroundBrush}"
-                BorderBrush="{StaticResource BorderDefaultBrush}"
-                BorderThickness="1"
-                CornerRadius="8">
-                <TextBlock
-                    x:Name="HeaderActionTipText"
-                    FontSize="12"
-                    Foreground="{StaticResource TextPrimaryBrush}" />
-            </Border>
-        </Popup>
-
-        <!-- No Permission overlay -->
-        <components:NoPermissionView
-            x:Name="NoPermissionOverlay"
-            Grid.Row="0"
-            Grid.RowSpan="99"
-            Grid.Column="0"
-            Grid.ColumnSpan="99"
-            Visibility="Collapsed" />
     </Grid>
 </Page>
 

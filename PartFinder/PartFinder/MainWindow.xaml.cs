@@ -1,14 +1,15 @@
-using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Input;
+using Microsoft.UI.Windowing;
 using Microsoft.Extensions.DependencyInjection;
 using PartFinder.Services;
-using PartFinder.ViewModels;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text.Json;
-using Windows.Foundation;
+using WinRT.Interop;
+using Windows.Graphics;
 
 namespace PartFinder;
 
@@ -25,30 +26,100 @@ public sealed partial class MainWindow : Window
     private string _workingOrgCode = "";
     private string? _cachedOrgDatabaseUri;
     private string? _resolvedSignedInEmail;
-    private string? _resolvedSignedInRole;
-    private bool _mustChangePassword = true;
-    private bool _signedInThisSession;
     private SetupStatusResult? _lastStatus;
 
     private Microsoft.UI.Xaml.DispatcherTimer? _maintenanceTimer;
     private DateTimeOffset? _maintenanceUntilUtc;
     private string? _orgCodeForMaintenanceRetry;
+    private AppWindow? _appWindow;
 
     private readonly string _setupFilePath = SetupPaths.SetupStateFilePath;
-
-    private AppWindow? _shellTitleBarAppWindow;
-    private TypedEventHandler<AppWindow, AppWindowChangedEventArgs>? _shellTitleBarAppWindowChangedHandler;
 
     public MainWindow()
     {
         InitializeComponent();
-        // Setup / blocked / app-lock use the standard caption strip; shell applies extended chrome.
+        SetupRoot.Opacity = 1;
+        // Setup and blocked states use the native title bar. Shell mode switches to a custom title bar.
         ExtendsContentIntoTitleBar = false;
         BackButton.IsEnabled = false;
+        ShellRoot.SizeChanged += OnShellRootSizeChanged;
 
+
+        if (IsSetupCompleted())
+        {
+            RootGrid.Loaded += OnRootGridLoadedPostSetupValidate;
+            return;
+        }
 
         RootGrid.Loaded += OnRootGridLoadedResumeWizard;
         UpdateStepUi();
+    }
+
+    private AppWindow GetAppWindow()
+    {
+        _appWindow ??= AppWindow.GetFromWindowId(
+            Microsoft.UI.Win32Interop.GetWindowIdFromWindow(WindowNative.GetWindowHandle(this)));
+        return _appWindow;
+    }
+
+    private void EnableShellTitleBar()
+    {
+        ExtendsContentIntoTitleBar = true;
+        SetTitleBar(ShellRoot.TitleBarDragElement);
+
+        if (!AppWindowTitleBar.IsCustomizationSupported())
+        {
+            ShellRoot.UpdateTitleBarInsets(0, 0);
+            return;
+        }
+
+        ShellRoot.UpdateTitleBarInsets(0, 0);
+    }
+
+    private void DisableShellTitleBar()
+    {
+        ExtendsContentIntoTitleBar = false;
+        SetTitleBar(null);
+        ShellRoot.UpdateTitleBarInsets(0, 0);
+    }
+
+    private void OnShellRootSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (ExtendsContentIntoTitleBar)
+        {
+            UpdateShellTitleBarRegions();
+        }
+    }
+
+    public void RefreshShellTitleBarRegions()
+    {
+        UpdateShellTitleBarRegions();
+    }
+
+    private void UpdateShellTitleBarRegions()
+    {
+        if (ShellRoot is null || !ExtendsContentIntoTitleBar)
+            return;
+
+        try
+        {
+            var windowId = AppWindow.Id;
+            var inputSource = InputNonClientPointerSource.GetForWindowId(windowId);
+            if (inputSource is null) return;
+
+            var rects = ShellRoot.GetTitleBarPassthroughRects();
+            inputSource.SetRegionRects(NonClientRegionKind.Passthrough, rects);
+            System.Diagnostics.Debug.WriteLine($"[MainWindow] Registered {rects.Length} interactive regions via ShellRoot.");
+        }
+        catch (System.Runtime.InteropServices.COMException ex) when (ex.HResult == unchecked((int)0x80010108) || ex.Message.Contains("closed"))
+        {
+            // RPC_E_DISCONNECTED or similar window-closed errors
+            System.Diagnostics.Debug.WriteLine("[MainWindow] Title bar update skipped: Window object is already closed.");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MainWindow] Title bar update failed: {ex.Message}");
+        }
     }
 
     private sealed class SetupState
@@ -85,7 +156,6 @@ public sealed partial class MainWindow : Window
     {
         Directory.CreateDirectory(Path.GetDirectoryName(_setupFilePath)!);
         File.WriteAllText(_setupFilePath, JsonSerializer.Serialize(state, SetupJson));
-        SetupPaths.PurgeLegacySetupStateFiles();
     }
 
     private bool IsSetupCompleted()
@@ -102,99 +172,42 @@ public sealed partial class MainWindow : Window
     {
         RootGrid.Loaded -= OnRootGridLoadedResumeWizard;
 
-        _signedInThisSession = false;
-
         var saved = LoadSetupState();
-        // Do not pre-fill email — user must sign in each app session.
+        if (saved.invitedUserLogin && !string.IsNullOrWhiteSpace(saved.adminEmail))
+        {
+            _resolvedSignedInEmail = saved.adminEmail.Trim();
+        }
 
         var code = TryReadOrgCodeFromSetup();
-        if (!string.IsNullOrWhiteSpace(code))
+        if (string.IsNullOrWhiteSpace(code))
         {
-            OrgCodeBox.Text = code;
-            _workingOrgCode = code;
-
-            try
-            {
-                var (status, _) = await SetupApiClient.StatusAsync(_workingOrgCode);
-                if (status is not null && status.Valid)
-                {
-                    _lastStatus = status;
-                    _cachedOrgDatabaseUri = status.OrgDatabaseUri;
-                    UpdateLicenseSummary(status);
-                }
-            }
-            catch { /* best effort */ }
+            return;
         }
 
-        InviteLoginEmailBox.Text = string.Empty;
-        InviteLoginPasswordBox.Password = string.Empty;
-        _step = 1;
-        SetupRoot.Visibility = Visibility.Visible;
-        ShellRoot.Visibility = Visibility.Collapsed;
+        OrgCodeBox.Text = code;
+        _workingOrgCode = code;
+
+        var (status, _) = await SetupApiClient.StatusAsync(_workingOrgCode);
+        if (status is null || !status.Valid)
+        {
+            return;
+        }
+
+        _lastStatus = status;
+        _cachedOrgDatabaseUri = status.OrgDatabaseUri;
+        UpdateLicenseSummary(status);
+        _step = ResolveTargetStep(status);
         UpdateStepUi();
-    }
-
-    private async void OnOrgCodeBoxTextChanged(object sender, TextChangedEventArgs e)
-    {
-        var text = OrgCodeBox.Text.Trim();
-        var previousOrg = LoadSetupState().orgCode?.Trim();
-        if (!string.IsNullOrEmpty(previousOrg) &&
-            text.Length == 6 &&
-            !string.Equals(previousOrg, text, StringComparison.Ordinal))
-        {
-            _resolvedSignedInEmail = null;
-            _resolvedSignedInRole = null;
-            _mustChangePassword = true;
-            InviteLoginPasswordBox.Password = string.Empty;
-        }
-
-        if (text.Length == 6 && text.All(char.IsDigit))
-        {
-            try
-            {
-                var (status, _) = await SetupApiClient.StatusAsync(text);
-                if (status is not null && status.Valid)
-                {
-                    _lastStatus = status;
-                    _cachedOrgDatabaseUri = status.OrgDatabaseUri;
-                    _workingOrgCode = text;
-                    UpdateLicenseSummary(status);
-                    return;
-                }
-            }
-            catch { }
-        }
-
-        LicenseSummaryPanel.Visibility = Visibility.Collapsed;
     }
 
     private async void OnRootGridLoadedPostSetupValidate(object sender, RoutedEventArgs e)
     {
         RootGrid.Loaded -= OnRootGridLoadedPostSetupValidate;
-        // Never open the shell without an explicit sign-in this session.
-        if (!_signedInThisSession)
-        {
-            _step = 1;
-            SetupRoot.Visibility = Visibility.Visible;
-            ShellRoot.Visibility = Visibility.Collapsed;
-            UpdateStepUi();
-            return;
-        }
-
         await ValidateAndShowShellAsync().ConfigureAwait(true);
     }
 
     private async Task ValidateAndShowShellAsync()
     {
-        if (!_signedInThisSession)
-        {
-            _step = 1;
-            SetupRoot.Visibility = Visibility.Visible;
-            ShellRoot.Visibility = Visibility.Collapsed;
-            UpdateStepUi();
-            return;
-        }
-
         var orgCode = TryReadOrgCodeFromSetup();
         if (string.IsNullOrWhiteSpace(orgCode))
         {
@@ -230,7 +243,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        if (!await MongoConnectionTester.TryPingAsync(dbUri, orgCode))
+        if (!await MongoConnectionTester.TryPingAsync(dbUri))
         {
             ShowSubscriptionBlocked(
                 "Cannot reach your organization MongoDB from this PC. Check the network or MongoDB URI.");
@@ -273,8 +286,8 @@ public sealed partial class MainWindow : Window
 
     private void ShowSubscriptionBlocked(string message)
     {
+        DisableShellTitleBar();
         StopMaintenanceTimer();
-        RestoreNonShellTitleBarChrome();
         MaintenanceBlockedRoot.Visibility = Visibility.Collapsed;
         SubscriptionBlockedMessage.Text = message;
         SubscriptionBlockedRoot.Visibility = Visibility.Visible;
@@ -284,8 +297,8 @@ public sealed partial class MainWindow : Window
 
     private void ShowMaintenanceBlocked(string maintenanceUntilIso, string orgCode)
     {
+        DisableShellTitleBar();
         StopMaintenanceTimer();
-        RestoreNonShellTitleBarChrome();
         SubscriptionBlockedRoot.Visibility = Visibility.Collapsed;
         _orgCodeForMaintenanceRetry = orgCode.Trim();
         if (!DateTimeOffset.TryParse(
@@ -324,6 +337,8 @@ public sealed partial class MainWindow : Window
         _maintenanceUntilUtc = null;
         _orgCodeForMaintenanceRetry = null;
     }
+
+
 
     private void OnMaintenanceTimerTick(object? sender, object e)
     {
@@ -421,7 +436,7 @@ public sealed partial class MainWindow : Window
                 return;
             }
 
-            if (!await MongoConnectionTester.TryPingAsync(dbUri, code))
+            if (!await MongoConnectionTester.TryPingAsync(dbUri))
             {
                 ShowSubscriptionBlocked(
                     "Cannot reach your organization MongoDB from this PC. Check the network or MongoDB URI.");
@@ -466,26 +481,19 @@ public sealed partial class MainWindow : Window
 
     public void ResetToSetup()
     {
+        DisableShellTitleBar();
         StopMaintenanceTimer();
-        RestoreNonShellTitleBarChrome();
         MaintenanceBlockedRoot.Visibility = Visibility.Collapsed;
-
-        // Clear ALL cached state from previous session
         try
         {
-            var adminSession = App.Services.GetRequiredService<AdminSessionStore>();
-            adminSession.Clear();
+            if (File.Exists(_setupFilePath))
+            {
+                File.Delete(_setupFilePath);
+            }
         }
-        catch { }
-
-        try
+        catch
         {
-            var profile = App.Services.GetRequiredService<LocalProfileStore>();
-            profile.Clear();
         }
-        catch { }
-
-        SetupPaths.ClearAllSetupStateFiles();
 
         SubscriptionBlockedRoot.Visibility = Visibility.Collapsed;
         SetupRoot.Visibility = Visibility.Visible;
@@ -495,9 +503,6 @@ public sealed partial class MainWindow : Window
         _workingOrgCode = "";
         _cachedOrgDatabaseUri = null;
         _resolvedSignedInEmail = null;
-        _resolvedSignedInRole = null;
-        _mustChangePassword = true;
-        _signedInThisSession = false;
         _lastStatus = null;
         OrgCodeBox.Text = "";
         InviteLoginEmailBox.Text = "";
@@ -546,15 +551,6 @@ public sealed partial class MainWindow : Window
     private void SaveProgressOrgCodeOnly(string code)
     {
         var st = LoadSetupState();
-        if (!string.Equals(st.orgCode?.Trim(), code.Trim(), StringComparison.Ordinal))
-        {
-            st.dbUri = null;
-            st.completed = false;
-            st.databaseMode = null;
-            st.adminName = null;
-            _cachedOrgDatabaseUri = null;
-        }
-
         st.orgCode = code;
         if (!string.IsNullOrWhiteSpace(_resolvedSignedInEmail))
         {
@@ -573,15 +569,7 @@ public sealed partial class MainWindow : Window
     {
         var st = LoadSetupState();
         st.orgCode = code;
-        try
-        {
-            st.dbUri = MongoConnectionStringUtil.Prepare(uri, code);
-        }
-        catch (ArgumentException)
-        {
-            st.dbUri = uri;
-        }
-
+        st.dbUri = uri;
         SaveSetupState(st);
     }
 
@@ -591,20 +579,7 @@ public sealed partial class MainWindow : Window
         var st = LoadSetupState();
         st.completed = true;
         st.orgCode = _workingOrgCode;
-        var storedUri = _cachedOrgDatabaseUri;
-        if (!string.IsNullOrWhiteSpace(storedUri))
-        {
-            try
-            {
-                storedUri = MongoConnectionStringUtil.Prepare(storedUri, _workingOrgCode);
-            }
-            catch (ArgumentException)
-            {
-                // Keep the URI that was entered when it is not a Mongo connection string.
-            }
-        }
-
-        st.dbUri = storedUri;
+        st.dbUri = _cachedOrgDatabaseUri;
         st.databaseMode = mode;
         st.adminName = "Organization Admin";
         st.adminEmail = string.IsNullOrWhiteSpace(_resolvedSignedInEmail)
@@ -614,191 +589,48 @@ public sealed partial class MainWindow : Window
         SaveSetupState(st);
     }
 
-    private void UnsubscribeShellTitleBarAppWindowChanged()
-    {
-        if (_shellTitleBarAppWindow is not null && _shellTitleBarAppWindowChangedHandler is not null)
-        {
-            _shellTitleBarAppWindow.Changed -= _shellTitleBarAppWindowChangedHandler;
-        }
-    }
-
-    private void OnShellTitleBarAppWindowChanged(AppWindow sender, AppWindowChangedEventArgs args)
-    {
-        SyncShellTitleBarCaptionInsets();
-    }
-
-    private void ApplyShellExtendedTitleBar()
-    {
-        if (ShellRoot.Visibility != Visibility.Visible)
-        {
-            return;
-        }
-
-        try
-        {
-            UnsubscribeShellTitleBarAppWindowChanged();
-            _shellTitleBarAppWindowChangedHandler = null;
-            _shellTitleBarAppWindow = null;
-
-            var appWindow = AppWindow;
-            _shellTitleBarAppWindow = appWindow;
-
-            var caption = appWindow.TitleBar;
-            caption.ExtendsContentIntoTitleBar = true;
-
-            ExtendsContentIntoTitleBar = true;
-            SetTitleBar(ShellRoot.ShellTitleBarDragTarget);
-
-            Windows.UI.Color bar = Windows.UI.Color.FromArgb(255, 255, 255, 255);
-            Windows.UI.Color text = Windows.UI.Color.FromArgb(255, 31, 41, 55);
-            Windows.UI.Color muted = Windows.UI.Color.FromArgb(255, 107, 114, 128);
-            caption.BackgroundColor = bar;
-            caption.InactiveBackgroundColor = bar;
-            caption.ForegroundColor = text;
-            caption.InactiveForegroundColor = muted;
-
-            caption.ButtonBackgroundColor = bar;
-            caption.ButtonInactiveBackgroundColor = bar;
-            caption.ButtonForegroundColor = text;
-            caption.ButtonInactiveForegroundColor = muted;
-            caption.ButtonHoverBackgroundColor = Windows.UI.Color.FromArgb(255, 229, 231, 235);
-            caption.ButtonHoverForegroundColor = text;
-            caption.ButtonPressedBackgroundColor = Windows.UI.Color.FromArgb(255, 209, 213, 219);
-            caption.ButtonPressedForegroundColor = text;
-
-            _shellTitleBarAppWindowChangedHandler = OnShellTitleBarAppWindowChanged;
-            appWindow.Changed += _shellTitleBarAppWindowChangedHandler;
-
-            SyncShellTitleBarCaptionInsets();
-        }
-        catch
-        {
-            RestoreNonShellTitleBarChrome();
-        }
-    }
-
-    private void RestoreNonShellTitleBarChrome()
-    {
-        UnsubscribeShellTitleBarAppWindowChanged();
-        _shellTitleBarAppWindowChangedHandler = null;
-        _shellTitleBarAppWindow = null;
-
-        try
-        {
-            SetTitleBar(null);
-        }
-        catch
-        {
-            // ignore
-        }
-
-        ExtendsContentIntoTitleBar = false;
-
-        try
-        {
-            var caption = AppWindow.TitleBar;
-            caption.ExtendsContentIntoTitleBar = false;
-            caption.BackgroundColor = null;
-            caption.InactiveBackgroundColor = null;
-            caption.ForegroundColor = null;
-            caption.InactiveForegroundColor = null;
-            caption.ButtonBackgroundColor = null;
-            caption.ButtonInactiveBackgroundColor = null;
-            caption.ButtonForegroundColor = null;
-            caption.ButtonInactiveForegroundColor = null;
-            caption.ButtonHoverBackgroundColor = null;
-            caption.ButtonHoverForegroundColor = null;
-            caption.ButtonPressedBackgroundColor = null;
-            caption.ButtonPressedForegroundColor = null;
-        }
-        catch
-        {
-            // ignore
-        }
-
-        ShellRoot.ResetShellTitleBarCaptionInsets();
-    }
-
-    private void SyncShellTitleBarCaptionInsets()
-    {
-        if (_shellTitleBarAppWindow is null || ShellRoot.Visibility != Visibility.Visible)
-        {
-            return;
-        }
-
-        var caption = _shellTitleBarAppWindow.TitleBar;
-        var scale = ShellRoot.XamlRoot?.RasterizationScale ?? 1.0;
-        ShellRoot.UpdateShellTitleBarCaptionInsets(caption.LeftInset, caption.RightInset, scale);
-    }
-
     private async void ShowShell()
     {
-        if (!_signedInThisSession)
+        SetupRoot.Visibility = Visibility.Collapsed;
+
+        // Check if Windows Hello app lock is enabled
+        var security = App.Services.GetRequiredService<LocalUserSecurityStore>();
+        security.Load();
+
+        if (security.AppLockEnabled)
         {
-            _step = 1;
-            SetupRoot.Visibility = Visibility.Visible;
-            ShellRoot.Visibility = Visibility.Collapsed;
-            UpdateStepUi();
-            return;
-        }
+            // Check availability
+            var available = await Windows.Security.Credentials.UI.UserConsentVerifier
+                .CheckAvailabilityAsync();
 
-        try
-        {
-            RestoreNonShellTitleBarChrome();
-            SetupRoot.Visibility = Visibility.Collapsed;
-
-            // Check if Windows Hello app lock is enabled
-            var security = App.Services.GetRequiredService<LocalUserSecurityStore>();
-            security.Load();
-
-            if (security.AppLockEnabled)
+            if (available == Windows.Security.Credentials.UI.UserConsentVerifierAvailability.Available)
             {
-                // Check availability
-                var available = await Windows.Security.Credentials.UI.UserConsentVerifier
-                    .CheckAvailabilityAsync();
+                var result = await Windows.Security.Credentials.UI.UserConsentVerifier
+                    .RequestVerificationAsync("Verify your identity to open PartFinder.");
 
-                if (available == Windows.Security.Credentials.UI.UserConsentVerifierAvailability.Available)
+                if (result == Windows.Security.Credentials.UI.UserConsentVerificationResult.Verified)
                 {
-                    var result = await Windows.Security.Credentials.UI.UserConsentVerifier
-                        .RequestVerificationAsync("Verify your identity to open PartFinder.");
-
-                    if (result == Windows.Security.Credentials.UI.UserConsentVerificationResult.Verified)
-                    {
-                        AppLockRoot.Visibility = Visibility.Collapsed;
-                        ShellRoot.Visibility = Visibility.Visible;
-                        ApplyShellExtendedTitleBar();
-                        await ReinitializeShellAsync();
-                        return;
-                    }
-
-                    // Not verified — show lock screen with retry
-                    AppLockRoot.Visibility = Visibility.Visible;
-                    ShellRoot.Visibility = Visibility.Collapsed;
-                    AppLockErrorText.Text = "Verification failed. Try again.";
-                    AppLockErrorBorder.Visibility = Visibility.Visible;
+                    AppLockRoot.Visibility = Visibility.Collapsed;
+                    ShellRoot.Visibility = Visibility.Visible;
+                    EnableShellTitleBar();
+                    LogAutoLoginIfSessionActive();
                     return;
                 }
+
+                // Not verified — show lock screen with retry
+                DisableShellTitleBar();
+                AppLockRoot.Visibility = Visibility.Visible;
+                ShellRoot.Visibility = Visibility.Collapsed;
+                AppLockErrorText.Text = "Verification failed. Try again.";
+                AppLockErrorBorder.Visibility = Visibility.Visible;
+                return;
             }
-
-            // App lock off or Windows Hello not available — open directly
-            AppLockRoot.Visibility = Visibility.Collapsed;
-            ShellRoot.Visibility = Visibility.Visible;
-            ApplyShellExtendedTitleBar();
-            await ReinitializeShellAsync();
         }
-        catch (Exception ex)
-        {
-            DebugLogClient.Post("error", "ShowShellException", ex.ToString());
-            ShowSubscriptionBlocked($"Could not load application workspace: {ex.Message}");
-        }
-    }
 
-    private async Task ReinitializeShellAsync()
-    {
-        // Always re-initialize shell with fresh data (permissions, name, nav items)
-        // This ensures no stale data from previous user session.
-        var shellVm = App.Services.GetRequiredService<ShellViewModel>();
-        await shellVm.InitializeAsync().ConfigureAwait(true);
+        // App lock off or Windows Hello not available — open directly
+        AppLockRoot.Visibility = Visibility.Collapsed;
+        ShellRoot.Visibility = Visibility.Visible;
+        EnableShellTitleBar();
         LogAutoLoginIfSessionActive();
     }
 
@@ -830,7 +662,7 @@ public sealed partial class MainWindow : Window
         {
             AppLockRoot.Visibility = Visibility.Collapsed;
             ShellRoot.Visibility = Visibility.Visible;
-            ApplyShellExtendedTitleBar();
+            EnableShellTitleBar();
             LogAutoLoginIfSessionActive();
         }
         else
@@ -863,11 +695,9 @@ public sealed partial class MainWindow : Window
 
     private async void OnNextClicked(object sender, RoutedEventArgs e)
     {
-        try
-        {
-            ValidationText.Text = string.Empty;
+        ValidationText.Text = string.Empty;
 
-            if (_step == 1)
+        if (_step == 1)
         {
             _resolvedSignedInEmail = null;
             if (string.IsNullOrWhiteSpace(OrgCodeBox.Text))
@@ -928,7 +758,7 @@ public sealed partial class MainWindow : Window
                         return;
                     }
 
-                    var (okInviteLogin, inviteErr, inviteLoginResponse) = await SetupApiClient
+                    var (okInviteLogin, inviteErr, _) = await SetupApiClient
                         .ValidateInviteLoginAsync(trimmed, invitedEmail, tempPassword)
                         .ConfigureAwait(true);
                     if (!okInviteLogin)
@@ -938,45 +768,18 @@ public sealed partial class MainWindow : Window
                     }
 
                     _resolvedSignedInEmail = invitedEmail;
-                    _mustChangePassword = inviteLoginResponse?.MustChangePassword ?? true;
-                    _resolvedSignedInRole = inviteLoginResponse?.Role;
-                    _signedInThisSession = true;
                 }
 
                 SaveProgressOrgCodeOnly(trimmed);
                 _step = ResolveTargetStep(status);
 
-                // Configured org: require successful sign-in above; never open shell from Step 1.
+                // If we can jump straight to Step 4 (org already fully configured),
+                // persist completed setup so the shell can load orgCode/adminEmail/dbUri.
                 if (_step == 4 && !string.IsNullOrWhiteSpace(status.OrgDatabaseUri))
                 {
                     _cachedOrgDatabaseUri = status.OrgDatabaseUri;
                     SaveProgressAfterDatabase(trimmed, status.OrgDatabaseUri);
-
-                    if (string.IsNullOrWhiteSpace(_resolvedSignedInEmail))
-                    {
-                        ValidationText.Text =
-                            "This organization requires sign-in. Enter your email and password.";
-                        _step = 1;
-                        return;
-                    }
-
-                    if (_mustChangePassword)
-                    {
-                        // Invited user with temporary password — force password change step.
-                        _step = 3;
-                    }
-                    else
-                    {
-                        SaveCompletedSetup();
-                        var appState = App.Services.GetRequiredService<IAppStateStore>();
-                        appState.OrgDisplayName = !string.IsNullOrWhiteSpace(status.OrganizationName)
-                            ? status.OrganizationName
-                            : trimmed;
-                        appState.OrgPlan = !string.IsNullOrWhiteSpace(status.Plan) ? status.Plan : string.Empty;
-                        appState.OrgType = !string.IsNullOrWhiteSpace(status.OrgType) ? status.OrgType : string.Empty;
-                        _step = 4;
-                        return;
-                    }
+                    SaveCompletedSetup();
                 }
             }
             finally
@@ -1034,7 +837,7 @@ public sealed partial class MainWindow : Window
                         return;
                     }
 
-                    if (!await MongoConnectionTester.TryPingAsync(customUri, _workingOrgCode))
+                    if (!await MongoConnectionTester.TryPingAsync(customUri))
                     {
                         ValidationText.Text = "Cannot reach this MongoDB from this PC.";
                         return;
@@ -1044,7 +847,7 @@ public sealed partial class MainWindow : Window
                         await SetupApiClient.SaveCustomDatabaseAsync(_workingOrgCode, customUri, false);
                     if (!ok)
                     {
-                        if (!await MongoTenantBootstrap.TryInitializeTenantAsync(customUri, _workingOrgCode))
+                        if (!await MongoTenantBootstrap.TryInitializeTenantAsync(customUri))
                         {
                             ValidationText.Text = err ?? "Server could not save database URI.";
                             return;
@@ -1127,43 +930,22 @@ public sealed partial class MainWindow : Window
             NextButton.IsEnabled = false;
             try
             {
-                // Invited employees use ChangePassword; first org admin uses CreateOrgAdmin.
-                bool ok;
-                string? err;
-
-                if (_mustChangePassword && !string.Equals(_lastStatus?.OrgAdminStatus, "no", StringComparison.OrdinalIgnoreCase))
-                {
-                    // Invited user (employee or returning admin) — use change-password endpoint
-                    (ok, err) = await SetupApiClient.ChangePasswordAsync(
-                        _workingOrgCode,
-                        _resolvedSignedInEmail,
-                        CurrentPasswordBox.Password,
-                        NewPasswordBox.Password);
-                }
-                else
-                {
-                    // First admin setup — use create-org-admin endpoint
-                    var (adminOk, adminErr, body) = await SetupApiClient.CreateOrgAdminAsync(
-                        _workingOrgCode,
-                        _resolvedSignedInEmail,
-                        CurrentPasswordBox.Password,
-                        NewPasswordBox.Password);
-                    ok = adminOk;
-                    err = adminErr;
-
-                    if (body?.Skipped == true)
-                    {
-                        ValidationText.Text = "An admin already exists for this organization. Continuing.";
-                    }
-                }
-
+                var (ok, err, body) = await SetupApiClient.CreateOrgAdminAsync(
+                    _workingOrgCode,
+                    _resolvedSignedInEmail,
+                    CurrentPasswordBox.Password,
+                    NewPasswordBox.Password);
                 if (!ok)
                 {
                     ValidationText.Text = err ?? "Could not change password.";
                     return;
                 }
 
-                _signedInThisSession = true;
+                if (body?.Skipped == true)
+                {
+                    ValidationText.Text = "An admin already exists for this organization. Continuing.";
+                }
+
                 SaveCompletedSetup();
                 _step = 4;
             }
@@ -1182,26 +964,9 @@ public sealed partial class MainWindow : Window
             UpdateStepUi();
         }
     }
-    catch (Exception ex)
-    {
-        NextButton.IsEnabled = true;
-        ValidationText.Text = $"Error: {ex.Message}";
-        DebugLogClient.Post("error", "OnNextClickedException", ex.ToString());
-    }
-}
 
     private async void OnLetsGoClicked(object sender, RoutedEventArgs e)
     {
-        if (!_signedInThisSession && string.IsNullOrWhiteSpace(_resolvedSignedInEmail))
-        {
-            ValidationText.Text = "Sign in on Step 1 before launching PartFinder.";
-            _step = 1;
-            UpdateStepUi();
-            return;
-        }
-
-        _signedInThisSession = true;
-
         // Fetch and store org display name + plan before showing shell
         // so Settings page ORGANIZATION section is never blank after login.
         var orgCode = TryReadOrgCodeFromSetup();
@@ -1273,7 +1038,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        var ok = await MongoConnectionTester.TryPingAsync(MongoUriBox.Text.Trim(), _workingOrgCode);
+        var ok = await MongoConnectionTester.TryPingAsync(MongoUriBox.Text.Trim());
         if (!ok)
         {
             ValidationText.Text = "Cannot ping this MongoDB URI from this PC.";
@@ -1358,11 +1123,6 @@ public sealed partial class MainWindow : Window
             Step3EmailText.Text = string.IsNullOrWhiteSpace(_resolvedSignedInEmail)
                 ? "Invited Email: —"
                 : $"Invited Email: {_resolvedSignedInEmail}";
-
-            var roleLabel = string.Equals(_resolvedSignedInRole, "Admin", StringComparison.OrdinalIgnoreCase)
-                ? "Admin Account"
-                : "Employee Account";
-            Step3AccountTypeText.Text = roleLabel;
         }
 
         NextButton.Content = _step == 3 ? "Change Password" : "Next";

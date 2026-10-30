@@ -2,8 +2,7 @@
 <Application
     x:Class="PartFinder.App"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    RequestedTheme="Light">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
@@ -12,8 +11,7 @@
                 <ResourceDictionary Source="Styles/Typography.xaml" />
                 <ResourceDictionary Source="Styles/Spacing.xaml" />
                 <ResourceDictionary Source="Styles/Controls.xaml" />
-                <ResourceDictionary Source="Styles/FluentControlLightOverrides.xaml" />
-                <ResourceDictionary Source="Styles/CanvasFluentLightInputBrushes.xaml" />
+                <ResourceDictionary Source="Styles/Motion.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

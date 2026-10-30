@@ -9,10 +9,10 @@
 
         <!-- Utilitarian Panel Style -->
         <Style x:Key="TechPanelStyle" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderDefaultBrush}" />
+            <Setter Property="Background" Value="{StaticResource ElevatedCardBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource GlassStrokeBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="2" /> <!-- Sharp corners -->
+            <Setter Property="CornerRadius" Value="10" />
             <Setter Property="Padding" Value="16" />
         </Style>
 
@@ -31,13 +31,7 @@
         </Style>
     </Page.Resources>
 
-    <Grid Background="{StaticResource PageBackgroundBrush}">
-        <Grid.Transitions>
-            <TransitionCollection>
-                <EntranceThemeTransition />
-            </TransitionCollection>
-        </Grid.Transitions>
-
+    <Grid Background="Transparent" Transitions="{StaticResource LuxuryPanelTransitions}">
         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel Padding="32,24,48,40" Spacing="24" HorizontalAlignment="Stretch">
 
