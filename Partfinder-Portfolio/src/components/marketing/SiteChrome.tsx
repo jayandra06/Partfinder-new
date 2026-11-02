@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { AccountSignInDialog, clearAccountSession, readAccountSession } from './AccountSignInDialog'
-import type { AccountSession } from './AccountSignInDialog'
-import { GetLicenceDialog } from './GetLicenceDialog'
+import { clearAccountSession, readAccountSession } from './accountSession'
+import type { AccountSession } from './accountSession'
 
 export const LOGO_SRC = '/partfinder-logo.png'
 
@@ -57,10 +56,14 @@ function DownloadLink({ className = '' }: { className?: string }) {
 
 export function SiteHeader() {
   const location = useLocation()
-  const [licenceOpen, setLicenceOpen] = useState(false)
-  const [accountOpen, setAccountOpen] = useState(false)
   const [account, setAccount] = useState<AccountSession | null>(() => readAccountSession())
   const onHome = location.pathname === '/'
+  const onLicence = location.pathname === '/get-licence'
+  const onSignIn = location.pathname === '/sign-in'
+
+  useEffect(() => {
+    setAccount(readAccountSession())
+  }, [location.pathname])
 
   return (
     <header className="fixed top-0 inset-x-0 z-50 bg-surface-container-lowest/90 backdrop-blur-md shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
@@ -109,31 +112,31 @@ export function SiteHeader() {
               </button>
             </div>
           ) : (
-            <button
-              type="button"
-              className="font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors px-1 sm:px-space-xs whitespace-nowrap bg-transparent border-0"
-              onClick={() => setAccountOpen(true)}
+            <Link
+              to="/sign-in"
+              className={
+                onSignIn
+                  ? 'font-label-md text-label-md text-primary font-bold transition-colors px-1 sm:px-space-xs whitespace-nowrap'
+                  : 'font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors px-1 sm:px-space-xs whitespace-nowrap'
+              }
             >
               Sign In
-            </button>
+            </Link>
           )}
-          <button
-            type="button"
-            className="bg-primary-container text-on-primary font-label-md text-label-md px-2.5 py-1.5 sm:px-space-md sm:py-space-sm rounded-lg hover:bg-primary transition-colors shadow-[0_4px_12px_rgba(37,99,235,0.25)] whitespace-nowrap border-0"
-            onClick={() => setLicenceOpen(true)}
+          <Link
+            to="/get-licence"
+            className={
+              onLicence
+                ? 'bg-primary text-on-primary font-label-md text-label-md px-2.5 py-1.5 sm:px-space-md sm:py-space-sm rounded-lg shadow-[0_4px_12px_rgba(37,99,235,0.25)] whitespace-nowrap'
+                : 'bg-primary-container text-on-primary font-label-md text-label-md px-2.5 py-1.5 sm:px-space-md sm:py-space-sm rounded-lg hover:bg-primary transition-colors shadow-[0_4px_12px_rgba(37,99,235,0.25)] whitespace-nowrap'
+            }
           >
             <span className="sm:hidden">Licence</span>
             <span className="hidden sm:inline">Get Licence</span>
-          </button>
+          </Link>
           <DownloadLink className="hidden lg:inline-flex" />
         </div>
       </div>
-      <GetLicenceDialog open={licenceOpen} onClose={() => setLicenceOpen(false)} />
-      <AccountSignInDialog
-        open={accountOpen}
-        onClose={() => setAccountOpen(false)}
-        onSignedIn={setAccount}
-      />
     </header>
   )
 }
