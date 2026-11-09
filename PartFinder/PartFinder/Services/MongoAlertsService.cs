@@ -97,6 +97,41 @@ public sealed class MongoAlertsService
         catch { }
     }
 
+    private static FilterDefinition<AlertDoc> ActiveUnreadFilter =>
+        Builders<AlertDoc>.Filter.And(
+            Builders<AlertDoc>.Filter.Eq(d => d.IsResolved, false),
+            Builders<AlertDoc>.Filter.Eq(d => d.IsRead, false));
+
+    public async Task<int> GetUnreadCountAsync(CancellationToken ct = default)
+    {
+        var coll = TryGetCollection();
+        if (coll is null) return 0;
+
+        try
+        {
+            return (int)await coll.CountDocumentsAsync(ActiveUnreadFilter, cancellationToken: ct)
+                .ConfigureAwait(false);
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    public async Task MarkAllActiveAsReadAsync(CancellationToken ct = default)
+    {
+        var coll = TryGetCollection();
+        if (coll is null) return;
+
+        try
+        {
+            var update = Builders<AlertDoc>.Update.Set(d => d.IsRead, true);
+            await coll.UpdateManyAsync(ActiveUnreadFilter, update, cancellationToken: ct)
+                .ConfigureAwait(false);
+        }
+        catch { }
+    }
+
     public async Task<(int Critical, int Warning, int Info)> GetCountsAsync(CancellationToken ct = default)
     {
         var coll = TryGetCollection();

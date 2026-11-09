@@ -274,15 +274,25 @@
                             <FontIcon Glyph="&#xEA8F;" FontSize="18" Foreground="{StaticResource TextPrimaryBrush}" />
                         </Button>
                         <Border
-                            Width="8"
-                            Height="8"
-                            CornerRadius="4"
+                            MinWidth="16"
+                            Height="16"
+                            CornerRadius="8"
+                            Padding="4,0"
                             Background="#E05252"
                             HorizontalAlignment="Right"
                             VerticalAlignment="Top"
-                            Margin="0,4,4,0"
+                            Margin="0,2,2,0"
                             IsHitTestVisible="False"
-                            Visibility="{Binding HasUnreadAlerts, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            Visibility="{Binding HasUnreadAlerts, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <TextBlock
+                                Text="{Binding UnreadNotificationBadgeText, Mode=OneWay}"
+                                FontSize="10"
+                                FontWeight="SemiBold"
+                                Foreground="White"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                LineHeight="14" />
+                        </Border>
                     </Grid>
                     <Button
                         x:Name="ProfileMenuButton"
