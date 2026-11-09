@@ -429,10 +429,14 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        if (!await MongoConnectionTester.TryPingAsync(dbUri, orgCode))
+        var ping = await MongoConnectionTester.PingAsync(dbUri, orgCode);
+        if (!ping.Ok)
         {
+            var detail = string.IsNullOrWhiteSpace(ping.ErrorDetail)
+                ? ""
+                : " " + ping.ErrorDetail.Trim();
             ShowSubscriptionBlocked(
-                "Cannot reach your organisation MongoDB from this PC. Check the network or MongoDB URI.");
+                "Cannot reach your organisation MongoDB from this PC." + detail);
             return;
         }
 
@@ -620,10 +624,14 @@ public sealed partial class MainWindow : Window
                 return;
             }
 
-            if (!await MongoConnectionTester.TryPingAsync(dbUri, code))
+            var pingAfterMaintenance = await MongoConnectionTester.PingAsync(dbUri, code);
+            if (!pingAfterMaintenance.Ok)
             {
+                var detail = string.IsNullOrWhiteSpace(pingAfterMaintenance.ErrorDetail)
+                    ? ""
+                    : " " + pingAfterMaintenance.ErrorDetail.Trim();
                 ShowSubscriptionBlocked(
-                    "Cannot reach your organisation MongoDB from this PC. Check the network or MongoDB URI.");
+                    "Cannot reach your organisation MongoDB from this PC." + detail);
                 return;
             }
 
@@ -1200,9 +1208,12 @@ public sealed partial class MainWindow : Window
                         return;
                     }
 
-                    if (!await MongoConnectionTester.TryPingAsync(customUri, _workingOrgCode))
+                    var customPing = await MongoConnectionTester.PingAsync(customUri, _workingOrgCode);
+                    if (!customPing.Ok)
                     {
-                        ValidationText.Text = "Cannot reach this MongoDB from this PC.";
+                        ValidationText.Text = string.IsNullOrWhiteSpace(customPing.ErrorDetail)
+                            ? "Cannot reach this MongoDB from this PC."
+                            : customPing.ErrorDetail;
                         return;
                     }
 
@@ -1487,10 +1498,12 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        var ok = await MongoConnectionTester.TryPingAsync(MongoUriBox.Text.Trim(), _workingOrgCode);
-        if (!ok)
+        var testPing = await MongoConnectionTester.PingAsync(MongoUriBox.Text.Trim(), _workingOrgCode);
+        if (!testPing.Ok)
         {
-            ValidationText.Text = "Cannot ping this MongoDB URI from this PC.";
+            ValidationText.Text = string.IsNullOrWhiteSpace(testPing.ErrorDetail)
+                ? "Cannot ping this MongoDB URI from this PC."
+                : testPing.ErrorDetail;
             _isCustomDbConnectionSuccessful = false;
             NextButton.IsEnabled = false;
             return;
