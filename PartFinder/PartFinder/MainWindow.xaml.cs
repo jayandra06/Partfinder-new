@@ -295,34 +295,18 @@ public sealed partial class MainWindow : Window
 
     private string? TryReadDbUriFromSetup() => LoadSetupState().dbUri?.Trim();
 
-    private async void OnRootGridLoadedResumeWizard(object sender, RoutedEventArgs e)
+    private void OnRootGridLoadedResumeWizard(object sender, RoutedEventArgs e)
     {
         RootGrid.Loaded -= OnRootGridLoadedResumeWizard;
         ApplySetupTitleBarChrome();
 
         _signedInThisSession = false;
 
-        var saved = LoadSetupState();
-        // Do not pre-fill email — user must sign in each app session.
-
-        var code = TryReadOrgCodeFromSetup();
-        if (!string.IsNullOrWhiteSpace(code))
-        {
-            OrgCodeBox.Text = code;
-            _workingOrgCode = code;
-
-            try
-            {
-                var (status, _) = await SetupApiClient.StatusAsync(_workingOrgCode);
-                if (status is not null && status.Valid)
-                {
-                    _lastStatus = status;
-                    _cachedOrgDatabaseUri = status.OrgDatabaseUri;
-                    UpdateLicenseSummary(status);
-                }
-            }
-            catch { /* best effort */ }
-        }
+        // Do not pre-fill org code or email — user must enter them each sign-in (privacy).
+        _workingOrgCode = string.Empty;
+        _lastStatus = null;
+        OrgCodeBox.Text = string.Empty;
+        LicenseSummaryPanel.Visibility = Visibility.Collapsed;
 
         InviteLoginEmailBox.Text = string.Empty;
         InviteLoginPasswordBox.Password = string.Empty;
@@ -333,7 +317,30 @@ public sealed partial class MainWindow : Window
         UpdateStepUi();
     }
 
-    private async void OnOrgCodeBoxTextChanged(object sender, TextChangedEventArgs e)
+    private bool _inviteLoginEmailLowercaseGuard;
+
+    private void OnInviteLoginEmailBoxTextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_inviteLoginEmailLowercaseGuard || sender is not TextBox box)
+        {
+            return;
+        }
+
+        var text = box.Text;
+        var lower = text.ToLowerInvariant();
+        if (string.Equals(text, lower, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _inviteLoginEmailLowercaseGuard = true;
+        var caret = box.SelectionStart;
+        box.Text = lower;
+        box.SelectionStart = Math.Clamp(caret, 0, lower.Length);
+        _inviteLoginEmailLowercaseGuard = false;
+    }
+
+    private void OnOrgCodeBoxTextChanged(object sender, TextChangedEventArgs e)
     {
         var text = OrgCodeBox.Text.Trim();
         var previousOrg = LoadSetupState().orgCode?.Trim();
@@ -345,23 +352,6 @@ public sealed partial class MainWindow : Window
             _resolvedSignedInRole = null;
             _mustChangePassword = true;
             InviteLoginPasswordBox.Password = string.Empty;
-        }
-
-        if (text.Length == 6 && text.All(char.IsDigit))
-        {
-            try
-            {
-                var (status, _) = await SetupApiClient.StatusAsync(text);
-                if (status is not null && status.Valid)
-                {
-                    _lastStatus = status;
-                    _cachedOrgDatabaseUri = status.OrgDatabaseUri;
-                    _workingOrgCode = text;
-                    UpdateLicenseSummary(status);
-                    return;
-                }
-            }
-            catch { }
         }
 
         LicenseSummaryPanel.Visibility = Visibility.Collapsed;
@@ -725,19 +715,6 @@ public sealed partial class MainWindow : Window
         UpdateStepUi();
     }
 
-    private void UpdateLicenseSummary(SetupStatusResult s)
-    {
-        LicenseSummaryPanel.Visibility = Visibility.Visible;
-        LicenseOrgNameText.Text = $"Organisation: {s.OrganizationName ?? "—"}";
-        LicenseCodeText.Text = $"Code: {s.OrgCode ?? "—"}";
-        LicenseStatusText.Text = $"Status: {s.Status ?? "—"}";
-        LicenseExpiryText.Text = string.IsNullOrWhiteSpace(s.ValidUntil)
-            ? "Validity: —"
-            : $"Valid until (UTC): {s.ValidUntil}";
-        LicenseLimitsText.Text =
-            $"Limits: max users {s.MaxUsers ?? 0}, max parts {s.MaxParts ?? 0}";
-    }
-
     private static int ResolveTargetStep(SetupStatusResult s)
     {
         if (s.HasOrgDatabase != true)
@@ -1058,7 +1035,7 @@ public sealed partial class MainWindow : Window
                 _workingOrgCode = trimmed;
                 _lastStatus = status;
                 _cachedOrgDatabaseUri = status.OrgDatabaseUri;
-                UpdateLicenseSummary(status);
+                LicenseSummaryPanel.Visibility = Visibility.Collapsed;
                 var needsInviteLogin =
                     status.RequiresInviteLogin == true ||
                     string.Equals(status.OrgAdminStatus, "yes", StringComparison.OrdinalIgnoreCase);
