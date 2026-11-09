@@ -9,6 +9,7 @@ public enum AppPage
     Alerts,
     Audit,
     Templates,
+    TemplateData,
     WorksheetRelations,
     LinkedTemplates,
     ViewData,

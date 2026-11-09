@@ -101,35 +101,21 @@
                         BorderThickness="1"
                         VerticalAlignment="Center">
                     <FontIcon x:Name="PageIndicatorIcon"
-                              Glyph="&#xE735;"
+                              Glyph="&#xE8A5;"
                               FontSize="15"
                               Foreground="{StaticResource AccentPrimaryBrush}"
                               HorizontalAlignment="Center"
                               VerticalAlignment="Center" />
                 </Border>
                 <TextBlock x:Name="PageIndicatorText"
-                           Text="Your Favourite Templates"
+                           Text="Your All Templates"
                            FontSize="16"
                            FontWeight="SemiBold"
                            Foreground="{StaticResource TextPrimaryBrush}"
                            VerticalAlignment="Center" />
             </StackPanel>
 
-            <!-- Right: Toggle button — View All Templates / My Favourite Templates -->
-            <Button
-                x:Name="ViewAllTemplatesButton"
-                Grid.Column="2"
-                Style="{StaticResource GlowButtonStyle}"
-                Height="40"
-                Padding="14,0"
-                Margin="0,0,8,0"
-                Click="OnShowAllTemplatesClick">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <FontIcon Glyph="&#xE8A5;" FontSize="12" />
-                    <TextBlock Text="View All Templates" FontSize="12" />
-                </StackPanel>
-            </Button>
-
+            <!-- Right: Favourite templates -->
             <Button
                 x:Name="ViewFavouritesButton"
                 Grid.Column="2"
@@ -137,11 +123,25 @@
                 Height="40"
                 Padding="14,0"
                 Margin="0,0,8,0"
-                Click="OnShowFavouritesClick"
-                Visibility="Collapsed">
+                Click="OnShowFavouritesClick">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <FontIcon Glyph="&#xE735;" FontSize="12" />
                     <TextBlock Text="My Favourite Templates" FontSize="12" />
+                </StackPanel>
+            </Button>
+
+            <Button
+                x:Name="ViewAllTemplatesButton"
+                Grid.Column="2"
+                Style="{StaticResource GlowButtonStyle}"
+                Height="40"
+                Padding="14,0"
+                Margin="0,0,8,0"
+                Click="OnShowAllTemplatesClick"
+                Visibility="Collapsed">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <FontIcon Glyph="&#xE8A5;" FontSize="12" />
+                    <TextBlock Text="All Templates" FontSize="12" />
                 </StackPanel>
             </Button>
         </Grid>
@@ -213,16 +213,93 @@
         <components:FavouritesSubPage
             x:Name="FavouritesSubPageControl"
             Grid.Row="2"
-            Padding="0,0,0,0"
-            Margin="0,0,0,0"
-            VerticalAlignment="Stretch"
-            Visibility="{Binding ElementName=TemplatesPageRoot, Path=DataContext.IsCreatingTemplate, Converter={StaticResource InvertedBoolToVisibilityConverter}}" />
+            Visibility="Collapsed" />
 
-        <!-- ── All Templates Panel ── -->
-        <Grid x:Name="AllTemplatesPanel"
-              Grid.Row="2"
-              Visibility="Collapsed">
-            <components:AllTemplatesCarousel x:Name="AllTemplatesCarouselControl" />
+        <!-- Template list (all or favourites) -->
+        <Grid
+            x:Name="AllTemplatesPanel"
+            Grid.Row="2"
+            Visibility="{Binding ElementName=TemplatesPageRoot, Path=DataContext.IsCreatingTemplate, Converter={StaticResource InvertedBoolToVisibilityConverter}}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <ScrollViewer
+                VerticalScrollMode="Auto"
+                VerticalScrollBarVisibility="Auto"
+                HorizontalScrollMode="Disabled">
+                <ListView
+                    x:Name="TemplatesListView"
+                    SelectionMode="None"
+                    IsItemClickEnabled="True"
+                    ItemClick="OnTemplatesListItemClick">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="Padding" Value="0" />
+                            <Setter Property="Margin" Value="0,0,0,10" />
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="models:PartTemplateDefinition">
+                            <Border
+                                Padding="16,14"
+                                CornerRadius="14"
+                                Background="{StaticResource ElevatedCardBackgroundBrush}"
+                                BorderBrush="{StaticResource GlassStrokeBrush}"
+                                BorderThickness="1">
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border
+                                        Width="40"
+                                        Height="40"
+                                        CornerRadius="10"
+                                        Background="#185EA2FF"
+                                        VerticalAlignment="Center">
+                                        <FontIcon
+                                            Glyph="&#xE8A5;"
+                                            FontSize="16"
+                                            Foreground="{StaticResource AccentPrimaryBrush}"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center" />
+                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                                        <TextBlock
+                                            Text="{x:Bind Name}"
+                                            FontSize="15"
+                                            FontWeight="SemiBold"
+                                            Foreground="{StaticResource TextPrimaryBrush}" />
+                                        <TextBlock
+                                            Text="{x:Bind ColumnCountLabel}"
+                                            FontSize="12"
+                                            Foreground="{StaticResource TextSecondaryBrush}" />
+                                    </StackPanel>
+                                    <FontIcon
+                                        Grid.Column="2"
+                                        Glyph="&#xE76C;"
+                                        FontSize="14"
+                                        Foreground="{StaticResource TextTertiaryBrush}"
+                                        VerticalAlignment="Center" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </ScrollViewer>
+            <TextBlock
+                x:Name="EmptyTemplatesHint"
+                Text="No templates yet. Use Create New Template or Bulk Upload."
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                FontSize="13"
+                Foreground="{StaticResource TextSecondaryBrush}"
+                Visibility="Collapsed"
+                TextWrapping="WrapWholeWords"
+                MaxWidth="420"
+                TextAlignment="Center" />
         </Grid>
 
         <Grid

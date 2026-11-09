@@ -288,11 +288,15 @@
                 HorizontalAlignment="Stretch"
                 VerticalAlignment="Stretch"
                 Padding="14"
+                Opacity="0"
                 Visibility="Collapsed"
                 CornerRadius="16"
                 Background="{StaticResource ElevatedCardBackgroundBrush}"
                 BorderBrush="{StaticResource GlassStrokeBrush}"
                 BorderThickness="1">
+                <Border.RenderTransform>
+                    <TranslateTransform x:Name="ActionResultsTransform" X="48" />
+                </Border.RenderTransform>
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -308,13 +312,14 @@
                     x:Name="ActionTitleText"
                     Grid.Row="0"
                     Grid.Column="0"
+                    Text="Linked data"
                     FontSize="14"
                     FontWeight="SemiBold" />
                 <Button
                     Grid.Row="0"
                     Grid.Column="1"
                     Style="{StaticResource GhostButtonStyle}"
-                    Content="âœ•"
+                    Content="✕"
                     FontSize="12"
                     Click="OnCloseActionPanelClick" />
 
@@ -326,35 +331,12 @@
                     FontSize="11"
                     Foreground="{StaticResource TextSecondaryBrush}" />
 
-                <ListView x:Name="ActionRowsListView" Grid.Row="2">
-                    <ListView.ItemTemplate>
-                        <DataTemplate>
-                            <Border
-                                Margin="0,0,0,6"
-                                Padding="10"
-                                Background="{StaticResource CardBackgroundBrush}"
-                                BorderBrush="{StaticResource BorderDefaultBrush}"
-                                BorderThickness="1"
-                                CornerRadius="8" Translation="0,0,32">
-                            <Border.Shadow><ThemeShadow/></Border.Shadow>
-                            <StackPanel Spacing="3">
-                                    <TextBlock
-                                        Text="{Binding Title}"
-                                        FontSize="12"
-                                        FontWeight="SemiBold"
-                                        TextWrapping="WrapWholeWords" />
-                                    <ItemsControl ItemsSource="{Binding Lines}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <TextBlock Text="{Binding}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="WrapWholeWords" />
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </StackPanel>
-                            </Border>
-                        </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
+                <TabView
+                    x:Name="LinkedDataTabView"
+                    Grid.Row="2"
+                    CanDragTabs="False"
+                    CanReorderTabs="False"
+                    IsAddTabButtonVisible="False" />
             </Grid>
             </Border>
         </Grid>

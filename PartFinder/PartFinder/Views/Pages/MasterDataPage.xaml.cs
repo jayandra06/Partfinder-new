@@ -27,7 +27,6 @@ public sealed partial class MasterDataPage : Page
     private MasterDataViewModel? _viewModel;
     private readonly IExcelTemplateService _excelTemplateService;
     private readonly ActivityLogger _activity;
-    private readonly List<ActionResultDisplayItem> _actionResultRows = new();
     private Grid? _sheetGrid;
 
     public MasterDataPage()
@@ -758,8 +757,17 @@ public sealed partial class MasterDataPage : Page
         }
     }
 
-    private TextBox BuildTextCell(MasterDataCellViewModel cellVm, MasterDataRowViewModel rowVm)
+    private UIElement BuildTextCell(MasterDataCellViewModel cellVm, MasterDataRowViewModel rowVm)
     {
+        var isViewMode = _viewModel is not null && !_viewModel.IsEditMode;
+        var hasRelationLinks = _viewModel?.HasWorksheetRelationsForFieldKey(cellVm.FieldKey) == true;
+        var hasContextLinks = _viewModel?.GetContextActionsForField(cellVm.FieldKey).Count > 0;
+        var display = string.IsNullOrWhiteSpace(cellVm.Text) ? "—" : cellVm.Text;
+        if (isViewMode && !string.IsNullOrWhiteSpace(cellVm.Text) && (hasRelationLinks || hasContextLinks))
+        {
+            return BuildLinkedValueHyperlink(cellVm, rowVm, display);
+        }
+
         var box = new TextBox
         {
             MinHeight = 36,
@@ -786,6 +794,22 @@ public sealed partial class MasterDataPage : Page
 
     private UIElement BuildLinkCell(MasterDataCellViewModel cellVm, MasterDataRowViewModel rowVm)
     {
+        var isViewMode = _viewModel is not null && !_viewModel.IsEditMode;
+        var display = string.IsNullOrWhiteSpace(cellVm.Text) ? cellVm.LinkedRowId ?? string.Empty : cellVm.Text;
+        if (isViewMode
+            && (!string.IsNullOrWhiteSpace(cellVm.LinkedRowId)
+                || _viewModel?.HasWorksheetRelationsForFieldKey(cellVm.FieldKey) == true))
+        {
+            var link = BuildLinkedValueHyperlink(
+                cellVm,
+                rowVm,
+                string.IsNullOrWhiteSpace(display) ? "Open linked data" : display);
+            var outerView = new Border { MinHeight = 36, Padding = new Thickness(GridCellHorizontalPadding, 6, GridCellHorizontalPadding, 6) };
+            outerView.ContextFlyout = BuildLinkCellMenu(cellVm, rowVm);
+            outerView.Child = link;
+            return outerView;
+        }
+
         var box = new TextBox
         {
             MinHeight = 36,
@@ -844,6 +868,27 @@ public sealed partial class MasterDataPage : Page
         return outer;
     }
 
+    private HyperlinkButton BuildLinkedValueHyperlink(
+        MasterDataCellViewModel cellVm,
+        MasterDataRowViewModel rowVm,
+        string displayText)
+    {
+        var link = new HyperlinkButton
+        {
+            Content = displayText,
+            FontSize = 12,
+            Padding = new Thickness(0),
+            Margin = new Thickness(0),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Center,
+            Foreground = (Brush)Application.Current.Resources["AccentPrimaryBrush"],
+        };
+        ToolTipService.SetToolTip(link, "Open linked template data");
+        link.Click += async (_, _) =>
+            await ShowLinkedDataForCellAsync(cellVm, rowVm).ConfigureAwait(true);
+        return link;
+    }
+
     private MenuFlyout BuildTextCellMenu(MasterDataCellViewModel cellVm, MasterDataRowViewModel rowVm)
     {
         var flyout = new MenuFlyout();
@@ -899,7 +944,7 @@ public sealed partial class MasterDataPage : Page
         TemplateContextAction action,
         MasterDataRowViewModel rowVm)
     {
-        if (_viewModel is null || XamlRoot is null || ActionRowsListView is null)
+        if (_viewModel is null || XamlRoot is null)
         {
             return;
         }
@@ -911,37 +956,185 @@ public sealed partial class MasterDataPage : Page
             return;
         }
 
-        ActionTitleText.Text = action.MenuLabel;
-        ActionCountText.Text = $"{rows.Count} row(s) in {targetDef.Name}";
-        _actionResultRows.Clear();
+        PopulateLinkedDataTabs(
+        [
+            new LinkedDataTabModel(
+                action.MenuLabel,
+                targetDef,
+                null,
+                rows,
+                action.DisplayFieldKeys),
+        ]);
+        OpenActionPanel();
+    }
 
-        if (rows.Count == 0)
+    private async Task ShowLinkedDataForCellAsync(MasterDataCellViewModel cellVm, MasterDataRowViewModel rowVm)
+    {
+        if (_viewModel is null)
         {
-            _actionResultRows.Add(
-                new ActionResultDisplayItem(
-                    "No matches",
-                    new[] { "No rows matched your rules for this line. Check values and Templates -> cell actions." }));
+            return;
         }
-        else
+
+        var tabs = new List<LinkedDataTabModel>();
+        var relationResults = await _viewModel
+            .QueryWorksheetRelationsForCellAsync(cellVm.FieldKey, rowVm)
+            .ConfigureAwait(true);
+        foreach (var result in relationResults)
         {
-            var fieldOrder = ResolveDisplayFields(targetDef, action.DisplayFieldKeys);
-            var rowNumber = 1;
-            foreach (var resultRow in rows)
+            tabs.Add(new LinkedDataTabModel(
+                result.TabHeader,
+                result.LookupTemplate,
+                result.Relation,
+                result.Matches));
+        }
+
+        var directLink = await _viewModel.QueryDirectRecordLinkAsync(cellVm).ConfigureAwait(true);
+        if (directLink is not null)
+        {
+            tabs.Insert(
+                0,
+                new LinkedDataTabModel(
+                    directLink.TabHeader,
+                    directLink.LookupTemplate,
+                    directLink.Relation,
+                    directLink.Matches));
+        }
+
+        var contextActions = _viewModel.GetContextActionsForField(cellVm.FieldKey);
+        if (tabs.Count == 0 && contextActions.Count > 0)
+        {
+            var sourceMap = MasterDataViewModel.BuildSourceRowMap(rowVm);
+            foreach (var action in contextActions)
             {
-                var lines = new List<string>(fieldOrder.Count);
-                foreach (var f in fieldOrder)
+                var (targetDef, rows) = await _viewModel.RunContextActionAsync(action, sourceMap).ConfigureAwait(true);
+                if (targetDef is null)
                 {
-                    var val = resultRow.Values.TryGetValue(f.Key, out var v) ? v : string.Empty;
-                    lines.Add($"{f.Label}: {val}");
+                    continue;
                 }
 
-                _actionResultRows.Add(new ActionResultDisplayItem($"Row {rowNumber}", lines));
-                rowNumber++;
+                tabs.Add(new LinkedDataTabModel(action.MenuLabel, targetDef, null, rows));
             }
         }
 
-        ActionRowsListView.ItemsSource = _actionResultRows;
+        if (tabs.Count == 0)
+        {
+            ActionTitleText.Text = "Linked data";
+            ActionCountText.Text = "No linked rows matched this cell.";
+            LinkedDataTabView.TabItems.Clear();
+            OpenActionPanel();
+            return;
+        }
+
+        PopulateLinkedDataTabs(tabs);
         OpenActionPanel();
+    }
+
+    private void PopulateLinkedDataTabs(IReadOnlyList<LinkedDataTabModel> tabs)
+    {
+        if (LinkedDataTabView is null)
+        {
+            return;
+        }
+
+        LinkedDataTabView.TabItems.Clear();
+        var totalMatches = tabs.Sum(t => t.Matches.Count);
+        ActionTitleText.Text = "Linked data";
+        ActionCountText.Text = $"{tabs.Count} linked template(s) · {totalMatches} matching row(s)";
+
+        foreach (var tab in tabs)
+        {
+            var tabItem = new TabViewItem
+            {
+                Header = tab.Header,
+                IconSource = new Microsoft.UI.Xaml.Controls.SymbolIconSource { Symbol = Symbol.Link },
+                Content = BuildLinkedTabContent(tab),
+            };
+            LinkedDataTabView.TabItems.Add(tabItem);
+        }
+
+        if (LinkedDataTabView.TabItems.Count > 0)
+        {
+            LinkedDataTabView.SelectedIndex = 0;
+        }
+    }
+
+    private ScrollViewer BuildLinkedTabContent(LinkedDataTabModel tab)
+    {
+        var panel = new StackPanel { Spacing = 8, Padding = new Thickness(0, 4, 0, 0) };
+        var fields = tab.DisplayFieldKeys is { Count: > 0 }
+            ? ResolveDisplayFields(tab.LookupTemplate, tab.DisplayFieldKeys)
+            : MasterDataViewModel.ResolveRelationDisplayFields(tab.LookupTemplate, tab.Relation);
+
+        if (tab.Matches.Count == 0)
+        {
+            panel.Children.Add(new TextBlock
+            {
+                Text = "No matching rows for this link.",
+                FontSize = 12,
+                Foreground = (Brush)Application.Current.Resources["TextSecondaryBrush"],
+                TextWrapping = TextWrapping.WrapWholeWords,
+            });
+        }
+        else
+        {
+            var rowIndex = 1;
+            foreach (var match in tab.Matches)
+            {
+                var lines = new StackPanel { Spacing = 4, Margin = new Thickness(0, 0, 0, 8) };
+                lines.Children.Add(new TextBlock
+                {
+                    Text = $"Row {rowIndex}",
+                    FontSize = 12,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    Foreground = (Brush)Application.Current.Resources["TextPrimaryBrush"],
+                });
+                foreach (var field in fields)
+                {
+                    var value = match.Values.TryGetValue(field.Key, out var v) ? v ?? string.Empty : string.Empty;
+                    var line = new TextBlock
+                    {
+                        Text = $"{field.Label}: {value}",
+                        FontSize = 11,
+                        Foreground = (Brush)Application.Current.Resources["TextSecondaryBrush"],
+                        TextWrapping = TextWrapping.WrapWholeWords,
+                        IsTextSelectionEnabled = true,
+                    };
+                    lines.Children.Add(line);
+                }
+
+                var card = new Border
+                {
+                    Padding = new Thickness(10),
+                    CornerRadius = new CornerRadius(8),
+                    Background = (Brush)Application.Current.Resources["CardBackgroundBrush"],
+                    BorderBrush = (Brush)Application.Current.Resources["BorderDefaultBrush"],
+                    BorderThickness = new Thickness(1),
+                    Child = lines,
+                };
+                panel.Children.Add(card);
+                rowIndex++;
+            }
+        }
+
+        return new ScrollViewer
+        {
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Content = panel,
+        };
+    }
+
+    private sealed class LinkedDataTabModel(
+        string header,
+        PartTemplateDefinition lookupTemplate,
+        WorksheetRelationDto? relation,
+        IReadOnlyList<MasterDataRowRecord> matches,
+        IReadOnlyList<string>? displayFieldKeys = null)
+    {
+        public string Header { get; } = header;
+        public PartTemplateDefinition LookupTemplate { get; } = lookupTemplate;
+        public WorksheetRelationDto? Relation { get; } = relation;
+        public IReadOnlyList<MasterDataRowRecord> Matches { get; } = matches;
+        public IReadOnlyList<string>? DisplayFieldKeys { get; } = displayFieldKeys;
     }
 
     private void OnCloseActionPanelClick(object sender, RoutedEventArgs e)
@@ -951,24 +1144,83 @@ public sealed partial class MasterDataPage : Page
 
     private void OpenActionPanel()
     {
-        if (ActionResultsPanel is null || ActionResultsColumn is null)
+        if (ActionResultsPanel is null || ActionResultsColumn is null || ActionResultsTransform is null)
         {
             return;
         }
 
         ActionResultsColumn.Width = new GridLength(ActionPanelWidth);
         ActionResultsPanel.Visibility = Visibility.Visible;
+        ActionResultsTransform.X = 48;
+        ActionResultsPanel.Opacity = 0;
+
+        var slide = new DoubleAnimation
+        {
+            Duration = TimeSpan.FromMilliseconds(280),
+            From = 48,
+            To = 0,
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+            EnableDependentAnimation = true,
+        };
+        Storyboard.SetTarget(slide, ActionResultsTransform);
+        Storyboard.SetTargetProperty(slide, "X");
+
+        var fade = new DoubleAnimation
+        {
+            Duration = TimeSpan.FromMilliseconds(280),
+            From = 0,
+            To = 1,
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+            EnableDependentAnimation = true,
+        };
+        Storyboard.SetTarget(fade, ActionResultsPanel);
+        Storyboard.SetTargetProperty(fade, "Opacity");
+
+        var storyboard = new Storyboard();
+        storyboard.Children.Add(slide);
+        storyboard.Children.Add(fade);
+        storyboard.Begin();
     }
 
     private void CloseActionPanel()
     {
-        if (ActionResultsPanel is null || ActionResultsColumn is null)
+        if (ActionResultsPanel is null || ActionResultsColumn is null || ActionResultsTransform is null)
         {
             return;
         }
 
-        ActionResultsPanel.Visibility = Visibility.Collapsed;
-        ActionResultsColumn.Width = new GridLength(0);
+        var slide = new DoubleAnimation
+        {
+            Duration = TimeSpan.FromMilliseconds(220),
+            From = 0,
+            To = 48,
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn },
+            EnableDependentAnimation = true,
+        };
+        Storyboard.SetTarget(slide, ActionResultsTransform);
+        Storyboard.SetTargetProperty(slide, "X");
+
+        var fade = new DoubleAnimation
+        {
+            Duration = TimeSpan.FromMilliseconds(220),
+            From = 1,
+            To = 0,
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn },
+            EnableDependentAnimation = true,
+        };
+        Storyboard.SetTarget(fade, ActionResultsPanel);
+        Storyboard.SetTargetProperty(fade, "Opacity");
+
+        var storyboard = new Storyboard();
+        storyboard.Children.Add(slide);
+        storyboard.Children.Add(fade);
+        storyboard.Completed += (_, _) =>
+        {
+            ActionResultsPanel.Visibility = Visibility.Collapsed;
+            ActionResultsColumn.Width = new GridLength(0);
+            LinkedDataTabView?.TabItems.Clear();
+        };
+        storyboard.Begin();
     }
 
     private static List<TemplateFieldDefinition> ResolveDisplayFields(
@@ -1128,31 +1380,14 @@ public sealed partial class MasterDataPage : Page
 
         var row = rows.FirstOrDefault();
 
-        ActionTitleText.Text = $"Linked — {template.Name}";
-        ActionCountText.Text = row is null ? "Record details" : template.Name;
-        _actionResultRows.Clear();
-
-        if (row is null)
-        {
-            _actionResultRows.Add(
-                new ActionResultDisplayItem(
-                    "Missing row",
-                    new[] { "That row no longer exists. Clear the link or pick another row." }));
-        }
-        else
-        {
-            var lines = template.Fields
-                .OrderBy(x => x.DisplayOrder)
-                .Select(f =>
-                {
-                    var val = row.Values.TryGetValue(f.Key, out var v) ? v : string.Empty;
-                    return $"{f.Label}: {val}";
-                })
-                .ToList();
-            _actionResultRows.Add(new ActionResultDisplayItem("Linked record", lines));
-        }
-
-        ActionRowsListView.ItemsSource = _actionResultRows;
+        PopulateLinkedDataTabs(
+        [
+            new LinkedDataTabModel(
+                template.Name,
+                template,
+                null,
+                row is null ? [] : [row]),
+        ]);
         OpenActionPanel();
     }
 
@@ -1180,15 +1415,4 @@ public sealed partial class MasterDataPage : Page
         public string Display { get; }
     }
 
-    private sealed class ActionResultDisplayItem
-    {
-        public ActionResultDisplayItem(string title, IReadOnlyList<string> lines)
-        {
-            Title = title;
-            Lines = lines;
-        }
-
-        public string Title { get; }
-        public IReadOnlyList<string> Lines { get; }
-    }
 }

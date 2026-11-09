@@ -557,7 +557,7 @@ public sealed class LinkedTemplateBrowseItem
     public required string RelationId { get; init; }
     public required string TemplateId { get; init; }
     public required string TemplateName { get; init; }
-    public required WorksheetRelationDto Relation { get; init; }
+    public WorksheetRelationDto Relation { get; set; } = null!;
     public PartTemplateDefinition? LookupTemplate { get; init; }
 }
 

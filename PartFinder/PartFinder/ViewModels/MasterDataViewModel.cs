@@ -12,11 +12,13 @@ public sealed partial class MasterDataViewModel : ViewModelBase
     private readonly ITemplateSchemaService _templateSchema;
     private readonly IMasterDataRecordsService _records;
     private readonly IContextActionsService _contextActions;
+    private readonly BackendApiClient _api;
     private readonly ActivityLogger _activityLogger;
 
     private bool _suppressTemplateSelectionChange;
     private IReadOnlyList<PartTemplateDefinition> _cachedTemplates = Array.Empty<PartTemplateDefinition>();
     private IReadOnlyList<TemplateContextAction> _loadedContextActions = Array.Empty<TemplateContextAction>();
+    private readonly List<WorksheetRelationDto> _worksheetRelations = [];
     private CancellationTokenSource? _templateLoadCts;
     private readonly Dictionary<string, string> _columnFilters = new(StringComparer.OrdinalIgnoreCase);
 
@@ -28,12 +30,14 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         ITemplateSchemaService templateSchema,
         IMasterDataRecordsService records,
         IContextActionsService contextActions,
+        BackendApiClient api,
         ActivityLogger activityLogger,
         ICurrentUserAccessService access)
     {
         _templateSchema = templateSchema;
         _records = records;
         _contextActions = contextActions;
+        _api = api;
         _activityLogger = activityLogger;
         _access = access;
     }
@@ -243,6 +247,7 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         Columns.Clear();
         Rows.Clear();
         _loadedContextActions = Array.Empty<TemplateContextAction>();
+        _worksheetRelations.Clear();
         _columnFilters.Clear();
 
         try
@@ -288,6 +293,14 @@ public sealed partial class MasterDataViewModel : ViewModelBase
             _loadedContextActions = await _contextActions
                 .GetForSourceTemplateAsync(template.Id, loadCt)
                 .ConfigureAwait(true);
+
+            var (relationsOk, _, relations) = await _api.GetRelationsAsync(loadCt).ConfigureAwait(true);
+            if (relationsOk)
+            {
+                _worksheetRelations.Clear();
+                _worksheetRelations.AddRange(
+                    relations.Where(r => string.Equals(r.PrimaryTemplateId, template.Id, StringComparison.Ordinal)));
+            }
 
             loadCt.ThrowIfCancellationRequested();
             if (!IsLoadStillCurrent(loadForId))
@@ -771,6 +784,95 @@ public sealed partial class MasterDataViewModel : ViewModelBase
             .Where(a => string.Equals(a.SourceFieldKey, fieldKey, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
+    public bool HasWorksheetRelationsForFieldKey(string fieldKey)
+    {
+        var field = Columns.FirstOrDefault(c => string.Equals(c.Key, fieldKey, StringComparison.OrdinalIgnoreCase));
+        return field is not null && GetWorksheetRelationsForField(field).Count > 0;
+    }
+
+    public IReadOnlyList<WorksheetRelationDto> GetWorksheetRelationsForField(TemplateFieldDefinition field) =>
+        _worksheetRelations.Where(r =>
+                string.Equals(r.TriggerColumn, field.Label, StringComparison.OrdinalIgnoreCase)
+                || r.MatchKeys.Any(m =>
+                    string.Equals(m.SourceColumn, field.Label, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+
+    public async Task<IReadOnlyList<WorksheetRelationMatchResult>> QueryWorksheetRelationsForCellAsync(
+        string fieldKey,
+        MasterDataRowViewModel row,
+        CancellationToken cancellationToken = default)
+    {
+        if (SelectedDataTemplate is null)
+        {
+            return [];
+        }
+
+        var field = Columns.FirstOrDefault(c => string.Equals(c.Key, fieldKey, StringComparison.OrdinalIgnoreCase));
+        if (field is null)
+        {
+            return [];
+        }
+
+        var sourceMap = BuildSourceRowMap(row);
+        var relations = GetWorksheetRelationsForField(field);
+        if (relations.Count == 0)
+        {
+            return [];
+        }
+
+        var results = new List<WorksheetRelationMatchResult>();
+        foreach (var relation in relations)
+        {
+            var lookup = _cachedTemplates.FirstOrDefault(t => t.Id == relation.LookupTemplateId)
+                         ?? await _templateSchema.GetTemplateAsync(relation.LookupTemplateId, cancellationToken)
+                             .ConfigureAwait(true);
+            if (lookup is null)
+            {
+                continue;
+            }
+
+            var lookupRows = await _records.GetRowsAsync(relation.LookupTemplateId, cancellationToken).ConfigureAwait(true);
+            var matches = lookupRows
+                .Where(r => RowMatchesWorksheetRelation(
+                    r.Values,
+                    lookup,
+                    relation,
+                    sourceMap,
+                    SelectedDataTemplate))
+                .ToList();
+
+            var header = !string.IsNullOrWhiteSpace(relation.MenuLabel)
+                ? relation.MenuLabel
+                : lookup.Name;
+            results.Add(new WorksheetRelationMatchResult(header, lookup, relation, matches));
+        }
+
+        return results;
+    }
+
+    public async Task<WorksheetRelationMatchResult?> QueryDirectRecordLinkAsync(
+        MasterDataCellViewModel cell,
+        CancellationToken cancellationToken = default)
+    {
+        if (!cell.IsRecordLink
+            || string.IsNullOrWhiteSpace(cell.LinkedRowId)
+            || string.IsNullOrWhiteSpace(cell.LinkedTemplateId))
+        {
+            return null;
+        }
+
+        var lookup = await _templateSchema.GetTemplateAsync(cell.LinkedTemplateId, cancellationToken).ConfigureAwait(true);
+        if (lookup is null)
+        {
+            return null;
+        }
+
+        var rows = await _records
+            .GetRowsByIdsAsync(cell.LinkedTemplateId, [cell.LinkedRowId], cancellationToken)
+            .ConfigureAwait(true);
+        return new WorksheetRelationMatchResult(lookup.Name, lookup, null, rows);
+    }
+
     public static IReadOnlyDictionary<string, string> BuildSourceRowMap(MasterDataRowViewModel row)
     {
         var d = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -837,6 +939,86 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         return importedCount;
     }
 
+    private static bool RowMatchesWorksheetRelation(
+        IReadOnlyDictionary<string, string> targetValues,
+        PartTemplateDefinition lookupTemplate,
+        WorksheetRelationDto relation,
+        IReadOnlyDictionary<string, string> sourceValues,
+        PartTemplateDefinition sourceTemplate)
+    {
+        var pairs = relation.MatchKeys;
+        if (pairs.Count == 0 && !string.IsNullOrWhiteSpace(relation.TriggerColumn))
+        {
+            pairs =
+            [
+                new RelationMatchPairDto
+                {
+                    SourceColumn = relation.TriggerColumn,
+                    TargetColumn = relation.TriggerColumn,
+                },
+            ];
+        }
+
+        if (pairs.Count == 0)
+        {
+            return false;
+        }
+
+        foreach (var pair in pairs)
+        {
+            var sourceField = sourceTemplate.Fields.FirstOrDefault(f =>
+                string.Equals(f.Label, pair.SourceColumn, StringComparison.OrdinalIgnoreCase));
+            var targetField = lookupTemplate.Fields.FirstOrDefault(f =>
+                string.Equals(f.Label, pair.TargetColumn, StringComparison.OrdinalIgnoreCase));
+            if (sourceField is null || targetField is null)
+            {
+                return false;
+            }
+
+            if (!sourceValues.TryGetValue(sourceField.Key, out var sourceValue)
+                || string.IsNullOrWhiteSpace(sourceValue))
+            {
+                return false;
+            }
+
+            if (!targetValues.TryGetValue(targetField.Key, out var targetValue))
+            {
+                return false;
+            }
+
+            if (!string.Equals(sourceValue.Trim(), targetValue.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public static IReadOnlyList<TemplateFieldDefinition> ResolveRelationDisplayFields(
+        PartTemplateDefinition lookupTemplate,
+        WorksheetRelationDto? relation)
+    {
+        var ordered = lookupTemplate.Fields.OrderBy(f => f.DisplayOrder).ToList();
+        if (relation is null || relation.DisplayColumns.Count == 0)
+        {
+            return ordered;
+        }
+
+        var picked = new List<TemplateFieldDefinition>();
+        foreach (var label in relation.DisplayColumns)
+        {
+            var field = ordered.FirstOrDefault(f =>
+                string.Equals(f.Label, label, StringComparison.OrdinalIgnoreCase));
+            if (field is not null)
+            {
+                picked.Add(field);
+            }
+        }
+
+        return picked.Count > 0 ? picked : ordered;
+    }
+
     private static bool RowMatchesAction(
         IReadOnlyDictionary<string, string> targetValues,
         IReadOnlyList<ContextActionMatchRule> rules,
@@ -891,4 +1073,16 @@ public sealed partial class MasterDataViewModel : ViewModelBase
 
         return $"{baseKey}_{index}";
     }
+}
+
+public sealed class WorksheetRelationMatchResult(
+    string tabHeader,
+    PartTemplateDefinition lookupTemplate,
+    WorksheetRelationDto? relation,
+    IReadOnlyList<MasterDataRowRecord> matches)
+{
+    public string TabHeader { get; } = tabHeader;
+    public PartTemplateDefinition LookupTemplate { get; } = lookupTemplate;
+    public WorksheetRelationDto? Relation { get; } = relation;
+    public IReadOnlyList<MasterDataRowRecord> Matches { get; } = matches;
 }
