@@ -179,17 +179,47 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
         set => SetProperty(ref _hasUnreadAlerts, value);
     }
 
+    private int _unreadNotificationCount;
+    public int UnreadNotificationCount
+    {
+        get => _unreadNotificationCount;
+        private set
+        {
+            if (!SetProperty(ref _unreadNotificationCount, value))
+                return;
+
+            HasUnreadAlerts = value > 0;
+            OnPropertyChanged(nameof(UnreadNotificationBadgeText));
+        }
+    }
+
+    public string UnreadNotificationBadgeText =>
+        UnreadNotificationCount > 99 ? "99+" : UnreadNotificationCount.ToString();
+
     public async Task RefreshAlertBadgeAsync()
     {
         try
         {
-            var (critical, warning, info) = await _alertsService.GetCountsAsync().ConfigureAwait(true);
-            HasUnreadAlerts = (critical + warning + info) > 0;
+            UnreadNotificationCount = await _alertsService.GetUnreadCountAsync().ConfigureAwait(true);
         }
         catch
         {
-            HasUnreadAlerts = false;
+            UnreadNotificationCount = 0;
         }
+    }
+
+    public async Task MarkNotificationsSeenAsync()
+    {
+        try
+        {
+            await _alertsService.MarkAllActiveAsReadAsync().ConfigureAwait(true);
+        }
+        catch
+        {
+            // ignore — badge refresh still reflects DB state
+        }
+
+        await RefreshAlertBadgeAsync().ConfigureAwait(true);
     }
 
     public async Task InitializeAsync()

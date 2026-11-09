@@ -28,11 +28,23 @@ public sealed partial class AlertsPage : Page
     private async void OnPageLoaded(object sender, RoutedEventArgs e)
     {
         await ViewModel.LoadAlertsAsync();
+
+        var shell = App.Services.GetRequiredService<ShellViewModel>();
+        await shell.MarkNotificationsSeenAsync().ConfigureAwait(true);
+        foreach (var alert in ViewModel.Alerts)
+            alert.IsRead = true;
+    }
+
+    private static async Task RefreshNavNotificationBadgeAsync()
+    {
+        var shell = App.Services.GetRequiredService<ShellViewModel>();
+        await shell.RefreshAlertBadgeAsync().ConfigureAwait(true);
     }
 
     private async void OnMarkAllReadClick(object sender, RoutedEventArgs e)
     {
-        ViewModel.MarkAllAsReadCommand.Execute(null);
+        await ViewModel.MarkAllAsReadCommand.ExecuteAsync(null);
+        await RefreshNavNotificationBadgeAsync();
         await ShowInfoAsync("Done", "All alerts marked as read.");
     }
 
@@ -130,6 +142,7 @@ public sealed partial class AlertsPage : Page
                 }).ConfigureAwait(true);
 
                 await ViewModel.LoadAlertsAsync().ConfigureAwait(true);
+                await RefreshNavNotificationBadgeAsync();
                 await ShowInfoAsync("Resolved", "Alert marked as resolved.");
             }
         }
@@ -152,6 +165,7 @@ public sealed partial class AlertsPage : Page
             }).ConfigureAwait(true);
 
             await ViewModel.LoadAlertsAsync().ConfigureAwait(true);
+            await RefreshNavNotificationBadgeAsync();
         }
     }
 

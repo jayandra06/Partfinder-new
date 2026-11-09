@@ -83,14 +83,13 @@ public sealed partial class ShellLayout : UserControl
         SelectNavigationPage(AppPage.Settings);
     }
 
-    private void OnBellClicked(object sender, RoutedEventArgs e)
+    private async void OnBellClicked(object sender, RoutedEventArgs e)
     {
         SelectNavigationPage(AppPage.Alerts);
 
-        // Clear badge after opening alerts
         if (DataContext is ShellViewModel vm)
         {
-            vm.HasUnreadAlerts = false;
+            await vm.MarkNotificationsSeenAsync().ConfigureAwait(true);
         }
     }
 
