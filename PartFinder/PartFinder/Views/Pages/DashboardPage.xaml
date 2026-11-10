@@ -10,21 +10,31 @@
     <Page.Resources>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
 
-        <!-- Card hover style with glassmorphism elevation -->
-        <Style x:Key="HoverCardStyle" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource ElevatedCardBackgroundBrush}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource GlassStrokeBrush}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="20"/>
+        <!-- In-page dashboard section (no floating card / shadow) -->
+        <Style x:Key="DashboardSectionStyle" TargetType="Border">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderDefaultBrush}"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="CornerRadius" Value="0"/>
+            <Setter Property="Padding" Value="0,4,0,22"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
         </Style>
 
-        <!-- Quick action button style -->
+        <Style x:Key="DashboardInsetSurfaceStyle" TargetType="Border">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="0"/>
+            <Setter Property="Padding" Value="0,6,0,0"/>
+        </Style>
+
+        <!-- Quick action rows — flat list on the page -->
         <Style x:Key="ActionRowStyle" TargetType="Button">
-            <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource GlassStrokeBrush}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="14"/>
-            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderDefaultBrush}"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="CornerRadius" Value="0"/>
+            <Setter Property="Padding" Value="4,12"/>
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="HorizontalContentAlignment" Value="Left"/>
         </Style>
@@ -256,8 +266,7 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- Parts Trend Chart -->
-                <Border x:Name="Row1ChartBorder" Grid.Column="0" Style="{StaticResource HoverCardStyle}" Padding="18,16">
-                    <Border.Shadow><ThemeShadow/></Border.Shadow>
+                <Border x:Name="Row1ChartBorder" Grid.Column="0" Style="{StaticResource DashboardSectionStyle}">
                     <StackPanel Spacing="12">
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -284,11 +293,7 @@
                             </StackPanel>
                         </Grid>
 
-                        <Border CornerRadius="14"
-                                Padding="8"
-                                Background="{StaticResource ChartSurfaceBackgroundBrush}"
-                                BorderBrush="{StaticResource GlassStrokeBrush}"
-                                BorderThickness="1">
+                        <Border Style="{StaticResource DashboardInsetSurfaceStyle}">
                             <Grid>
                                 <lvc:CartesianChart
                                     x:Name="TrendChart"
@@ -318,17 +323,12 @@
                 </Border>
 
                 <!-- Template Distribution Donut -->
-                <Border x:Name="Row1DonutBorder" Grid.Column="1" Style="{StaticResource HoverCardStyle}" Padding="18,16">
-                    <Border.Shadow><ThemeShadow/></Border.Shadow>
+                <Border x:Name="Row1DonutBorder" Grid.Column="1" Style="{StaticResource DashboardSectionStyle}">
                     <StackPanel Spacing="10">
                         <TextBlock Text="Template Distribution" FontSize="15" FontWeight="SemiBold"/>
                         <TextBlock Text="Parts per schema category" FontSize="11"
                                    Foreground="{StaticResource TextTertiaryBrush}"/>
-                        <Border CornerRadius="14"
-                                Padding="8"
-                                Background="{StaticResource ChartSurfaceBackgroundBrush}"
-                                BorderBrush="{StaticResource GlassStrokeBrush}"
-                                BorderThickness="1">
+                        <Border Style="{StaticResource DashboardInsetSurfaceStyle}">
                             <lvc:PieChart
                                 x:Name="DistributionChart"
                                 Height="190"
@@ -371,8 +371,7 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- Stock Level Bar Chart (NEW) -->
-                <Border x:Name="Row2BarBorder" Grid.Column="0" Style="{StaticResource HoverCardStyle}" Padding="18,16">
-                    <Border.Shadow><ThemeShadow/></Border.Shadow>
+                <Border x:Name="Row2BarBorder" Grid.Column="0" Style="{StaticResource DashboardSectionStyle}">
                     <StackPanel Spacing="12">
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -393,11 +392,7 @@
                             </Border>
                         </Grid>
 
-                        <Border CornerRadius="14"
-                                Padding="8"
-                                Background="{StaticResource ChartSurfaceBackgroundBrush}"
-                                BorderBrush="{StaticResource GlassStrokeBrush}"
-                                BorderThickness="1">
+                        <Border Style="{StaticResource DashboardInsetSurfaceStyle}">
                             <lvc:CartesianChart
                                 x:Name="StockLevelChart"
                                 Height="200"
@@ -417,18 +412,13 @@
                 </Border>
 
                 <!-- System Health Gauge -->
-                <Border x:Name="Row2HealthBorder" Grid.Column="1" Style="{StaticResource HoverCardStyle}" Padding="18,16">
-                    <Border.Shadow><ThemeShadow/></Border.Shadow>
+                <Border x:Name="Row2HealthBorder" Grid.Column="1" Style="{StaticResource DashboardSectionStyle}">
                     <StackPanel Spacing="10">
                         <TextBlock Text="System Health" FontSize="15" FontWeight="SemiBold"/>
                         <TextBlock Text="Import pipeline reliability" FontSize="11"
                                    Foreground="{StaticResource TextTertiaryBrush}"/>
                         <Grid>
-                            <Border CornerRadius="14"
-                                    Padding="8"
-                                    Background="{StaticResource ChartSurfaceBackgroundBrush}"
-                                    BorderBrush="{StaticResource GlassStrokeBrush}"
-                                    BorderThickness="1">
+                            <Border Style="{StaticResource DashboardInsetSurfaceStyle}">
                                 <lvc:PieChart
                                     x:Name="HealthGaugeChart"
                                     Height="170"
@@ -480,8 +470,7 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- Recent Activity with icons -->
-                <Border x:Name="Row3ActivityBorder" Grid.Column="0" Style="{StaticResource HoverCardStyle}" Padding="18,16">
-                    <Border.Shadow><ThemeShadow/></Border.Shadow>
+                <Border x:Name="Row3ActivityBorder" Grid.Column="0" Style="{StaticResource DashboardSectionStyle}">
                     <StackPanel Spacing="10">
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -502,9 +491,9 @@
                             </Border>
                         </Grid>
 
-                        <Border Background="{StaticResource ElevatedCardBackgroundBrush}"
-                                CornerRadius="10" Padding="10"
-                                BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1"
+                        <Border Background="Transparent"
+                                CornerRadius="0" Padding="0,4,0,0"
+                                BorderBrush="Transparent" BorderThickness="0"
                                 MinHeight="200">
                             <ItemsControl ItemsSource="{Binding RecentActivity}">
                                 <ItemsControl.ItemTemplate>
@@ -535,8 +524,7 @@
                 </Border>
 
                 <!-- Quick Actions (animated buttons) -->
-                <Border x:Name="Row3ActionsBorder" Grid.Column="1" Style="{StaticResource HoverCardStyle}" Padding="18,16">
-                    <Border.Shadow><ThemeShadow/></Border.Shadow>
+                <Border x:Name="Row3ActionsBorder" Grid.Column="1" Style="{StaticResource DashboardSectionStyle}">
                     <StackPanel Spacing="12">
                         <TextBlock Text="Quick Actions" FontSize="15" FontWeight="SemiBold"/>
                         <TextBlock Text="Common workflows at a glance" FontSize="11"

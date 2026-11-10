@@ -50,18 +50,13 @@
     </UserControl.Resources>
 
     <Border x:Name="RootBorder"
-            Background="{StaticResource ElevatedCardBackgroundBrush}"
-            BorderBrush="{StaticResource GlassStrongStrokeBrush}"
-            BorderThickness="1"
-            CornerRadius="20"
-            Padding="18,16"
+            Background="Transparent"
+            BorderBrush="{StaticResource BorderDefaultBrush}"
+            BorderThickness="0,0,0,1"
+            CornerRadius="0"
+            Padding="12,14,12,16"
             Margin="0,0,12,0"
-            Opacity="0"
-            Translation="0,0,24">
-
-        <Border.Shadow>
-            <ThemeShadow/>
-        </Border.Shadow>
+            Opacity="0">
 
         <Border.RenderTransform>
             <TranslateTransform x:Name="SlideTransform" Y="14"/>
@@ -71,7 +66,7 @@
         <Grid>
             <!-- Alert glow overlay (sits behind content, animated opacity) -->
             <Border x:Name="AlertGlow"
-                    CornerRadius="20"
+                    CornerRadius="0"
                     Opacity="0"
                     IsHitTestVisible="False"
                     HorizontalAlignment="Stretch"
@@ -80,11 +75,6 @@
                     <SolidColorBrush x:Name="AlertGlowBrush" Color="#FFB781"/>
                 </Border.Background>
             </Border>
-
-            <!-- Glassmorphism top-edge highlight -->
-            <Border CornerRadius="20,20,0,0" Height="1" VerticalAlignment="Top"
-                    IsHitTestVisible="False" Opacity="0.18"
-                    Background="{StaticResource GlassHighlightBrush}" Margin="1,0,1,0"/>
 
             <!-- Card content -->
             <Grid RowSpacing="6">

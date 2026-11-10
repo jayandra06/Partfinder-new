@@ -28,7 +28,7 @@ public sealed partial class InventoryItemFormPanel : UserControl
     {
         PartNameBox.IsReadOnly = true;
         PartNameBox.Text = item.PartName;
-        PartIdBox.Text = item.Id;
+        PartIdBox.Text = string.IsNullOrWhiteSpace(item.PartId) ? item.Id : item.PartId;
         CategoryBox.Text = item.Category;
         SupplierBox.Text = item.Supplier;
         LocationBox.Text = item.Location;

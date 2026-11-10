@@ -842,7 +842,7 @@
                                             TextChanged="OnOrgCodeBoxTextChanged"
                                             Margin="0,0,0,20" />
 
-                                        <!-- License summary card (shown when org code is validated) -->
+                                        <!-- License summary card (hidden during login for privacy) -->
                                         <StackPanel
                                             x:Name="LicenseSummaryPanel"
                                             Spacing="0"
@@ -913,7 +913,11 @@
                                         <TextBox
                                             x:Name="InviteLoginEmailBox"
                                             PlaceholderText="your@email.com"
+                                            InputScope="EmailSmtpAddress"
+                                            IsSpellCheckEnabled="False"
+                                            IsTextPredictionEnabled="False"
                                             Style="{StaticResource DarkInputStyle}"
+                                            TextChanged="OnInviteLoginEmailBoxTextChanged"
                                             Margin="0,0,0,16" />
 
                                         <TextBlock Text="PASSWORD" Style="{StaticResource FieldLabelStyle}" />

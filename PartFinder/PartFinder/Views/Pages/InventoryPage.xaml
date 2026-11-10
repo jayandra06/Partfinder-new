@@ -70,7 +70,7 @@
                         <TextBlock Text="Track stock levels, monitor part availability, and manage inventory across your organisation." FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                        <Button Style="{StaticResource OutlinedButtonStyle}" FontSize="12">
+                        <Button Style="{StaticResource OutlinedButtonStyle}" FontSize="12" Click="OnExportClick">
                             <StackPanel Orientation="Horizontal" Spacing="5">
                                 <FontIcon Glyph="&#xE74E;" FontSize="13" />
                                 <TextBlock Text="Export" FontSize="12" />
@@ -188,7 +188,7 @@
                                     <FontIcon Glyph="&#xE80A;" FontSize="20" Foreground="{StaticResource AccentPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Border>
                             </Grid>
-                            <TextBlock Text="â†‘ 12% from last month" FontSize="10" Foreground="{StaticResource SuccessBrush}" />
+                            <TextBlock Text="Live from inventory" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
                         </StackPanel>
                     </Border>
 
@@ -269,7 +269,7 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <StackPanel Orientation="Horizontal" Spacing="8">
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
                             <FontIcon Glyph="&#xE721;" FontSize="12" Foreground="{StaticResource TextTertiaryBrush}" VerticalAlignment="Center" />
                             <TextBox
                                 BorderThickness="0"
@@ -277,7 +277,8 @@
                                 PlaceholderText="Search parts by name or ID..."
                                 FontSize="12"
                                 MinWidth="240"
-                                VerticalAlignment="Center" />
+                                VerticalAlignment="Center"
+                                Text="{x:Bind ViewModel.SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                         </StackPanel>
 
                         <ComboBox Grid.Column="1" MinWidth="160" FontSize="11"
@@ -294,7 +295,8 @@
                                   Foreground="{StaticResource TextPrimaryBrush}"
                                   BorderBrush="{StaticResource BorderDefaultBrush}"
                                   PlaceholderForeground="{StaticResource TextTertiaryBrush}" />
-                        <Button Grid.Column="3" Style="{StaticResource GhostButtonStyle}" Content="Clear Filters" FontSize="11" />
+                        <Button Grid.Column="3" Style="{StaticResource GhostButtonStyle}" Content="Clear Filters" FontSize="11"
+                                Command="{x:Bind ViewModel.ClearFiltersCommand}" />
                     </Grid>
                 </Border>
 
@@ -307,7 +309,6 @@
                         <!-- Table header -->
                         <Grid Padding="14,10" Background="{StaticResource GridHeaderBackgroundBrush}" ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="1.5*" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
@@ -315,13 +316,12 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <CheckBox Grid.Column="0" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="1" Text="PART NAME" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="2" Text="PART ID" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="3" Text="QUANTITY" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="4" Text="CATEGORY" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="5" Text="STATUS" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="6" Text="ACTION" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" VerticalAlignment="Center" MinWidth="60" />
+                            <TextBlock Grid.Column="0" Text="PART NAME" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="PART ID" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Text="QUANTITY" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="3" Text="CATEGORY" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="4" Text="STATUS" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="5" Text="ACTION" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" VerticalAlignment="Center" MinWidth="60" />
                         </Grid>
 
                         <!-- Sample rows -->
@@ -329,7 +329,7 @@
                                       Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
                                       Width="32" Height="32" HorizontalAlignment="Center" Margin="0,12,0,12"/>
 
-                        <ListView ItemsSource="{x:Bind ViewModel.InventoryItems, Mode=OneWay}"
+                        <ListView ItemsSource="{x:Bind ViewModel.FilteredInventoryItems, Mode=OneWay}"
                                   SelectionMode="None">
                             <ListView.ItemContainerStyle>
                                 <Style TargetType="ListViewItem">
@@ -342,7 +342,6 @@
                                     <Grid Padding="14,10" ColumnSpacing="12" MinHeight="44"
                                           BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="0,0,0,1">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="1.5*"/>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="*"/>
@@ -350,27 +349,36 @@
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <CheckBox Grid.Column="0" VerticalAlignment="Center"/>
-                                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                        <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
                                             <TextBlock Text="{x:Bind PartName}" FontSize="12" FontWeight="SemiBold"/>
                                             <TextBlock Text="{x:Bind Category}" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}"/>
                                         </StackPanel>
-                                        <TextBlock Grid.Column="2" Text="{x:Bind Id}" FontSize="11" VerticalAlignment="Center"/>
-                                        <TextBlock Grid.Column="3" Text="{x:Bind Quantity}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                        <TextBlock Grid.Column="4" Text="{x:Bind Category}" FontSize="11" VerticalAlignment="Center"/>
-                                        <Border Grid.Column="5" CornerRadius="6" Padding="8,4" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                        <TextBlock Grid.Column="1" Text="{x:Bind PartIdDisplay}" FontSize="11" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="2" Text="{x:Bind Quantity}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="3" Text="{x:Bind Category}" FontSize="11" VerticalAlignment="Center"/>
+                                        <Border Grid.Column="4" CornerRadius="6" Padding="8,4" VerticalAlignment="Center" HorizontalAlignment="Left">
                                             <TextBlock Text="{x:Bind Status}" FontSize="9" FontWeight="SemiBold"/>
                                         </Border>
-                                        <Button Grid.Column="6" Style="{StaticResource GhostButtonStyle}" FontSize="10" Padding="6,2" Click="OnEditInventoryClick">
-                                            <StackPanel Orientation="Horizontal" Spacing="3">
-                                                <FontIcon Glyph="&#xE70F;" FontSize="10"/>
-                                                <TextBlock Text="Edit" FontSize="10"/>
-                                            </StackPanel>
+                                        <Button Grid.Column="5"
+                                                Style="{StaticResource GhostButtonStyle}"
+                                                Padding="8,4"
+                                                MinWidth="36"
+                                                Tag="{x:Bind}"
+                                                Click="OnInventoryRowActionsClick"
+                                                ToolTipService.ToolTip="More actions">
+                                            <Viewbox Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <StackPanel Orientation="Vertical" Spacing="3">
+                                                    <Ellipse Width="2.5" Height="2.5" Fill="{StaticResource TextSecondaryBrush}" />
+                                                    <Ellipse Width="2.5" Height="2.5" Fill="{StaticResource TextSecondaryBrush}" />
+                                                    <Ellipse Width="2.5" Height="2.5" Fill="{StaticResource TextSecondaryBrush}" />
+                                                </StackPanel>
+                                            </Viewbox>
                                         </Button>
                                     </Grid>
                                 </DataTemplate>
                             </ListView.ItemTemplate>
                         </ListView>
+                        <components:TablePaginationBar />
                     </StackPanel>
                 </Border>
 

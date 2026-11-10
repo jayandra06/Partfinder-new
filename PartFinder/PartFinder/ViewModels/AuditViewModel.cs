@@ -5,10 +5,11 @@ using System.Collections.ObjectModel;
 
 namespace PartFinder.ViewModels;
 
-public partial class AuditViewModel : ViewModelBase
+public partial class AuditViewModel : PaginatedViewModelBase
 {
     private readonly MongoAuditService _auditService;
     private readonly ICurrentUserAccessService _access;
+    private readonly List<AuditLogEntry> _filteredLogs = [];
 
     public AuditViewModel(MongoAuditService auditService, ICurrentUserAccessService access)
     {
@@ -37,10 +38,32 @@ public partial class AuditViewModel : ViewModelBase
 
     public ObservableCollection<string> AvailableUsers { get; } = new() { "All Users" };
 
-    partial void OnSearchTextChanged(string value) => ApplyFilters();
-    partial void OnSelectedEventTypeChanged(string value) => ApplyFilters();
-    partial void OnSelectedUserChanged(string value) => ApplyFilters();
-    partial void OnSelectedDateRangeChanged(string value) => ApplyFilters();
+    partial void OnSearchTextChanged(string value)
+    {
+        ResetPaginationPage();
+        ApplyFilters();
+    }
+
+    partial void OnSelectedEventTypeChanged(string value)
+    {
+        ResetPaginationPage();
+        ApplyFilters();
+    }
+
+    partial void OnSelectedUserChanged(string value)
+    {
+        ResetPaginationPage();
+        ApplyFilters();
+    }
+
+    partial void OnSelectedDateRangeChanged(string value)
+    {
+        ResetPaginationPage();
+        ApplyFilters();
+    }
+
+    protected override void OnPaginationRefreshRequested() =>
+        RefreshPage(AuditLogs, _filteredLogs);
 
     private void ApplyFilters()
     {
@@ -87,11 +110,13 @@ public partial class AuditViewModel : ViewModelBase
             }
         }
 
-        AuditLogs.Clear();
+        _filteredLogs.Clear();
         foreach (var item in filtered)
         {
-            AuditLogs.Add(item);
+            _filteredLogs.Add(item);
         }
+
+        CommitFilterPage(_filteredLogs, AuditLogs);
     }
 
     public async Task LoadAuditLogsAsync(CancellationToken cancellationToken = default)
