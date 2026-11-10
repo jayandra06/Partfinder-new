@@ -308,17 +308,33 @@
                                 Spacing="6"
                                 VerticalAlignment="Center"
                                 DataContext="{Binding ElementName=ProfileMenuButton, Path=DataContext}">
-                                <Border
-                                    Width="28"
-                                    Height="28"
-                                    CornerRadius="14"
-                                    Background="Transparent">
-                                    <Image
-                                        Source="{Binding CurrentUserAvatarSource}"
-                                        Stretch="UniformToFill"
+                                <Grid Width="28" Height="28">
+                                    <Border
                                         Width="28"
-                                        Height="28" />
-                                </Border>
+                                        Height="28"
+                                        CornerRadius="14"
+                                        Background="#151F7AE0"
+                                        Visibility="{Binding HasUserAvatar, Mode=OneWay, Converter={StaticResource InvertedBoolToVisibilityConverter}}">
+                                        <FontIcon
+                                            Glyph="&#xE77B;"
+                                            FontSize="14"
+                                            Foreground="{StaticResource AccentPrimaryBrush}"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center" />
+                                    </Border>
+                                    <Border
+                                        Width="28"
+                                        Height="28"
+                                        CornerRadius="14"
+                                        Background="{StaticResource ElevatedCardBackgroundBrush}"
+                                        Visibility="{Binding HasUserAvatar, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <Image
+                                            Source="{Binding CurrentUserAvatarSource}"
+                                            Stretch="UniformToFill"
+                                            Width="28"
+                                            Height="28" />
+                                    </Border>
+                                </Grid>
                                 <TextBlock
                                     VerticalAlignment="Center"
                                     FontSize="13"

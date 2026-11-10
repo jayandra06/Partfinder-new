@@ -306,22 +306,73 @@
                 <Border Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="0" Translation="0,0,32">
                             <Border.Shadow><ThemeShadow/></Border.Shadow>
                             <StackPanel>
-                        <!-- Table header -->
+                        <!-- Table header — click title to show column search -->
                         <Grid Padding="14,10" Background="{StaticResource GridHeaderBackgroundBrush}" ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="1.5*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="1.5*" MinWidth="140" />
+                                <ColumnDefinition Width="*" MinWidth="100" />
+                                <ColumnDefinition Width="*" MinWidth="88" />
+                                <ColumnDefinition Width="*" MinWidth="100" />
+                                <ColumnDefinition Width="*" MinWidth="100" />
+                                <ColumnDefinition Width="72" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="PART NAME" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="1" Text="PART ID" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="2" Text="QUANTITY" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="3" Text="CATEGORY" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="4" Text="STATUS" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="5" Text="ACTION" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" VerticalAlignment="Center" MinWidth="60" />
+
+                            <StackPanel Grid.Column="0" Spacing="4" HorizontalAlignment="Stretch">
+                                <Button Style="{StaticResource GhostButtonStyle}" Padding="4,2" MinHeight="0"
+                                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                        Command="{x:Bind ViewModel.TogglePartNameHeaderSearchCommand}">
+                                    <TextBlock Text="PART NAME" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" TextAlignment="Center" />
+                                </Button>
+                                <TextBox FontSize="10" Padding="6,4" PlaceholderText="Search name…"
+                                         Text="{x:Bind ViewModel.ColumnFilterPartName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Visibility="{x:Bind ViewModel.ShowPartNameColumnSearch, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Spacing="4" HorizontalAlignment="Stretch">
+                                <Button Style="{StaticResource GhostButtonStyle}" Padding="4,2" MinHeight="0"
+                                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                        Command="{x:Bind ViewModel.TogglePartIdHeaderSearchCommand}">
+                                    <TextBlock Text="PART ID" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" TextAlignment="Center" />
+                                </Button>
+                                <TextBox FontSize="10" Padding="6,4" PlaceholderText="Search ID…"
+                                         Text="{x:Bind ViewModel.ColumnFilterPartId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Visibility="{x:Bind ViewModel.ShowPartIdColumnSearch, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2" Spacing="4" HorizontalAlignment="Stretch">
+                                <Button Style="{StaticResource GhostButtonStyle}" Padding="4,2" MinHeight="0"
+                                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                        Command="{x:Bind ViewModel.ToggleQuantityHeaderSearchCommand}">
+                                    <TextBlock Text="QUANTITY" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" TextAlignment="Center" />
+                                </Button>
+                                <TextBox FontSize="10" Padding="6,4" PlaceholderText="Search qty…"
+                                         Text="{x:Bind ViewModel.ColumnFilterQuantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Visibility="{x:Bind ViewModel.ShowQuantityColumnSearch, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="3" Spacing="4" HorizontalAlignment="Stretch">
+                                <Button Style="{StaticResource GhostButtonStyle}" Padding="4,2" MinHeight="0"
+                                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                        Command="{x:Bind ViewModel.ToggleCategoryHeaderSearchCommand}">
+                                    <TextBlock Text="CATEGORY" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" TextAlignment="Center" />
+                                </Button>
+                                <TextBox FontSize="10" Padding="6,4" PlaceholderText="Search category…"
+                                         Text="{x:Bind ViewModel.ColumnFilterCategory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Visibility="{x:Bind ViewModel.ShowCategoryColumnSearch, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="4" Spacing="4" HorizontalAlignment="Stretch">
+                                <Button Style="{StaticResource GhostButtonStyle}" Padding="4,2" MinHeight="0"
+                                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                        Command="{x:Bind ViewModel.ToggleStatusHeaderSearchCommand}">
+                                    <TextBlock Text="STATUS" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" TextAlignment="Center" />
+                                </Button>
+                                <TextBox FontSize="10" Padding="6,4" PlaceholderText="Search status…"
+                                         Text="{x:Bind ViewModel.ColumnFilterStatus, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Visibility="{x:Bind ViewModel.ShowStatusColumnSearch, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            </StackPanel>
+
+                            <TextBlock Grid.Column="5" Text="ACTION" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" VerticalAlignment="Center" />
                         </Grid>
 
                         <!-- Sample rows -->
@@ -342,27 +393,31 @@
                                     <Grid Padding="14,10" ColumnSpacing="12" MinHeight="44"
                                           BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="0,0,0,1">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="1.5*"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="1.5*" MinWidth="140"/>
+                                            <ColumnDefinition Width="*" MinWidth="100"/>
+                                            <ColumnDefinition Width="*" MinWidth="88"/>
+                                            <ColumnDefinition Width="*" MinWidth="100"/>
+                                            <ColumnDefinition Width="*" MinWidth="100"/>
+                                            <ColumnDefinition Width="72"/>
                                         </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
-                                            <TextBlock Text="{x:Bind PartName}" FontSize="12" FontWeight="SemiBold"/>
-                                            <TextBlock Text="{x:Bind Category}" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}"/>
-                                        </StackPanel>
-                                        <TextBlock Grid.Column="1" Text="{x:Bind PartIdDisplay}" FontSize="11" VerticalAlignment="Center"/>
-                                        <TextBlock Grid.Column="2" Text="{x:Bind Quantity}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                        <TextBlock Grid.Column="3" Text="{x:Bind Category}" FontSize="11" VerticalAlignment="Center"/>
-                                        <Border Grid.Column="4" CornerRadius="6" Padding="8,4" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                            <TextBlock Text="{x:Bind Status}" FontSize="9" FontWeight="SemiBold"/>
+                                        <TextBlock Grid.Column="0" Text="{x:Bind PartName}" FontSize="12" FontWeight="SemiBold"
+                                                   VerticalAlignment="Center" HorizontalAlignment="Center" TextAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis" MaxLines="2" TextWrapping="Wrap"/>
+                                        <TextBlock Grid.Column="1" Text="{x:Bind PartIdDisplay}" FontSize="11" VerticalAlignment="Center"
+                                                   HorizontalAlignment="Center" TextAlignment="Center"/>
+                                        <TextBlock Grid.Column="2" Text="{x:Bind Quantity}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"
+                                                   HorizontalAlignment="Center" TextAlignment="Center"/>
+                                        <TextBlock Grid.Column="3" Text="{x:Bind Category}" FontSize="11" VerticalAlignment="Center"
+                                                   HorizontalAlignment="Center" TextAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                        <Border Grid.Column="4" CornerRadius="6" Padding="8,4" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                            <TextBlock Text="{x:Bind Status}" FontSize="9" FontWeight="SemiBold"
+                                                       HorizontalAlignment="Center" TextAlignment="Center"/>
                                         </Border>
                                         <Button Grid.Column="5"
                                                 Style="{StaticResource GhostButtonStyle}"
                                                 Padding="8,4"
                                                 MinWidth="36"
+                                                HorizontalAlignment="Center"
                                                 Tag="{x:Bind}"
                                                 Click="OnInventoryRowActionsClick"
                                                 ToolTipService.ToolTip="More actions">
@@ -378,7 +433,7 @@
                                 </DataTemplate>
                             </ListView.ItemTemplate>
                         </ListView>
-                        <components:TablePaginationBar />
+                        <components:TablePaginationBar DataContext="{x:Bind ViewModel, Mode=OneWay}" />
                     </StackPanel>
                 </Border>
 
