@@ -16,6 +16,8 @@ public sealed class NavigationService : INavigationService
         [AppPage.Alerts]             = typeof(AlertsPage),
         [AppPage.Audit]              = typeof(AuditPage),
         [AppPage.Templates]          = typeof(TemplatesPage),
+        [AppPage.TemplateData]       = typeof(TemplateDataPage),
+        [AppPage.TemplateDataEdit]   = typeof(MasterDataPage),
         [AppPage.WorksheetRelations] = typeof(WorksheetRelationsPage),
         [AppPage.LinkedTemplates]    = typeof(LinkedTemplatesPage),
         [AppPage.ViewData]           = typeof(ViewDataPage),

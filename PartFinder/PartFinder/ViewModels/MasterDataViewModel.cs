@@ -12,11 +12,13 @@ public sealed partial class MasterDataViewModel : ViewModelBase
     private readonly ITemplateSchemaService _templateSchema;
     private readonly IMasterDataRecordsService _records;
     private readonly IContextActionsService _contextActions;
+    private readonly BackendApiClient _api;
     private readonly ActivityLogger _activityLogger;
 
     private bool _suppressTemplateSelectionChange;
     private IReadOnlyList<PartTemplateDefinition> _cachedTemplates = Array.Empty<PartTemplateDefinition>();
     private IReadOnlyList<TemplateContextAction> _loadedContextActions = Array.Empty<TemplateContextAction>();
+    private readonly List<WorksheetRelationDto> _worksheetRelations = [];
     private CancellationTokenSource? _templateLoadCts;
     private readonly Dictionary<string, string> _columnFilters = new(StringComparer.OrdinalIgnoreCase);
 
@@ -28,12 +30,14 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         ITemplateSchemaService templateSchema,
         IMasterDataRecordsService records,
         IContextActionsService contextActions,
+        BackendApiClient api,
         ActivityLogger activityLogger,
         ICurrentUserAccessService access)
     {
         _templateSchema = templateSchema;
         _records = records;
         _contextActions = contextActions;
+        _api = api;
         _activityLogger = activityLogger;
         _access = access;
     }
@@ -64,6 +68,29 @@ public sealed partial class MasterDataViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool isEditMode;
+
+    [ObservableProperty]
+    private bool isAddColumnPanelVisible;
+
+    [ObservableProperty]
+    private MasterDataSurfaceMode surfaceMode = MasterDataSurfaceMode.ReadOnlyCatalog;
+
+    /// <summary>Worksheet relation hyperlinks (Linked Templates browse only).</summary>
+    public bool EnableWorksheetHyperlinks => SurfaceMode == MasterDataSurfaceMode.LinkedBrowse;
+
+    public bool IsCatalogReadOnly => SurfaceMode == MasterDataSurfaceMode.ReadOnlyCatalog;
+
+    public bool ShowSpreadsheetEditChrome => SurfaceMode == MasterDataSurfaceMode.TemplateEdit;
+
+    public bool ShowImportExportToolbar => SurfaceMode == MasterDataSurfaceMode.LinkedBrowse;
+
+    public bool IsEmbeddedLinkedBrowse => SurfaceMode == MasterDataSurfaceMode.LinkedBrowse;
+
+    public bool ShowTemplatePickerInChrome =>
+        !IsEmbeddedLinkedBrowse
+        && (SurfaceMode == MasterDataSurfaceMode.ReadOnlyCatalog
+            ? DataTemplates.Count > 0
+            : ShowTemplatePicker);
 
     public string EditModeButtonText => IsEditMode ? "Stop Editing" : "Edit Data";
 
@@ -143,9 +170,26 @@ public sealed partial class MasterDataViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(EditModeButtonText));
         OnPropertyChanged(nameof(CanAddRows));
+        OnPropertyChanged(nameof(CanDeleteRows));
         OnPropertyChanged(nameof(CanManageColumns));
         OnPropertyChanged(nameof(CanRemoveColumns));
         AddRowCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnSurfaceModeChanged(MasterDataSurfaceMode value)
+    {
+        if (value is MasterDataSurfaceMode.ReadOnlyCatalog or MasterDataSurfaceMode.LinkedBrowse)
+        {
+            IsEditMode = false;
+        }
+
+        OnPropertyChanged(nameof(EnableWorksheetHyperlinks));
+        OnPropertyChanged(nameof(IsCatalogReadOnly));
+        OnPropertyChanged(nameof(ShowSpreadsheetEditChrome));
+        OnPropertyChanged(nameof(ShowTemplatePickerInChrome));
+        OnPropertyChanged(nameof(CanAddRows));
+        OnPropertyChanged(nameof(CanManageColumns));
+        OnPropertyChanged(nameof(CanRemoveColumns));
     }
 
     partial void OnSelectedDataTemplateChanged(PartTemplateDefinition? value)
@@ -155,10 +199,90 @@ public sealed partial class MasterDataViewModel : ViewModelBase
             return;
         }
 
+        OnPropertyChanged(nameof(ShowTemplatePickerInChrome));
         _ = LoadForTemplateAsync(value.Id);
     }
 
-    /// <summary>Initial load: templates list + default grid (Master Data if present).</summary>
+    public async Task InitializeSurfaceAsync(
+        MasterDataNavigationArgs? args = null,
+        CancellationToken cancellationToken = default)
+    {
+        args ??= new MasterDataNavigationArgs();
+        SurfaceMode = args.Mode;
+
+        switch (args.Mode)
+        {
+            case MasterDataSurfaceMode.TemplateEdit:
+                if (string.IsNullOrWhiteSpace(args.TemplateId))
+                {
+                    StatusMessage = "No template selected for editing.";
+                    return;
+                }
+
+                await LoadForTemplateEditAsync(args.TemplateId, args.StartInEditMode, cancellationToken).ConfigureAwait(true);
+                return;
+            case MasterDataSurfaceMode.LinkedBrowse:
+                await LoadCatalogAsync(cancellationToken).ConfigureAwait(true);
+                return;
+            default:
+                await LoadCatalogAsync(cancellationToken).ConfigureAwait(true);
+                return;
+        }
+    }
+
+    /// <summary>Initial load: all templates + first grid selection (catalog / linked browse).</summary>
+    public async Task LoadCatalogAsync(CancellationToken cancellationToken = default) =>
+        await LoadAsync(cancellationToken).ConfigureAwait(true);
+
+    public async Task LoadForTemplateEditAsync(
+        string templateId,
+        bool startInEditMode,
+        CancellationToken cancellationToken = default)
+    {
+        SurfaceMode = MasterDataSurfaceMode.TemplateEdit;
+        ShowTemplatePicker = false;
+        IsEditMode = false;
+
+        try
+        {
+            _cachedTemplates = await _templateSchema
+                .GetTemplatesAsync(cancellationToken)
+                .ConfigureAwait(true);
+            DataTemplates.Clear();
+            foreach (var t in _cachedTemplates.OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                DataTemplates.Add(t);
+            }
+        }
+        catch
+        {
+            // Link pickers may fall back to schema refresh later.
+        }
+
+        var pick = _cachedTemplates.FirstOrDefault(t => t.Id == templateId)
+                   ?? DataTemplates.FirstOrDefault(t => t.Id == templateId);
+        if (pick is null)
+        {
+            StatusMessage = "Template not found.";
+            return;
+        }
+
+        _suppressTemplateSelectionChange = true;
+        SelectedDataTemplate = pick;
+        _suppressTemplateSelectionChange = false;
+
+        await LoadForTemplateAsync(
+            templateId,
+            cancellationToken,
+            restoreEditModeAfterLoad: startInEditMode && CanEditMasterData).ConfigureAwait(true);
+
+        if (startInEditMode && CanEditMasterData)
+        {
+            IsEditMode = true;
+        }
+    }
+
+    /// <summary>Initial load: templates list + default grid.</summary>
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
         IsLoading = true;
@@ -195,7 +319,7 @@ public sealed partial class MasterDataViewModel : ViewModelBase
                 DataTemplates.Add(t);
             }
 
-            ShowTemplatePicker = DataTemplates.Count > 1;
+            ShowTemplatePicker = DataTemplates.Count > 0;
 
             var master = _cachedTemplates.FirstOrDefault(
                 t => string.Equals(t.Name, MongoTemplateSchemaService.MasterDataTemplateName, StringComparison.OrdinalIgnoreCase));
@@ -206,6 +330,7 @@ public sealed partial class MasterDataViewModel : ViewModelBase
             _suppressTemplateSelectionChange = false;
 
             await LoadForTemplateAsync(pick.Id, cancellationToken).ConfigureAwait(true);
+            OnPropertyChanged(nameof(ShowTemplatePickerInChrome));
         }
         catch (InvalidOperationException)
         {
@@ -236,13 +361,14 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         IsLoading = true;
         StatusMessage = null;
         ShowNoTemplateHint = false;
-        if (!preserveEditMode)
+        if (!(preserveEditMode && SurfaceMode == MasterDataSurfaceMode.TemplateEdit))
         {
             IsEditMode = false;
         }
         Columns.Clear();
         Rows.Clear();
         _loadedContextActions = Array.Empty<TemplateContextAction>();
+        _worksheetRelations.Clear();
         _columnFilters.Clear();
 
         try
@@ -288,6 +414,14 @@ public sealed partial class MasterDataViewModel : ViewModelBase
             _loadedContextActions = await _contextActions
                 .GetForSourceTemplateAsync(template.Id, loadCt)
                 .ConfigureAwait(true);
+
+            var (relationsOk, _, relations) = await _api.GetRelationsAsync(loadCt).ConfigureAwait(true);
+            if (relationsOk)
+            {
+                _worksheetRelations.Clear();
+                _worksheetRelations.AddRange(
+                    WorksheetRelationBidirectional.GetOutboundRelations(template.Id, relations));
+            }
 
             loadCt.ThrowIfCancellationRequested();
             if (!IsLoadStillCurrent(loadForId))
@@ -359,12 +493,14 @@ public sealed partial class MasterDataViewModel : ViewModelBase
             if (IsLoadStillCurrent(loadForId))
             {
                 IsLoading = false;
-                if (preserveEditMode)
+                if (preserveEditMode
+                    || (SurfaceMode == MasterDataSurfaceMode.TemplateEdit && restoreEditModeAfterLoad))
                 {
                     IsEditMode = true;
                 }
 
                 OnPropertyChanged(nameof(CanAddRows));
+                OnPropertyChanged(nameof(CanDeleteRows));
                 OnPropertyChanged(nameof(CanManageColumns));
                 OnPropertyChanged(nameof(CanRemoveColumns));
                 AddRowCommand.NotifyCanExecuteChanged();
@@ -440,6 +576,38 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         }
     }
 
+    public bool CanDeleteRows =>
+        ShowSpreadsheetEditChrome && IsEditMode && CanDeleteMasterData && SelectedDataTemplate is not null;
+
+    public async Task<bool> DeleteRowAsync(
+        MasterDataRowViewModel row,
+        CancellationToken cancellationToken = default)
+    {
+        if (!CanDeleteRows || SelectedDataTemplate is null)
+        {
+            StatusMessage = "You do not have permission to delete rows.";
+            return false;
+        }
+
+        var templateId = SelectedDataTemplate.Id;
+        Rows.Remove(row);
+        if (!string.IsNullOrWhiteSpace(row.RowId))
+        {
+            try
+            {
+                await _records.DeleteRowAsync(templateId, row.RowId, cancellationToken).ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = "Error deleting row: " + ex.Message;
+                return false;
+            }
+        }
+
+        StatusMessage = "Row removed.";
+        return true;
+    }
+
     [RelayCommand(CanExecute = nameof(CanAddRows))]
     private void AddRow()
     {
@@ -459,10 +627,10 @@ public sealed partial class MasterDataViewModel : ViewModelBase
     }
 
     public bool CanManageColumns =>
-        IsEditMode && Columns.Count > 0 && (CanEditMasterData || CanAddMasterData);
+        ShowSpreadsheetEditChrome && IsEditMode && Columns.Count > 0 && (CanEditMasterData || CanAddMasterData);
 
     public bool CanRemoveColumns =>
-        IsEditMode && CanEditMasterData && Columns.Count > 1;
+        ShowSpreadsheetEditChrome && IsEditMode && CanEditMasterData && Columns.Count > 1;
 
     public async Task<bool> InsertColumnAtAsync(int index, string columnName, CancellationToken cancellationToken = default)
     {
@@ -529,8 +697,13 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         try
         {
             await _templateSchema.SaveTemplateAsync(patched, cancellationToken).ConfigureAwait(true);
-            await LoadForTemplateAsync(SelectedDataTemplate.Id, cancellationToken).ConfigureAwait(true);
-            StatusMessage = $"Column \"{trimmed}\" added.";
+            await LoadForTemplateAsync(
+                SelectedDataTemplate.Id,
+                cancellationToken,
+                restoreEditModeAfterLoad: true).ConfigureAwait(true);
+            IsEditMode = true;
+            IsAddColumnPanelVisible = false;
+            StatusMessage = $"Column \"{trimmed}\" added. You can edit cells in the new column, then Save.";
             _activityLogger.LogUserAction("Column Added",
                 $"Column \"{trimmed}\" added to template \"{SelectedDataTemplate.Name}\"");
             return true;
@@ -654,8 +827,17 @@ public sealed partial class MasterDataViewModel : ViewModelBase
             }
 
             await ResolveRecordLinkLabelsAsync(cancellationToken).ConfigureAwait(true);
-            IsEditMode = false;
-            StatusMessage = "Saved. You're back in view mode.";
+            IsAddColumnPanelVisible = false;
+            if (SurfaceMode == MasterDataSurfaceMode.TemplateEdit)
+            {
+                StatusMessage = "Saved.";
+            }
+            else
+            {
+                IsEditMode = false;
+                StatusMessage = "Saved. You're back in view mode.";
+            }
+
             _activityLogger.LogUserAction("Master Data Saved",
                 $"Saved {Rows.Count} rows for template \"{SelectedDataTemplate.Name}\"");
         }
@@ -680,7 +862,7 @@ public sealed partial class MasterDataViewModel : ViewModelBase
 
         IsEditMode = !IsEditMode;
         StatusMessage = IsEditMode
-            ? "Edit mode: add columns above the grid, remove with × on column headers, then Save."
+            ? "Edit mode: use Add row / Add column below the table, then Save."
             : "View mode: browse data only.";
     }
 
@@ -771,6 +953,164 @@ public sealed partial class MasterDataViewModel : ViewModelBase
             .Where(a => string.Equals(a.SourceFieldKey, fieldKey, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
+    public bool HasWorksheetRelationsForFieldKey(string fieldKey)
+    {
+        var field = Columns.FirstOrDefault(c => string.Equals(c.Key, fieldKey, StringComparison.OrdinalIgnoreCase));
+        return field is not null && GetWorksheetRelationsForField(field).Count > 0;
+    }
+
+    /// <summary>
+    /// Worksheet links configured on this primary template for the clicked column (trigger or match source).
+    /// </summary>
+    public IReadOnlyList<WorksheetRelationDto> GetWorksheetRelationsForField(TemplateFieldDefinition field) =>
+        _worksheetRelations
+            .Where(r => RelationAppliesToFieldColumn(r, field.Label))
+            .ToList();
+
+    private static bool RelationAppliesToFieldColumn(WorksheetRelationDto relation, string fieldLabel)
+    {
+        foreach (var label in WorksheetRelationBidirectional.GetMatchKeyColumnLabels(relation))
+        {
+            if (string.Equals(label, fieldLabel, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public async Task<IReadOnlyList<WorksheetRelationMatchResult>> QueryWorksheetRelationsForCellAsync(
+        string fieldKey,
+        MasterDataRowViewModel row,
+        CancellationToken cancellationToken = default)
+    {
+        if (SelectedDataTemplate is null)
+        {
+            return [];
+        }
+
+        var field = Columns.FirstOrDefault(c => string.Equals(c.Key, fieldKey, StringComparison.OrdinalIgnoreCase));
+        if (field is null)
+        {
+            return [];
+        }
+
+        var clickedCell = row.Cells.FirstOrDefault(c =>
+            string.Equals(c.FieldKey, fieldKey, StringComparison.OrdinalIgnoreCase));
+        var clickedValue = clickedCell?.Text?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(clickedValue))
+        {
+            return [];
+        }
+
+        var sourceMap = BuildSourceRowMapForRelationMatching(row, Columns);
+        var relations = GetWorksheetRelationsForField(field);
+        if (relations.Count == 0)
+        {
+            return [];
+        }
+
+        var results = new List<WorksheetRelationMatchResult>();
+        foreach (var relation in relations)
+        {
+            var lookup = _cachedTemplates.FirstOrDefault(t => t.Id == relation.LookupTemplateId)
+                         ?? await _templateSchema.GetTemplateAsync(relation.LookupTemplateId, cancellationToken)
+                             .ConfigureAwait(true);
+            if (lookup is null)
+            {
+                continue;
+            }
+
+            var lookupRows = await _records.GetRowsAsync(relation.LookupTemplateId, cancellationToken)
+                .ConfigureAwait(true);
+            if (lookupRows.Count == 0)
+            {
+                lookupRows = await _records
+                    .GetStoredRowsAsync(relation.LookupTemplateId, cancellationToken)
+                    .ConfigureAwait(true);
+            }
+
+            var matches = lookupRows
+                .Where(r => RowMatchesWorksheetRelation(
+                    ExpandRowValuesForTemplate(r.Values, lookup),
+                    lookup,
+                    relation,
+                    sourceMap,
+                    SelectedDataTemplate,
+                    field.Label))
+                .ToList();
+
+            if (matches.Count == 0)
+            {
+                continue;
+            }
+
+            var header = !string.IsNullOrWhiteSpace(relation.MenuLabel)
+                ? relation.MenuLabel
+                : lookup.Name;
+            results.Add(new WorksheetRelationMatchResult(header, lookup, relation, matches));
+        }
+
+        return results;
+    }
+
+    /// <summary>
+    /// Row values used to match worksheet relations (display text, not linked row ids).
+    /// </summary>
+    public static IReadOnlyDictionary<string, string> BuildSourceRowMapForRelationMatching(
+        MasterDataRowViewModel row,
+        IReadOnlyList<TemplateFieldDefinition>? columnDefs = null)
+    {
+        var d = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var cell in row.Cells)
+        {
+            d[cell.FieldKey] = cell.Text?.Trim() ?? string.Empty;
+        }
+
+        if (columnDefs is not null)
+        {
+            foreach (var col in columnDefs)
+            {
+                var cell = row.Cells.FirstOrDefault(c =>
+                    string.Equals(c.FieldKey, col.Key, StringComparison.OrdinalIgnoreCase));
+                if (cell is null)
+                {
+                    continue;
+                }
+
+                var text = cell.Text?.Trim() ?? string.Empty;
+                d[col.Label] = text;
+                d[col.Key] = text;
+            }
+        }
+
+        return d;
+    }
+
+    public async Task<WorksheetRelationMatchResult?> QueryDirectRecordLinkAsync(
+        MasterDataCellViewModel cell,
+        CancellationToken cancellationToken = default)
+    {
+        if (!cell.IsRecordLink
+            || string.IsNullOrWhiteSpace(cell.LinkedRowId)
+            || string.IsNullOrWhiteSpace(cell.LinkedTemplateId))
+        {
+            return null;
+        }
+
+        var lookup = await _templateSchema.GetTemplateAsync(cell.LinkedTemplateId, cancellationToken).ConfigureAwait(true);
+        if (lookup is null)
+        {
+            return null;
+        }
+
+        var rows = await _records
+            .GetRowsByIdsAsync(cell.LinkedTemplateId, [cell.LinkedRowId], cancellationToken)
+            .ConfigureAwait(true);
+        return new WorksheetRelationMatchResult(lookup.Name, lookup, null, rows);
+    }
+
     public static IReadOnlyDictionary<string, string> BuildSourceRowMap(MasterDataRowViewModel row)
     {
         var d = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -837,6 +1177,232 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         return importedCount;
     }
 
+    private static bool RowMatchesWorksheetRelation(
+        IReadOnlyDictionary<string, string> targetValues,
+        PartTemplateDefinition lookupTemplate,
+        WorksheetRelationDto relation,
+        IReadOnlyDictionary<string, string> sourceValues,
+        PartTemplateDefinition sourceTemplate,
+        string? clickedColumnLabel = null)
+    {
+        var pairs = GetEffectiveMatchPairs(relation);
+        if (pairs.Count == 0)
+        {
+            return false;
+        }
+
+        var comparedAny = false;
+        foreach (var pair in pairs)
+        {
+            if (!string.IsNullOrWhiteSpace(clickedColumnLabel)
+                && !string.Equals(pair.SourceColumn, clickedColumnLabel, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var sourceValue = GetRowValueForColumn(sourceValues, sourceTemplate, pair.SourceColumn);
+            if (string.IsNullOrWhiteSpace(sourceValue))
+            {
+                continue;
+            }
+
+            comparedAny = true;
+
+            var targetValue = GetRowValueForColumn(targetValues, lookupTemplate, pair.TargetColumn);
+            if (string.IsNullOrWhiteSpace(targetValue))
+            {
+                return false;
+            }
+
+            if (!string.Equals(sourceValue.Trim(), targetValue.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
+        return comparedAny;
+    }
+
+    private static List<RelationMatchPairDto> GetEffectiveMatchPairs(WorksheetRelationDto relation)
+    {
+        WorksheetRelationBidirectional.EnsureMatchKeysFromTrigger(relation);
+
+        var pairs = new List<RelationMatchPairDto>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in relation.MatchKeys)
+        {
+            var source = pair.SourceColumn?.Trim() ?? string.Empty;
+            if (string.IsNullOrEmpty(source))
+            {
+                continue;
+            }
+
+            var target = string.IsNullOrWhiteSpace(pair.TargetColumn) ? source : pair.TargetColumn.Trim();
+            var signature = $"{source}\0{target}";
+            if (!seen.Add(signature))
+            {
+                continue;
+            }
+
+            pairs.Add(new RelationMatchPairDto { SourceColumn = source, TargetColumn = target });
+        }
+
+        if (pairs.Count == 0 && !string.IsNullOrWhiteSpace(relation.TriggerColumn))
+        {
+            var trigger = relation.TriggerColumn.Trim();
+            pairs.Add(new RelationMatchPairDto { SourceColumn = trigger, TargetColumn = trigger });
+        }
+
+        return pairs;
+    }
+
+    private static IReadOnlyDictionary<string, string> ExpandRowValuesForTemplate(
+        IReadOnlyDictionary<string, string> raw,
+        PartTemplateDefinition template)
+    {
+        var expanded = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var kv in raw)
+        {
+            expanded[kv.Key] = kv.Value ?? string.Empty;
+        }
+
+        foreach (var field in template.Fields)
+        {
+            var resolved = GetRowValueForColumn(raw, template, field.Label)
+                           ?? GetRowValueForColumn(raw, template, field.Key)
+                           ?? string.Empty;
+            expanded[field.Key] = resolved;
+            expanded[field.Label] = resolved;
+        }
+
+        return expanded;
+    }
+
+    private static string? GetRowValueForColumn(
+        IReadOnlyDictionary<string, string> values,
+        PartTemplateDefinition template,
+        string columnLabel)
+    {
+        if (string.IsNullOrWhiteSpace(columnLabel))
+        {
+            return null;
+        }
+
+        var label = columnLabel.Trim();
+        var field = template.Fields.FirstOrDefault(f =>
+                        string.Equals(f.Label, label, StringComparison.OrdinalIgnoreCase))
+                    ?? template.Fields.FirstOrDefault(f =>
+                        string.Equals(f.Key, label, StringComparison.OrdinalIgnoreCase));
+
+        if (field is not null)
+        {
+            if (values.TryGetValue(field.Key, out var byKey) && !string.IsNullOrWhiteSpace(byKey))
+            {
+                return byKey;
+            }
+
+            if (values.TryGetValue(field.Label, out var byLabel) && !string.IsNullOrWhiteSpace(byLabel))
+            {
+                return byLabel;
+            }
+        }
+
+        foreach (var kv in values)
+        {
+            if (string.Equals(kv.Key, label, StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(kv.Value))
+            {
+                return kv.Value;
+            }
+        }
+
+        return null;
+    }
+
+    public static IReadOnlyList<TemplateFieldDefinition> ResolveRelationDisplayFields(
+        PartTemplateDefinition lookupTemplate,
+        WorksheetRelationDto? relation)
+    {
+        if (relation is null || relation.DisplayColumns.Count == 0)
+        {
+            return [];
+        }
+
+        var ordered = lookupTemplate.Fields.OrderBy(f => f.DisplayOrder).ToList();
+        var picked = new List<TemplateFieldDefinition>();
+        foreach (var label in relation.DisplayColumns)
+        {
+            var field = ordered.FirstOrDefault(f =>
+                string.Equals(f.Label, label, StringComparison.OrdinalIgnoreCase));
+            if (field is not null)
+            {
+                picked.Add(field);
+            }
+        }
+
+        return picked;
+    }
+
+    public static IReadOnlyList<TemplateFieldDefinition> GetAllBrowsableFields(PartTemplateDefinition lookupTemplate) =>
+        lookupTemplate.Fields.OrderBy(f => f.DisplayOrder).ToList();
+
+    public static bool IsInternalBrowseField(TemplateFieldDefinition field) =>
+        field.Key.StartsWith("_", StringComparison.Ordinal)
+        || string.Equals(field.Key, "org_code", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Initial checked columns in the linked-data panel (user can change via checkboxes).</summary>
+    public static IReadOnlyCollection<string> GetDefaultSelectedFieldKeysForBrowse(
+        PartTemplateDefinition lookupTemplate,
+        WorksheetRelationDto? relation)
+    {
+        var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var fields = lookupTemplate.Fields;
+
+        if (relation?.DisplayColumns is { Count: > 0 } displayLabels)
+        {
+            foreach (var label in displayLabels)
+            {
+                var field = fields.FirstOrDefault(f =>
+                    string.Equals(f.Label, label, StringComparison.OrdinalIgnoreCase));
+                if (field is not null)
+                {
+                    keys.Add(field.Key);
+                }
+            }
+        }
+
+        if (relation?.MatchKeys is { Count: > 0 } pairs)
+        {
+            foreach (var pair in pairs)
+            {
+                var field = fields.FirstOrDefault(f =>
+                    string.Equals(f.Label, pair.TargetColumn, StringComparison.OrdinalIgnoreCase));
+                if (field is not null)
+                {
+                    keys.Add(field.Key);
+                }
+            }
+        }
+
+        if (keys.Count == 0)
+        {
+            foreach (var field in fields.OrderBy(f => f.DisplayOrder))
+            {
+                if (!IsInternalBrowseField(field))
+                {
+                    keys.Add(field.Key);
+                }
+            }
+        }
+
+        if (keys.Count == 0 && fields.Count > 0)
+        {
+            keys.Add(fields.OrderBy(f => f.DisplayOrder).First().Key);
+        }
+
+        return keys;
+    }
+
     private static bool RowMatchesAction(
         IReadOnlyDictionary<string, string> targetValues,
         IReadOnlyList<ContextActionMatchRule> rules,
@@ -891,4 +1457,16 @@ public sealed partial class MasterDataViewModel : ViewModelBase
 
         return $"{baseKey}_{index}";
     }
+}
+
+public sealed class WorksheetRelationMatchResult(
+    string tabHeader,
+    PartTemplateDefinition lookupTemplate,
+    WorksheetRelationDto? relation,
+    IReadOnlyList<MasterDataRowRecord> matches)
+{
+    public string TabHeader { get; } = tabHeader;
+    public PartTemplateDefinition LookupTemplate { get; } = lookupTemplate;
+    public WorksheetRelationDto? Relation { get; } = relation;
+    public IReadOnlyList<MasterDataRowRecord> Matches { get; } = matches;
 }

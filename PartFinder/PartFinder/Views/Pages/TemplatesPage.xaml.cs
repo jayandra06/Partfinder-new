@@ -30,6 +30,7 @@ public sealed partial class TemplatesPage : Page
     private bool _acceptBulkProgress;
     private int _bulkUploaded;
     private int _bulkUploadTotal;
+    private bool _showingFavouritesOnly;
 
     public TemplatesPage()
     {
@@ -68,6 +69,13 @@ public sealed partial class TemplatesPage : Page
 
         // Then load templates
         await vm.LoadAsync().ConfigureAwait(true);
+        vm.Templates.CollectionChanged += (_, _) =>
+        {
+            if (AllTemplatesPanel.Visibility == Visibility.Visible)
+            {
+                RefreshTemplatesListSource();
+            }
+        };
         OnShowAllTemplatesClick(this, new RoutedEventArgs());
 
         var pending = App.Services.GetRequiredService<IAppStateStore>().TemplatesPendingAction;
@@ -83,6 +91,12 @@ public sealed partial class TemplatesPage : Page
             if (args.PropertyName == nameof(TemplatesViewModel.IsCreatingTemplate) && vm.IsCreatingTemplate)
             {
                 HideTemplateBrowsingPanels();
+            }
+
+            if (args.PropertyName == nameof(TemplatesViewModel.IsCreatingTemplate) && !vm.IsCreatingTemplate)
+            {
+                AllTemplatesPanel.Visibility = Visibility.Visible;
+                RefreshTemplatesListSource();
             }
 
             if (args.PropertyName == nameof(TemplatesViewModel.IsCreatingTemplate) &&
@@ -277,14 +291,6 @@ public sealed partial class TemplatesPage : Page
         DispatcherQueue.TryEnqueue(Apply);
     }
 
-    private async void OnShowFavouritesInlineClick(object sender, RoutedEventArgs e)
-    {
-        if (DataContext is TemplatesViewModel vm)
-        {
-            await FavouritesSubPageControl.ShowAsync(vm).ConfigureAwait(true);
-        }
-    }
-
     private void HideTemplateBrowsingPanels()
     {
         FavouritesSubPageControl.Visibility = Visibility.Collapsed;
@@ -293,44 +299,80 @@ public sealed partial class TemplatesPage : Page
 
     private void OnShowAllTemplatesClick(object sender, RoutedEventArgs e)
     {
-        if (DataContext is not TemplatesViewModel vm) return;
+        if (DataContext is not TemplatesViewModel) return;
 
+        _showingFavouritesOnly = false;
         FavouritesSubPageControl.Visibility = Visibility.Collapsed;
         AllTemplatesPanel.Visibility = Visibility.Visible;
 
-        // Toggle buttons
         ViewAllTemplatesButton.Visibility = Visibility.Collapsed;
         ViewFavouritesButton.Visibility = Visibility.Visible;
 
-        // Update page indicator
         PageIndicatorIcon.Glyph = "\uE8A5";
         PageIndicatorText.Text = "Your All Templates";
 
-        BuildAllTemplatesList(vm);
+        RefreshTemplatesListSource();
     }
 
     private void OnShowFavouritesClick(object sender, RoutedEventArgs e)
     {
-        OnCloseAllTemplatesClick(sender, e);
-    }
+        if (DataContext is not TemplatesViewModel) return;
 
-    private void OnCloseAllTemplatesClick(object sender, RoutedEventArgs e)
-    {
-        AllTemplatesPanel.Visibility = Visibility.Collapsed;
-        FavouritesSubPageControl.Visibility = Visibility.Visible;
+        _showingFavouritesOnly = true;
+        FavouritesSubPageControl.Visibility = Visibility.Collapsed;
+        AllTemplatesPanel.Visibility = Visibility.Visible;
 
-        // Toggle buttons
         ViewAllTemplatesButton.Visibility = Visibility.Visible;
         ViewFavouritesButton.Visibility = Visibility.Collapsed;
 
-        // Update page indicator
         PageIndicatorIcon.Glyph = "\uE735";
         PageIndicatorText.Text = "Your Favourite Templates";
+
+        RefreshTemplatesListSource();
     }
 
-    private void BuildAllTemplatesList(TemplatesViewModel vm)
+    private void RefreshTemplatesListSource()
     {
-        AllTemplatesCarouselControl.Load(vm);
+        if (DataContext is not TemplatesViewModel vm)
+        {
+            return;
+        }
+
+        IEnumerable<PartTemplateDefinition> source;
+        if (_showingFavouritesOnly)
+        {
+            var favouriteIds = App.Services.GetRequiredService<IFavouriteStore>().GetAll();
+            source = vm.Templates.Where(t => favouriteIds.Contains(t.Id));
+        }
+        else
+        {
+            source = vm.Templates;
+        }
+
+        var list = source.OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        TemplatesListView.ItemsSource = list;
+        if (_showingFavouritesOnly)
+        {
+            EmptyTemplatesHint.Text = list.Count == 0
+                ? "No favourite templates yet. Star templates to see them here."
+                : string.Empty;
+        }
+        else
+        {
+            EmptyTemplatesHint.Text = "No templates yet. Use Create New Template or Bulk Upload.";
+        }
+
+        EmptyTemplatesHint.Visibility = list.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void OnTemplatesListItemClick(object sender, ItemClickEventArgs e)
+    {
+        if (e.ClickedItem is not PartTemplateDefinition template)
+        {
+            return;
+        }
+
+        App.Services.GetRequiredService<INavigationService>().Navigate(AppPage.TemplateData, template.Id);
     }
 
     private void OnTemplateCanvasPointerWheelChanged(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
@@ -814,17 +856,6 @@ public sealed partial class TemplatesPage : Page
         return null;
     }
 
-    private async void OnFavouritesBackRequested(object? sender, EventArgs e)
-    {
-        if (DataContext is not TemplatesViewModel vm)
-        {
-            return;
-        }
-
-        await FavouritesSubPageControl.PlayExitAsync().ConfigureAwait(true);
-        vm.HideFavouritesCommand.Execute(null);
-    }
-
     private void OnDataContextChanged(FrameworkElement sender, DataContextChangedEventArgs args)
     {
         if (_boundVm is not null)
@@ -853,9 +884,9 @@ public sealed partial class TemplatesPage : Page
             UpdateFavoriteStars();
 
             // If the All Templates panel is open, rebuild it so star states stay in sync
-            if (AllTemplatesPanel.Visibility == Visibility.Visible && DataContext is TemplatesViewModel vm)
+            if (AllTemplatesPanel.Visibility == Visibility.Visible)
             {
-                BuildAllTemplatesList(vm);
+                RefreshTemplatesListSource();
             }
         }
     }
@@ -868,10 +899,9 @@ public sealed partial class TemplatesPage : Page
         }
 
         // Find the ListView and update all star buttons
-        var listView = FindName("TemplatesList") as ListView;
+        var listView = TemplatesListView;
         if (listView?.Items != null)
         {
-            // Force refresh of the ListView items
             foreach (var item in listView.Items)
             {
                 if (item is PartTemplateDefinition template)

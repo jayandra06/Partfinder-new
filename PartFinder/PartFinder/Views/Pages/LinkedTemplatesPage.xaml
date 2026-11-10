@@ -3,12 +3,11 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:converters="using:PartFinder.Converters"
-    xmlns:viewmodels="using:PartFinder.ViewModels"
     xmlns:models="using:PartFinder.Models">
 
     <Page.Resources>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
-        <converters:InvertedBoolToVisibilityConverter x:Key="InvertedBoolToVisibilityConverter" />
+        <converters:StringToVisibilityConverter x:Key="StringToVisibilityConverter" />
 
         <Storyboard x:Name="PageEntranceStoryboard">
             <DoubleAnimation
@@ -24,21 +23,6 @@
                 <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
             </DoubleAnimation>
         </Storyboard>
-
-        <Style x:Key="BrowseListItemStyle" TargetType="ListViewItem">
-            <Setter Property="Padding" Value="0" />
-            <Setter Property="Margin" Value="0,0,0,4" />
-            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-            <Setter Property="MinHeight" Value="0" />
-        </Style>
-
-        <Style x:Key="BrowseTemplateRowStyle" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource GridRowAltBackgroundBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource GlassStrokeBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="12" />
-            <Setter Property="Padding" Value="12,10" />
-        </Style>
     </Page.Resources>
 
     <Grid
@@ -53,11 +37,12 @@
         </Grid.RenderTransform>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" MinHeight="360" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <StackPanel Spacing="3">
+        <StackPanel Spacing="4">
             <TextBlock
                 Text="LINKED TEMPLATES"
                 FontSize="10"
@@ -65,145 +50,44 @@
                 CharacterSpacing="120"
                 FontWeight="SemiBold" />
             <TextBlock
-                Text="Browse linked data"
+                Text="Browse &amp; link"
                 FontSize="22"
                 FontWeight="SemiBold"
                 Foreground="{StaticResource TextPrimaryBrush}" />
             <TextBlock
-                Text="Select a template, open a linked template, choose columns, and preview its rows. To create or edit links, use Link Templates in the sidebar."
+                Text="Select a template, then click column values with links to open matching data from linked templates in the panel on the right."
                 FontSize="12"
                 Foreground="{StaticResource TextSecondaryBrush}"
-                TextWrapping="WrapWholeWords" />
+                TextWrapping="WrapWholeWords"
+                MaxWidth="920" />
         </StackPanel>
 
         <Border
             Grid.Row="1"
+            Padding="10,8"
+            HorizontalAlignment="Left"
             Background="{StaticResource ElevatedCardBackgroundBrush}"
-            BorderBrush="{StaticResource BorderDefaultBrush}"
+            BorderBrush="{StaticResource GlassStrokeBrush}"
             BorderThickness="1"
-            CornerRadius="10"
-            Padding="16"
-            Translation="0,0,24">
-            <Border.Shadow><ThemeShadow/></Border.Shadow>
-            <Grid ColumnSpacing="14">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="260" />
-                    <ColumnDefinition Width="260" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-
-                <StackPanel Spacing="10">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <FontIcon Glyph="&#xE8A5;" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}" VerticalAlignment="Center" />
-                        <TextBlock Text="TEMPLATES" FontSize="9" CharacterSpacing="80" FontWeight="SemiBold" Foreground="{StaticResource TextTertiaryBrush}" />
-                    </StackPanel>
-                    <ListView
-                        ItemsSource="{Binding Templates}"
-                        SelectedItem="{Binding BrowseSourceTemplate, Mode=TwoWay}"
-                        SelectionMode="Single"
-                        ItemContainerStyle="{StaticResource BrowseListItemStyle}">
-                        <ListView.ItemTemplate>
-                            <DataTemplate x:DataType="models:PartTemplateDefinition">
-                                <Border Style="{StaticResource BrowseTemplateRowStyle}">
-                                    <StackPanel Spacing="2">
-                                        <TextBlock Text="{x:Bind Name}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Text="{x:Bind ColumnCountLabel}" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}" />
-                                    </StackPanel>
-                                </Border>
-                            </DataTemplate>
-                        </ListView.ItemTemplate>
-                    </ListView>
-                </StackPanel>
-
-                <StackPanel Grid.Column="1" Spacing="10">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <FontIcon Glyph="&#xE71B;" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}" VerticalAlignment="Center" />
-                        <TextBlock Text="LINKED TO SELECTION" FontSize="9" CharacterSpacing="80" FontWeight="SemiBold" Foreground="{StaticResource TextTertiaryBrush}" />
-                    </StackPanel>
-                    <TextBlock
-                        Text="Select a template on the left."
-                        FontSize="12"
-                        Foreground="{StaticResource TextTertiaryBrush}"
-                        Visibility="{Binding HasBrowseSourceTemplate, Converter={StaticResource InvertedBoolToVisibilityConverter}}" />
-                    <TextBlock
-                        Text="No saved links for this template. Use Link Templates to configure a link."
-                        FontSize="12"
-                        Foreground="{StaticResource TextTertiaryBrush}"
-                        TextWrapping="WrapWholeWords"
-                        Visibility="{Binding ShowNoLinksForBrowseMessage, Converter={StaticResource BoolToVisibilityConverter}}" />
-                    <ListView
-                        ItemsSource="{Binding LinkedTemplatesForBrowse}"
-                        SelectionMode="None"
-                        ItemContainerStyle="{StaticResource BrowseListItemStyle}"
-                        Visibility="{Binding HasLinkedTemplatesForBrowse, Converter={StaticResource BoolToVisibilityConverter}}">
-                        <ListView.ItemTemplate>
-                            <DataTemplate x:DataType="viewmodels:LinkedTemplateBrowseItem">
-                                <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Style="{StaticResource GhostButtonStyle}" Click="OnLinkedTemplateBrowseClick">
-                                    <Border Style="{StaticResource BrowseTemplateRowStyle}" Background="Transparent" BorderThickness="0">
-                                        <StackPanel Orientation="Horizontal" Spacing="8">
-                                            <FontIcon Glyph="&#xE8A7;" FontSize="13" Foreground="{StaticResource AccentPrimaryBrush}" VerticalAlignment="Center" />
-                                            <TextBlock Text="{x:Bind TemplateName}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                                        </StackPanel>
-                                    </Border>
-                                </Button>
-                            </DataTemplate>
-                        </ListView.ItemTemplate>
-                    </ListView>
-                </StackPanel>
-
-                <StackPanel Grid.Column="2" Spacing="10">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <FontIcon Glyph="&#xE8F1;" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}" VerticalAlignment="Center" />
-                        <TextBlock Text="DATA PREVIEW" FontSize="9" CharacterSpacing="80" FontWeight="SemiBold" Foreground="{StaticResource TextTertiaryBrush}" />
-                    </StackPanel>
-                    <TextBlock Text="{Binding PreviewTitle}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Visibility="{Binding HasPreviewData, Converter={StaticResource BoolToVisibilityConverter}}" />
-                    <TextBlock
-                        Text="Choose a linked template and select columns to preview its rows here."
-                        FontSize="12"
-                        Foreground="{StaticResource TextTertiaryBrush}"
-                        TextWrapping="WrapWholeWords"
-                        Visibility="{Binding HasPreviewData, Converter={StaticResource InvertedBoolToVisibilityConverter}}" />
-                    <Border
-                        Background="{StaticResource CardBackgroundBrush}"
-                        BorderBrush="{StaticResource BorderDefaultBrush}"
-                        BorderThickness="1"
-                        CornerRadius="10"
-                        MinHeight="280"
-                        Visibility="{Binding HasPreviewData, Converter={StaticResource BoolToVisibilityConverter}}">
-                        <Grid>
-                            <ScrollViewer VerticalScrollMode="Auto" VerticalScrollBarVisibility="Auto">
-                                <ListView ItemsSource="{Binding PreviewRows}" SelectionMode="None" ItemContainerStyle="{StaticResource BrowseListItemStyle}">
-                                    <ListView.ItemTemplate>
-                                        <DataTemplate x:DataType="viewmodels:LinkedTemplatePreviewRow">
-                                            <Border Padding="10,8" BorderThickness="0,0,0,1" BorderBrush="{StaticResource BorderDefaultBrush}">
-                                                <ItemsControl ItemsSource="{x:Bind Cells}">
-                                                    <ItemsControl.ItemsPanel>
-                                                        <ItemsPanelTemplate>
-                                                            <StackPanel Orientation="Horizontal" Spacing="16" />
-                                                        </ItemsPanelTemplate>
-                                                    </ItemsControl.ItemsPanel>
-                                                    <ItemsControl.ItemTemplate>
-                                                        <DataTemplate x:DataType="viewmodels:PreviewColumnCell">
-                                                            <StackPanel Width="120" Spacing="2">
-                                                                <TextBlock Text="{x:Bind Header}" FontSize="9" CharacterSpacing="40" Foreground="{StaticResource TextTertiaryBrush}" />
-                                                                <TextBlock Text="{x:Bind Value}" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
-                                                            </StackPanel>
-                                                        </DataTemplate>
-                                                    </ItemsControl.ItemTemplate>
-                                                </ItemsControl>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ListView.ItemTemplate>
-                                </ListView>
-                            </ScrollViewer>
-                            <ProgressRing Width="28" Height="28" HorizontalAlignment="Center" VerticalAlignment="Center" IsActive="{Binding IsLoadingPreview}" Foreground="{StaticResource AccentPrimaryBrush}" />
-                        </Grid>
-                    </Border>
-                </StackPanel>
-            </Grid>
+            CornerRadius="16">
+            <ComboBox
+                x:Name="TemplatePicker"
+                MinWidth="280"
+                FontSize="12"
+                DisplayMemberPath="Name"
+                ItemsSource="{Binding Templates}"
+                PlaceholderText="Choose template…"
+                SelectedItem="{Binding BrowseSourceTemplate, Mode=TwoWay}" />
         </Border>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+        <Frame
+            x:Name="BrowseDataFrame"
+            Grid.Row="2"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Stretch"
+            Background="Transparent" />
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
             <ProgressRing Width="16" Height="16" IsActive="{Binding IsLoading}" Foreground="{StaticResource AccentPrimaryBrush}" />
             <TextBlock Text="{Binding ErrorMessage}" FontSize="12" Foreground="{StaticResource DangerBrush}" TextWrapping="WrapWholeWords" />
         </StackPanel>

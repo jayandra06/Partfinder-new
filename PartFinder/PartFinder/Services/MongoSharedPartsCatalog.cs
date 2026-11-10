@@ -25,6 +25,11 @@ internal static class MongoSharedPartsCatalog
         IReadOnlyList<TemplateFieldDefinition> fields,
         CancellationToken cancellationToken = default)
     {
+        if (string.IsNullOrWhiteSpace(orgCode))
+        {
+            return Array.Empty<MasterDataRowRecord>();
+        }
+
         var coll = client.GetDatabase(SharedDatabaseName).GetCollection<BsonDocument>(PartsCollectionName);
         var filter = Builders<BsonDocument>.Filter.Eq(OrgCodeField, orgCode.Trim());
         var docs = await coll.Find(filter)
@@ -43,6 +48,11 @@ internal static class MongoSharedPartsCatalog
         CancellationToken cancellationToken = default)
     {
         if (pageSize <= 0)
+        {
+            return (Array.Empty<MasterDataRowRecord>(), false);
+        }
+
+        if (string.IsNullOrWhiteSpace(orgCode))
         {
             return (Array.Empty<MasterDataRowRecord>(), false);
         }
@@ -70,6 +80,11 @@ internal static class MongoSharedPartsCatalog
         CancellationToken cancellationToken = default)
     {
         if (ids.Count == 0)
+        {
+            return Array.Empty<MasterDataRowRecord>();
+        }
+
+        if (string.IsNullOrWhiteSpace(orgCode))
         {
             return Array.Empty<MasterDataRowRecord>();
         }

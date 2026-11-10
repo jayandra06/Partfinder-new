@@ -101,6 +101,7 @@ namespace PartFinder
             services.AddSingleton<DashboardViewModel>();
             services.AddTransient<PartsViewModel>();
             services.AddTransient<TemplatesViewModel>();
+            services.AddTransient<TemplateDataViewModel>();
             services.AddTransient<ViewDataViewModel>();
             services.AddTransient<WorksheetRelationsViewModel>();
             services.AddTransient<LinkedTemplatesViewModel>();
@@ -120,6 +121,7 @@ namespace PartFinder
             services.AddTransient<AlertsPage>();
             services.AddTransient<AuditPage>();
             services.AddTransient<TemplatesPage>();
+            services.AddTransient<TemplateDataPage>();
             services.AddTransient<ViewDataPage>();
             services.AddTransient<WorksheetRelationsPage>();
             services.AddTransient<LinkedTemplatesPage>();

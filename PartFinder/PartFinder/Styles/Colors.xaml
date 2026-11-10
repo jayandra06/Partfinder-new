@@ -72,21 +72,21 @@
         </ResourceDictionary>
 
         <ResourceDictionary x:Key="Light">
-            <!-- Backgrounds -->
-            <Color x:Key="PageBackgroundColor">#B3F5F8FD</Color>
-            <Color x:Key="CardBackgroundColor">#D9FFFFFF</Color>
-            <Color x:Key="ElevatedCardBackgroundColor">#ECFFFFFF</Color>
-            <Color x:Key="InputBackgroundColor">#D6FFFFFF</Color>
-            <Color x:Key="GridHeaderBackgroundColor">#DCEAF7FF</Color>
-            <Color x:Key="GridRowAltBackgroundColor">#66FFFFFF</Color>
-            <Color x:Key="ShellSurfaceColor">#CCFFFFFF</Color>
-            <Color x:Key="ShellSidebarColor">#BFF6F8FD</Color>
-            <Color x:Key="GlassStrokeColor">#4C8AA4C4</Color>
-            <Color x:Key="GlassStrongStrokeColor">#6681A9D8</Color>
-            <Color x:Key="GlassHighlightColor">#66FFFFFF</Color>
-            <Color x:Key="AmbientBlueColor">#222F7FD2</Color>
-            <Color x:Key="AmbientPurpleColor">#1F8B5CF6</Color>
-            <Color x:Key="AmbientPinkColor">#18F472B6</Color>
+            <!-- Backgrounds — layered cool gray-blue (canvas → cards → elevated) -->
+            <Color x:Key="PageBackgroundColor">#FFD8E1EC</Color>
+            <Color x:Key="CardBackgroundColor">#FFF0F4FA</Color>
+            <Color x:Key="ElevatedCardBackgroundColor">#FFFBFCFE</Color>
+            <Color x:Key="InputBackgroundColor">#FFEEF2F8</Color>
+            <Color x:Key="GridHeaderBackgroundColor">#FFC5D6EA</Color>
+            <Color x:Key="GridRowAltBackgroundColor">#99E2E9F3</Color>
+            <Color x:Key="ShellSurfaceColor">#FFE8EDF5</Color>
+            <Color x:Key="ShellSidebarColor">#FFDCE4EF</Color>
+            <Color x:Key="GlassStrokeColor">#5A8AA4C4</Color>
+            <Color x:Key="GlassStrongStrokeColor">#6E81A9D8</Color>
+            <Color x:Key="GlassHighlightColor">#55FFFFFF</Color>
+            <Color x:Key="AmbientBlueColor">#3A3878C8</Color>
+            <Color x:Key="AmbientPurpleColor">#348B5CF6</Color>
+            <Color x:Key="AmbientPinkColor">#30E879A8</Color>
 
             <!-- Interactive states -->
             <Color x:Key="RowHoverBackgroundColor">#E4F0FA</Color>
@@ -116,18 +116,18 @@
             <Color x:Key="InfoColor">#3D86E8</Color>
 
             <!-- Navigation -->
-            <Color x:Key="NavBackgroundColor">#BFF6F8FD</Color>
-            <Color x:Key="NavItemHoverColor">#D6E8F9FF</Color>
+            <Color x:Key="NavBackgroundColor">#FFDCE4EF</Color>
+            <Color x:Key="NavItemHoverColor">#D8E4F2FF</Color>
             <Color x:Key="NavItemSelectedColor">#402F7FD2</Color>
             <Color x:Key="NavItemSelectedBorderColor">#662F7FD2</Color>
-            <Color x:Key="HeaderBarBackgroundColor">#E6FFFFFF</Color>
-            <Color x:Key="ChartSurfaceBackgroundColor">#FFFFFF</Color>
-            <Color x:Key="ContentShellBackgroundColor">#D9FFFFFF</Color>
+            <Color x:Key="HeaderBarBackgroundColor">#E8EEF4F9</Color>
+            <Color x:Key="ChartSurfaceBackgroundColor">#FFF0F4FA</Color>
+            <Color x:Key="ContentShellBackgroundColor">#FFD8E1EC</Color>
 
             <!-- Backward-compatible aliases -->
             <Color x:Key="AppPrimaryColor">#2F7FD2</Color>
-            <Color x:Key="AppBackgroundColor">#B3F5F8FD</Color>
-            <Color x:Key="AppSurfaceColor">#CCFFFFFF</Color>
+            <Color x:Key="AppBackgroundColor">#FFD8E1EC</Color>
+            <Color x:Key="AppSurfaceColor">#FFE8EDF5</Color>
             <Color x:Key="AppTextColor">#172234</Color>
             <Color x:Key="AppBorderColor">#66A8BDD8</Color>
             <Color x:Key="AppSkeletonColor">#2E7FA6D6</Color>

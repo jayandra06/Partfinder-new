@@ -25,6 +25,11 @@ public interface IMasterDataRecordsService
         IReadOnlyDictionary<string, string> values,
         CancellationToken cancellationToken = default);
 
+    Task<bool> DeleteRowAsync(
+        string templateId,
+        string rowId,
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Inserts many new rows for a template in batches. Reports how many rows have been written so far.
     /// </summary>

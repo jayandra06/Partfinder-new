@@ -1,13 +1,16 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using PartFinder.Helpers;
+using PartFinder.Models;
 using PartFinder.ViewModels;
 
 namespace PartFinder.Views.Pages;
 
 public sealed partial class LinkedTemplatesPage : Page
 {
+    private LinkedTemplatesViewModel? _vm;
+    private bool _browseFrameReady;
+
     public LinkedTemplatesPage()
     {
         InitializeComponent();
@@ -19,82 +22,60 @@ public sealed partial class LinkedTemplatesPage : Page
     {
         PageEntranceStoryboard.Begin();
 
-        if (DataContext is LinkedTemplatesViewModel vm)
+        if (DataContext is not LinkedTemplatesViewModel vm)
         {
-            await vm.InitializeAsync();
+            return;
+        }
+
+        _vm = vm;
+        vm.PropertyChanged += OnBrowseVmPropertyChanged;
+        await vm.InitializeAsync().ConfigureAwait(true);
+        EnsureBrowseFrame();
+        SyncBrowseTemplate();
+    }
+
+    private void OnBrowseVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(LinkedTemplatesViewModel.BrowseSourceTemplate)
+            or nameof(LinkedTemplatesViewModel.BrowseSourceTemplateName))
+        {
+            SyncBrowseTemplate();
         }
     }
 
-    private async void OnLinkedTemplateBrowseClick(object sender, RoutedEventArgs e)
+    private void EnsureBrowseFrame()
     {
-        if (sender is not Button { DataContext: LinkedTemplateBrowseItem item }
-            || DataContext is not LinkedTemplatesViewModel vm
-            || XamlRoot is null)
+        if (_browseFrameReady || BrowseDataFrame is null)
         {
             return;
         }
 
-        vm.PreparePreviewColumnPicker(item);
-        await ShowLinkedTemplateColumnDialogAsync(vm).ConfigureAwait(true);
+        _browseFrameReady = true;
+        BrowseDataFrame.Navigated += OnBrowseFrameNavigated;
+        BrowseDataFrame.Navigate(
+            typeof(MasterDataPage),
+            new MasterDataNavigationArgs { Mode = MasterDataSurfaceMode.LinkedBrowse });
     }
 
-    private async Task ShowLinkedTemplateColumnDialogAsync(LinkedTemplatesViewModel vm)
+    private void OnBrowseFrameNavigated(object sender, Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
     {
-        if (XamlRoot is null)
+        if (e.Content is MasterDataPage page)
+        {
+            page.ConfigureEmbeddedBrowseChrome();
+            SyncBrowseTemplate();
+        }
+    }
+
+    private void SyncBrowseTemplate()
+    {
+        if (_vm?.BrowseSourceTemplate is null)
         {
             return;
         }
 
-        var columnPanel = new StackPanel { Spacing = 6 };
-        foreach (var pick in vm.PreviewColumnPicks)
+        if (BrowseDataFrame?.Content is MasterDataPage page)
         {
-            var check = new CheckBox
-            {
-                Content = pick.ColumnName,
-                IsChecked = pick.IsChecked,
-                FontSize = 13,
-            };
-            check.Checked += (_, _) => pick.IsChecked = true;
-            check.Unchecked += (_, _) => pick.IsChecked = false;
-            columnPanel.Children.Add(check);
+            page.ApplyBrowseTemplate(_vm.BrowseSourceTemplate.Id);
         }
-
-        var scroll = new ScrollViewer
-        {
-            MaxHeight = 360,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            Content = columnPanel,
-        };
-
-        var content = new StackPanel { Spacing = 10 };
-        content.Children.Add(
-            new TextBlock
-            {
-                Text = $"Choose columns from \"{vm.PendingLinkedTemplateName}\" to preview in the grid.",
-                TextWrapping = TextWrapping.Wrap,
-                Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextSecondaryBrush"],
-                FontSize = 12,
-            });
-        content.Children.Add(scroll);
-
-        var dialog = new ContentDialog
-        {
-            Title = "Select columns",
-            Content = content,
-            PrimaryButtonText = "Select",
-            CloseButtonText = "Cancel",
-            DefaultButton = ContentDialogButton.Primary,
-            XamlRoot = XamlRoot,
-        };
-
-        UiResourceHelper.ApplyLightContentDialog(dialog);
-
-        var result = await dialog.ShowAsync();
-        if (result != ContentDialogResult.Primary)
-        {
-            return;
-        }
-
-        await vm.LoadLinkedPreviewDataAsync().ConfigureAwait(true);
     }
 }

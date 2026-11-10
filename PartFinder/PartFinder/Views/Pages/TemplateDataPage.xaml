@@ -1,0 +1,93 @@
+<Page
+    x:Class="PartFinder.Views.Pages.TemplateDataPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:converters="using:PartFinder.Converters">
+    <Page.Resources>
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+        <converters:InvertedBoolToVisibilityConverter x:Key="InvertedBoolToVisibilityConverter" />
+        <converters:StringToVisibilityConverter x:Key="StringToVisibilityConverter" />
+    </Page.Resources>
+
+    <Grid Padding="24" Background="Transparent">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" MinHeight="200" />
+        </Grid.RowDefinitions>
+
+        <Button
+            Grid.Row="0"
+            Style="{StaticResource GhostButtonStyle}"
+            Padding="8,4"
+            HorizontalAlignment="Left"
+            Margin="0,0,0,12"
+            Click="OnBackClick">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+                <FontIcon Glyph="&#xE72B;" FontSize="12" />
+                <TextBlock Text="Back to templates" FontSize="12" />
+            </StackPanel>
+        </Button>
+
+        <Grid Grid.Row="1" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="4">
+                <TextBlock
+                    Text="{Binding TemplateName}"
+                    FontSize="20"
+                    FontWeight="SemiBold"
+                    Foreground="{StaticResource TextPrimaryBrush}" />
+                <TextBlock
+                    Text="{Binding StatusMessage}"
+                    FontSize="12"
+                    Foreground="{StaticResource TextSecondaryBrush}"
+                    Visibility="{Binding StatusMessage, Converter={StaticResource StringToVisibilityConverter}}" />
+            </StackPanel>
+            <Button
+                Grid.Column="1"
+                Style="{StaticResource PrimaryButtonStyle}"
+                Padding="16,8"
+                MinHeight="40"
+                VerticalAlignment="Top"
+                Click="OnEditDataClick"
+                ToolTipService.ToolTip="Edit this template's row data">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE70F;" FontSize="14" />
+                    <TextBlock Text="Edit data" FontSize="13" FontWeight="SemiBold" />
+                </StackPanel>
+            </Button>
+        </Grid>
+
+        <Border
+            Grid.Row="2"
+            CornerRadius="16"
+            Background="{StaticResource CardBackgroundBrush}"
+            BorderBrush="{StaticResource GlassStrokeBrush}"
+            BorderThickness="1"
+            Padding="0">
+            <Grid>
+                <ProgressRing
+                    Width="32"
+                    Height="32"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    IsActive="{Binding IsLoading}"
+                    Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}" />
+                <ScrollViewer
+                    x:Name="DataScrollViewer"
+                    HorizontalScrollMode="Enabled"
+                    HorizontalScrollBarVisibility="Auto"
+                    VerticalScrollMode="Auto"
+                    VerticalScrollBarVisibility="Auto"
+                    ZoomMode="Disabled"
+                    HorizontalContentAlignment="Stretch"
+                    Visibility="{Binding IsLoading, Converter={StaticResource InvertedBoolToVisibilityConverter}}">
+                    <Border x:Name="GridHost" Padding="0" HorizontalAlignment="Stretch" />
+                </ScrollViewer>
+            </Grid>
+        </Border>
+    </Grid>
+</Page>

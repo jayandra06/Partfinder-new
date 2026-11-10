@@ -29,10 +29,26 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" MinHeight="200" />
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0" Margin="0,0,0,8">
+        <Button
+            x:Name="BackFromEditButton"
+            Grid.Row="0"
+            Style="{StaticResource GhostButtonStyle}"
+            Padding="8,4"
+            HorizontalAlignment="Left"
+            Margin="0,0,0,8"
+            Click="OnBackFromEditClick"
+            Visibility="{Binding ShowSpreadsheetEditChrome, Converter={StaticResource BoolToVisibilityConverter}}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+                <FontIcon Glyph="&#xE72B;" FontSize="12" />
+                <TextBlock Text="Back to template data" FontSize="12" />
+            </StackPanel>
+        </Button>
+
+        <Grid Grid.Row="1" Margin="0,0,0,8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -47,7 +63,7 @@
                 BorderBrush="{StaticResource GlassStrokeBrush}"
                 BorderThickness="1"
                 CornerRadius="16"
-                Visibility="{Binding ShowTemplatePicker, Converter={StaticResource BoolToVisibilityConverter}}">
+                Visibility="{Binding ShowTemplatePickerInChrome, Converter={StaticResource BoolToVisibilityConverter}}">
                 <ComboBox
                     MinWidth="260"
                     HorizontalAlignment="Left"
@@ -64,20 +80,7 @@
                 Spacing="8"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Center"
-                Visibility="{Binding IsEditMode, Converter={StaticResource InvertedBoolToVisibilityConverter}}">
-                <Button
-                    Style="{StaticResource OutlinedButtonStyle}"
-                    Padding="14,8"
-                    MinHeight="40"
-                    IsEnabled="{Binding CanEditMasterData}"
-                    Click="OnToggleEditModeClicked"
-                    ToolTipService.ToolTip="Edit rows and columns">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <FontIcon Glyph="&#xE70F;" FontSize="14" Foreground="{StaticResource AccentPrimaryBrush}" />
-                        <TextBlock Text="Edit data" FontSize="13" FontWeight="SemiBold" />
-                    </StackPanel>
-                </Button>
-
+                Visibility="{Binding ShowImportExportToolbar, Converter={StaticResource BoolToVisibilityConverter}}">
                 <Button
                     Style="{StaticResource ToolbarSegmentButtonStyle}"
                     Click="OnExportTemplateClicked"
@@ -100,7 +103,7 @@
                 Spacing="8"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Center"
-                Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibilityConverter}}">
+                Visibility="{Binding ShowSpreadsheetEditChrome, Converter={StaticResource BoolToVisibilityConverter}}">
                 <Button
                     Style="{StaticResource PrimaryButtonStyle}"
                     Padding="16,8"
@@ -124,7 +127,7 @@
             </StackPanel>
         </Grid>
 
-        <StackPanel Grid.Row="1" Margin="0,0,0,6" Spacing="6">
+        <StackPanel Grid.Row="2" Margin="0,0,0,6" Spacing="6" Visibility="{Binding IsEmbeddedLinkedBrowse, Converter={StaticResource InvertedBoolToVisibilityConverter}}">
             <!-- Status messages -->
             <StackPanel Spacing="4">
                 <TextBlock
@@ -141,58 +144,19 @@
                 <TextBlock
                     Foreground="{StaticResource TextSecondaryBrush}"
                     FontSize="11"
-                    Text="Choose a template from the header. Edit, export and import from the right."
-                    Visibility="{Binding IsEditMode, Converter={StaticResource InvertedBoolToVisibilityConverter}}" />
+                    Text="Choose a template to view its data. This page is read-only."
+                    Visibility="{Binding IsCatalogReadOnly, Converter={StaticResource BoolToVisibilityConverter}}" />
                 <TextBlock
                     Foreground="{StaticResource TextSecondaryBrush}"
                     FontSize="11"
-                    Text="Edit mode: update cells, add columns above, remove with × on headers, then Save."
-                    Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibilityConverter}}" />
+                    Text="Browse linked rows using hyperlinks. Export and import from the toolbar."
+                    Visibility="{Binding ShowImportExportToolbar, Converter={StaticResource BoolToVisibilityConverter}}" />
+                <TextBlock
+                    Foreground="{StaticResource TextSecondaryBrush}"
+                    FontSize="11"
+                    Text="Edit mode: use Add row / Add column below the table, delete rows with ×, remove columns from headers, then Save."
+                    Visibility="{Binding ShowSpreadsheetEditChrome, Converter={StaticResource BoolToVisibilityConverter}}" />
             </StackPanel>
-
-            <!-- Add column (edit mode only) -->
-            <Border
-                Margin="0,4,0,0"
-                Padding="12,10"
-                CornerRadius="12"
-                Background="{StaticResource ElevatedCardBackgroundBrush}"
-                BorderBrush="{StaticResource GlassStrokeBrush}"
-                BorderThickness="1"
-                Visibility="{Binding CanManageColumns, Converter={StaticResource BoolToVisibilityConverter}}">
-                <Grid ColumnSpacing="10">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" MaxWidth="280" />
-                        <ColumnDefinition Width="200" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBox
-                        x:Name="NewColumnNameBox"
-                        Style="{StaticResource StandardTextBoxStyle}"
-                        PlaceholderText="New column name"
-                        IsEnabled="{Binding CanManageColumns}"
-                        KeyDown="OnNewColumnNameKeyDown" />
-                    <ComboBox
-                        x:Name="InsertAfterColumnCombo"
-                        Grid.Column="1"
-                        VerticalAlignment="Stretch"
-                        FontSize="12"
-                        DisplayMemberPath="Label"
-                        IsEnabled="{Binding CanManageColumns}"
-                        PlaceholderText="Insert position" />
-                    <Button
-                        Grid.Column="2"
-                        Style="{StaticResource PrimaryButtonStyle}"
-                        Padding="16,8"
-                        IsEnabled="{Binding CanManageColumns}"
-                        Click="OnAddColumnClick"
-                        ToolTipService.ToolTip="Add column">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <FontIcon Glyph="&#xE710;" FontSize="12" />
-                            <TextBlock Text="Add column" FontSize="12" />
-                        </StackPanel>
-                    </Button>
-                </Grid>
-            </Border>
 
             <TextBlock
                 Foreground="{StaticResource TextSecondaryBrush}"
@@ -210,7 +174,7 @@
 
         <!-- Spreadsheet + optional detail column (no modal overlay) -->
         <Grid
-            Grid.Row="2"
+            Grid.Row="3"
             Margin="0,4,0,0"
             ColumnSpacing="12">
             <Grid.ColumnDefinitions>
@@ -238,22 +202,37 @@
                         HorizontalContentAlignment="Stretch"
                         VerticalContentAlignment="Stretch" />
                 </Border>
-                <Grid Grid.Row="1" Margin="0,10,0,0">
+                <StackPanel Grid.Row="1" Margin="0,10,0,0" Spacing="10">
+                    <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <Button
-                        HorizontalAlignment="Left"
-                        Style="{StaticResource PrimaryButtonStyle}"
-                        Padding="16,8"
-                        Command="{Binding AddRowCommand}"
-                        Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibilityConverter}}">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <FontIcon Glyph="&#xE710;" FontSize="12" />
-                            <TextBlock Text="Add row" FontSize="13" />
-                        </StackPanel>
-                    </Button>
+                    <StackPanel
+                        Orientation="Horizontal"
+                        Spacing="8"
+                        Visibility="{Binding ShowSpreadsheetEditChrome, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Button
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            Padding="16,8"
+                            Command="{Binding AddRowCommand}"
+                            Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE710;" FontSize="12" />
+                                <TextBlock Text="Add row" FontSize="13" />
+                            </StackPanel>
+                        </Button>
+                        <Button
+                            Style="{StaticResource OutlinedButtonStyle}"
+                            Padding="16,8"
+                            Click="OnShowAddColumnPanelClick"
+                            Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE710;" FontSize="12" />
+                                <TextBlock Text="Add column" FontSize="13" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
                     <StackPanel
                         Grid.Column="1"
                         Orientation="Horizontal"
@@ -279,7 +258,55 @@
                             Style="{StaticResource OutlinedButtonStyle}"
                             Click="OnMasterDataNextPageClick" />
                     </StackPanel>
-                </Grid>
+                    </Grid>
+
+                    <Border
+                        x:Name="AddColumnPanel"
+                        Padding="12,10"
+                        CornerRadius="12"
+                        Background="{StaticResource ElevatedCardBackgroundBrush}"
+                        BorderBrush="{StaticResource GlassStrokeBrush}"
+                        BorderThickness="1"
+                        Visibility="{Binding IsAddColumnPanelVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" MaxWidth="280" />
+                                <ColumnDefinition Width="200" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox
+                                x:Name="NewColumnNameBox"
+                                Style="{StaticResource StandardTextBoxStyle}"
+                                PlaceholderText="New column name"
+                                IsEnabled="{Binding CanManageColumns}"
+                                KeyDown="OnNewColumnNameKeyDown" />
+                            <ComboBox
+                                x:Name="InsertAfterColumnCombo"
+                                Grid.Column="1"
+                                VerticalAlignment="Stretch"
+                                FontSize="12"
+                                DisplayMemberPath="Label"
+                                IsEnabled="{Binding CanManageColumns}"
+                                PlaceholderText="Insert position" />
+                            <Button
+                                Grid.Column="2"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Padding="16,8"
+                                IsEnabled="{Binding CanManageColumns}"
+                                Click="OnAddColumnClick"
+                                ToolTipService.ToolTip="Add column">
+                                <TextBlock Text="Add column" FontSize="12" />
+                            </Button>
+                            <Button
+                                Grid.Column="3"
+                                Style="{StaticResource GhostButtonStyle}"
+                                Padding="14,8"
+                                Click="OnHideAddColumnPanelClick"
+                                Content="Cancel" />
+                        </Grid>
+                    </Border>
+                </StackPanel>
             </Grid>
 
             <Border
@@ -288,11 +315,15 @@
                 HorizontalAlignment="Stretch"
                 VerticalAlignment="Stretch"
                 Padding="14"
+                Opacity="0"
                 Visibility="Collapsed"
                 CornerRadius="16"
                 Background="{StaticResource ElevatedCardBackgroundBrush}"
                 BorderBrush="{StaticResource GlassStrokeBrush}"
                 BorderThickness="1">
+                <Border.RenderTransform>
+                    <TranslateTransform x:Name="ActionResultsTransform" X="48" />
+                </Border.RenderTransform>
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -308,13 +339,14 @@
                     x:Name="ActionTitleText"
                     Grid.Row="0"
                     Grid.Column="0"
+                    Text="Linked data"
                     FontSize="14"
                     FontWeight="SemiBold" />
                 <Button
                     Grid.Row="0"
                     Grid.Column="1"
                     Style="{StaticResource GhostButtonStyle}"
-                    Content="âœ•"
+                    Content="✕"
                     FontSize="12"
                     Click="OnCloseActionPanelClick" />
 
@@ -324,37 +356,16 @@
                     Grid.ColumnSpan="2"
                     Margin="0,4,0,10"
                     FontSize="11"
-                    Foreground="{StaticResource TextSecondaryBrush}" />
+                    Foreground="{StaticResource TextSecondaryBrush}"
+                    TextWrapping="WrapWholeWords"
+                    MaxWidth="420" />
 
-                <ListView x:Name="ActionRowsListView" Grid.Row="2">
-                    <ListView.ItemTemplate>
-                        <DataTemplate>
-                            <Border
-                                Margin="0,0,0,6"
-                                Padding="10"
-                                Background="{StaticResource CardBackgroundBrush}"
-                                BorderBrush="{StaticResource BorderDefaultBrush}"
-                                BorderThickness="1"
-                                CornerRadius="8" Translation="0,0,32">
-                            <Border.Shadow><ThemeShadow/></Border.Shadow>
-                            <StackPanel Spacing="3">
-                                    <TextBlock
-                                        Text="{Binding Title}"
-                                        FontSize="12"
-                                        FontWeight="SemiBold"
-                                        TextWrapping="WrapWholeWords" />
-                                    <ItemsControl ItemsSource="{Binding Lines}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <TextBlock Text="{Binding}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="WrapWholeWords" />
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </StackPanel>
-                            </Border>
-                        </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
+                <TabView
+                    x:Name="LinkedDataTabView"
+                    Grid.Row="2"
+                    CanDragTabs="False"
+                    CanReorderTabs="False"
+                    IsAddTabButtonVisible="False" />
             </Grid>
             </Border>
         </Grid>
