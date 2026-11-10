@@ -80,6 +80,24 @@ public sealed partial class TemplateDataPage : Page
         App.Services.GetRequiredService<INavigationService>().Navigate(AppPage.Templates);
     }
 
+    private void OnEditDataClick(object sender, RoutedEventArgs e)
+    {
+        var templateId = _pendingTemplateId ?? _viewModel.TemplateId;
+        if (string.IsNullOrWhiteSpace(templateId))
+        {
+            return;
+        }
+
+        App.Services.GetRequiredService<INavigationService>().Navigate(
+            AppPage.TemplateDataEdit,
+            new MasterDataNavigationArgs
+            {
+                Mode = MasterDataSurfaceMode.TemplateEdit,
+                TemplateId = templateId,
+                StartInEditMode = true,
+            });
+    }
+
     private double GetAvailableTableWidth()
     {
         var width = DataScrollViewer.ViewportWidth;

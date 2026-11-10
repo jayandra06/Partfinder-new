@@ -166,13 +166,18 @@ public partial class LinkedTemplatesViewModel : ViewModelBase
             return;
         }
 
-        foreach (var relation in _allRelations.Where(
-                     r => string.Equals(r.PrimaryTemplateId, BrowseSourceTemplate.Id, StringComparison.Ordinal)))
+        var outbound = WorksheetRelationBidirectional.GetOutboundRelations(
+            BrowseSourceTemplate.Id,
+            _allRelations);
+        foreach (var relation in outbound)
         {
             var lookup = Templates.FirstOrDefault(t => t.Id == relation.LookupTemplateId);
+            var relationId = relation.Id.EndsWith(":mirror", StringComparison.OrdinalIgnoreCase)
+                ? relation.Id[..^":mirror".Length]
+                : relation.Id;
             LinkedTemplatesForBrowse.Add(new LinkedTemplateBrowseItem
             {
-                RelationId = relation.Id,
+                RelationId = relationId,
                 TemplateId = relation.LookupTemplateId,
                 TemplateName = lookup?.Name ?? relation.LookupTemplateId,
                 Relation = relation,
@@ -199,12 +204,8 @@ public partial class LinkedTemplatesViewModel : ViewModelBase
 
         var displaySet = new HashSet<string>(item.Relation.DisplayColumns, StringComparer.OrdinalIgnoreCase);
         var matchKeys = new HashSet<string>(
-            item.Relation.MatchKeys.Select(k => k.TargetColumn).Where(k => !string.IsNullOrWhiteSpace(k)),
+            WorksheetRelationBidirectional.GetMatchKeyColumnLabels(item.Relation),
             StringComparer.OrdinalIgnoreCase);
-        if (matchKeys.Count == 0 && !string.IsNullOrWhiteSpace(item.Relation.TriggerColumn))
-        {
-            matchKeys.Add(item.Relation.TriggerColumn);
-        }
 
         foreach (var field in template.Fields.OrderBy(f => f.DisplayOrder))
         {

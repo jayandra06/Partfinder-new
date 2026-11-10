@@ -79,6 +79,13 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
 
     public bool CanCreateTemplateLinks => Templates.Count > 1;
 
+    public bool CanSaveLink =>
+        CanCreateTemplateLinks
+        && PrimaryTemplate is not null
+        && LookupTemplate is not null
+        && HasSharedColumns
+        && PrimaryColumns.Any(c => c.IsChecked);
+
     public string NoTemplatesToLinkMessage =>
         "No templates available to link. Template relationships require at least two templates in your organisation. Create another template to enable linking.";
 
@@ -165,6 +172,8 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
         OnPropertyChanged(nameof(SharedColumnCount));
         OnPropertyChanged(nameof(HasSharedColumns));
         OnPropertyChanged(nameof(SharedColumnSummary));
+        OnPropertyChanged(nameof(CanSaveLink));
+        SaveCommand.NotifyCanExecuteChanged();
         RefreshRelationHealthInsight();
         _ = TryLoadExistingRelationAsync();
     }
@@ -183,6 +192,8 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
         OnPropertyChanged(nameof(SharedColumnCount));
         OnPropertyChanged(nameof(HasSharedColumns));
         OnPropertyChanged(nameof(SharedColumnSummary));
+        OnPropertyChanged(nameof(CanSaveLink));
+        SaveCommand.NotifyCanExecuteChanged();
         _ = TryLoadExistingRelationAsync();
     }
 
@@ -240,12 +251,23 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
         StatusMessage = string.Empty;
         try
         {
+            var reverse = WorksheetRelationBidirectional.FindRelationBetween(
+                AllRelations.ToList(),
+                LookupTemplate!.Id,
+                PrimaryTemplate!.Id);
+
             var (ok, error) = await _api.DeleteRelationAsync(LoadedRelation.Id).ConfigureAwait(true);
             if (!ok)
             {
                 ErrorMessage = error ?? "Failed to delete relation.";
                 return;
             }
+
+            if (reverse is not null && !string.Equals(reverse.Id, LoadedRelation.Id, StringComparison.Ordinal))
+            {
+                _ = await _api.DeleteRelationAsync(reverse.Id).ConfigureAwait(true);
+            }
+
             LoadedRelation = null;
             SelectedRelationId = null;
             StatusMessage = "Relation deleted.";
@@ -270,7 +292,7 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
     }
     // ────────────────────────────────────────────────────────────────────────
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanSaveLink))]
     private async Task SaveAsync()
     {
         if (!CanCreateTemplateLinks)
@@ -281,7 +303,7 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
 
         if (PrimaryTemplate is null || LookupTemplate is null)
         {
-            ErrorMessage = "Choose both primary and lookup templates.";
+            ErrorMessage = "Choose Template 1 and Template 2.";
             return;
         }
 
@@ -294,18 +316,11 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
         {
             ErrorMessage = sharedNames.Count == 0
                 ? "These templates have no columns with the same name. Rename or add matching column labels first."
-                : "Select at least one shared match column on the source template.";
+                : "Select at least one shared key column on Template 1.";
             return;
         }
 
-        var selectedDisplays = LookupColumns.Where(x => x.IsChecked).Select(x => x.ColumnName).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        foreach (var key in selectedKeys)
-        {
-            if (!selectedDisplays.Contains(key, StringComparer.OrdinalIgnoreCase))
-            {
-                selectedDisplays.Add(key);
-            }
-        }
+        var selectedDisplays = selectedKeys.ToList();
 
         IsLoading = true;
         ErrorMessage = string.Empty;
@@ -316,11 +331,11 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
             {
                 PrimaryTemplateId = PrimaryTemplate.Id,
                 LookupTemplateId = LookupTemplate.Id,
-                Name = $"{PrimaryTemplate.Name} to {LookupTemplate.Name}",
+                Name = $"{PrimaryTemplate.Name} ↔ {LookupTemplate.Name}",
                 TriggerColumn = selectedKeys.FirstOrDefault() ?? "",
                 MatchKeys = selectedKeys.Select(k => new RelationMatchPairDto { SourceColumn = k, TargetColumn = k }).ToList(),
                 DisplayColumns = selectedDisplays,
-                MenuLabel = $"{LookupTemplate.Name} info",
+                MenuLabel = $"{LookupTemplate.Name}",
             };
 
             var useUpdate = LoadedRelation is not null && !string.IsNullOrWhiteSpace(LoadedRelation.Id);
@@ -336,9 +351,28 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
 
             LoadedRelation = relation;
             SelectedRelationId = relation.Id;
-            StatusMessage = "Worksheet relation saved.";
 
-            // ── NEW: refresh chip strip after save ───────────────────────────
+            var reverseRequest = WorksheetRelationBidirectional.BuildReverseRequest(
+                dto,
+                PrimaryTemplate.Name,
+                LookupTemplate.Name);
+            await LoadAllRelationsAsync().ConfigureAwait(true);
+            var existingReverse = WorksheetRelationBidirectional.FindRelationBetween(
+                AllRelations.ToList(),
+                reverseRequest.PrimaryTemplateId,
+                reverseRequest.LookupTemplateId);
+            var (reverseOk, reverseError, _) = existingReverse is not null
+                ? await _api.UpdateRelationAsync(existingReverse.Id, reverseRequest).ConfigureAwait(true)
+                : await _api.CreateRelationAsync(reverseRequest).ConfigureAwait(true);
+            if (!reverseOk)
+            {
+                StatusMessage = "Forward link saved; reverse link failed: " + (reverseError ?? "unknown error");
+            }
+            else
+            {
+                StatusMessage = "Worksheet relation saved (both directions).";
+            }
+
             await LoadAllRelationsAsync().ConfigureAwait(true);
             // ────────────────────────────────────────────────────────────────
         }
@@ -383,24 +417,24 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
             return;
         }
 
-        foreach (var f in PrimaryTemplate.Fields.OrderBy(f => f.DisplayOrder))
+        var sharedNames = GetSharedColumnNameSet().OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList();
+        if (sharedNames.Count == 0)
         {
-            var item = new RelationColumnPickItem(f.Label, isPrimary: true);
-            item.PropertyChanged += OnPrimaryColumnChanged;
-            PrimaryColumns.Add(item);
+            ErrorMessage = "These templates have no columns with the same name. Add matching column labels on both templates to link them.";
         }
 
-        var primarySet = new HashSet<string>(PrimaryColumns.Select(x => x.ColumnName), StringComparer.OrdinalIgnoreCase);
-        foreach (var f in LookupTemplate.Fields.OrderBy(f => f.DisplayOrder))
+        foreach (var label in sharedNames)
         {
-            var isAutoKey = primarySet.Contains(f.Label);
-            var item = new RelationColumnPickItem(f.Label, isPrimary: false)
+            var item = new RelationColumnPickItem(label, isPrimary: true);
+            item.PropertyChanged += OnPrimaryColumnChanged;
+            PrimaryColumns.Add(item);
+
+            LookupColumns.Add(new RelationColumnPickItem(label, isPrimary: false)
             {
-                IsDisabled = isAutoKey,
+                IsDisabled = true,
+                IsAutoMatchKey = true,
                 IsChecked = false,
-                IsAutoMatchKey = isAutoKey,
-            };
-            LookupColumns.Add(item);
+            });
         }
 
         if (LoadedRelation is null && SharedColumnCount > 0)
@@ -414,6 +448,8 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
         OnPropertyChanged(nameof(SharedColumnSummary));
         OnPropertyChanged(nameof(HasNoPrimaryColumns));
         OnPropertyChanged(nameof(HasNoLookupColumns));
+        OnPropertyChanged(nameof(CanSaveLink));
+        SaveCommand.NotifyCanExecuteChanged();
     }
 
     private HashSet<string> GetSharedColumnNameSet()
@@ -439,6 +475,8 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
 
         SyncLookupWithPrimary();
         OnPropertyChanged(nameof(SelectedMatchColumnHint));
+        OnPropertyChanged(nameof(CanSaveLink));
+        SaveCommand.NotifyCanExecuteChanged();
     }
 
     public string SelectedMatchColumnHint =>
@@ -453,17 +491,9 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
 
         foreach (var lookup in LookupColumns)
         {
-            var shouldAuto = selectedKeys.Contains(lookup.ColumnName);
-            lookup.IsAutoMatchKey = shouldAuto;
-            lookup.IsDisabled = shouldAuto;
-            if (shouldAuto)
-            {
-                lookup.IsChecked = true;
-            }
-            else if (!lookup.IsDisabled)
-            {
-                lookup.IsChecked = false;
-            }
+            lookup.IsChecked = selectedKeys.Contains(lookup.ColumnName);
+            lookup.IsAutoMatchKey = true;
+            lookup.IsDisabled = true;
         }
     }
 
@@ -481,9 +511,11 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
             return;
         }
 
-        var existing = relations.FirstOrDefault(
-            r => string.Equals(r.PrimaryTemplateId, PrimaryTemplate.Id, StringComparison.Ordinal)
-              && string.Equals(r.LookupTemplateId, LookupTemplate.Id, StringComparison.Ordinal));
+        var existing = relations.FirstOrDefault(r =>
+            (string.Equals(r.PrimaryTemplateId, PrimaryTemplate.Id, StringComparison.OrdinalIgnoreCase)
+             && string.Equals(r.LookupTemplateId, LookupTemplate.Id, StringComparison.OrdinalIgnoreCase))
+            || (string.Equals(r.PrimaryTemplateId, LookupTemplate.Id, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(r.LookupTemplateId, PrimaryTemplate.Id, StringComparison.OrdinalIgnoreCase)));
         if (existing is null)
         {
             return;
@@ -502,8 +534,6 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
             matchKeySet.Add(existing.TriggerColumn);
         }
 
-        var displaySet = new HashSet<string>(existing.DisplayColumns, StringComparer.OrdinalIgnoreCase);
-
         foreach (var p in PrimaryColumns)
         {
             p.IsChecked = matchKeySet.Contains(p.ColumnName) && sharedNames.Contains(p.ColumnName);
@@ -519,13 +549,8 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
             OnPropertyChanged(nameof(SelectedMatchColumnHint));
         }
 
-        foreach (var l in LookupColumns.Where(x => !x.IsDisabled))
-        {
-            if (displaySet.Contains(l.ColumnName))
-            {
-                l.IsChecked = true;
-            }
-        }
+        OnPropertyChanged(nameof(CanSaveLink));
+        SaveCommand.NotifyCanExecuteChanged();
     }
 
     // ── NEW: private helper — load all relations + build chip items ──────────
@@ -537,9 +562,18 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
         AllRelations.Clear();
         RelationChips.Clear();
 
+        var dedupeKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var r in relations)
         {
             AllRelations.Add(r);
+
+            var pairKey = string.Join(
+                "|",
+                new[] { r.PrimaryTemplateId, r.LookupTemplateId }.OrderBy(id => id, StringComparer.OrdinalIgnoreCase));
+            if (!dedupeKeys.Add(pairKey))
+            {
+                continue;
+            }
 
             var primaryName = Templates.FirstOrDefault(t => t.Id == r.PrimaryTemplateId)?.Name ?? r.PrimaryTemplateId;
             var lookupName = Templates.FirstOrDefault(t => t.Id == r.LookupTemplateId)?.Name ?? r.LookupTemplateId;
@@ -583,7 +617,7 @@ public sealed class RelationChipItem(
     public string RelationId { get; } = relationId;
     public string PrimaryTemplateId { get; } = primaryTemplateId;
     public string LookupTemplateId { get; } = lookupTemplateId;
-    public string Label { get; } = $"{primaryName}  →  {lookupName}";
+    public string Label { get; } = $"{primaryName}  ↔  {lookupName}";
 }
 // ────────────────────────────────────────────────────────────────────────────
 

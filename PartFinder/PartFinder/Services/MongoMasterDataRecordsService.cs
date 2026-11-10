@@ -49,6 +49,13 @@ public sealed class MongoMasterDataRecordsService : IMasterDataRecordsService
         }
     }
 
+    private string? GetOrgCodeOrNull()
+    {
+        _setupContext.Refresh();
+        var code = _setupContext.OrgCode?.Trim();
+        return string.IsNullOrWhiteSpace(code) ? null : code;
+    }
+
     private IMongoCollection<MasterDataRowDoc>? TryGetCollection(MongoClient client)
     {
         try
@@ -88,13 +95,14 @@ public sealed class MongoMasterDataRecordsService : IMasterDataRecordsService
             var template = await _templateSchema
                 .GetTemplateAsync(templateId, cancellationToken)
                 .ConfigureAwait(false);
+            var orgCode = GetOrgCodeOrNull();
             if (template is not null
                 && MongoSharedPartsCatalog.IsCatalogTemplateName(template.Name)
-                && !string.IsNullOrWhiteSpace(_setupContext.OrgCode))
+                && orgCode is not null)
             {
                 return await MongoSharedPartsCatalog.LoadRowsAsync(
                         client,
-                        _setupContext.OrgCode,
+                        orgCode,
                         template.Fields,
                         cancellationToken)
                     .ConfigureAwait(false);
@@ -161,13 +169,14 @@ public sealed class MongoMasterDataRecordsService : IMasterDataRecordsService
             var template = await _templateSchema
                 .GetTemplateAsync(templateId, cancellationToken)
                 .ConfigureAwait(false);
+            var orgCode = GetOrgCodeOrNull();
             if (template is not null
                 && MongoSharedPartsCatalog.IsCatalogTemplateName(template.Name)
-                && !string.IsNullOrWhiteSpace(_setupContext.OrgCode))
+                && orgCode is not null)
             {
                 var rows = await MongoSharedPartsCatalog.LoadRowsAsync(
                         client,
-                        _setupContext.OrgCode,
+                        orgCode,
                         template.Fields,
                         cancellationToken)
                     .ConfigureAwait(false);
@@ -218,13 +227,14 @@ public sealed class MongoMasterDataRecordsService : IMasterDataRecordsService
         var template = await _templateSchema
             .GetTemplateAsync(templateId, cancellationToken)
             .ConfigureAwait(false);
+        var orgCode = GetOrgCodeOrNull();
         if (template is not null
             && MongoSharedPartsCatalog.IsCatalogTemplateName(template.Name)
-            && !string.IsNullOrWhiteSpace(_setupContext.OrgCode))
+            && orgCode is not null)
         {
             return await MongoSharedPartsCatalog.LoadRowsByIdsAsync(
                     client,
-                    _setupContext.OrgCode,
+                    orgCode,
                     template.Fields,
                     oids,
                     cancellationToken)
@@ -286,6 +296,34 @@ public sealed class MongoMasterDataRecordsService : IMasterDataRecordsService
                 cancellationToken)
             .ConfigureAwait(false);
         return id.ToString();
+    }
+
+    public async Task<bool> DeleteRowAsync(
+        string templateId,
+        string rowId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(rowId) || !ObjectId.TryParse(rowId, out var oid))
+        {
+            return false;
+        }
+
+        if (!TryGetClient(out var client))
+        {
+            return false;
+        }
+
+        var coll = TryGetCollection(client);
+        if (coll is null)
+        {
+            return false;
+        }
+
+        var filter = Builders<MasterDataRowDoc>.Filter.And(
+            Builders<MasterDataRowDoc>.Filter.Eq(d => d.TemplateId, templateId),
+            Builders<MasterDataRowDoc>.Filter.Eq(d => d.MongoId, oid));
+        var result = await coll.DeleteOneAsync(filter, cancellationToken).ConfigureAwait(false);
+        return result.DeletedCount > 0;
     }
 
     public async Task<int> AppendRowsAsync(
