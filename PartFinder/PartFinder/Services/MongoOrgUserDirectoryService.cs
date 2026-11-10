@@ -737,6 +737,58 @@ public sealed class MongoOrgUserDirectoryService : IOrgUserDirectoryService
         return result.DeletedCount > 0;
     }
 
+    public async Task<bool> UpdateOrgAdminDisplayNameAsync(
+        string email,
+        string name,
+        CancellationToken cancellationToken = default)
+    {
+        var trimmedName = name.Trim();
+        if (string.IsNullOrWhiteSpace(trimmedName))
+        {
+            return false;
+        }
+
+        var bindings = await EnsureBindingsAsync(cancellationToken).ConfigureAwait(false);
+        if (bindings is null)
+        {
+            return false;
+        }
+
+        var em = email.Trim();
+        if (string.IsNullOrEmpty(em))
+        {
+            return false;
+        }
+
+        var normalized = NormalizeEmail(em);
+        var filter = Builders<BsonDocument>.Filter.Or(
+            Builders<BsonDocument>.Filter.Eq("email", normalized),
+            Builders<BsonDocument>.Filter.Eq("email", em));
+        var update = Builders<BsonDocument>.Update.Set("name", trimmedName);
+        var result = await bindings.Admins.UpdateOneAsync(filter, update, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        if (result.ModifiedCount > 0 || result.MatchedCount > 0)
+        {
+            return true;
+        }
+
+        var appUser = await bindings.AppUsers.Find(x => x.EmailNormalized == normalized)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (appUser is null)
+        {
+            return false;
+        }
+
+        var appResult = await bindings.AppUsers.UpdateOneAsync(
+                x => x.Id == appUser.Id,
+                Builders<OrgAppUserDoc>.Update.Set(x => x.Name, trimmedName),
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        return appResult.ModifiedCount > 0 || appResult.MatchedCount > 0;
+    }
+
     private async Task<IReadOnlyList<OrgAppUserSummary>> ListOrgAdminSummariesAsync(
         UserDirectoryBindings bindings,
         IReadOnlyList<OrgAppUserSummary> appUsers,

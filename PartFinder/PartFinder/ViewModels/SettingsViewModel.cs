@@ -551,9 +551,38 @@ public partial class SettingsViewModel : ViewModelBase
         ProfileDepartment = _profile.Department ?? string.Empty;
         ProfileDesignation = _profile.Designation ?? string.Empty;
         ProfileBio = _profile.Bio ?? string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(nameToSave))
+        {
+            var email = SessionEmailDisplay;
+            if (string.IsNullOrWhiteSpace(email) || email == "—")
+            {
+                _setupContext.Refresh();
+                email = _setupContext.AdminEmail?.Trim()
+                    ?? _session.Email?.Trim();
+            }
+
+            if (!string.IsNullOrWhiteSpace(email))
+            {
+                _ = SyncProfileDisplayNameToDirectoryAsync(email, nameToSave);
+            }
+        }
+
         ProfileMessage = "Profile updated.";
         _activityLogger.LogUserAction("Profile Updated", $"Profile saved for \"{SessionEmailDisplay}\"");
         CaptureProfileBaseline();
+    }
+
+    private async Task SyncProfileDisplayNameToDirectoryAsync(string email, string displayName)
+    {
+        try
+        {
+            await _users.UpdateOrgAdminDisplayNameAsync(email, displayName).ConfigureAwait(false);
+        }
+        catch
+        {
+            // Local profile remains saved; Team Management overlays local name on load.
+        }
     }
 
     [RelayCommand(CanExecute = nameof(CanSaveProfile))]

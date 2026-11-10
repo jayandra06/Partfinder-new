@@ -1,8 +1,13 @@
+using ClosedXML.Excel;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Media;
 using PartFinder.Services;
 using PartFinder.ViewModels;
+using Windows.Storage;
 using Windows.Storage.Pickers;
 using WinRT.Interop;
 
@@ -49,11 +54,19 @@ public sealed partial class InventoryPage : Page
 
     private void OnEditInventoryClick(object sender, RoutedEventArgs e)
     {
-        if (sender is Button btn && btn.DataContext is InventoryItem item)
+        if (sender is not Button btn)
         {
-            ItemFormPanel.PrepareForEdit(item);
-            ViewModel.BeginEditForm(item);
+            return;
         }
+
+        var item = btn.Tag as InventoryItem ?? btn.DataContext as InventoryItem;
+        if (item is null)
+        {
+            return;
+        }
+
+        ItemFormPanel.PrepareForEdit(item);
+        ViewModel.BeginEditForm(item);
     }
 
     private void OnCancelFormClick(object sender, RoutedEventArgs e)
@@ -150,12 +163,26 @@ public sealed partial class InventoryPage : Page
             return;
         }
 
+        var partName = ItemFormPanel.PartName?.Trim();
+        if (!string.IsNullOrWhiteSpace(partName))
+        {
+            doc.PartName = partName;
+        }
+
+        doc.PartId = ItemFormPanel.PartId?.Trim() ?? doc.PartId;
+        var category = ItemFormPanel.Category?.Trim();
+        if (!string.IsNullOrWhiteSpace(category))
+        {
+            doc.Category = category;
+        }
+
         var oldQty = doc.Quantity;
         doc.Quantity = newQty;
         doc.MinStock = newMinStock > 0 ? newMinStock : doc.MinStock;
         doc.UnitPrice = newUnitPrice > 0 ? newUnitPrice : doc.UnitPrice;
         doc.Location = string.IsNullOrWhiteSpace(ItemFormPanel.Location) ? doc.Location : ItemFormPanel.Location;
         doc.Supplier = string.IsNullOrWhiteSpace(ItemFormPanel.Supplier) ? doc.Supplier : ItemFormPanel.Supplier;
+        doc.Notes = ItemFormPanel.Notes ?? doc.Notes;
         doc.LastUpdated = DateTime.UtcNow;
 
         try
@@ -444,5 +471,183 @@ public sealed partial class InventoryPage : Page
         }
 
         return (int)Math.Clamp(Math.Round(completed * 100.0 / total, MidpointRounding.AwayFromZero), 0, 100);
+    }
+
+    private async void OnExportClick(object sender, RoutedEventArgs e)
+    {
+        var items = ViewModel.GetAllItemsForExport();
+        if (items.Count == 0)
+        {
+            await ShowSimpleDialogAsync("Nothing to export", "There are no inventory items to export.");
+            return;
+        }
+
+        if (XamlRoot is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var fileName = $"PartFinder_Inventory_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+            var downloadsDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                "Downloads");
+            Directory.CreateDirectory(downloadsDir);
+
+            var savePath = Path.Combine(downloadsDir, fileName);
+            if (File.Exists(savePath))
+            {
+                savePath = Path.Combine(
+                    downloadsDir,
+                    $"{Path.GetFileNameWithoutExtension(fileName)}_{DateTime.Now:HHmmss}.xlsx");
+            }
+
+            using var workbook = new XLWorkbook();
+            var sheet = workbook.Worksheets.Add("Inventory");
+            var headers = new[]
+            {
+                "Part Name", "Part ID", "Category", "Quantity", "Min Stock", "Unit Price", "Total Value",
+                "Location", "Supplier", "Status", "Last Updated (UTC)",
+            };
+            for (var c = 0; c < headers.Length; c++)
+            {
+                sheet.Cell(1, c + 1).Value = headers[c];
+            }
+
+            var row = 2;
+            foreach (var item in items.OrderBy(i => i.PartId, StringComparer.OrdinalIgnoreCase))
+            {
+                sheet.Cell(row, 1).Value = item.PartName;
+                sheet.Cell(row, 2).Value = string.IsNullOrWhiteSpace(item.PartId) ? item.Id : item.PartId;
+                sheet.Cell(row, 3).Value = item.Category;
+                sheet.Cell(row, 4).Value = item.Quantity;
+                sheet.Cell(row, 5).Value = item.MinStock;
+                sheet.Cell(row, 6).Value = item.UnitPrice;
+                sheet.Cell(row, 7).Value = item.TotalValue;
+                sheet.Cell(row, 8).Value = item.Location;
+                sheet.Cell(row, 9).Value = item.Supplier;
+                sheet.Cell(row, 10).Value = item.Status;
+                sheet.Cell(row, 11).Value = item.LastUpdated;
+                row++;
+            }
+
+            sheet.Columns().AdjustToContents();
+            workbook.SaveAs(savePath);
+
+            _activity.LogUserAction("Inventory Export", $"Exported {items.Count} row(s) to {Path.GetFileName(savePath)}");
+            await ShowSimpleDialogAsync("Export complete", $"Saved to:\n{savePath}");
+        }
+        catch (Exception ex)
+        {
+            await ShowSimpleDialogAsync("Export failed", ex.Message);
+        }
+    }
+
+    private void OnInventoryRowActionsClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn)
+        {
+            return;
+        }
+
+        var item = btn.Tag as InventoryItem ?? btn.DataContext as InventoryItem;
+        if (item is null)
+        {
+            return;
+        }
+
+        var flyout = new MenuFlyout { ShouldConstrainToRootBounds = false };
+
+        var edit = new MenuFlyoutItem { Text = "Edit" };
+        edit.Click += (_, _) =>
+        {
+            flyout.Hide();
+            EnqueueAfterFlyoutClosed(() =>
+            {
+                ItemFormPanel.PrepareForEdit(item);
+                ViewModel.BeginEditForm(item);
+            });
+        };
+        flyout.Items.Add(edit);
+
+        var delete = new MenuFlyoutItem { Text = "Delete" };
+        if (Application.Current.Resources.TryGetValue("DangerBrush", out var dangerObj) && dangerObj is Brush dangerBrush)
+        {
+            delete.Foreground = dangerBrush;
+        }
+
+        delete.Click += (_, _) =>
+        {
+            flyout.Hide();
+            EnqueueAfterFlyoutClosed(() => _ = ConfirmDeleteSingleItemAsync(item));
+        };
+        flyout.Items.Add(delete);
+
+        flyout.ShowAt(btn, new FlyoutShowOptions { Placement = FlyoutPlacementMode.Bottom });
+    }
+
+    private async Task ConfirmDeleteSingleItemAsync(InventoryItem item)
+    {
+        if (XamlRoot is null)
+        {
+            return;
+        }
+
+        var dialog = new ContentDialog
+        {
+            Title = "Delete item",
+            Content = $"Delete \"{item.PartName}\"?",
+            PrimaryButtonText = "Delete",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = XamlRoot,
+        };
+
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+        {
+            return;
+        }
+
+        _session.Load();
+        await ViewModel.DeleteItemAsync(item.Id).ConfigureAwait(true);
+        await _auditService.LogAsync(new AuditDoc
+        {
+            EventType = "Stock Change",
+            Action = "Item Deleted",
+            Details = $"{item.PartName} removed from inventory",
+            User = _session.Email ?? "Admin",
+            Timestamp = DateTime.UtcNow,
+        }).ConfigureAwait(true);
+        ViewModel.StatusMessage = $"Deleted {item.PartName}.";
+    }
+
+    private void EnqueueAfterFlyoutClosed(Action action)
+    {
+        var dq = DispatcherQueue.GetForCurrentThread();
+        if (dq is null)
+        {
+            action();
+            return;
+        }
+
+        _ = dq.TryEnqueue(DispatcherQueuePriority.Normal, () => action());
+    }
+
+    private async Task ShowSimpleDialogAsync(string title, string message)
+    {
+        if (XamlRoot is null)
+        {
+            return;
+        }
+
+        var dialog = new ContentDialog
+        {
+            Title = title,
+            Content = new TextBlock { Text = message, TextWrapping = TextWrapping.WrapWholeWords },
+            CloseButtonText = "OK",
+            XamlRoot = XamlRoot,
+        };
+        _ = await dialog.ShowAsync();
     }
 }

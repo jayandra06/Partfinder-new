@@ -12,11 +12,13 @@ public enum InventoryFormMode
     Edit,
 }
 
-public partial class InventoryViewModel : ViewModelBase
+public partial class InventoryViewModel : PaginatedViewModelBase
 {
     private readonly MongoInventoryService _inventoryService;
     private readonly BulkInventoryImportService _bulkImport;
     private readonly ActivityLogger _activityLogger;
+    private readonly List<InventoryItem> _allInventory = [];
+    private readonly List<InventoryItem> _filteredInventory = [];
 
     public InventoryViewModel(
         MongoInventoryService inventoryService,
@@ -28,7 +30,9 @@ public partial class InventoryViewModel : ViewModelBase
         _activityLogger = activityLogger;
     }
 
-    public ObservableCollection<InventoryItem> InventoryItems { get; } = [];
+    public ObservableCollection<InventoryItem> FilteredInventoryItems { get; } = [];
+
+    public ObservableCollection<string> CategoryFilterOptions { get; } = ["All categories"];
 
     [ObservableProperty] private bool _isLoading;
     [ObservableProperty] private string _statusMessage = string.Empty;
@@ -51,12 +55,42 @@ public partial class InventoryViewModel : ViewModelBase
 
     public bool IsFormVisible => FormMode != InventoryFormMode.None;
 
+    public IReadOnlyList<string> StatusFilterOptions { get; } =
+        ["All statuses", "In Stock", "Low Stock", "Out of Stock"];
+
+    public string TotalValueFormatted => TotalValue >= 1_000_000
+        ? $"${TotalValue / 1_000_000:F1}M"
+        : TotalValue >= 1_000
+            ? $"${TotalValue / 1_000:F1}K"
+            : $"${TotalValue:N0}";
+
     partial void OnFormModeChanged(InventoryFormMode value)
     {
         OnPropertyChanged(nameof(IsListVisible));
         OnPropertyChanged(nameof(IsFormVisible));
         FormStatusMessage = string.Empty;
     }
+
+    partial void OnSearchQueryChanged(string value)
+    {
+        ResetPaginationPage();
+        ApplyFilters();
+    }
+
+    partial void OnSelectedCategoryFilterChanged(string value)
+    {
+        ResetPaginationPage();
+        ApplyFilters();
+    }
+
+    partial void OnSelectedStatusFilterChanged(string value)
+    {
+        ResetPaginationPage();
+        ApplyFilters();
+    }
+
+    protected override void OnPaginationRefreshRequested() =>
+        RefreshPage(FilteredInventoryItems, _filteredInventory);
 
     public void BeginAddForm()
     {
@@ -78,17 +112,7 @@ public partial class InventoryViewModel : ViewModelBase
         SelectedItem = null;
     }
 
-    public IReadOnlyList<string> CategoryFilterOptions { get; } =
-        ["All categories", "Engine", "Electrical", "Hardware", "General"];
-
-    public IReadOnlyList<string> StatusFilterOptions { get; } =
-        ["All statuses", "In Stock", "Low Stock", "Out of Stock"];
-
-    public string TotalValueFormatted => TotalValue >= 1_000_000
-        ? $"${TotalValue / 1_000_000:F1}M"
-        : TotalValue >= 1_000
-            ? $"${TotalValue / 1_000:F1}K"
-            : $"${TotalValue:N0}";
+    public IReadOnlyList<InventoryItem> GetAllItemsForExport() => _allInventory.ToList();
 
     public async Task LoadInventoryAsync(CancellationToken cancellationToken = default)
     {
@@ -98,40 +122,15 @@ public partial class InventoryViewModel : ViewModelBase
         {
             var docs = await _inventoryService.GetAllAsync(cancellationToken).ConfigureAwait(true);
 
-            InventoryItems.Clear();
-            TotalItems = 0;
-            LowStockItems = 0;
-            OutOfStockItems = 0;
-            TotalValue = 0;
-
+            _allInventory.Clear();
             foreach (var doc in docs)
             {
-                var status = doc.Quantity == 0 ? "Out of Stock"
-                           : doc.Quantity < doc.MinStock ? "Low Stock"
-                           : "In Stock";
-
-                if (doc.Quantity == 0) OutOfStockItems++;
-                else if (doc.Quantity < doc.MinStock) LowStockItems++;
-
-                TotalValue += doc.Quantity * doc.UnitPrice;
-
-                InventoryItems.Add(new InventoryItem
-                {
-                    Id = doc.MongoId.ToString(),
-                    PartName = string.IsNullOrWhiteSpace(doc.PartName) ? "(No name)" : doc.PartName,
-                    Category = string.IsNullOrWhiteSpace(doc.Category) ? "Uncategorized" : doc.Category,
-                    Quantity = doc.Quantity,
-                    MinStock = doc.MinStock,
-                    UnitPrice = doc.UnitPrice,
-                    TotalValue = doc.Quantity * doc.UnitPrice,
-                    Location = doc.Location,
-                    Supplier = doc.Supplier,
-                    Status = status,
-                    LastUpdated = doc.LastUpdated,
-                });
-
-                TotalItems++;
+                _allInventory.Add(MapDocToItem(doc));
             }
+
+            RecomputeAnalytics();
+            RefreshCategoryFilterOptions();
+            ApplyFilters();
 
             StatusMessage = TotalItems == 0
                 ? "No inventory items yet. Add stock to get started."
@@ -149,10 +148,123 @@ public partial class InventoryViewModel : ViewModelBase
         }
     }
 
-    // Called from code-behind dialogs
+    private void RecomputeAnalytics()
+    {
+        TotalItems = _allInventory.Count;
+        LowStockItems = 0;
+        OutOfStockItems = 0;
+        TotalValue = 0;
+
+        foreach (var item in _allInventory)
+        {
+            item.Status = ComputeStatus(item.Quantity, item.MinStock);
+
+            if (item.Quantity == 0)
+            {
+                OutOfStockItems++;
+            }
+            else if (item.Quantity < item.MinStock)
+            {
+                LowStockItems++;
+            }
+
+            item.TotalValue = item.Quantity * item.UnitPrice;
+            TotalValue += item.TotalValue;
+        }
+    }
+
+    private void RefreshCategoryFilterOptions()
+    {
+        var previous = SelectedCategoryFilter;
+        CategoryFilterOptions.Clear();
+        CategoryFilterOptions.Add("All categories");
+
+        foreach (var cat in _allInventory
+                     .Select(i => i.Category.Trim())
+                     .Where(c => !string.IsNullOrWhiteSpace(c))
+                     .Distinct(StringComparer.OrdinalIgnoreCase)
+                     .OrderBy(c => c, StringComparer.OrdinalIgnoreCase))
+        {
+            CategoryFilterOptions.Add(cat);
+        }
+
+        SelectedCategoryFilter = CategoryFilterOptions.Contains(previous) ? previous : "All categories";
+    }
+
+    private void ApplyFilters()
+    {
+        var query = SearchQuery?.Trim() ?? string.Empty;
+
+        IEnumerable<InventoryItem> items = _allInventory;
+
+        if (!string.IsNullOrEmpty(query))
+        {
+            items = items.Where(i =>
+                i.PartName.Contains(query, StringComparison.OrdinalIgnoreCase)
+                || i.PartId.Contains(query, StringComparison.OrdinalIgnoreCase)
+                || i.Id.Contains(query, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.Equals(SelectedCategoryFilter, "All categories", StringComparison.OrdinalIgnoreCase))
+        {
+            items = items.Where(i =>
+                string.Equals(i.Category, SelectedCategoryFilter, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.Equals(SelectedStatusFilter, "All statuses", StringComparison.OrdinalIgnoreCase))
+        {
+            items = items.Where(i =>
+                string.Equals(i.Status, SelectedStatusFilter, StringComparison.OrdinalIgnoreCase));
+        }
+
+        items = items
+            .OrderBy(i => PartIdSortKey(i.PartId), StringComparer.OrdinalIgnoreCase)
+            .ThenBy(i => i.PartName, StringComparer.OrdinalIgnoreCase);
+
+        _filteredInventory.Clear();
+        foreach (var item in items)
+        {
+            _filteredInventory.Add(item);
+        }
+
+        CommitFilterPage(_filteredInventory, FilteredInventoryItems);
+    }
+
+    private static string PartIdSortKey(string partId)
+    {
+        var trimmed = partId?.Trim() ?? string.Empty;
+        return string.IsNullOrEmpty(trimmed) ? "\uFFFF" : trimmed;
+    }
+
+    private static string ComputeStatus(int quantity, int minStock) =>
+        quantity == 0 ? "Out of Stock"
+        : quantity < minStock ? "Low Stock"
+        : "In Stock";
+
+    private static InventoryItem MapDocToItem(InventoryDoc doc)
+    {
+        var minStock = doc.MinStock > 0 ? doc.MinStock : 10;
+        var qty = doc.Quantity;
+        return new InventoryItem
+        {
+            Id = doc.MongoId.ToString(),
+            PartId = string.IsNullOrWhiteSpace(doc.PartId) ? string.Empty : doc.PartId.Trim(),
+            PartName = string.IsNullOrWhiteSpace(doc.PartName) ? "(No name)" : doc.PartName,
+            Category = string.IsNullOrWhiteSpace(doc.Category) ? "Uncategorized" : doc.Category.Trim(),
+            Quantity = qty,
+            MinStock = minStock,
+            UnitPrice = doc.UnitPrice,
+            TotalValue = qty * doc.UnitPrice,
+            Location = doc.Location ?? string.Empty,
+            Supplier = doc.Supplier ?? string.Empty,
+            Status = ComputeStatus(qty, minStock),
+            LastUpdated = doc.LastUpdated,
+        };
+    }
+
     public async Task<bool> AddStockAsync(string partId, int quantityToAdd, CancellationToken ct = default)
     {
-        var item = InventoryItems.FirstOrDefault(x => x.Id == partId);
+        var item = _allInventory.FirstOrDefault(x => x.Id == partId);
         if (item is null) return false;
 
         var docs = await _inventoryService.GetAllAsync(ct).ConfigureAwait(true);
@@ -165,11 +277,11 @@ public partial class InventoryViewModel : ViewModelBase
 
         item.Quantity = doc.Quantity;
         item.TotalValue = item.Quantity * item.UnitPrice;
-        item.Status = item.Quantity == 0 ? "Out of Stock"
-                    : item.Quantity < item.MinStock ? "Low Stock"
-                    : "In Stock";
+        item.Status = ComputeStatus(item.Quantity, item.MinStock);
         item.LastUpdated = doc.LastUpdated;
 
+        RecomputeAnalytics();
+        ApplyFilters();
         StatusMessage = $"Added {quantityToAdd} units to {item.PartName}";
         _activityLogger.LogStockChange("Stock Added",
             $"Added {quantityToAdd} units to \"{item.PartName}\" (new qty: {item.Quantity})");
@@ -178,7 +290,7 @@ public partial class InventoryViewModel : ViewModelBase
 
     public async Task<bool> UpdateStockAsync(string partId, int newQuantity, CancellationToken ct = default)
     {
-        var item = InventoryItems.FirstOrDefault(x => x.Id == partId);
+        var item = _allInventory.FirstOrDefault(x => x.Id == partId);
         if (item is null) return false;
 
         var docs = await _inventoryService.GetAllAsync(ct).ConfigureAwait(true);
@@ -191,15 +303,40 @@ public partial class InventoryViewModel : ViewModelBase
 
         item.Quantity = newQuantity;
         item.TotalValue = item.Quantity * item.UnitPrice;
-        item.Status = item.Quantity == 0 ? "Out of Stock"
-                    : item.Quantity < item.MinStock ? "Low Stock"
-                    : "In Stock";
+        item.Status = ComputeStatus(item.Quantity, item.MinStock);
         item.LastUpdated = doc.LastUpdated;
 
+        RecomputeAnalytics();
+        ApplyFilters();
         StatusMessage = $"Updated {item.PartName} to {newQuantity} units";
         _activityLogger.LogStockChange("Stock Updated",
             $"Updated \"{item.PartName}\" to {newQuantity} units");
         return true;
+    }
+
+    public async Task<bool> DeleteItemAsync(string mongoId, CancellationToken ct = default)
+    {
+        await _inventoryService.DeleteAsync(mongoId, ct).ConfigureAwait(true);
+        var item = _allInventory.FirstOrDefault(i => i.Id == mongoId);
+        if (item is not null)
+        {
+            _allInventory.Remove(item);
+            _activityLogger.LogStockChange("Item Deleted", $"Removed \"{item.PartName}\" from inventory");
+        }
+
+        RecomputeAnalytics();
+        RefreshCategoryFilterOptions();
+        ApplyFilters();
+        return true;
+    }
+
+    [RelayCommand]
+    private void ClearFilters()
+    {
+        SearchQuery = string.Empty;
+        SelectedCategoryFilter = "All categories";
+        SelectedStatusFilter = "All statuses";
+        ApplyFilters();
     }
 
     [RelayCommand]
@@ -219,6 +356,7 @@ public partial class InventoryViewModel : ViewModelBase
 public sealed partial class InventoryItem : ObservableObject
 {
     public required string Id { get; init; }
+    public required string PartId { get; init; }
     public required string PartName { get; init; }
     public required string Category { get; init; }
     public required string Location { get; init; }
@@ -231,11 +369,20 @@ public sealed partial class InventoryItem : ObservableObject
     [ObservableProperty] private string _status = "In Stock";
     [ObservableProperty] private DateTime _lastUpdated;
 
+    public string PartIdDisplay => string.IsNullOrWhiteSpace(PartId) ? "—" : PartId;
+
     public string StatusColor => Status switch
     {
         "Out of Stock" => "#FF5F57",
         "Low Stock"    => "#FFB781",
         _              => "#2ABD8F"
+    };
+
+    public string StatusBackgroundColor => Status switch
+    {
+        "Out of Stock" => "#25FF5F57",
+        "Low Stock"    => "#25FFB781",
+        _              => "#252ABD8F"
     };
 
     public string StatusIcon => Status switch

@@ -7,11 +7,12 @@ using System.ComponentModel;
 
 namespace PartFinder.ViewModels;
 
-public partial class UserManagementViewModel : ViewModelBase
+public partial class UserManagementViewModel : PaginatedViewModelBase
 {
     private readonly IOrgUserDirectoryService _users;
     private readonly ITemplateSchemaService _templates;
     private readonly ILocalSetupContext _setupContext;
+    private readonly LocalProfileStore _profile;
     private readonly ActivityLogger _activityLogger;
     private bool _suppressGrantAllSync;
 
@@ -60,6 +61,7 @@ public partial class UserManagementViewModel : ViewModelBase
     private string? _editUserId;
 
     private List<OrgAppUserSummary> _allUsers = [];
+    private readonly List<OrgAppUserSummary> _filteredUsers = [];
 
     [ObservableProperty]
     private string searchQuery = string.Empty;
@@ -69,14 +71,22 @@ public partial class UserManagementViewModel : ViewModelBase
     [ObservableProperty]
     private string selectedRoleFilter = "All";
 
-    partial void OnSelectedRoleFilterChanged(string value) => ApplyFilter();
+    partial void OnSelectedRoleFilterChanged(string value)
+    {
+        ResetPaginationPage();
+        ApplyFilter();
+    }
 
     public string[] StatusFilters { get; } = ["All Status", "Active", "Pending"];
 
     [ObservableProperty]
     private string selectedStatusFilter = "All Status";
 
-    partial void OnSelectedStatusFilterChanged(string value) => ApplyFilter();
+    partial void OnSelectedStatusFilterChanged(string value)
+    {
+        ResetPaginationPage();
+        ApplyFilter();
+    }
 
     private int _totalUsersCount;
     public int TotalUsersCount
@@ -114,15 +124,22 @@ public partial class UserManagementViewModel : ViewModelBase
         PendingUsersCount = _allUsers.Count(u => u.Status == "Pending");
     }
 
-    partial void OnSearchQueryChanged(string value) => ApplyFilter();
+    partial void OnSearchQueryChanged(string value)
+    {
+        ResetPaginationPage();
+        ApplyFilter();
+    }
+
+    protected override void OnPaginationRefreshRequested() =>
+        RefreshPage(Users, _filteredUsers);
 
     private void ApplyFilter()
     {
-        Users.Clear();
         var query = SearchQuery?.Trim() ?? string.Empty;
         var roleFilter = SelectedRoleFilter ?? "All";
         var statusFilter = SelectedStatusFilter ?? "All Status";
 
+        _filteredUsers.Clear();
         foreach (var u in _allUsers)
         {
             var matchesQuery = string.IsNullOrEmpty(query)
@@ -137,9 +154,11 @@ public partial class UserManagementViewModel : ViewModelBase
 
             if (matchesQuery && matchesRole && matchesStatus)
             {
-                Users.Add(u);
+                _filteredUsers.Add(u);
             }
         }
+
+        CommitFilterPage(_filteredUsers, Users);
     }
 
     public bool IsEmployeeRole =>
@@ -169,11 +188,13 @@ public partial class UserManagementViewModel : ViewModelBase
         IOrgUserDirectoryService users,
         ITemplateSchemaService templates,
         ILocalSetupContext setupContext,
+        LocalProfileStore profile,
         ActivityLogger activityLogger)
     {
         _users = users;
         _templates = templates;
         _setupContext = setupContext;
+        _profile = profile;
         _activityLogger = activityLogger;
     }
 
@@ -350,6 +371,18 @@ public partial class UserManagementViewModel : ViewModelBase
             _setupContext.Refresh();
             var orgCode = _setupContext.OrgCode?.Trim();
             var merged = new Dictionary<string, OrgAppUserSummary>(StringComparer.OrdinalIgnoreCase);
+            string? orgDisplayName = null;
+            SetupStatusResult? status = null;
+
+            if (!string.IsNullOrWhiteSpace(orgCode))
+            {
+                (status, _) = await SetupApiClient.StatusAsync(orgCode).ConfigureAwait(true);
+                orgDisplayName = status?.OrganizationName?.Trim();
+                if (string.IsNullOrWhiteSpace(orgDisplayName))
+                {
+                    orgDisplayName = null;
+                }
+            }
 
             void MergeUsers(IEnumerable<OrgAppUserSummary> users)
             {
@@ -360,16 +393,23 @@ public partial class UserManagementViewModel : ViewModelBase
                         continue;
                     }
 
-                    merged[user.Email.Trim()] = user;
+                    var key = user.Email.Trim();
+                    if (merged.TryGetValue(key, out var existing))
+                    {
+                        merged[key] = PickPreferredUser(existing, user, orgDisplayName, orgCode);
+                    }
+                    else
+                    {
+                        merged[key] = NormalizeUserDisplayName(user, orgDisplayName, orgCode);
+                    }
                 }
             }
 
             MergeUsers(await _users.ListUsersAsync().ConfigureAwait(true));
 
-            if (!string.IsNullOrWhiteSpace(orgCode))
+            if (!string.IsNullOrWhiteSpace(orgCode) && status is not null)
             {
-                var (status, _) = await SetupApiClient.StatusAsync(orgCode).ConfigureAwait(true);
-                if (status?.OrgAppUsers is { Count: > 0 })
+                if (status.OrgAppUsers is { Count: > 0 })
                 {
                     MergeUsers(SetupApiClient.MapOrgAppUserItems(status.OrgAppUsers));
                 }
@@ -393,7 +433,13 @@ public partial class UserManagementViewModel : ViewModelBase
                 }
             }
 
-            _allUsers = merged.Values.OrderByDescending(u => u.InvitedAtUtc).ToList();
+            _allUsers = merged.Values
+                .Select(u => NormalizeUserDisplayName(u, orgDisplayName, orgCode))
+                .OrderByDescending(u => u.InvitedAtUtc)
+                .ToList();
+
+            await ReconcileStoredUserNamesAsync(orgDisplayName, orgCode).ConfigureAwait(true);
+            await ApplyLocalProfileDisplayNamesAsync().ConfigureAwait(true);
             NotifyKpiChanges();
             ApplyFilter();
             if (_allUsers.Count == 0)
@@ -749,4 +795,203 @@ public partial class UserManagementViewModel : ViewModelBase
         Add = true,
         Delete = true,
     };
+
+    private async Task ApplyLocalProfileDisplayNamesAsync()
+    {
+        _profile.Load();
+        var savedName = _profile.DisplayName?.Trim();
+        if (string.IsNullOrWhiteSpace(savedName))
+        {
+            return;
+        }
+
+        _setupContext.Refresh();
+        var sessionEmail = _setupContext.AdminEmail?.Trim();
+        if (string.IsNullOrWhiteSpace(sessionEmail))
+        {
+            return;
+        }
+
+        for (var i = 0; i < _allUsers.Count; i++)
+        {
+            var user = _allUsers[i];
+            if (!string.Equals(user.Email.Trim(), sessionEmail, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (string.Equals(user.Name, savedName, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            _allUsers[i] = WithName(user, savedName);
+            await _users.UpdateOrgAdminDisplayNameAsync(user.Email, savedName).ConfigureAwait(true);
+        }
+    }
+
+    private async Task ReconcileStoredUserNamesAsync(string? orgDisplayName, string? orgCode)
+    {
+        for (var i = 0; i < _allUsers.Count; i++)
+        {
+            var user = _allUsers[i];
+            if (user.IsOrgAdminDirectoryEntry)
+            {
+                var resolvedAdmin = ResolvePersonName(user, orgDisplayName, orgCode);
+                if (!IsPlaceholderName(user.Name, orgDisplayName, orgCode)
+                    || string.Equals(resolvedAdmin, user.Name, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var syncedAdmin = await _users.UpdateOrgAdminDisplayNameAsync(user.Email, resolvedAdmin)
+                    .ConfigureAwait(true);
+                if (syncedAdmin)
+                {
+                    _allUsers[i] = WithName(user, resolvedAdmin);
+                }
+
+                continue;
+            }
+
+            var resolved = ResolvePersonName(user, orgDisplayName, orgCode);
+            if (string.Equals(resolved, user.Name, StringComparison.Ordinal)
+                || !IsPlaceholderName(user.Name, orgDisplayName, orgCode))
+            {
+                continue;
+            }
+
+            var ok = await _users.UpdateUserAsync(
+                user.Id,
+                resolved,
+                user.Role,
+                user.PartsAllTemplates,
+                user.AllowedTemplateIds,
+                user.TemplatePermissions,
+                user.MasterDataPermissions).ConfigureAwait(true);
+
+            if (ok)
+            {
+                _allUsers[i] = WithName(user, resolved);
+            }
+        }
+    }
+
+    private static OrgAppUserSummary PickPreferredUser(
+        OrgAppUserSummary existing,
+        OrgAppUserSummary incoming,
+        string? orgDisplayName,
+        string? orgCode)
+    {
+        var existingGood = !IsPlaceholderName(existing.Name, orgDisplayName, orgCode);
+        var incomingGood = !IsPlaceholderName(incoming.Name, orgDisplayName, orgCode);
+        var newer = incoming.InvitedAtUtc >= existing.InvitedAtUtc ? incoming : existing;
+        var bestName = existingGood ? existing.Name.Trim()
+            : incomingGood ? incoming.Name.Trim()
+            : ResolvePersonName(
+                !string.IsNullOrWhiteSpace(incoming.Name) ? incoming : existing,
+                orgDisplayName,
+                orgCode);
+
+        return WithName(newer, bestName);
+    }
+
+    private static OrgAppUserSummary NormalizeUserDisplayName(
+        OrgAppUserSummary user,
+        string? orgDisplayName,
+        string? orgCode)
+    {
+        var name = ResolvePersonName(user, orgDisplayName, orgCode);
+        return string.Equals(name, user.Name, StringComparison.Ordinal) ? user : WithName(user, name);
+    }
+
+    private static OrgAppUserSummary WithName(OrgAppUserSummary user, string name) =>
+        new()
+        {
+            Id = user.Id,
+            Name = name,
+            Email = user.Email,
+            Role = user.Role,
+            PartsAllTemplates = user.PartsAllTemplates,
+            AllowedTemplateIds = user.AllowedTemplateIds,
+            InvitedAtUtc = user.InvitedAtUtc,
+            TemplatePermissions = user.TemplatePermissions,
+            MasterDataPermissions = user.MasterDataPermissions,
+            Status = user.Status,
+            IsOrgAdminDirectoryEntry = user.IsOrgAdminDirectoryEntry,
+        };
+
+    private static bool IsPlaceholderName(string? name, string? orgDisplayName, string? orgCode)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return true;
+        }
+
+        var n = name.Trim();
+        if (string.Equals(n, "Organisation Admin", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(n, "Organization Admin", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(orgDisplayName)
+            && string.Equals(n, $"{orgDisplayName.Trim()} Admin", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(orgDisplayName)
+            && string.Equals(n, orgDisplayName.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(orgCode)
+            && string.Equals(n, orgCode.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static string ResolvePersonName(OrgAppUserSummary user, string? orgDisplayName, string? orgCode)
+    {
+        var email = user.Email?.Trim() ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(email)
+            && string.Equals(user.Name.Trim(), email, StringComparison.OrdinalIgnoreCase))
+        {
+            var fromEmail = DisplayNameFromEmail(email);
+            return string.IsNullOrWhiteSpace(fromEmail) ? email : fromEmail;
+        }
+
+        if (!IsPlaceholderName(user.Name, orgDisplayName, orgCode))
+        {
+            return user.Name.Trim();
+        }
+
+        var derived = DisplayNameFromEmail(email);
+        return string.IsNullOrWhiteSpace(derived) ? email : derived;
+    }
+
+    private static string DisplayNameFromEmail(string email)
+    {
+        var trimmed = email.Trim();
+        var at = trimmed.IndexOf('@');
+        if (at <= 0)
+        {
+            return trimmed;
+        }
+
+        var local = trimmed[..at].Replace('.', ' ').Replace('_', ' ').Replace('-', ' ');
+        while (local.Contains("  ", StringComparison.Ordinal))
+        {
+            local = local.Replace("  ", " ", StringComparison.Ordinal);
+        }
+
+        return string.IsNullOrWhiteSpace(local)
+            ? trimmed
+            : System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(local.Trim());
+    }
 }

@@ -83,6 +83,12 @@ public interface IOrgUserDirectoryService
 
     Task<bool> DeleteUserAsync(string id, CancellationToken cancellationToken = default);
 
+    /// <summary>Updates the display name on the organisation bootstrap admin record (<c>org_admin_users</c>).</summary>
+    Task<bool> UpdateOrgAdminDisplayNameAsync(
+        string email,
+        string name,
+        CancellationToken cancellationToken = default);
+
     /// <summary>Clears temporary password and stores permanent hash after first-time password setup.</summary>
     Task<bool> CompleteInvitedUserActivationAsync(
         string email,
