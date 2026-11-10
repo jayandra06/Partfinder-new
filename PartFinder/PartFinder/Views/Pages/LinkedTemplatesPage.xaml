@@ -55,7 +55,7 @@
                 FontWeight="SemiBold"
                 Foreground="{StaticResource TextPrimaryBrush}" />
             <TextBlock
-                Text="Select a template, then click column values with links to open matching data from linked templates in the panel on the right."
+                Text="Select a template, then click a linked value. In Linked data, choose columns and click View to open them beside this table."
                 FontSize="12"
                 Foreground="{StaticResource TextSecondaryBrush}"
                 TextWrapping="WrapWholeWords"
