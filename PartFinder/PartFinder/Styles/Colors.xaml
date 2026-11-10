@@ -176,6 +176,7 @@
     <SolidColorBrush x:Key="HeaderBarBackgroundBrush" Color="#CC111A27" />
     <SolidColorBrush x:Key="ChartSurfaceBackgroundBrush" Color="#141D2A" />
     <SolidColorBrush x:Key="ContentShellBackgroundBrush" Color="#96111A27" />
+    <SolidColorBrush x:Key="WindowRootBackgroundBrush" Color="#FF0A0E15" />
     <SolidColorBrush x:Key="AmbientBlueBrush" Color="#332F7FD2" />
     <SolidColorBrush x:Key="AmbientPurpleBrush" Color="#2E8B5CF6" />
     <SolidColorBrush x:Key="AmbientPinkBrush" Color="#26F472B6" />

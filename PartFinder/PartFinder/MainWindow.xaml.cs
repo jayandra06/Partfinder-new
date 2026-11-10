@@ -55,6 +55,7 @@ public sealed partial class MainWindow : Window
         UpdateStepUi();
 
         var themeService = App.Services.GetRequiredService<IThemeService>();
+        themeService.AttachWindowRoot(RootGrid);
         themeService.ThemeChanged += OnShellThemeChangedForTitleBar;
     }
 
