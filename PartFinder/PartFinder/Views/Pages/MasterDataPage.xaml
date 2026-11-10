@@ -172,16 +172,18 @@
                 Visibility="{Binding ShowNoDatabaseHint, Converter={StaticResource BoolToVisibilityConverter}}" />
         </StackPanel>
 
-        <!-- Spreadsheet + optional detail column (no modal overlay) -->
+        <!-- Spreadsheet, linked-column view, and the Linked data panel -->
         <Grid
+            x:Name="DataWorkspace"
             Grid.Row="3"
             Margin="0,4,0,0"
             ColumnSpacing="12">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
+                <ColumnDefinition x:Name="SourceTableColumn" Width="*" />
+                <ColumnDefinition x:Name="LinkedViewColumn" Width="0" />
                 <ColumnDefinition x:Name="ActionResultsColumn" Width="0" />
             </Grid.ColumnDefinitions>
-            <Grid Grid.Column="0">
+            <Grid x:Name="SourceTableHost" Grid.Column="0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
@@ -310,8 +312,69 @@
             </Grid>
 
             <Border
-                x:Name="ActionResultsPanel"
+                x:Name="LinkedViewPanel"
                 Grid.Column="1"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"
+                Padding="14"
+                Visibility="Collapsed"
+                CornerRadius="16"
+                Background="{StaticResource ElevatedCardBackgroundBrush}"
+                BorderBrush="{StaticResource AccentPrimaryBrush}"
+                BorderThickness="1">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            x:Name="LinkedViewTitleText"
+                            FontSize="14"
+                            FontWeight="SemiBold"
+                            TextTrimming="CharacterEllipsis"
+                            VerticalAlignment="Center" />
+                        <Button
+                            Grid.Column="1"
+                            Style="{StaticResource GhostButtonStyle}"
+                            Content="✕"
+                            FontSize="12"
+                            ToolTipService.ToolTip="Hide linked table"
+                            Click="OnCloseLinkedViewClick" />
+                    </Grid>
+                    <TextBlock
+                        x:Name="LinkedViewSubtitleText"
+                        Grid.Row="1"
+                        Margin="0,4,0,10"
+                        FontSize="11"
+                        Foreground="{StaticResource TextSecondaryBrush}"
+                        TextWrapping="WrapWholeWords" />
+                    <Border
+                        Grid.Row="2"
+                        CornerRadius="12"
+                        Background="{StaticResource CardBackgroundBrush}"
+                        BorderBrush="{StaticResource BorderDefaultBrush}"
+                        BorderThickness="1">
+                        <ScrollViewer
+                            x:Name="LinkedViewScroll"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Stretch"
+                            HorizontalScrollMode="Auto"
+                            HorizontalScrollBarVisibility="Auto"
+                            VerticalScrollMode="Auto"
+                            VerticalScrollBarVisibility="Auto" />
+                    </Border>
+                </Grid>
+            </Border>
+
+            <Border
+                x:Name="ActionResultsPanel"
+                Grid.Column="2"
                 HorizontalAlignment="Stretch"
                 VerticalAlignment="Stretch"
                 Padding="14"
@@ -368,6 +431,57 @@
                     IsAddTabButtonVisible="False" />
             </Grid>
             </Border>
+
+            <Canvas
+                x:Name="LinkConnectorCanvas"
+                Grid.Column="0"
+                Grid.ColumnSpan="2"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"
+                IsHitTestVisible="False"
+                Visibility="Collapsed">
+                <Path
+                    x:Name="LinkConnectorGlow"
+                    Stroke="{StaticResource AccentPrimaryBrush}"
+                    StrokeThickness="7"
+                    Opacity="0.28"
+                    StrokeStartLineCap="Round"
+                    StrokeEndLineCap="Round" />
+                <Path
+                    x:Name="LinkConnectorPath"
+                    Stroke="{StaticResource AccentPrimaryBrush}"
+                    StrokeThickness="2"
+                    StrokeStartLineCap="Round"
+                    StrokeEndLineCap="Round" />
+                <Ellipse
+                    x:Name="LinkSourceHalo"
+                    Width="16"
+                    Height="16"
+                    Visibility="Collapsed"
+                    Stroke="{StaticResource AccentPrimaryBrush}"
+                    StrokeThickness="1.5"
+                    Fill="Transparent" />
+                <Ellipse
+                    x:Name="LinkSourceNode"
+                    Width="8"
+                    Height="8"
+                    Visibility="Collapsed"
+                    Fill="{StaticResource AccentPrimaryBrush}" />
+                <Ellipse
+                    x:Name="LinkTargetHalo"
+                    Width="16"
+                    Height="16"
+                    Visibility="Collapsed"
+                    Stroke="{StaticResource AccentPrimaryBrush}"
+                    StrokeThickness="1.5"
+                    Fill="Transparent" />
+                <Ellipse
+                    x:Name="LinkTargetNode"
+                    Width="8"
+                    Height="8"
+                    Visibility="Collapsed"
+                    Fill="{StaticResource AccentPrimaryBrush}" />
+            </Canvas>
         </Grid>
     </Grid>
 </Page>

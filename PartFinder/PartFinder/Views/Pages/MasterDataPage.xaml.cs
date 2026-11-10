@@ -13,6 +13,7 @@ using PartFinder.Models;
 using PartFinder.Services;
 using PartFinder.ViewModels;
 using Windows.ApplicationModel.DataTransfer;
+using Windows.Foundation;
 using Windows.Storage.Pickers;
 using WinRT.Interop;
 
@@ -26,12 +27,20 @@ public sealed partial class MasterDataPage : Page
     private const int MasterDataPageSize = 50;
     private int _gridPageIndex;
     private bool _rebuildSpreadsheetScheduled;
+    private bool _connectorUpdateQueued;
     private MasterDataViewModel? _viewModel;
     private readonly IExcelTemplateService _excelTemplateService;
     private readonly ActivityLogger _activity;
     private Grid? _sheetGrid;
     private MasterDataNavigationArgs? _navigationArgs;
     private bool _surfaceInitialized;
+    private MasterDataRowViewModel? _activeLinkRow;
+    private string? _activeLinkFieldKey;
+    private string _activeLinkLabel = string.Empty;
+    private HyperlinkButton? _linkAnchor;
+    private Border? _highlightedCell;
+    private Brush? _highlightedCellBackground;
+    private Brush? _highlightedCellBorderBrush;
 
     public MasterDataPage()
     {
@@ -42,6 +51,8 @@ public sealed partial class MasterDataPage : Page
         DataContext = vm;
         Loaded += OnMasterDataPageLoaded;
         Unloaded += OnMasterDataPageUnloaded;
+        DataWorkspace.SizeChanged += (_, _) => ScheduleLinkConnectorUpdate();
+        LinkedViewPanel.SizeChanged += (_, _) => ScheduleLinkConnectorUpdate();
     }
 
     private async void OnMasterDataPageLoaded(object sender, RoutedEventArgs e)
@@ -442,6 +453,9 @@ public sealed partial class MasterDataPage : Page
 
     private void RebuildSpreadsheet()
     {
+        ClearLinkHighlight();
+        _linkAnchor = null;
+
         if (_viewModel is null || SpreadsheetHost is null)
         {
             return;
@@ -495,7 +509,12 @@ public sealed partial class MasterDataPage : Page
             }
         }
 
-        scroll.SizeChanged += FitGridToViewport;
+        scroll.SizeChanged += (_, _) =>
+        {
+            FitGridToViewport(null, EventArgs.Empty);
+            ScheduleLinkConnectorUpdate();
+        };
+        scroll.ViewChanged += (_, _) => ScheduleLinkConnectorUpdate();
         scroll.Loaded += (_, _) => FitGridToViewport(null, EventArgs.Empty);
 
         for (var c = 0; c < gridColCount; c++)
@@ -735,6 +754,11 @@ public sealed partial class MasterDataPage : Page
         _sheetGrid = grid;
         RefreshColumnManagementCombos();
         FitGridToViewport(null, EventArgs.Empty);
+        if (LinkedViewPanel is { Visibility: Visibility.Visible })
+        {
+            HighlightLinkAnchor();
+            ScheduleLinkConnectorUpdate();
+        }
     }
 
     private sealed class ColumnInsertOption
@@ -1120,8 +1144,21 @@ public sealed partial class MasterDataPage : Page
             Foreground = (Brush)Application.Current.Resources["AccentPrimaryBrush"],
         };
         ToolTipService.SetToolTip(link, "Open rows from templates linked to this column");
+        if (ReferenceEquals(rowVm, _activeLinkRow)
+            && string.Equals(cellVm.FieldKey, _activeLinkFieldKey, StringComparison.OrdinalIgnoreCase))
+        {
+            _linkAnchor = link;
+        }
+
         link.Click += async (_, _) =>
+        {
+            _activeLinkRow = rowVm;
+            _activeLinkFieldKey = cellVm.FieldKey;
+            _activeLinkLabel = displayText;
+            _linkAnchor = link;
+            HideLinkedColumnView();
             await ShowLinkedDataForCellAsync(cellVm, rowVm).ConfigureAwait(true);
+        };
         return link;
     }
 
@@ -1272,6 +1309,8 @@ public sealed partial class MasterDataPage : Page
             {
                 Header = tab.Header,
                 IconSource = new Microsoft.UI.Xaml.Controls.SymbolIconSource { Symbol = Symbol.Link },
+                HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                VerticalContentAlignment = VerticalAlignment.Stretch,
                 Content = BuildLinkedTabContent(tab),
             };
             LinkedDataTabView.TabItems.Add(tabItem);
@@ -1283,137 +1322,461 @@ public sealed partial class MasterDataPage : Page
         }
     }
 
-    private ScrollViewer BuildLinkedTabContent(LinkedDataTabModel tab)
+    private UIElement BuildLinkedTabContent(LinkedDataTabModel tab)
     {
         var allFields = MasterDataViewModel.GetAllBrowsableFields(tab.LookupTemplate);
         var selectedKeys = new HashSet<string>(
             MasterDataViewModel.GetDefaultSelectedFieldKeysForBrowse(tab.LookupTemplate, tab.Relation),
             StringComparer.OrdinalIgnoreCase);
 
-        var root = new StackPanel { Spacing = 10, Padding = new Thickness(0, 4, 0, 8) };
-
+        var root = new StackPanel { Spacing = 4, Padding = new Thickness(0, 4, 0, 8) };
         root.Children.Add(new TextBlock
         {
             Text = tab.LookupTemplate.Name,
             FontSize = 14,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             Foreground = (Brush)Application.Current.Resources["TextPrimaryBrush"],
+            TextWrapping = TextWrapping.WrapWholeWords,
+            Margin = new Thickness(0, 0, 0, 6),
         });
-
         root.Children.Add(new TextBlock
         {
             Text = "Columns to show",
             FontSize = 11,
+            Margin = new Thickness(0, 0, 0, 4),
             Foreground = (Brush)Application.Current.Resources["TextTertiaryBrush"],
         });
 
-        var rowsHost = new StackPanel { Spacing = 8 };
+        var viewButton = new Button
+        {
+            Style = (Style)Application.Current.Resources["PrimaryButtonStyle"],
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 10, 0, 0),
+            MinHeight = 36,
+            Padding = new Thickness(12, 6, 12, 6),
+            Content = "View",
+        };
+        ToolTipService.SetToolTip(viewButton, "Show the selected columns beside this table");
 
-        var pickerPanel = new StackPanel { Spacing = 4 };
         foreach (var field in allFields)
         {
             var capturedField = field;
             var check = new CheckBox
             {
                 Content = field.Label,
-                FontSize = 11,
+                FontSize = 12,
                 IsChecked = selectedKeys.Contains(field.Key),
             };
             check.Checked += (_, _) =>
             {
                 selectedKeys.Add(capturedField.Key);
-                RefreshLinkedTabRows(rowsHost, tab, allFields, selectedKeys);
+                viewButton.IsEnabled = selectedKeys.Count > 0;
             };
             check.Unchecked += (_, _) =>
             {
                 selectedKeys.Remove(capturedField.Key);
-                RefreshLinkedTabRows(rowsHost, tab, allFields, selectedKeys);
+                viewButton.IsEnabled = selectedKeys.Count > 0;
             };
-            pickerPanel.Children.Add(check);
+            root.Children.Add(check);
         }
 
-        root.Children.Add(pickerPanel);
-
-        root.Children.Add(rowsHost);
-        RefreshLinkedTabRows(rowsHost, tab, allFields, selectedKeys);
+        viewButton.IsEnabled = selectedKeys.Count > 0;
+        viewButton.Click += (_, _) => ShowLinkedColumnView(tab, allFields, selectedKeys);
+        root.Children.Add(viewButton);
 
         return new ScrollViewer
         {
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
             Content = root,
         };
     }
 
-    private static void RefreshLinkedTabRows(
-        StackPanel rowsHost,
+    private void ShowLinkedColumnView(
         LinkedDataTabModel tab,
         IReadOnlyList<TemplateFieldDefinition> allFields,
         IReadOnlySet<string> selectedKeys)
     {
-        rowsHost.Children.Clear();
-
-        if (selectedKeys.Count == 0)
+        if (LinkedViewColumn is null || LinkedViewPanel is null || LinkedViewScroll is null
+            || SourceTableColumn is null || LinkedViewTitleText is null || LinkedViewSubtitleText is null)
         {
-            rowsHost.Children.Add(new TextBlock
-            {
-                Text = "Select at least one column above to view row data.",
-                FontSize = 12,
-                Foreground = (Brush)Application.Current.Resources["TextSecondaryBrush"],
-                TextWrapping = TextWrapping.WrapWholeWords,
-            });
             return;
         }
 
-        if (tab.Matches.Count == 0)
+        var fields = allFields.Where(f => selectedKeys.Contains(f.Key)).ToList();
+        if (fields.Count == 0)
         {
-            rowsHost.Children.Add(new TextBlock
+            return;
+        }
+
+        LinkedViewTitleText.Text = tab.LookupTemplate.Name;
+        var fromLabel = string.IsNullOrWhiteSpace(_activeLinkLabel) ? "this link" : _activeLinkLabel;
+        LinkedViewSubtitleText.Text =
+            $"From {fromLabel} · {fields.Count} column(s) · {tab.Matches.Count} matching row(s)";
+        LinkedViewScroll.Content = BuildLinkedResultGrid(tab, fields);
+
+        SourceTableColumn.Width = new GridLength(1, GridUnitType.Star);
+        LinkedViewColumn.Width = new GridLength(1.2, GridUnitType.Star);
+        LinkedViewPanel.Visibility = Visibility.Visible;
+        LinkedViewPanel.Opacity = 1;
+        if (LinkConnectorCanvas is not null)
+        {
+            LinkConnectorCanvas.Visibility = Visibility.Visible;
+        }
+
+        HighlightLinkAnchor();
+        ScheduleLinkConnectorUpdate();
+    }
+
+    private static UIElement BuildLinkedResultGrid(
+        LinkedDataTabModel tab,
+        IReadOnlyList<TemplateFieldDefinition> fields)
+    {
+        var borderBrush = (Brush)Application.Current.Resources["BorderDefaultBrush"];
+        var headerBg = (Brush)Application.Current.Resources["GridHeaderBackgroundBrush"];
+        var primary = (Brush)Application.Current.Resources["TextPrimaryBrush"];
+        var rowCount = tab.Matches.Count;
+
+        var grid = new Grid
+        {
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Background = (Brush)Application.Current.Resources["CardBackgroundBrush"],
+        };
+
+        for (var c = 0; c < fields.Count; c++)
+        {
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(160) });
+        }
+
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        for (var r = 0; r < Math.Max(rowCount, 1); r++)
+        {
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        }
+
+        for (var c = 0; c < fields.Count; c++)
+        {
+            var header = new Border
+            {
+                Background = headerBg,
+                BorderBrush = borderBrush,
+                BorderThickness = new Thickness(0, 0, 1, 1),
+                Padding = new Thickness(10, 10, 10, 10),
+                Child = new TextBlock
+                {
+                    Text = fields[c].Label,
+                    FontSize = 12,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    Foreground = primary,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                },
+            };
+            Grid.SetRow(header, 0);
+            Grid.SetColumn(header, c);
+            grid.Children.Add(header);
+        }
+
+        if (rowCount == 0)
+        {
+            var empty = new TextBlock
             {
                 Text = "No matching rows for this link.",
                 FontSize = 12,
+                Margin = new Thickness(10, 12, 10, 12),
                 Foreground = (Brush)Application.Current.Resources["TextSecondaryBrush"],
                 TextWrapping = TextWrapping.WrapWholeWords,
-            });
+            };
+            Grid.SetRow(empty, 1);
+            Grid.SetColumn(empty, 0);
+            Grid.SetColumnSpan(empty, Math.Max(fields.Count, 1));
+            grid.Children.Add(empty);
+            return grid;
+        }
+
+        for (var r = 0; r < rowCount; r++)
+        {
+            var match = tab.Matches[r];
+            for (var c = 0; c < fields.Count; c++)
+            {
+                var raw = match.Values.TryGetValue(fields[c].Key, out var value) ? value : null;
+                var cell = new Border
+                {
+                    Background = (Brush)Application.Current.Resources[
+                        r % 2 == 0 ? "CardBackgroundBrush" : "GridRowAltBackgroundBrush"],
+                    BorderBrush = borderBrush,
+                    BorderThickness = new Thickness(0, 0, 1, 1),
+                    Padding = new Thickness(10, 8, 10, 8),
+                    MinHeight = 36,
+                    Child = new TextBlock
+                    {
+                        Text = string.IsNullOrWhiteSpace(raw) ? "—" : raw,
+                        FontSize = 12,
+                        Foreground = primary,
+                        TextWrapping = TextWrapping.Wrap,
+                        IsTextSelectionEnabled = true,
+                        VerticalAlignment = VerticalAlignment.Center,
+                    },
+                };
+                Grid.SetRow(cell, r + 1);
+                Grid.SetColumn(cell, c);
+                grid.Children.Add(cell);
+            }
+        }
+
+        return grid;
+    }
+
+    private void OnCloseLinkedViewClick(object sender, RoutedEventArgs e)
+    {
+        HideLinkedColumnView();
+    }
+
+    private void HideLinkedColumnView()
+    {
+        ClearLinkHighlight();
+        if (LinkedViewScroll is not null)
+        {
+            LinkedViewScroll.Content = null;
+        }
+
+        if (LinkedViewPanel is not null)
+        {
+            LinkedViewPanel.Visibility = Visibility.Collapsed;
+            LinkedViewPanel.Opacity = 1;
+        }
+
+        if (LinkedViewColumn is not null)
+        {
+            LinkedViewColumn.Width = new GridLength(0);
+        }
+
+        if (SourceTableColumn is not null)
+        {
+            SourceTableColumn.Width = new GridLength(1, GridUnitType.Star);
+        }
+
+        HideConnectorGraphics();
+        if (LinkConnectorCanvas is not null)
+        {
+            LinkConnectorCanvas.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void ClearActiveLink()
+    {
+        _activeLinkRow = null;
+        _activeLinkFieldKey = null;
+        _activeLinkLabel = string.Empty;
+        _linkAnchor = null;
+        HideLinkedColumnView();
+    }
+
+    private void HighlightLinkAnchor()
+    {
+        ClearLinkHighlight();
+        if (_linkAnchor is null)
+        {
             return;
         }
 
-        var visibleFields = allFields.Where(f => selectedKeys.Contains(f.Key)).ToList();
-        var rowIndex = 1;
-        foreach (var match in tab.Matches)
+        DependencyObject? node = _linkAnchor;
+        while (node is not null)
         {
-            var lines = new StackPanel { Spacing = 4 };
-            lines.Children.Add(new TextBlock
+            if (node is Border border && border.Tag is MasterDataRowViewModel)
             {
-                Text = $"Row {rowIndex}",
-                FontSize = 12,
-                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                Foreground = (Brush)Application.Current.Resources["TextPrimaryBrush"],
-            });
-
-            foreach (var field in visibleFields)
-            {
-                var value = match.Values.TryGetValue(field.Key, out var v) ? v ?? string.Empty : string.Empty;
-                lines.Children.Add(new TextBlock
+                _highlightedCell = border;
+                _highlightedCellBackground = border.Background;
+                _highlightedCellBorderBrush = border.BorderBrush;
+                border.BorderBrush = (Brush)Application.Current.Resources["AccentPrimaryBrush"];
+                if (Application.Current.Resources["AccentPrimaryBrush"] is SolidColorBrush accent)
                 {
-                    Text = $"{field.Label}: {value}",
-                    FontSize = 11,
-                    Foreground = (Brush)Application.Current.Resources["TextSecondaryBrush"],
-                    TextWrapping = TextWrapping.WrapWholeWords,
-                    IsTextSelectionEnabled = true,
-                });
+                    var color = accent.Color;
+                    border.Background = new SolidColorBrush(
+                        Microsoft.UI.ColorHelper.FromArgb(0x33, color.R, color.G, color.B));
+                }
+
+                return;
             }
 
-            rowsHost.Children.Add(new Border
-            {
-                Padding = new Thickness(10),
-                CornerRadius = new CornerRadius(8),
-                Margin = new Thickness(0, 0, 0, 8),
-                Background = (Brush)Application.Current.Resources["CardBackgroundBrush"],
-                BorderBrush = (Brush)Application.Current.Resources["BorderDefaultBrush"],
-                BorderThickness = new Thickness(1),
-                Child = lines,
-            });
-            rowIndex++;
+            node = VisualTreeHelper.GetParent(node);
         }
+    }
+
+    private void ClearLinkHighlight()
+    {
+        if (_highlightedCell is null)
+        {
+            return;
+        }
+
+        _highlightedCell.Background = _highlightedCellBackground;
+        _highlightedCell.BorderBrush = _highlightedCellBorderBrush;
+        _highlightedCell = null;
+        _highlightedCellBackground = null;
+        _highlightedCellBorderBrush = null;
+    }
+
+    private void ScheduleLinkConnectorUpdate()
+    {
+        if (_connectorUpdateQueued || LinkedViewPanel is not { Visibility: Visibility.Visible })
+        {
+            return;
+        }
+
+        _connectorUpdateQueued = true;
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            _connectorUpdateQueued = false;
+            UpdateLinkConnector();
+        });
+    }
+
+    private void UpdateLinkConnector()
+    {
+        if (LinkConnectorCanvas is null || LinkConnectorPath is null || LinkConnectorGlow is null
+            || LinkSourceNode is null || LinkSourceHalo is null
+            || LinkTargetNode is null || LinkTargetHalo is null
+            || LinkedViewPanel is not { Visibility: Visibility.Visible }
+            || _linkAnchor is null
+            || SpreadsheetHost is null)
+        {
+            HideConnectorGraphics();
+            return;
+        }
+
+        LinkConnectorCanvas.Visibility = Visibility.Visible;
+        if (_linkAnchor.ActualWidth <= 0 || _linkAnchor.ActualHeight <= 0
+            || LinkedViewPanel.ActualWidth <= 0 || LinkedViewPanel.ActualHeight <= 0)
+        {
+            HideConnectorGraphics();
+            return;
+        }
+
+        if (!TryGetCanvasPoint(_linkAnchor, new Point(_linkAnchor.ActualWidth + 2, _linkAnchor.ActualHeight / 2), out var start)
+            || !TryGetCanvasPoint(LinkedViewPanel, new Point(0, 0), out var panelOrigin)
+            || !TryGetCanvasPoint(SpreadsheetHost, new Point(0, 0), out var hostOrigin))
+        {
+            HideConnectorGraphics();
+            return;
+        }
+
+        var hostBottom = hostOrigin.Y + SpreadsheetHost.ActualHeight;
+        if (start.Y < hostOrigin.Y - 4 || start.Y > hostBottom + 4)
+        {
+            HideConnectorGraphics();
+            return;
+        }
+
+        var panelTop = panelOrigin.Y + 20;
+        var panelBottom = panelOrigin.Y + LinkedViewPanel.ActualHeight - 20;
+        if (panelBottom < panelTop)
+        {
+            panelBottom = panelTop;
+        }
+
+        var end = new Point(panelOrigin.X, Math.Clamp(start.Y, panelTop, panelBottom));
+        if (end.X - start.X < 8)
+        {
+            HideConnectorGraphics();
+            return;
+        }
+
+        try
+        {
+            // Each Path must own its own geometry. Sharing one instance throws ArgumentException.
+            LinkConnectorGlow.Data = CreateConnectorGeometry(start, end);
+            LinkConnectorPath.Data = CreateConnectorGeometry(start, end);
+        }
+        catch (ArgumentException)
+        {
+            HideConnectorGraphics();
+            return;
+        }
+
+        PlaceNode(LinkSourceHalo, start);
+        PlaceNode(LinkSourceNode, start);
+        PlaceNode(LinkTargetHalo, end);
+        PlaceNode(LinkTargetNode, end);
+    }
+
+    private static PathGeometry CreateConnectorGeometry(Point start, Point end)
+    {
+        var midX = start.X + ((end.X - start.X) * 0.55);
+        var figure = new PathFigure
+        {
+            StartPoint = start,
+            IsClosed = false,
+            IsFilled = false,
+        };
+        figure.Segments.Add(new BezierSegment
+        {
+            Point1 = new Point(midX, start.Y),
+            Point2 = new Point(midX, end.Y),
+            Point3 = end,
+        });
+        var geometry = new PathGeometry();
+        geometry.Figures.Add(figure);
+        return geometry;
+    }
+
+    private void HideConnectorGraphics()
+    {
+        if (LinkConnectorGlow is not null)
+        {
+            LinkConnectorGlow.Data = null;
+        }
+
+        if (LinkConnectorPath is not null)
+        {
+            LinkConnectorPath.Data = null;
+        }
+
+        if (LinkSourceHalo is not null)
+        {
+            LinkSourceHalo.Visibility = Visibility.Collapsed;
+        }
+
+        if (LinkSourceNode is not null)
+        {
+            LinkSourceNode.Visibility = Visibility.Collapsed;
+        }
+
+        if (LinkTargetHalo is not null)
+        {
+            LinkTargetHalo.Visibility = Visibility.Collapsed;
+        }
+
+        if (LinkTargetNode is not null)
+        {
+            LinkTargetNode.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private bool TryGetCanvasPoint(UIElement element, Point localPoint, out Point canvasPoint)
+    {
+        canvasPoint = default;
+        if (LinkConnectorCanvas is null || element.XamlRoot is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            canvasPoint = element.TransformToVisual(LinkConnectorCanvas).TransformPoint(localPoint);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    private static void PlaceNode(FrameworkElement node, Point center)
+    {
+        node.Visibility = Visibility.Visible;
+        Canvas.SetLeft(node, center.X - (node.Width / 2));
+        Canvas.SetTop(node, center.Y - (node.Height / 2));
     }
 
     private sealed class LinkedDataTabModel(
@@ -1477,6 +1840,7 @@ public sealed partial class MasterDataPage : Page
 
     private void CloseActionPanel()
     {
+        ClearActiveLink();
         if (ActionResultsPanel is null || ActionResultsColumn is null || ActionResultsTransform is null)
         {
             return;
