@@ -367,7 +367,6 @@ public partial class DashboardViewModel : ViewModelBase
 
         DistributionItems.Clear();
 
-        var colors = new[] { "#1F7AE0", "#2ABD8F", "#FEBC2E", "#8B5CF6", "#FF6B6B" };
         var sliceStroke = _themeService.IsDark
             ? new SKColor(10, 14, 21)
             : new SKColor(255, 255, 255);
@@ -410,7 +409,7 @@ public partial class DashboardViewModel : ViewModelBase
             {
                 var (name, count) = slices[i];
                 var pct = (int)Math.Round(100.0 * count / totalParts);
-                var hex = colors[i % colors.Length];
+                var hex = ResolveDistributionColorHex(name, i);
                 var color = ParseSkColor(hex);
 
                 series[i] = new PieSeries<int>
@@ -463,7 +462,7 @@ public partial class DashboardViewModel : ViewModelBase
     {
         var rng = new Random(stats.LowStock + stats.TotalParts);
         int[] values = [rng.Next(0, 5), rng.Next(0, 4), rng.Next(1, 6), rng.Next(2, 7), rng.Next(0, 5)];
-        var labelColor = isLight ? new SKColor(75, 95, 119) : new SKColor(234, 242, 255);
+        var labelColor = isLight ? new SKColor(33, 47, 66) : new SKColor(234, 242, 255);
         return
         [
             new RowSeries<int>
@@ -484,6 +483,30 @@ public partial class DashboardViewModel : ViewModelBase
                 AnimationsSpeed = TimeSpan.FromMilliseconds(1000),
             }
         ];
+    }
+
+    /// <summary>Template distribution: vendor = yellow, partfinder.parts = green, customers = blue.</summary>
+    private static string ResolveDistributionColorHex(string templateName, int fallbackIndex)
+    {
+        var name = templateName.Trim();
+        if (name.Contains("vendor", StringComparison.OrdinalIgnoreCase))
+        {
+            return "#FEBC2E";
+        }
+
+        if (name.Contains("partfinder.parts", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "parts", StringComparison.OrdinalIgnoreCase))
+        {
+            return "#2ABD8F";
+        }
+
+        if (name.Contains("customer", StringComparison.OrdinalIgnoreCase))
+        {
+            return "#1F7AE0";
+        }
+
+        var fallback = new[] { "#1F7AE0", "#2ABD8F", "#FEBC2E", "#8B5CF6", "#FF6B6B" };
+        return fallback[fallbackIndex % fallback.Length];
     }
 
     private static ISeries[] BuildEmptyDistributionSeries()

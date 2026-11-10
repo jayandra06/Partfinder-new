@@ -45,6 +45,18 @@ public partial class InventoryViewModel : PaginatedViewModelBase
     [ObservableProperty] private string _selectedCategoryFilter = "All categories";
     [ObservableProperty] private string _selectedStatusFilter = "All statuses";
 
+    [ObservableProperty] private bool _showPartNameColumnSearch;
+    [ObservableProperty] private bool _showPartIdColumnSearch;
+    [ObservableProperty] private bool _showQuantityColumnSearch;
+    [ObservableProperty] private bool _showCategoryColumnSearch;
+    [ObservableProperty] private bool _showStatusColumnSearch;
+
+    [ObservableProperty] private string _columnFilterPartName = string.Empty;
+    [ObservableProperty] private string _columnFilterPartId = string.Empty;
+    [ObservableProperty] private string _columnFilterQuantity = string.Empty;
+    [ObservableProperty] private string _columnFilterCategory = string.Empty;
+    [ObservableProperty] private string _columnFilterStatus = string.Empty;
+
     [ObservableProperty] private InventoryFormMode _formMode = InventoryFormMode.None;
 
     [ObservableProperty] private string _formTitle = string.Empty;
@@ -87,6 +99,86 @@ public partial class InventoryViewModel : PaginatedViewModelBase
     {
         ResetPaginationPage();
         ApplyFilters();
+    }
+
+    partial void OnColumnFilterPartNameChanged(string value)
+    {
+        ResetPaginationPage();
+        ApplyFilters();
+    }
+
+    partial void OnColumnFilterPartIdChanged(string value)
+    {
+        ResetPaginationPage();
+        ApplyFilters();
+    }
+
+    partial void OnColumnFilterQuantityChanged(string value)
+    {
+        ResetPaginationPage();
+        ApplyFilters();
+    }
+
+    partial void OnColumnFilterCategoryChanged(string value)
+    {
+        ResetPaginationPage();
+        ApplyFilters();
+    }
+
+    partial void OnColumnFilterStatusChanged(string value)
+    {
+        ResetPaginationPage();
+        ApplyFilters();
+    }
+
+    [RelayCommand]
+    private void TogglePartNameHeaderSearch()
+    {
+        ShowPartNameColumnSearch = !ShowPartNameColumnSearch;
+        if (!ShowPartNameColumnSearch)
+        {
+            ColumnFilterPartName = string.Empty;
+        }
+    }
+
+    [RelayCommand]
+    private void TogglePartIdHeaderSearch()
+    {
+        ShowPartIdColumnSearch = !ShowPartIdColumnSearch;
+        if (!ShowPartIdColumnSearch)
+        {
+            ColumnFilterPartId = string.Empty;
+        }
+    }
+
+    [RelayCommand]
+    private void ToggleQuantityHeaderSearch()
+    {
+        ShowQuantityColumnSearch = !ShowQuantityColumnSearch;
+        if (!ShowQuantityColumnSearch)
+        {
+            ColumnFilterQuantity = string.Empty;
+        }
+    }
+
+    [RelayCommand]
+    private void ToggleCategoryHeaderSearch()
+    {
+        ShowCategoryColumnSearch = !ShowCategoryColumnSearch;
+        if (!ShowCategoryColumnSearch)
+        {
+            ColumnFilterCategory = string.Empty;
+        }
+    }
+
+    [RelayCommand]
+    private void ToggleStatusHeaderSearch()
+    {
+        ShowStatusColumnSearch = !ShowStatusColumnSearch;
+        if (!ShowStatusColumnSearch)
+        {
+            ColumnFilterStatus = string.Empty;
+        }
     }
 
     protected override void OnPaginationRefreshRequested() =>
@@ -217,9 +309,50 @@ public partial class InventoryViewModel : PaginatedViewModelBase
                 string.Equals(i.Status, SelectedStatusFilter, StringComparison.OrdinalIgnoreCase));
         }
 
-        items = items
-            .OrderBy(i => PartIdSortKey(i.PartId), StringComparer.OrdinalIgnoreCase)
-            .ThenBy(i => i.PartName, StringComparer.OrdinalIgnoreCase);
+        var partNameCol = ColumnFilterPartName?.Trim() ?? string.Empty;
+        if (!string.IsNullOrEmpty(partNameCol))
+        {
+            items = items.Where(i =>
+                i.PartName.Contains(partNameCol, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var partIdCol = ColumnFilterPartId?.Trim() ?? string.Empty;
+        if (!string.IsNullOrEmpty(partIdCol))
+        {
+            items = items.Where(i =>
+                i.PartId.Contains(partIdCol, StringComparison.OrdinalIgnoreCase)
+                || i.PartIdDisplay.Contains(partIdCol, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var quantityCol = ColumnFilterQuantity?.Trim() ?? string.Empty;
+        if (!string.IsNullOrEmpty(quantityCol))
+        {
+            items = items.Where(i =>
+                i.Quantity.ToString().Contains(quantityCol, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var categoryCol = ColumnFilterCategory?.Trim() ?? string.Empty;
+        if (!string.IsNullOrEmpty(categoryCol))
+        {
+            items = items.Where(i =>
+                i.Category.Contains(categoryCol, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var statusCol = ColumnFilterStatus?.Trim() ?? string.Empty;
+        if (!string.IsNullOrEmpty(statusCol))
+        {
+            items = items.Where(i =>
+                i.Status.Contains(statusCol, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var partNameFilterActive = !string.IsNullOrEmpty(partNameCol);
+        items = partNameFilterActive
+            ? items
+                .OrderByDescending(i => i.PartName.StartsWith(partNameCol, StringComparison.OrdinalIgnoreCase))
+                .ThenBy(i => i.PartName, StringComparer.OrdinalIgnoreCase)
+            : items
+                .OrderBy(i => PartIdSortKey(i.PartId), StringComparer.OrdinalIgnoreCase)
+                .ThenBy(i => i.PartName, StringComparer.OrdinalIgnoreCase);
 
         _filteredInventory.Clear();
         foreach (var item in items)
@@ -336,6 +469,16 @@ public partial class InventoryViewModel : PaginatedViewModelBase
         SearchQuery = string.Empty;
         SelectedCategoryFilter = "All categories";
         SelectedStatusFilter = "All statuses";
+        ColumnFilterPartName = string.Empty;
+        ColumnFilterPartId = string.Empty;
+        ColumnFilterQuantity = string.Empty;
+        ColumnFilterCategory = string.Empty;
+        ColumnFilterStatus = string.Empty;
+        ShowPartNameColumnSearch = false;
+        ShowPartIdColumnSearch = false;
+        ShowQuantityColumnSearch = false;
+        ShowCategoryColumnSearch = false;
+        ShowStatusColumnSearch = false;
         ApplyFilters();
     }
 

@@ -77,6 +77,12 @@
 
         <!-- Same light input chrome when effective theme is Light/Default (template canvas, etc.) -->
         <ResourceDictionary x:Key="Light">
+            <Color x:Key="TextFillColorPrimary">#E40B1220</Color>
+            <Color x:Key="TextFillColorSecondary">#C42C3B4F</Color>
+            <Color x:Key="TextFillColorTertiary">#A44A5C73</Color>
+            <SolidColorBrush x:Key="TextFillColorPrimaryBrush" Color="#FF0B1220" />
+            <SolidColorBrush x:Key="TextFillColorSecondaryBrush" Color="#FF2C3B4F" />
+            <SolidColorBrush x:Key="TextFillColorTertiaryBrush" Color="#FF4A5C73" />
             <SolidColorBrush x:Key="TextControlBackground" Color="#FFFFFFFF" />
             <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#FFF9FAFB" />
             <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#FFFFFFFF" />

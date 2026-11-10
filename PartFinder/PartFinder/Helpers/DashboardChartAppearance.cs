@@ -17,7 +17,7 @@ internal static class DashboardChartAppearance
         var surface = isDark ? new SKColor(20, 29, 42) : new SKColor(255, 255, 255);
         var border = isDark ? new SKColor(40, 55, 75) : new SKColor(230, 236, 245);
         var grid = isDark ? new SKColor(80, 100, 130, 120) : new SKColor(200, 210, 225, 200);
-        var labels = isDark ? new SKColor(196, 208, 223) : new SKColor(75, 95, 119);
+        var labels = isDark ? new SKColor(196, 208, 223) : new SKColor(33, 47, 66);
 
         var frame = new DrawMarginFrame
         {
