@@ -15,7 +15,7 @@
 
     
 
-    <Grid x:Name="RootGrid" Background="{StaticResource AppBackgroundBrush}">
+    <Grid x:Name="RootGrid" Background="{StaticResource WindowRootBackgroundBrush}">
         <Grid.Resources>
         <!-- ===== INPUT STYLE ===== -->
         <Style x:Key="DarkInputStyle" TargetType="TextBox">

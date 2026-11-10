@@ -9,6 +9,7 @@ public sealed class ThemeService : IThemeService
 {
     private readonly IAppStateStore _appState;
     private FrameworkElement? _shellRoot;
+    private FrameworkElement? _windowRoot;
     private bool _isDark = true;
 
     private static string SettingsPath =>
@@ -21,6 +22,7 @@ public sealed class ThemeService : IThemeService
     {
         _appState = appState;
         Load();
+
         if (Application.Current?.Resources is not null)
         {
             PaintBrushes();
@@ -36,6 +38,12 @@ public sealed class ThemeService : IThemeService
     public void AttachShell(FrameworkElement shellRoot)
     {
         _shellRoot = shellRoot;
+        Apply();
+    }
+
+    public void AttachWindowRoot(FrameworkElement windowRoot)
+    {
+        _windowRoot = windowRoot;
         Apply();
     }
 
@@ -93,6 +101,12 @@ public sealed class ThemeService : IThemeService
     private void Apply()
     {
         _appState.CurrentTheme = Current;
+
+        if (_windowRoot is not null)
+        {
+            _windowRoot.RequestedTheme = Current;
+        }
+
         if (_shellRoot is not null)
         {
             _shellRoot.RequestedTheme = Current;
@@ -215,7 +229,8 @@ public sealed class ThemeService : IThemeService
         navSelectedBorder: "#995EA2FF",
         header: "#CC111A27",
         chart: "#FF141D2A",
-        content: "#96111A27",
+        content: "#FF111A27",
+        windowRoot: "#FF0A0E15",
         ambientBlue: "#332F7FD2",
         ambientPurple: "#2E8B5CF6",
         ambientPink: "#26F472B6",
@@ -255,6 +270,7 @@ public sealed class ThemeService : IThemeService
         header: "#E8EEF4F9",
         chart: "#FFF0F4FA",
         content: "#FFD8E1EC",
+        windowRoot: "#FFD8E1EC",
         ambientBlue: "#3A3878C8",
         ambientPurple: "#348B5CF6",
         ambientPink: "#30E879A8",
@@ -294,6 +310,7 @@ public sealed class ThemeService : IThemeService
         string header,
         string chart,
         string content,
+        string windowRoot,
         string ambientBlue,
         string ambientPurple,
         string ambientPink,
