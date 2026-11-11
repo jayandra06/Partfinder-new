@@ -215,7 +215,7 @@
             Grid.Row="2"
             Visibility="Collapsed" />
 
-        <!-- Template list (all or favourites) -->
+        <!-- Template list (all or favourites) — horizontal fan carousel -->
         <Grid
             x:Name="AllTemplatesPanel"
             Grid.Row="2"
@@ -223,72 +223,12 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
-            <ScrollViewer
-                VerticalScrollMode="Auto"
-                VerticalScrollBarVisibility="Auto"
-                HorizontalScrollMode="Disabled">
-                <ListView
-                    x:Name="TemplatesListView"
-                    SelectionMode="None"
-                    IsItemClickEnabled="True"
-                    ItemClick="OnTemplatesListItemClick">
-                    <ListView.ItemContainerStyle>
-                        <Style TargetType="ListViewItem">
-                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                            <Setter Property="Padding" Value="0" />
-                            <Setter Property="Margin" Value="0,0,0,10" />
-                        </Style>
-                    </ListView.ItemContainerStyle>
-                    <ListView.ItemTemplate>
-                        <DataTemplate x:DataType="models:PartTemplateDefinition">
-                            <Border
-                                Padding="16,14"
-                                CornerRadius="14"
-                                Background="{StaticResource ElevatedCardBackgroundBrush}"
-                                BorderBrush="{StaticResource GlassStrokeBrush}"
-                                BorderThickness="1">
-                                <Grid ColumnSpacing="12">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <Border
-                                        Width="40"
-                                        Height="40"
-                                        CornerRadius="10"
-                                        Background="#185EA2FF"
-                                        VerticalAlignment="Center">
-                                        <FontIcon
-                                            Glyph="&#xE8A5;"
-                                            FontSize="16"
-                                            Foreground="{StaticResource AccentPrimaryBrush}"
-                                            HorizontalAlignment="Center"
-                                            VerticalAlignment="Center" />
-                                    </Border>
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
-                                        <TextBlock
-                                            Text="{x:Bind Name}"
-                                            FontSize="15"
-                                            FontWeight="SemiBold"
-                                            Foreground="{StaticResource TextPrimaryBrush}" />
-                                        <TextBlock
-                                            Text="{x:Bind ColumnCountLabel}"
-                                            FontSize="12"
-                                            Foreground="{StaticResource TextSecondaryBrush}" />
-                                    </StackPanel>
-                                    <FontIcon
-                                        Grid.Column="2"
-                                        Glyph="&#xE76C;"
-                                        FontSize="14"
-                                        Foreground="{StaticResource TextTertiaryBrush}"
-                                        VerticalAlignment="Center" />
-                                </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
-            </ScrollViewer>
+
+            <!-- Horizontal fan carousel — centre card is largest, side cards peek in -->
+            <components:AllTemplatesCarousel
+                x:Name="AllTemplatesCarouselControl"
+                Visibility="Collapsed" />
+
             <TextBlock
                 x:Name="EmptyTemplatesHint"
                 Text="No templates yet. Use Create New Template or Bulk Upload."

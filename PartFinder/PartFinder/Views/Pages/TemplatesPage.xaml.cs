@@ -350,19 +350,21 @@ public sealed partial class TemplatesPage : Page
         }
 
         var list = source.OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase).ToList();
-        TemplatesListView.ItemsSource = list;
-        if (_showingFavouritesOnly)
+
+        if (list.Count == 0)
         {
-            EmptyTemplatesHint.Text = list.Count == 0
+            AllTemplatesCarouselControl.Visibility = Visibility.Collapsed;
+            EmptyTemplatesHint.Text = _showingFavouritesOnly
                 ? "No favourite templates yet. Star templates to see them here."
-                : string.Empty;
+                : "No templates yet. Use Create New Template or Bulk Upload.";
+            EmptyTemplatesHint.Visibility = Visibility.Visible;
         }
         else
         {
-            EmptyTemplatesHint.Text = "No templates yet. Use Create New Template or Bulk Upload.";
+            EmptyTemplatesHint.Visibility = Visibility.Collapsed;
+            AllTemplatesCarouselControl.Visibility = Visibility.Visible;
+            AllTemplatesCarouselControl.Load(vm);
         }
-
-        EmptyTemplatesHint.Visibility = list.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void OnTemplatesListItemClick(object sender, ItemClickEventArgs e)
@@ -893,26 +895,11 @@ public sealed partial class TemplatesPage : Page
 
     private void UpdateFavoriteStars()
     {
-        if (DataContext is not TemplatesViewModel vm)
+        // The AllTemplatesCarousel manages its own star state via its card buttons.
+        // Reload the carousel so all cards reflect the latest favourite state.
+        if (DataContext is TemplatesViewModel vm && AllTemplatesCarouselControl.Visibility == Visibility.Visible)
         {
-            return;
-        }
-
-        // Find the ListView and update all star buttons
-        var listView = TemplatesListView;
-        if (listView?.Items != null)
-        {
-            foreach (var item in listView.Items)
-            {
-                if (item is PartTemplateDefinition template)
-                {
-                    var container = listView.ContainerFromItem(item) as ListViewItem;
-                    if (container != null)
-                    {
-                        UpdateStarForContainer(container, template);
-                    }
-                }
-            }
+            AllTemplatesCarouselControl.Load(vm);
         }
     }
 

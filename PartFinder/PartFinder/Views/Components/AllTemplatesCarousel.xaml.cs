@@ -325,54 +325,81 @@ public sealed partial class AllTemplatesCarousel : UserControl
 
         CarouselClip.Rect = new Windows.Foundation.Rect(0, 0, canvasWidth, canvasHeight);
 
-        var peekWidth  = Math.Clamp(canvasWidth * PEEK_RATIO, PEEK_MIN, PEEK_MAX);
-        var cardWidth  = canvasWidth - 2.0 * peekWidth;
-        var cardHeight = canvasHeight;
+        // Multi-tier cascading fan layout (matching reference 1, 2, 3)
+        // Center card is largest, side cards stagger outwards with decreasing height, width, and z-index
+        var baseCenterWidth = Math.Clamp(canvasWidth * 0.42, 320.0, 560.0);
+        var baseCenterHeight = Math.Max(260.0, canvasHeight - 20.0);
+        var centerX = (canvasWidth - baseCenterWidth) / 2.0;
 
         for (int i = 0; i < _cards.Count; i++)
         {
-            var card     = _cards[i];
+            var card = _cards[i];
             var distance = i - _activeIndex;
+            var absDist = Math.Abs(distance);
             var isCenter = distance == 0;
-            var isLeft   = distance == -1;
-            var isRight  = distance == 1;
-
-            double finalX, finalY, opacity, zIndex;
             var accent = _accents[i % _accents.Length];
+
+            double cardW, cardH, finalX, finalY, opacity, zIndex;
 
             if (isCenter)
             {
-                finalX = peekWidth; finalY = 0;
-                opacity = 1.0; zIndex = 100;
+                cardW = baseCenterWidth;
+                cardH = baseCenterHeight;
+                finalX = centerX;
+                finalY = (canvasHeight - cardH) / 2.0;
+                opacity = 1.0;
+                zIndex = 100;
                 card.BorderBrush = new SolidColorBrush(accent);
             }
-            else if (isLeft)
+            else if (absDist <= 4)
             {
-                finalX = peekWidth - cardWidth - CARD_GAP; finalY = 0;
-                opacity = 1.0; zIndex = 90;
-                card.BorderBrush = new SolidColorBrush(Color.FromArgb(160, 42, 61, 88));
-            }
-            else if (isRight)
-            {
-                finalX = peekWidth + cardWidth + CARD_GAP; finalY = 0;
-                opacity = 1.0; zIndex = 90;
-                card.BorderBrush = new SolidColorBrush(Color.FromArgb(160, 42, 61, 88));
+                // Each step outward reduces scale and offsets horizontally in a cascading fan
+                var scaleFactor = Math.Pow(0.88, absDist);
+                cardW = baseCenterWidth * scaleFactor;
+                cardH = baseCenterHeight * scaleFactor;
+                finalY = (canvasHeight - cardH) / 2.0;
+
+                // Horizontal step offset: allows cards behind to partially peek out
+                double stepOffset = 0.0;
+                for (int s = 1; s <= absDist; s++)
+                {
+                    stepOffset += (baseCenterWidth * Math.Pow(0.88, s - 1)) * 0.32;
+                }
+
+                if (distance < 0)
+                {
+                    // Left flank
+                    finalX = centerX - stepOffset;
+                }
+                else
+                {
+                    // Right flank
+                    finalX = centerX + baseCenterWidth - (cardW * 0.68) + (stepOffset - (baseCenterWidth * 0.32));
+                }
+
+                opacity = Math.Max(0.45, 1.0 - (absDist * 0.15));
+                zIndex = 100 - (absDist * 10);
+                card.BorderBrush = new SolidColorBrush(Color.FromArgb((byte)(160 - absDist * 25), 42, 61, 88));
             }
             else
             {
-                finalX = distance < 0 ? -(cardWidth + 40) : canvasWidth + 40;
-                finalY = 0; opacity = 0.0; zIndex = 5;
+                cardW = baseCenterWidth * 0.6;
+                cardH = baseCenterHeight * 0.6;
+                finalX = distance < 0 ? -cardW - 100 : canvasWidth + 100;
+                finalY = (canvasHeight - cardH) / 2.0;
+                opacity = 0.0;
+                zIndex = 5;
                 card.BorderBrush = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
             }
 
-            ApplyCardContent(card, isCenter, isLeft, isRight);
-            card.IsHitTestVisible = Math.Abs(distance) <= 1;
+            ApplyCardContent(card, isCenter, distance < 0, distance > 0);
+            card.IsHitTestVisible = absDist <= 3;
             card.RenderTransform = null;
 
             if (animate)
-                AnimateCard(card, finalX, finalY, cardWidth, cardHeight, opacity, zIndex);
+                AnimateCard(card, finalX, finalY, cardW, cardH, opacity, zIndex);
             else
-                ApplyCardTransform(card, finalX, finalY, cardWidth, cardHeight, opacity, zIndex);
+                ApplyCardTransform(card, finalX, finalY, cardW, cardH, opacity, zIndex);
 
             RefreshPreviewTableLayoutForCard(card);
         }
@@ -515,11 +542,20 @@ public sealed partial class AllTemplatesCarousel : UserControl
         card.Tag    = index;
         card.Tapped += (s, _) =>
         {
-            if (s is Border b && b.Tag is int idx && idx != _activeIndex)
+            if (s is Border b && b.Tag is int idx)
             {
-                _activeIndex = idx;
-                UpdateLayout(animate: true);
-                UpdateNav();
+                if (idx == _activeIndex)
+                {
+                    // Tapping the already-active centre card navigates into it
+                    App.Services.GetRequiredService<INavigationService>()
+                       .Navigate(AppPage.TemplateData, template.Id);
+                }
+                else
+                {
+                    _activeIndex = idx;
+                    UpdateLayout(animate: true);
+                    UpdateNav();
+                }
             }
         };
 
