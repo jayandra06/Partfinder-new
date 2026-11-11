@@ -172,6 +172,15 @@ public sealed partial class MasterDataPage : Page
     public void ConfigureEmbeddedBrowseChrome()
     {
         RootGrid.Padding = new Thickness(0);
+        if (StandalonePageTitlePanel is not null)
+        {
+            StandalonePageTitlePanel.Visibility = Visibility.Collapsed;
+        }
+
+        if (PageTitleHeaderGrid is not null)
+        {
+            PageTitleHeaderGrid.Margin = new Thickness(0, 0, 0, 4);
+        }
     }
 
     public void ApplyBrowseTemplate(string? templateId)

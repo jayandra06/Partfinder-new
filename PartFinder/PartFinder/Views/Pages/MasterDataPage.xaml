@@ -110,13 +110,18 @@
             </StackPanel>
         </Button>
 
-        <Grid Grid.Row="1" Margin="0,0,0,12">
+        <Grid x:Name="PageTitleHeaderGrid" Grid.Row="1" Margin="0,0,0,12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+            <StackPanel
+                x:Name="StandalonePageTitlePanel"
+                Grid.Column="0"
+                Spacing="4"
+                VerticalAlignment="Center"
+                Visibility="{Binding IsEmbeddedLinkedBrowse, Converter={StaticResource InvertedBoolToVisibilityConverter}}">
                 <TextBlock Text="Master Data" Style="{StaticResource MasterDataPageTitleStyle}" />
                 <TextBlock
                     Text="{Binding SelectedDataTemplate.Name}"

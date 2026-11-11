@@ -188,6 +188,8 @@ public sealed partial class MasterDataViewModel : ViewModelBase
 
         OnPropertyChanged(nameof(EnableWorksheetHyperlinks));
         OnPropertyChanged(nameof(IsCatalogReadOnly));
+        OnPropertyChanged(nameof(IsEmbeddedLinkedBrowse));
+        OnPropertyChanged(nameof(ShowImportExportToolbar));
         OnPropertyChanged(nameof(ShowSpreadsheetEditChrome));
         OnPropertyChanged(nameof(ShowTemplatePickerInChrome));
         OnPropertyChanged(nameof(CanAddRows));
