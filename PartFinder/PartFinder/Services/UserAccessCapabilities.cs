@@ -31,6 +31,12 @@ public sealed class UserAccessCapabilities
     /// <summary>When PartsAllTemplates is false for an employee, only these template ids.</summary>
     public IReadOnlyList<string> AllowedTemplateIds { get; init; } = Array.Empty<string>();
 
+    /// <summary>View inventory list, search, and filters (employees and admins).</summary>
+    public bool CanViewInventory { get; init; } = true;
+
+    /// <summary>Admin inventory tools: KPIs, export, bulk import, add/edit stock, row actions.</summary>
+    public bool CanManageInventory { get; init; }
+
     public static UserAccessCapabilities FullAdmin { get; } = new()
     {
         CanAccessMasterData = true,
@@ -53,5 +59,8 @@ public sealed class UserAccessCapabilities
 
         PartsAllTemplates = true,
         AllowedTemplateIds = Array.Empty<string>(),
+
+        CanViewInventory = true,
+        CanManageInventory = true,
     };
 }

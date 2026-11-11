@@ -22,6 +22,16 @@ public partial class AuditViewModel : PaginatedViewModelBase
     /// <summary>Only org creator can delete audit logs.</summary>
     public bool CanDeleteLogs => _access.Capabilities.CanAccessUserManagement;
 
+    public bool CanViewAllAuditHistory => _access.CanViewAllAuditHistory;
+
+    public bool ShowUserFilter => CanViewAllAuditHistory;
+
+    public string PageDescription => CanViewAllAuditHistory
+        ? "Complete audit trail of all inventory changes, user actions, and system events for compliance and traceability."
+        : "Your activity history: inventory changes and actions performed under your account.";
+
+    private string? _scopedUserEmail;
+
     [ObservableProperty] private bool _isLoading;
     [ObservableProperty] private string _statusMessage = string.Empty;
     [ObservableProperty] private int _totalEvents;
@@ -92,7 +102,12 @@ public partial class AuditViewModel : PaginatedViewModelBase
             filtered = filtered.Where(x => x.EventType == matchType);
         }
 
-        if (SelectedUser != "All Users" && !string.IsNullOrWhiteSpace(SelectedUser))
+        if (!CanViewAllAuditHistory && !string.IsNullOrWhiteSpace(_scopedUserEmail))
+        {
+            filtered = filtered.Where(x =>
+                string.Equals(x.User, _scopedUserEmail, StringComparison.OrdinalIgnoreCase));
+        }
+        else if (SelectedUser != "All Users" && !string.IsNullOrWhiteSpace(SelectedUser))
         {
             filtered = filtered.Where(x => x.User == SelectedUser);
         }
@@ -125,7 +140,36 @@ public partial class AuditViewModel : PaginatedViewModelBase
         StatusMessage = string.Empty;
         try
         {
-            var docs = await _auditService.GetRecentAsync(200, cancellationToken).ConfigureAwait(true);
+            await _access.RefreshAsync(cancellationToken).ConfigureAwait(true);
+            OnPropertyChanged(nameof(CanViewAllAuditHistory));
+            OnPropertyChanged(nameof(ShowUserFilter));
+            OnPropertyChanged(nameof(CanDeleteLogs));
+            OnPropertyChanged(nameof(PageDescription));
+
+            _scopedUserEmail = _access.GetCurrentUserEmail()?.Trim();
+            string? restrictUser = null;
+            if (!CanViewAllAuditHistory)
+            {
+                if (string.IsNullOrWhiteSpace(_scopedUserEmail))
+                {
+                    _allLogs.Clear();
+                    TotalEvents = 0;
+                    StockChangeCount = 0;
+                    UserActionCount = 0;
+                    SystemEventCount = 0;
+                    AvailableUsers.Clear();
+                    AvailableUsers.Add("All Users");
+                    StatusMessage = "Sign in to view your activity history.";
+                    ApplyFilters();
+                    return;
+                }
+
+                restrictUser = _scopedUserEmail;
+            }
+
+            var docs = await _auditService
+                .GetRecentAsync(200, restrictUser, cancellationToken)
+                .ConfigureAwait(true);
 
             _allLogs.Clear();
             StockChangeCount = 0;
@@ -157,16 +201,28 @@ public partial class AuditViewModel : PaginatedViewModelBase
             }
 
             AvailableUsers.Clear();
-            AvailableUsers.Add("All Users");
-            foreach (var u in users.OrderBy(x => x))
+            if (CanViewAllAuditHistory)
             {
-                AvailableUsers.Add(u);
+                AvailableUsers.Add("All Users");
+                foreach (var u in users.OrderBy(x => x))
+                {
+                    AvailableUsers.Add(u);
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(_scopedUserEmail))
+            {
+                SelectedUser = _scopedUserEmail;
+                AvailableUsers.Add(_scopedUserEmail);
             }
 
             TotalEvents = _allLogs.Count;
             StatusMessage = TotalEvents == 0
-                ? "No audit events yet. Events will appear here as users interact with the system."
-                : $"{TotalEvents} events loaded";
+                ? CanViewAllAuditHistory
+                    ? "No audit events yet. Events will appear here as users interact with the system."
+                    : "No activity recorded for your account yet."
+                : CanViewAllAuditHistory
+                    ? $"{TotalEvents} events loaded"
+                    : $"{TotalEvents} of your events loaded";
                 
             ApplyFilters();
         }

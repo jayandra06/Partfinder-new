@@ -66,10 +66,15 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel Spacing="2">
                         <TextBlock Text="INVENTORY" FontSize="10" Foreground="{StaticResource AccentPrimaryBrush}" CharacterSpacing="100" FontWeight="SemiBold" />
-                        <TextBlock Text="Inventory Management" FontSize="32" FontWeight="Light" CharacterSpacing="20" />
-                        <TextBlock Text="Track stock levels, monitor part availability, and manage inventory across your organisation." FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
+                        <TextBlock Text="{x:Bind ViewModel.InventoryPageTitle, Mode=OneWay}" FontSize="32" FontWeight="Light" CharacterSpacing="20" />
+                        <TextBlock Text="{x:Bind ViewModel.InventoryPageDescription, Mode=OneWay}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="WrapWholeWords" />
                     </StackPanel>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <StackPanel
+                        Grid.Column="1"
+                        Orientation="Horizontal"
+                        Spacing="8"
+                        VerticalAlignment="Center"
+                        Visibility="{x:Bind ViewModel.ShowInventoryAdminChrome, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
                         <Button Style="{StaticResource OutlinedButtonStyle}" FontSize="12" Click="OnExportClick">
                             <StackPanel Orientation="Horizontal" Spacing="5">
                                 <FontIcon Glyph="&#xE74E;" FontSize="13" />
@@ -157,7 +162,7 @@
                 <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
                 <!-- KPI CARDS ROW                              -->
                 <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-                <Grid x:Name="KpiGrid" ColumnSpacing="14">
+                <Grid x:Name="KpiGrid" ColumnSpacing="14" Visibility="{x:Bind ViewModel.ShowInventoryAdminChrome, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition x:Name="KpiGridDef2" Height="0" />
@@ -372,7 +377,17 @@
                                          Visibility="{x:Bind ViewModel.ShowStatusColumnSearch, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
                             </StackPanel>
 
-                            <TextBlock Grid.Column="5" Text="ACTION" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" VerticalAlignment="Center" />
+                            <TextBlock
+                                Grid.Column="5"
+                                Text="ACTION"
+                                FontSize="9"
+                                Foreground="{StaticResource TextTertiaryBrush}"
+                                CharacterSpacing="60"
+                                FontWeight="SemiBold"
+                                HorizontalAlignment="Center"
+                                TextAlignment="Center"
+                                VerticalAlignment="Center"
+                                Visibility="{x:Bind ViewModel.ShowInventoryAdminChrome, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
                         </Grid>
 
                         <!-- Sample rows -->
@@ -420,7 +435,8 @@
                                                 HorizontalAlignment="Center"
                                                 Tag="{x:Bind}"
                                                 Click="OnInventoryRowActionsClick"
-                                                ToolTipService.ToolTip="More actions">
+                                                ToolTipService.ToolTip="More actions"
+                                                Visibility="{Binding ElementName=PageRoot, Path=ViewModel.ShowInventoryAdminChrome, Converter={StaticResource BoolToVisibilityConverter}}">
                                             <Viewbox Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center">
                                                 <StackPanel Orientation="Vertical" Spacing="3">
                                                     <Ellipse Width="2.5" Height="2.5" Fill="{StaticResource TextSecondaryBrush}" />

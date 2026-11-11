@@ -23,6 +23,7 @@ public sealed partial class MasterDataViewModel : ViewModelBase
     private readonly Dictionary<string, string> _columnFilters = new(StringComparer.OrdinalIgnoreCase);
 
     private readonly ICurrentUserAccessService _access;
+    private readonly CatalogBrowseSessionStore _catalogSession;
 
     public event EventHandler? ColumnFiltersChanged;
 
@@ -32,7 +33,8 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         IContextActionsService contextActions,
         BackendApiClient api,
         ActivityLogger activityLogger,
-        ICurrentUserAccessService access)
+        ICurrentUserAccessService access,
+        CatalogBrowseSessionStore catalogSession)
     {
         _templateSchema = templateSchema;
         _records = records;
@@ -40,6 +42,7 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         _api = api;
         _activityLogger = activityLogger;
         _access = access;
+        _catalogSession = catalogSession;
     }
 
     public ObservableCollection<PartTemplateDefinition> DataTemplates { get; } = new();
@@ -199,6 +202,21 @@ public sealed partial class MasterDataViewModel : ViewModelBase
             return;
         }
 
+        var gridState = _catalogSession.GetGridStateFor(SurfaceMode);
+        var templateChanged = !string.Equals(gridState.TemplateId, value.Id, StringComparison.Ordinal);
+        if (templateChanged)
+        {
+            gridState.PageIndex = 0;
+            gridState.ScrollHorizontalOffset = 0;
+            gridState.ScrollVerticalOffset = 0;
+        }
+
+        gridState.TemplateId = value.Id;
+        if (SurfaceMode == MasterDataSurfaceMode.LinkedBrowse)
+        {
+            _catalogSession.LinkedTemplatesBrowseTemplateId = value.Id;
+        }
+
         OnPropertyChanged(nameof(ShowTemplatePickerInChrome));
         _ = LoadForTemplateAsync(value.Id);
     }
@@ -314,20 +332,30 @@ public sealed partial class MasterDataViewModel : ViewModelBase
                 return;
             }
 
-            foreach (var t in _cachedTemplates.OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase))
+            var ordered = CatalogBrowseSessionStore.OrderForCatalogSidebar(_cachedTemplates);
+            foreach (var t in ordered)
             {
                 DataTemplates.Add(t);
             }
 
             ShowTemplatePicker = DataTemplates.Count > 0;
 
-            var master = _cachedTemplates.FirstOrDefault(
-                t => string.Equals(t.Name, MongoTemplateSchemaService.MasterDataTemplateName, StringComparison.OrdinalIgnoreCase));
-            var pick = master ?? DataTemplates[0];
+            var savedId = _catalogSession.GetGridStateFor(SurfaceMode).TemplateId;
+            var pick = CatalogBrowseSessionStore.ResolveInitialTemplate(ordered, savedId);
+            if (pick is null)
+            {
+                return;
+            }
 
             _suppressTemplateSelectionChange = true;
             SelectedDataTemplate = pick;
             _suppressTemplateSelectionChange = false;
+
+            _catalogSession.GetGridStateFor(SurfaceMode).TemplateId = pick.Id;
+            if (SurfaceMode == MasterDataSurfaceMode.LinkedBrowse)
+            {
+                _catalogSession.LinkedTemplatesBrowseTemplateId = pick.Id;
+            }
 
             await LoadForTemplateAsync(pick.Id, cancellationToken).ConfigureAwait(true);
             OnPropertyChanged(nameof(ShowTemplatePickerInChrome));
@@ -373,6 +401,13 @@ public sealed partial class MasterDataViewModel : ViewModelBase
 
         try
         {
+            if (IsCatalogBrowseSurface()
+                && _catalogSession.TryGetSheetCache(SurfaceMode, loadForId, out var cached))
+            {
+                ApplySheetCache(cached);
+                return;
+            }
+
             try
             {
                 _cachedTemplates = await _templateSchema
@@ -469,6 +504,11 @@ public sealed partial class MasterDataViewModel : ViewModelBase
             }
 
             await ResolveRecordLinkLabelsAsync(loadCt).ConfigureAwait(true);
+
+            if (IsCatalogBrowseSurface())
+            {
+                SaveSheetCache(loadForId);
+            }
         }
         catch (OperationCanceledException) when (loadCt.IsCancellationRequested)
         {
@@ -510,6 +550,83 @@ public sealed partial class MasterDataViewModel : ViewModelBase
 
     private bool IsLoadStillCurrent(string templateId) =>
         string.Equals(SelectedDataTemplate?.Id, templateId, StringComparison.Ordinal);
+
+    private bool IsCatalogBrowseSurface() =>
+        SurfaceMode is MasterDataSurfaceMode.ReadOnlyCatalog or MasterDataSurfaceMode.LinkedBrowse;
+
+    private void ApplySheetCache(MasterDataSheetCacheEntry cached)
+    {
+        Columns.Clear();
+        foreach (var f in cached.Fields.OrderBy(x => x.DisplayOrder))
+        {
+            Columns.Add(f);
+        }
+
+        Rows.Clear();
+        foreach (var row in cached.Rows)
+        {
+            var rowVm = new MasterDataRowViewModel { RowId = row.RowId };
+            foreach (var cell in row.Cells)
+            {
+                rowVm.Cells.Add(new MasterDataCellViewModel
+                {
+                    FieldKey = cell.FieldKey,
+                    FieldType = cell.FieldType,
+                    LinkedTemplateId = cell.LinkedTemplateId,
+                    LinkedDisplayFieldKey = cell.LinkedDisplayFieldKey,
+                    Text = cell.Text,
+                    LinkedRowId = cell.LinkedRowId,
+                });
+            }
+
+            Rows.Add(rowVm);
+        }
+
+        _loadedContextActions = cached.ContextActions.ToList();
+        _worksheetRelations.Clear();
+        _worksheetRelations.AddRange(cached.WorksheetRelations);
+    }
+
+    private void SaveSheetCache(string templateId)
+    {
+        var fields = Columns.ToList();
+        var rows = Rows.Select(row => new MasterDataRowCacheRow
+        {
+            RowId = row.RowId,
+            Cells = row.Cells.Select(cell => new MasterDataCellCacheCell
+            {
+                FieldKey = cell.FieldKey,
+                FieldType = cell.FieldType,
+                LinkedTemplateId = cell.LinkedTemplateId,
+                LinkedDisplayFieldKey = cell.LinkedDisplayFieldKey,
+                Text = cell.Text,
+                LinkedRowId = cell.LinkedRowId,
+            }).ToList(),
+        }).ToList();
+
+        _catalogSession.SetSheetCache(
+            SurfaceMode,
+            templateId,
+            new MasterDataSheetCacheEntry
+            {
+                TemplateId = templateId,
+                SurfaceMode = SurfaceMode,
+                Fields = fields,
+                Rows = rows,
+                ContextActions = _loadedContextActions.ToList(),
+                WorksheetRelations = _worksheetRelations.ToList(),
+            });
+    }
+
+    private void InvalidateCurrentSheetCache()
+    {
+        if (SelectedDataTemplate is null)
+        {
+            return;
+        }
+
+        _catalogSession.InvalidateSheetCache(SurfaceMode, SelectedDataTemplate.Id);
+    }
 
     private async Task ResolveRecordLinkLabelsAsync(CancellationToken cancellationToken)
     {
@@ -605,6 +722,15 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         }
 
         StatusMessage = "Row removed.";
+        if (IsCatalogBrowseSurface())
+        {
+            SaveSheetCache(templateId);
+        }
+        else
+        {
+            InvalidateCurrentSheetCache();
+        }
+
         return true;
     }
 
@@ -840,6 +966,15 @@ public sealed partial class MasterDataViewModel : ViewModelBase
 
             _activityLogger.LogUserAction("Master Data Saved",
                 $"Saved {Rows.Count} rows for template \"{SelectedDataTemplate.Name}\"");
+
+            if (IsCatalogBrowseSurface())
+            {
+                SaveSheetCache(templateId);
+            }
+            else
+            {
+                InvalidateCurrentSheetCache();
+            }
         }
         catch (Exception ex)
         {

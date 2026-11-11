@@ -103,6 +103,7 @@ public sealed partial class ShellLayout : UserControl
 
         adminSession.Clear();
         // Do NOT delete setup-state.json — it holds orgCode/dbUri needed after re-login
+        App.Services.GetRequiredService<CatalogBrowseSessionStore>().Reset();
 
         if (App.MainAppWindow is MainWindow main)
         {

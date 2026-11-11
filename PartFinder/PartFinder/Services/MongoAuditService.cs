@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
@@ -34,7 +35,10 @@ public sealed class MongoAuditService
         return db.GetCollection<AuditDoc>(CollectionName);
     }
 
-    public async Task<IReadOnlyList<AuditDoc>> GetRecentAsync(int limit = 200, CancellationToken ct = default)
+    public async Task<IReadOnlyList<AuditDoc>> GetRecentAsync(
+        int limit = 200,
+        string? restrictToUser = null,
+        CancellationToken ct = default)
     {
         var coll = TryGetCollection();
         if (coll is null) return Array.Empty<AuditDoc>();
@@ -47,7 +51,9 @@ public sealed class MongoAuditService
                 new CreateIndexOptions { Background = true, Name = "timestamp_desc" });
             await coll.Indexes.CreateOneAsync(indexModel, cancellationToken: ct).ConfigureAwait(false);
 
-            return await coll.Find(FilterDefinition<AuditDoc>.Empty)
+            var filter = BuildUserFilter(restrictToUser);
+
+            return await coll.Find(filter)
                 .SortByDescending(d => d.Timestamp)
                 .Limit(limit)
                 .ToListAsync(ct)
@@ -57,6 +63,17 @@ public sealed class MongoAuditService
         {
             return Array.Empty<AuditDoc>();
         }
+    }
+
+    private static FilterDefinition<AuditDoc> BuildUserFilter(string? restrictToUser)
+    {
+        if (string.IsNullOrWhiteSpace(restrictToUser))
+        {
+            return FilterDefinition<AuditDoc>.Empty;
+        }
+
+        var pattern = $"^{Regex.Escape(restrictToUser.Trim())}$";
+        return Builders<AuditDoc>.Filter.Regex(d => d.User, new BsonRegularExpression(pattern, "i"));
     }
 
     /// <summary>

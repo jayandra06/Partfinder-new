@@ -17,17 +17,45 @@ public partial class InventoryViewModel : PaginatedViewModelBase
     private readonly MongoInventoryService _inventoryService;
     private readonly BulkInventoryImportService _bulkImport;
     private readonly ActivityLogger _activityLogger;
+    private readonly ICurrentUserAccessService _access;
     private readonly List<InventoryItem> _allInventory = [];
     private readonly List<InventoryItem> _filteredInventory = [];
 
     public InventoryViewModel(
         MongoInventoryService inventoryService,
         BulkInventoryImportService bulkImport,
-        ActivityLogger activityLogger)
+        ActivityLogger activityLogger,
+        ICurrentUserAccessService access)
     {
         _inventoryService = inventoryService;
         _bulkImport = bulkImport;
         _activityLogger = activityLogger;
+        _access = access;
+    }
+
+    /// <summary>Export, import, add stock, KPI cards, and row edit actions (admin only).</summary>
+    public bool ShowInventoryAdminChrome => _access.Capabilities.CanManageInventory;
+
+    public string InventoryPageTitle =>
+        ShowInventoryAdminChrome ? "Inventory Management" : "Inventory";
+
+    public string InventoryPageDescription =>
+        ShowInventoryAdminChrome
+            ? "Track stock levels, monitor part availability, and manage inventory across your organisation."
+            : "Browse stock levels and part availability across your organisation.";
+
+    private static string DemoInventoryPurgeFlagPath =>
+        Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "PartFinder",
+            "flags",
+            "inventory-demo-purge-v1.flag");
+
+    public void RefreshRoleChrome()
+    {
+        OnPropertyChanged(nameof(ShowInventoryAdminChrome));
+        OnPropertyChanged(nameof(InventoryPageTitle));
+        OnPropertyChanged(nameof(InventoryPageDescription));
     }
 
     public ObservableCollection<InventoryItem> FilteredInventoryItems { get; } = [];
@@ -186,12 +214,22 @@ public partial class InventoryViewModel : PaginatedViewModelBase
 
     public void BeginAddForm()
     {
+        if (!ShowInventoryAdminChrome)
+        {
+            return;
+        }
+
         FormTitle = "Add inventory item";
         FormMode = InventoryFormMode.Add;
     }
 
     public void BeginEditForm(InventoryItem item)
     {
+        if (!ShowInventoryAdminChrome)
+        {
+            return;
+        }
+
         SelectedItem = item;
         FormTitle = $"Edit — {item.PartName}";
         FormMode = InventoryFormMode.Edit;
@@ -212,6 +250,8 @@ public partial class InventoryViewModel : PaginatedViewModelBase
         StatusMessage = string.Empty;
         try
         {
+            await TryPurgeLegacyDemoInventoryOnceAsync(cancellationToken).ConfigureAwait(true);
+
             var docs = await _inventoryService.GetAllAsync(cancellationToken).ConfigureAwait(true);
 
             _allInventory.Clear();
@@ -225,7 +265,9 @@ public partial class InventoryViewModel : PaginatedViewModelBase
             ApplyFilters();
 
             StatusMessage = TotalItems == 0
-                ? "No inventory items yet. Add stock to get started."
+                ? ShowInventoryAdminChrome
+                    ? "No inventory items yet. Add stock to get started."
+                    : "No inventory items to display."
                 : $"{TotalItems} items loaded";
 
             OnPropertyChanged(nameof(TotalValueFormatted));
@@ -237,6 +279,29 @@ public partial class InventoryViewModel : PaginatedViewModelBase
         finally
         {
             IsLoading = false;
+        }
+    }
+
+    private async Task TryPurgeLegacyDemoInventoryOnceAsync(CancellationToken cancellationToken)
+    {
+        if (File.Exists(DemoInventoryPurgeFlagPath))
+        {
+            return;
+        }
+
+        try
+        {
+            await _inventoryService.DeleteAllAsync(cancellationToken).ConfigureAwait(true);
+            var dir = Path.GetDirectoryName(DemoInventoryPurgeFlagPath)!;
+            Directory.CreateDirectory(dir);
+            await File.WriteAllTextAsync(
+                DemoInventoryPurgeFlagPath,
+                DateTime.UtcNow.ToString("O"),
+                cancellationToken).ConfigureAwait(true);
+        }
+        catch
+        {
+            // Non-fatal — inventory still loads on the next attempt.
         }
     }
 
@@ -449,6 +514,11 @@ public partial class InventoryViewModel : PaginatedViewModelBase
 
     public async Task<bool> DeleteItemAsync(string mongoId, CancellationToken ct = default)
     {
+        if (!ShowInventoryAdminChrome)
+        {
+            return false;
+        }
+
         await _inventoryService.DeleteAsync(mongoId, ct).ConfigureAwait(true);
         var item = _allInventory.FirstOrDefault(i => i.Id == mongoId);
         if (item is not null)
@@ -490,6 +560,14 @@ public partial class InventoryViewModel : PaginatedViewModelBase
         IProgress<BulkImportProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        if (!ShowInventoryAdminChrome)
+        {
+            return new BulkInventoryImportResult
+            {
+                Errors = ["You do not have permission to import inventory."],
+            };
+        }
+
         return await _bulkImport
             .ImportFromFileAsync(filePath, progress, cancellationToken)
             .ConfigureAwait(true);

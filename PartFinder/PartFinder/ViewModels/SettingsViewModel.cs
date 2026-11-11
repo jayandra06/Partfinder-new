@@ -25,6 +25,7 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly IOrgUserDirectoryService _users;
     private readonly ICurrentUserAccessService _access;
     private readonly ITemplateSchemaService _templates;
+    private readonly CatalogBrowseSessionStore _catalogSession;
     private string? _pendingTwoFactorSecret;
 
     public SettingsViewModel(
@@ -37,7 +38,8 @@ public partial class SettingsViewModel : ViewModelBase
         MongoSessionService sessionService,
         IOrgUserDirectoryService users,
         ICurrentUserAccessService access,
-        ITemplateSchemaService templates)
+        ITemplateSchemaService templates,
+        CatalogBrowseSessionStore catalogSession)
     {
         _security = security;
         _session = session;
@@ -49,6 +51,7 @@ public partial class SettingsViewModel : ViewModelBase
         _users = users;
         _access = access;
         _templates = templates;
+        _catalogSession = catalogSession;
         _setupContext.Refresh();
         RefreshAllState();
     }

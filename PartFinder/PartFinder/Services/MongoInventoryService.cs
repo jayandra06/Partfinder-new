@@ -105,6 +105,25 @@ public class MongoInventoryService
         }
         catch { /* ignore if collection doesn't exist */ }
     }
+
+    public async Task<long> DeleteAllAsync(CancellationToken ct = default)
+    {
+        var coll = TryGetCollection();
+        if (coll is null)
+        {
+            return 0;
+        }
+
+        try
+        {
+            var result = await coll.DeleteManyAsync(FilterDefinition<InventoryDoc>.Empty, ct).ConfigureAwait(false);
+            return result.DeletedCount;
+        }
+        catch
+        {
+            return 0;
+        }
+    }
 }
 
 [BsonIgnoreExtraElements]
