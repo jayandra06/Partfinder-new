@@ -85,7 +85,10 @@ public sealed partial class MasterDataViewModel : ViewModelBase
 
     public bool ShowSpreadsheetEditChrome => SurfaceMode == MasterDataSurfaceMode.TemplateEdit;
 
-    public bool ShowImportExportToolbar => SurfaceMode == MasterDataSurfaceMode.LinkedBrowse;
+    public bool ShowImportExportToolbar =>
+        SelectedDataTemplate is not null
+        && CanViewMasterData
+        && SurfaceMode is MasterDataSurfaceMode.ReadOnlyCatalog or MasterDataSurfaceMode.LinkedBrowse;
 
     public bool IsEmbeddedLinkedBrowse => SurfaceMode == MasterDataSurfaceMode.LinkedBrowse;
 
@@ -100,6 +103,7 @@ public sealed partial class MasterDataViewModel : ViewModelBase
     public bool CanEditMasterData => _access.Capabilities.CanEditMasterData;
     public bool CanAddMasterData => _access.Capabilities.CanAddMasterData;
     public bool CanCopyMasterData => _access.Capabilities.CanCopyMasterData;
+    public bool CanViewMasterData => _access.Capabilities.CanViewMasterData;
     public bool CanDeleteMasterData => _access.Capabilities.CanDeleteMasterData;
 
     public IReadOnlyList<MasterDataRowViewModel> GetVisibleRows() =>
@@ -204,22 +208,14 @@ public sealed partial class MasterDataViewModel : ViewModelBase
             return;
         }
 
-        var gridState = _catalogSession.GetGridStateFor(SurfaceMode);
-        var templateChanged = !string.Equals(gridState.TemplateId, value.Id, StringComparison.Ordinal);
-        if (templateChanged)
-        {
-            gridState.PageIndex = 0;
-            gridState.ScrollHorizontalOffset = 0;
-            gridState.ScrollVerticalOffset = 0;
-        }
-
-        gridState.TemplateId = value.Id;
+        _catalogSession.GetGridStateFor(SurfaceMode).TemplateId = value.Id;
         if (SurfaceMode == MasterDataSurfaceMode.LinkedBrowse)
         {
             _catalogSession.LinkedTemplatesBrowseTemplateId = value.Id;
         }
 
         OnPropertyChanged(nameof(ShowTemplatePickerInChrome));
+        OnPropertyChanged(nameof(ShowImportExportToolbar));
         _ = LoadForTemplateAsync(value.Id);
     }
 
@@ -324,9 +320,8 @@ public sealed partial class MasterDataViewModel : ViewModelBase
 
         try
         {
-            _cachedTemplates = await _templateSchema
-                .GetTemplatesAsync(cancellationToken)
-                .ConfigureAwait(true);
+            _cachedTemplates = TemplateCatalogFilters.MasterDataCatalogs(
+                await _templateSchema.GetTemplatesAsync(cancellationToken).ConfigureAwait(true));
 
             if (_cachedTemplates.Count == 0)
             {

@@ -569,10 +569,12 @@
 
                 <!-- Status / error messages -->
                 <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <ProgressRing
-                        Width="16" Height="16"
-                        IsActive="{Binding IsLoading}"
-                        Foreground="{StaticResource AccentPrimaryBrush}" />
+                    <components:LoadingSkeleton
+                        Kind="Inline"
+                        Width="140"
+                        Height="14"
+                        VerticalAlignment="Center"
+                        Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}" />
                     <TextBlock
                         Text="{Binding StatusMessage}"
                         FontSize="12"

@@ -187,6 +187,10 @@ public sealed class MongoTemplateSchemaService : ITemplateSchemaService
 
         var childFields = d.Fields.Select(ToFieldSnapshot).ToList();
         var merged = TemplateFieldMerge.MergeInheritedFields(baseFields, childFields);
+        var patterns = d.Fields
+            .Where(field => !string.IsNullOrWhiteSpace(field.Key))
+            .GroupBy(field => field.Key, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First().ValidationPattern, StringComparer.OrdinalIgnoreCase);
         var fields = merged
             .Select(
                 f => new TemplateFieldDefinition
@@ -196,7 +200,7 @@ public sealed class MongoTemplateSchemaService : ITemplateSchemaService
                     Type = ParseFieldType(f.Type),
                     IsRequired = f.IsRequired,
                     DisplayOrder = f.DisplayOrder,
-                    ValidationPattern = null,
+                    ValidationPattern = patterns.TryGetValue(f.Key, out var pattern) ? pattern : null,
                     Options = null,
                     LinkedTemplateId = f.LinkedTemplateId,
                     LinkedDisplayFieldKey = f.LinkedDisplayFieldKey,
@@ -210,9 +214,16 @@ public sealed class MongoTemplateSchemaService : ITemplateSchemaService
             Version = d.Version,
             IsPublished = d.IsPublished,
             BaseTemplateId = string.IsNullOrWhiteSpace(d.BaseTemplateId) ? null : d.BaseTemplateId,
+            IsMasterDataCatalog = d.IsMasterDataCatalog ?? !LooksLikeOrganizationTemplate(d),
             Fields = fields,
         };
     }
+
+    private static bool LooksLikeOrganizationTemplate(TemplateDoc d) =>
+        d.Fields.Count > 0
+        && d.Fields.All(f =>
+            f.Key.StartsWith("column_", StringComparison.OrdinalIgnoreCase)
+            || f.Key.StartsWith("col_", StringComparison.OrdinalIgnoreCase));
 
     private static FieldSnapshot ToFieldSnapshot(FieldDoc f) =>
         new(
@@ -233,6 +244,7 @@ public sealed class MongoTemplateSchemaService : ITemplateSchemaService
             Version = t.Version,
             IsPublished = t.IsPublished,
             BaseTemplateId = t.BaseTemplateId,
+            IsMasterDataCatalog = t.IsMasterDataCatalog,
             Fields = t.Fields
                 .OrderBy(f => f.DisplayOrder)
                 .Select(
@@ -284,6 +296,9 @@ public sealed class MongoTemplateSchemaService : ITemplateSchemaService
 
         [BsonElement("baseTemplateId")]
         public string? BaseTemplateId { get; set; }
+
+        [BsonElement("isMasterDataCatalog")]
+        public bool? IsMasterDataCatalog { get; set; }
 
         [BsonElement("fields")]
         public List<FieldDoc> Fields { get; set; } = [];

@@ -34,6 +34,8 @@ public sealed partial class MasterDataPage : Page
     private readonly CatalogBrowseSessionStore _catalogSession;
     private ScrollViewer? _spreadsheetScroll;
     private Grid? _sheetGrid;
+    private string? _displayedTemplateId;
+    private bool _suspendBrowsePersist;
     private MasterDataNavigationArgs? _navigationArgs;
     private bool _surfaceInitialized;
     private MasterDataRowViewModel? _activeLinkRow;
@@ -43,6 +45,7 @@ public sealed partial class MasterDataPage : Page
     private Border? _highlightedCell;
     private Brush? _highlightedCellBackground;
     private Brush? _highlightedCellBorderBrush;
+    private readonly HashSet<string> _openColumnSearchKeys = new(StringComparer.OrdinalIgnoreCase);
 
     public MasterDataPage()
     {
@@ -69,6 +72,7 @@ public sealed partial class MasterDataPage : Page
         _viewModel = vm;
         vm.Rows.CollectionChanged += OnGridStructureChanged;
         vm.Columns.CollectionChanged += OnGridStructureChanged;
+        vm.ColumnFiltersChanged += OnColumnFiltersChanged;
         vm.PropertyChanged += OnViewModelPropertyChanged;
         var theme = App.Services.GetService<IThemeService>();
         if (theme is not null)
@@ -89,31 +93,52 @@ public sealed partial class MasterDataPage : Page
         }
 
         UpdateCatalogNavChrome();
+        _displayedTemplateId ??= _viewModel.SelectedDataTemplate?.Id;
         RestorePageIndexFromSession();
         RebuildSpreadsheet();
     }
 
+    private CatalogGridBrowseState? CurrentBrowseState()
+    {
+        if (_viewModel is null || string.IsNullOrWhiteSpace(_displayedTemplateId))
+        {
+            return null;
+        }
+
+        return _catalogSession.GetTemplateBrowseState(_viewModel.SurfaceMode, _displayedTemplateId);
+    }
+
     private void RestorePageIndexFromSession()
     {
-        if (_viewModel is null)
+        var state = CurrentBrowseState();
+        if (state is null)
         {
             return;
         }
 
-        var state = _catalogSession.GetGridStateFor(_viewModel.SurfaceMode);
         _gridPageIndex = Math.Max(0, state.PageIndex);
     }
 
-    private void PersistGridBrowseState()
+    private void PersistGridBrowseState(bool includeScrollOffsets = true)
     {
-        if (_viewModel is null)
+        if (_suspendBrowsePersist)
         {
             return;
         }
 
-        var state = _catalogSession.GetGridStateFor(_viewModel.SurfaceMode);
+        WriteBrowseState(includeScrollOffsets);
+    }
+
+    private void WriteBrowseState(bool includeScrollOffsets)
+    {
+        var state = CurrentBrowseState();
+        if (state is null)
+        {
+            return;
+        }
+
         state.PageIndex = _gridPageIndex;
-        if (_spreadsheetScroll is not null)
+        if (includeScrollOffsets && _spreadsheetScroll is not null)
         {
             state.ScrollHorizontalOffset = _spreadsheetScroll.HorizontalOffset;
             state.ScrollVerticalOffset = _spreadsheetScroll.VerticalOffset;
@@ -122,22 +147,47 @@ public sealed partial class MasterDataPage : Page
 
     private void RestoreScrollFromSession(ScrollViewer scroll)
     {
-        if (_viewModel is null)
+        var state = CurrentBrowseState();
+        if (state is null)
         {
             return;
         }
 
-        var state = _catalogSession.GetGridStateFor(_viewModel.SurfaceMode);
-        if (state.ScrollHorizontalOffset <= 0 && state.ScrollVerticalOffset <= 0)
+        var horizontal = Math.Max(0, state.ScrollHorizontalOffset);
+        var vertical = Math.Max(0, state.ScrollVerticalOffset);
+        if (horizontal <= 0 && vertical <= 0)
         {
+            _suspendBrowsePersist = false;
             return;
         }
 
-        scroll.ChangeView(
-            state.ScrollHorizontalOffset,
-            state.ScrollVerticalOffset,
-            null,
-            disableAnimation: true);
+        void Apply()
+        {
+            _suspendBrowsePersist = true;
+            scroll.ChangeView(horizontal, vertical, null, disableAnimation: true);
+            _ = scroll.DispatcherQueue.TryEnqueue(
+                Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
+                () => _suspendBrowsePersist = false);
+        }
+
+        if (scroll.ExtentHeight > 1 || scroll.ExtentWidth > 1)
+        {
+            Apply();
+            return;
+        }
+
+        void OnSized(object sender, SizeChangedEventArgs args)
+        {
+            if (scroll.ExtentHeight <= 1 && scroll.ExtentWidth <= 1 && args.NewSize.Height <= 1)
+            {
+                return;
+            }
+
+            scroll.SizeChanged -= OnSized;
+            Apply();
+        }
+
+        scroll.SizeChanged += OnSized;
     }
 
     private void OnSpreadsheetScrollLoaded(object sender, RoutedEventArgs e)
@@ -204,11 +254,13 @@ public sealed partial class MasterDataPage : Page
     private void OnMasterDataPageUnloaded(object sender, RoutedEventArgs e)
     {
         Unloaded -= OnMasterDataPageUnloaded;
+        _suspendBrowsePersist = false;
         PersistGridBrowseState();
         if (_viewModel is not null)
         {
             _viewModel.Rows.CollectionChanged -= OnGridStructureChanged;
             _viewModel.Columns.CollectionChanged -= OnGridStructureChanged;
+            _viewModel.ColumnFiltersChanged -= OnColumnFiltersChanged;
             _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
             _viewModel = null;
         }
@@ -238,6 +290,11 @@ public sealed partial class MasterDataPage : Page
                 NewColumnNameBox.Text = string.Empty;
             }
 
+            if (e.PropertyName == nameof(MasterDataViewModel.SurfaceMode))
+            {
+                RestorePageIndexFromSession();
+            }
+
             UpdateCatalogNavChrome();
             RebuildSpreadsheet();
             return;
@@ -245,15 +302,39 @@ public sealed partial class MasterDataPage : Page
 
         if (e.PropertyName == nameof(MasterDataViewModel.SelectedDataTemplate))
         {
+            // Keep the page the user was on, even if a scroll restore is still settling.
+            WriteBrowseState(includeScrollOffsets: true);
+            _suspendBrowsePersist = true;
+            _displayedTemplateId = _viewModel?.SelectedDataTemplate?.Id;
             RestorePageIndexFromSession();
+            if (_viewModel is { IsLoading: false })
+            {
+                RebuildSpreadsheet();
+            }
         }
 
         if (e.PropertyName == nameof(MasterDataViewModel.IsLoading)
             && _viewModel is { IsLoading: false })
         {
+            if (!string.Equals(
+                    _displayedTemplateId,
+                    _viewModel.SelectedDataTemplate?.Id,
+                    StringComparison.Ordinal))
+            {
+                // Cached catalogs finish loading before the selection handler
+                // switches the saved page. Wait for that handler to rebuild.
+                return;
+            }
+
             RestorePageIndexFromSession();
             RebuildSpreadsheet();
         }
+    }
+
+    private void OnColumnFiltersChanged(object? sender, EventArgs e)
+    {
+        _gridPageIndex = 0;
+        ScheduleRebuildSpreadsheet();
     }
 
     private void OnGridStructureChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -261,6 +342,11 @@ public sealed partial class MasterDataPage : Page
         if (_viewModel is { IsLoading: true })
         {
             return;
+        }
+
+        if (e is not null && ReferenceEquals(sender, _viewModel?.Columns))
+        {
+            _openColumnSearchKeys.Clear();
         }
 
         if (e.Action == NotifyCollectionChangedAction.Add
@@ -297,14 +383,16 @@ public sealed partial class MasterDataPage : Page
         }
 
         _gridPageIndex--;
-        PersistGridBrowseState();
+        _suspendBrowsePersist = false;
+        WriteBrowseState(includeScrollOffsets: true);
         RebuildSpreadsheet();
     }
 
     private void OnMasterDataNextPageClick(object sender, RoutedEventArgs e)
     {
         _gridPageIndex++;
-        PersistGridBrowseState();
+        _suspendBrowsePersist = false;
+        WriteBrowseState(includeScrollOffsets: true);
         RebuildSpreadsheet();
     }
 
@@ -448,12 +536,18 @@ public sealed partial class MasterDataPage : Page
             return;
         }
 
-        await _excelTemplateService.ExportTemplateAsync(_viewModel.SelectedDataTemplate, file.Path);
+        var rowData = _viewModel.Rows
+            .Select(row => (IReadOnlyDictionary<string, string>)row.Cells.ToDictionary(
+                cell => cell.FieldKey,
+                cell => cell.Text ?? string.Empty,
+                StringComparer.Ordinal))
+            .ToList();
+        await _excelTemplateService.ExportTemplateWithDataAsync(_viewModel.SelectedDataTemplate, file.Path, rowData);
 
         var dlg = new ContentDialog
         {
-            Title = "Template exported",
-            Content = $"Excel template saved to:\n{file.Path}",
+            Title = "Data exported",
+            Content = $"Excel file saved with {rowData.Count} row(s):\n{file.Path}",
             CloseButtonText = "OK",
             DefaultButton = ContentDialogButton.Close,
             XamlRoot = XamlRoot,
@@ -578,52 +672,74 @@ public sealed partial class MasterDataPage : Page
         sheetRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         sheetRoot.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
+        const double columnMinWidth = 180d;
+        var viewportWidth = SpreadsheetHost.ActualWidth;
+        if (viewportWidth <= 1 && SourceTableHost is not null)
+        {
+            viewportWidth = SourceTableHost.ActualWidth;
+        }
+
+        var deleteColumnWidth = showDeleteCol ? 52d : 0d;
+        var dataColumnWidth = columnMinWidth;
+        if (viewportWidth > 1 && colCount > 0 && viewportWidth > (colCount * columnMinWidth) + deleteColumnWidth)
+        {
+            dataColumnWidth = (viewportWidth - deleteColumnWidth) / colCount;
+        }
+
+        var tableWidth = (colCount * dataColumnWidth) + deleteColumnWidth;
+
         var headerGrid = new Grid
         {
-            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Width = tableWidth,
             Background = (Brush)Application.Current.Resources["CardBackgroundBrush"],
         };
+        headerGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         headerGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
         var dataGrid = new Grid
         {
-            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Width = tableWidth,
             Background = (Brush)Application.Current.Resources["CardBackgroundBrush"],
+        };
+
+        var headerScroll = new ScrollViewer
+        {
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalScrollMode = ScrollMode.Enabled,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden,
+            VerticalScrollMode = ScrollMode.Disabled,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            IsTabStop = false,
         };
 
         var scroll = new ScrollViewer
         {
             HorizontalAlignment = HorizontalAlignment.Stretch,
             VerticalAlignment = VerticalAlignment.Stretch,
-            HorizontalScrollMode = ScrollMode.Disabled,
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            HorizontalScrollMode = ScrollMode.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
             VerticalScrollMode = ScrollMode.Auto,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Left,
         };
 
-        void FitGridToViewport(object? sender, object e)
-        {
-            var width = scroll.ActualWidth;
-            if (width <= 0 && SpreadsheetHost.ActualWidth > 0)
-            {
-                width = SpreadsheetHost.ActualWidth;
-            }
-
-            if (width > 0)
-            {
-                headerGrid.Width = width;
-                dataGrid.Width = width;
-            }
-        }
-
-        scroll.SizeChanged += (_, _) =>
-        {
-            FitGridToViewport(null, EventArgs.Empty);
-            ScheduleLinkConnectorUpdate();
-        };
+        scroll.SizeChanged += (_, _) => ScheduleLinkConnectorUpdate();
         scroll.ViewChanged += (_, e) =>
         {
+            headerScroll.ChangeView(scroll.HorizontalOffset, null, null, disableAnimation: true);
+            if (_suspendBrowsePersist)
+            {
+                if (!e.IsIntermediate)
+                {
+                    _suspendBrowsePersist = false;
+                }
+
+                ScheduleLinkConnectorUpdate();
+                return;
+            }
+
             if (!e.IsIntermediate)
             {
                 PersistGridBrowseState();
@@ -631,20 +747,21 @@ public sealed partial class MasterDataPage : Page
 
             ScheduleLinkConnectorUpdate();
         };
-        scroll.Loaded += (_, _) => FitGridToViewport(null, EventArgs.Empty);
 
-        static void AddColumnDefinitions(Grid target, int columns, bool showDelete)
+        static void AddColumnDefinitions(Grid target, int columns, bool showDelete, double columnWidth)
         {
             for (var c = 0; c < columns; c++)
             {
-                target.ColumnDefinitions.Add(c == columns - 1 && showDelete
-                    ? new ColumnDefinition { Width = new GridLength(52) }
-                    : new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                var isDelete = showDelete && c == columns - 1;
+                target.ColumnDefinitions.Add(new ColumnDefinition
+                {
+                    Width = new GridLength(isDelete ? 52 : columnWidth),
+                });
             }
         }
 
-        AddColumnDefinitions(headerGrid, gridColCount, showDeleteCol);
-        AddColumnDefinitions(dataGrid, gridColCount, showDeleteCol);
+        AddColumnDefinitions(headerGrid, gridColCount, showDeleteCol, dataColumnWidth);
+        AddColumnDefinitions(dataGrid, gridColCount, showDeleteCol, dataColumnWidth);
 
         for (var r = 0; r < rowCount; r++)
         {
@@ -676,6 +793,7 @@ public sealed partial class MasterDataPage : Page
                 ColumnSpacing = 4,
             };
             headerHost.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            headerHost.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             if (_viewModel.CanRemoveColumns)
             {
                 headerHost.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -692,6 +810,46 @@ public sealed partial class MasterDataPage : Page
             };
             Grid.SetColumn(titleBlock, 0);
             headerHost.Children.Add(titleBlock);
+
+            var fieldKey = field.Key;
+            var filterOpen = _openColumnSearchKeys.Contains(fieldKey);
+            _viewModel.TryGetColumnFilter(fieldKey, out var activeFilter);
+            var searchBtn = new Button
+            {
+                Width = 28,
+                Height = 28,
+                MinWidth = 28,
+                MinHeight = 28,
+                Padding = new Thickness(0),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Background = filterOpen
+                    ? (Brush)Application.Current.Resources["RowSelectedBackgroundBrush"]
+                    : new SolidColorBrush(Microsoft.UI.Colors.Transparent),
+                BorderThickness = new Thickness(0),
+            };
+            ToolTipService.SetToolTip(searchBtn, filterOpen ? "Hide column search" : "Search this column");
+            searchBtn.Content = new FontIcon
+            {
+                Glyph = "\uE721",
+                FontSize = 12,
+                Foreground = (Brush)Application.Current.Resources["TextSecondaryBrush"],
+            };
+            searchBtn.Click += (_, _) =>
+            {
+                if (_openColumnSearchKeys.Contains(fieldKey))
+                {
+                    _openColumnSearchKeys.Remove(fieldKey);
+                }
+                else
+                {
+                    _openColumnSearchKeys.Add(fieldKey);
+                }
+
+                RebuildSpreadsheet();
+            };
+            Grid.SetColumn(searchBtn, 1);
+            headerHost.Children.Add(searchBtn);
 
             if (_viewModel.CanRemoveColumns)
             {
@@ -718,7 +876,7 @@ public sealed partial class MasterDataPage : Page
                     FontSize = 8,
                     Foreground = (Brush)Application.Current.Resources["DangerBrush"],
                 };
-                Grid.SetColumn(removeBtn, 1);
+                Grid.SetColumn(removeBtn, 2);
                 removeBtn.Click += (_, _) =>
                 {
                     if (_viewModel is null || !_viewModel.CanRemoveColumns)
@@ -734,6 +892,34 @@ public sealed partial class MasterDataPage : Page
             headerBorder.Child = headerHost;
 
             headerGrid.Children.Add(headerBorder);
+
+            var filterBorder = new Border
+            {
+                Background = headerBg,
+                BorderBrush = borderBrush,
+                BorderThickness = new Thickness(0, 0, 1, 1),
+                Padding = new Thickness(6, 4, 6, 6),
+                Visibility = filterOpen ? Visibility.Visible : Visibility.Collapsed,
+            };
+            var filterBox = new TextBox
+            {
+                PlaceholderText = "Search column…",
+                FontSize = 12,
+                Text = activeFilter ?? string.Empty,
+            };
+            filterBox.TextChanged += (_, _) =>
+            {
+                if (_viewModel is null)
+                {
+                    return;
+                }
+
+                _viewModel.SetColumnFilter(fieldKey, filterBox.Text);
+            };
+            filterBorder.Child = filterBox;
+            Grid.SetRow(filterBorder, 1);
+            Grid.SetColumn(filterBorder, c);
+            headerGrid.Children.Add(filterBorder);
         }
 
         if (showDeleteCol)
@@ -754,6 +940,7 @@ public sealed partial class MasterDataPage : Page
                 },
             };
             Grid.SetRow(deleteHeader, 0);
+            Grid.SetRowSpan(deleteHeader, 2);
             Grid.SetColumn(deleteHeader, colCount);
             headerGrid.Children.Add(deleteHeader);
         }
@@ -870,16 +1057,16 @@ public sealed partial class MasterDataPage : Page
             }
         }
 
+        headerScroll.Content = headerGrid;
         scroll.Content = dataGrid;
-        Grid.SetRow(headerGrid, 0);
+        Grid.SetRow(headerScroll, 0);
         Grid.SetRow(scroll, 1);
-        sheetRoot.Children.Add(headerGrid);
+        sheetRoot.Children.Add(headerScroll);
         sheetRoot.Children.Add(scroll);
         SpreadsheetHost.Content = sheetRoot;
         _spreadsheetScroll = scroll;
         _sheetGrid = dataGrid;
         RefreshColumnManagementCombos();
-        FitGridToViewport(null, EventArgs.Empty);
         if (scroll.IsLoaded)
         {
             RestoreScrollFromSession(scroll);
@@ -960,7 +1147,7 @@ public sealed partial class MasterDataPage : Page
         }
 
         var pageCount = Math.Max(1, (visibleCount + MasterDataPageSize - 1) / MasterDataPageSize);
-        if (_gridPageIndex >= pageCount)
+        if (visibleCount > 0 && _gridPageIndex >= pageCount)
         {
             _gridPageIndex = pageCount - 1;
         }

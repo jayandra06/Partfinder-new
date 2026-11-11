@@ -112,12 +112,12 @@
                                 </DataTemplate>
                             </ListView.ItemTemplate>
                         </ListView>
-                        <ProgressRing
-                            Width="28"
-                            Height="28"
-                            HorizontalAlignment="Center"
+                        <components:LoadingSkeleton
+                            Kind="Lines"
+                            Margin="12"
+                            HorizontalAlignment="Stretch"
                             VerticalAlignment="Center"
-                            IsActive="{Binding IsLoading}" />
+                            Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}" />
                     </Grid>
                 </Border>
             </StackPanel>

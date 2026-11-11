@@ -2,6 +2,7 @@
     x:Class="PartFinder.Views.Pages.SettingsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:components="using:PartFinder.Views.Components"
     xmlns:converters="using:PartFinder.Converters">
     <Page.Resources>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
@@ -962,13 +963,10 @@
                     <TextBlock Text="View and manage all devices where your account is currently signed in. You can remotely sign out from any device except the one you're using right now." Style="{StaticResource SectionDescriptionStyle}" />
 
                     <!-- Loading indicator -->
-                    <StackPanel Visibility="{Binding IsLoadingSessions, Converter={StaticResource BoolToVisibilityConverter}}"
-                                HorizontalAlignment="Center" Margin="0,16,0,16">
-                        <ProgressRing IsActive="True" Width="32" Height="32" />
-                        <TextBlock Text="Loading sessions..." FontSize="12"
-                                   Foreground="{StaticResource TextSecondaryBrush}"
-                                   HorizontalAlignment="Center" Margin="0,8,0,0" />
-                    </StackPanel>
+                    <components:LoadingSkeleton
+                        Kind="Lines"
+                        Margin="0,16,0,16"
+                        Visibility="{Binding IsLoadingSessions, Converter={StaticResource BoolToVisibilityConverter}}" />
 
                     <!-- Sessions List - built in code-behind for full control -->
                     <StackPanel x:Name="SessionCardsPanel" Spacing="12" />

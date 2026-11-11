@@ -139,18 +139,28 @@
                 VerticalAlignment="Center"
                 Visibility="{Binding ShowImportExportToolbar, Converter={StaticResource BoolToVisibilityConverter}}">
                 <Button
-                    Style="{StaticResource ToolbarSegmentButtonStyle}"
+                    Style="{StaticResource OutlinedButtonStyle}"
+                    Height="40"
+                    Padding="14,0"
                     Click="OnExportTemplateClicked"
-                    ToolTipService.ToolTip="Export Excel">
-                    <SymbolIcon Symbol="Upload" />
+                    ToolTipService.ToolTip="Export catalog data to Excel">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE898;" FontSize="13" />
+                        <TextBlock Text="Export data" FontSize="13" />
+                    </StackPanel>
                 </Button>
 
                 <Button
-                    Style="{StaticResource ToolbarSegmentButtonStyle}"
+                    Style="{StaticResource OutlinedButtonStyle}"
+                    Height="40"
+                    Padding="14,0"
                     Click="OnImportExcelClicked"
                     IsEnabled="{Binding CanAddMasterData}"
-                    ToolTipService.ToolTip="Import Excel">
-                    <SymbolIcon Symbol="Download" />
+                    ToolTipService.ToolTip="Import catalog data from Excel">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE896;" FontSize="13" />
+                        <TextBlock Text="Import data" FontSize="13" />
+                    </StackPanel>
                 </Button>
             </StackPanel>
 
@@ -189,11 +199,6 @@
             <StackPanel Spacing="4">
                 <TextBlock
                     Foreground="{StaticResource TextSecondaryBrush}"
-                    FontSize="11"
-                    Text="Loading..."
-                    Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}" />
-                <TextBlock
-                    Foreground="{StaticResource TextSecondaryBrush}"
                     Text="{Binding StatusMessage}"
                     FontSize="11"
                     TextWrapping="Wrap"
@@ -206,7 +211,7 @@
                 <TextBlock
                     Foreground="{StaticResource TextSecondaryBrush}"
                     FontSize="11"
-                    Text="Browse linked rows using hyperlinks. Export and import from the toolbar."
+                    Text="Use Export data and Import data in the toolbar. Click the search icon on a column header to filter that column."
                     Visibility="{Binding ShowImportExportToolbar, Converter={StaticResource BoolToVisibilityConverter}}" />
                 <TextBlock
                     Foreground="{StaticResource TextSecondaryBrush}"
@@ -254,12 +259,22 @@
                     BorderThickness="1"
                     CornerRadius="16"
                     Padding="0">
-                    <ContentControl
-                        x:Name="SpreadsheetHost"
-                        HorizontalAlignment="Stretch"
-                        VerticalAlignment="Stretch"
-                        HorizontalContentAlignment="Stretch"
-                        VerticalContentAlignment="Stretch" />
+                    <Grid>
+                        <ContentControl
+                            x:Name="SpreadsheetHost"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Stretch"
+                            HorizontalContentAlignment="Stretch"
+                            VerticalContentAlignment="Stretch" />
+                        <Border
+                            Background="{StaticResource ElevatedCardBackgroundBrush}"
+                            CornerRadius="16"
+                            Padding="16"
+                            IsHitTestVisible="False"
+                            Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <components:LoadingSkeleton Kind="Table" />
+                        </Border>
+                    </Grid>
                 </Border>
                 <StackPanel Grid.Row="1" Margin="0,10,0,0" Spacing="10">
                     <Grid>

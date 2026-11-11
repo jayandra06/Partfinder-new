@@ -30,6 +30,13 @@ public interface IMasterDataRecordsService
         string rowId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Upserts every row and deletes the listed row ids in one write.</summary>
+    Task<IReadOnlyList<string>> SaveRowsAsync(
+        string templateId,
+        IReadOnlyList<(string? Id, int RowOrder, IReadOnlyDictionary<string, string> Values)> rows,
+        IReadOnlyList<string> deleteRowIds,
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Inserts many new rows for a template in batches. Reports how many rows have been written so far.
     /// </summary>

@@ -104,11 +104,12 @@ public sealed class CurrentUserAccessService : ICurrentUserAccessService
                     CanDeleteTemplate = record.TemplatePermissions?.Delete ?? false,
 
                     // Granular master data permissions (actual operations)
+                    // Master data row add/delete: admins only (not employees).
                     CanCopyMasterData = record.MasterDataPermissions?.Copy ?? false,
                     CanViewMasterData = record.MasterDataPermissions?.View ?? false,
                     CanEditMasterData = record.MasterDataPermissions?.Edit ?? false,
-                    CanAddMasterData = record.MasterDataPermissions?.Add ?? false,
-                    CanDeleteMasterData = record.MasterDataPermissions?.Delete ?? false,
+                    CanAddMasterData = false,
+                    CanDeleteMasterData = false,
 
                     PartsAllTemplates = record.PartsAllTemplates,
                     AllowedTemplateIds = record.AllowedTemplateIds,

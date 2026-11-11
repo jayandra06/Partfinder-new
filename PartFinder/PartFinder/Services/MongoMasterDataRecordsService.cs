@@ -326,6 +326,69 @@ public sealed class MongoMasterDataRecordsService : IMasterDataRecordsService
         return result.DeletedCount > 0;
     }
 
+    public async Task<IReadOnlyList<string>> SaveRowsAsync(
+        string templateId,
+        IReadOnlyList<(string? Id, int RowOrder, IReadOnlyDictionary<string, string> Values)> rows,
+        IReadOnlyList<string> deleteRowIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetClient(out var client))
+        {
+            throw new InvalidOperationException(
+                "No tenant database is configured. Complete setup and ensure setup-state.json contains dbUri.");
+        }
+
+        var coll = TryGetCollection(client)
+                   ?? throw new InvalidOperationException(
+                       "No tenant database is configured. Complete setup and ensure setup-state.json contains dbUri.");
+
+        var models = new List<WriteModel<MasterDataRowDoc>>(rows.Count + deleteRowIds.Count);
+        var ids = new string[rows.Count];
+        for (var i = 0; i < rows.Count; i++)
+        {
+            var (rowId, rowOrder, values) = rows[i];
+            var id = !string.IsNullOrWhiteSpace(rowId) && ObjectId.TryParse(rowId, out var existing)
+                ? existing
+                : ObjectId.GenerateNewId();
+            ids[i] = id.ToString();
+            var bsonValues = new BsonDocument();
+            foreach (var kv in values)
+            {
+                bsonValues[kv.Key] = kv.Value ?? string.Empty;
+            }
+
+            models.Add(new ReplaceOneModel<MasterDataRowDoc>(
+                Builders<MasterDataRowDoc>.Filter.Eq(d => d.MongoId, id),
+                new MasterDataRowDoc
+                {
+                    MongoId = id,
+                    TemplateId = templateId,
+                    RowOrder = rowOrder,
+                    Values = bsonValues,
+                })
+            {
+                IsUpsert = true,
+            });
+        }
+
+        foreach (var removedId in deleteRowIds)
+        {
+            if (!string.IsNullOrWhiteSpace(removedId) && ObjectId.TryParse(removedId, out var oid))
+            {
+                models.Add(new DeleteOneModel<MasterDataRowDoc>(
+                    Builders<MasterDataRowDoc>.Filter.Eq(d => d.MongoId, oid)));
+            }
+        }
+
+        if (models.Count > 0)
+        {
+            await coll.BulkWriteAsync(models, new BulkWriteOptions { IsOrdered = false }, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        return ids;
+    }
+
     public async Task<int> AppendRowsAsync(
         string templateId,
         IEnumerable<IReadOnlyDictionary<string, string>> rows,
