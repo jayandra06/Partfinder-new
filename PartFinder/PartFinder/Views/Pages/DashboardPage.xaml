@@ -176,7 +176,7 @@
                             <TextBlock Text="LOW STOCK ALERT" FontSize="11" FontWeight="Bold"
                                        Foreground="#FFB781" CharacterSpacing="40"/>
                             <Border CornerRadius="4" Padding="5,1" Background="#20FFB781">
-                                <TextBlock Text="{Binding LowStockItems.Count}" FontSize="9"
+                                <TextBlock Text="{Binding LowStockRaw}" FontSize="9"
                                            FontWeight="Bold" Foreground="#FFB781"/>
                             </Border>
                         </StackPanel>
@@ -302,9 +302,13 @@
                                     Series="{Binding TrendSeries}"
                                     AnimationsSpeed="00:00:00.8"
                                     EasingFunction="{x:Null}"/>
-                                <ProgressRing Width="24" Height="24"
-                                              HorizontalAlignment="Center" VerticalAlignment="Center"
-                                              IsActive="{Binding IsLoading}"/>
+                                <components:LoadingSkeleton
+                                    Kind="Block"
+                                    Height="240"
+                                    HorizontalAlignment="Stretch"
+                                    VerticalAlignment="Stretch"
+                                    IsHitTestVisible="False"
+                                    Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}" />
                             </Grid>
                         </Border>
 

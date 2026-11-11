@@ -391,9 +391,10 @@
                         </Grid>
 
                         <!-- Sample rows -->
-                        <ProgressRing IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
-                                      Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
-                                      Width="32" Height="32" HorizontalAlignment="Center" Margin="0,12,0,12"/>
+                        <components:LoadingSkeleton
+                            Kind="Table"
+                            Margin="12"
+                            Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
 
                         <ListView ItemsSource="{x:Bind ViewModel.FilteredInventoryItems, Mode=OneWay}"
                                   SelectionMode="None">

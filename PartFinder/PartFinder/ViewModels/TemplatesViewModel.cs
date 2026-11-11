@@ -13,6 +13,7 @@ public partial class TemplatesViewModel : ViewModelBase
     private readonly IShellNavCoordinator _shellNav;
     private readonly ILocalSetupContext _setupContext;
     private readonly IContextActionsService _contextActions;
+    private readonly IMasterDataRecordsService _records;
     private readonly ActivityLogger _activityLogger;
     private readonly IFavouriteStore _favouriteStore;
 
@@ -29,7 +30,8 @@ public partial class TemplatesViewModel : ViewModelBase
         ActivityLogger activityLogger,
         IFavouriteStore favouriteStore,
         ICurrentUserAccessService access,
-        BulkTemplateImportService bulkImport)
+        BulkTemplateImportService bulkImport,
+        IMasterDataRecordsService records)
     {
         _templateSchema = templateSchema;
         _shellNav = shellNav;
@@ -39,6 +41,7 @@ public partial class TemplatesViewModel : ViewModelBase
         _favouriteStore = favouriteStore;
         _access = access;
         _bulkImport = bulkImport;
+        _records = records;
         _dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
         
         ColumnLabels.Add(new ColumnLabelDraft());
@@ -533,8 +536,9 @@ public partial class TemplatesViewModel : ViewModelBase
             templates = Array.Empty<PartTemplateDefinition>();
         }
 
-        // Filter templates based on user's allowed template IDs (employee restriction)
-        var filtered = _access.FilterTemplatesForParts(templates);
+        // Organization templates (Templates page) — exclude master data catalogs from the gallery.
+        var orgTemplates = TemplateCatalogFilters.OrganizationTemplates(templates);
+        var filtered = _access.FilterTemplatesForParts(orgTemplates);
 
         Templates.Clear();
         foreach (var template in filtered)
@@ -624,6 +628,74 @@ public partial class TemplatesViewModel : ViewModelBase
         CellConnections.Clear();
         SelectedTemplate = null;
         NotifyTemplateUiState();
+    }
+
+    public string? LastCreatedTemplateId { get; private set; }
+
+    /// <summary>Creates a named template with 5 columns and 10 empty rows. Returns an error message, or null on success.</summary>
+    public async Task<string?> CreateDefaultTableTemplateAsync(string name, CancellationToken cancellationToken = default)
+    {
+        LastCreatedTemplateId = null;
+        name = name.Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return "Enter a template name.";
+        }
+
+        if (!CanAddTemplate)
+        {
+            return "You do not have permission to create a template.";
+        }
+
+        if (Templates.Any(t => string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase)))
+        {
+            return "A template with this name already exists.";
+        }
+
+        const int defaultColumns = 5;
+        const int defaultRows = 10;
+        var templateId = Guid.NewGuid().ToString("N");
+        var fields = new List<TemplateFieldDefinition>(defaultColumns);
+        for (var i = 1; i <= defaultColumns; i++)
+        {
+            fields.Add(new TemplateFieldDefinition
+            {
+                Key = $"column_{i}",
+                Label = $"Column {i}",
+                Type = TemplateFieldType.Text,
+                IsRequired = false,
+                DisplayOrder = i - 1,
+            });
+        }
+
+        var def = new PartTemplateDefinition
+        {
+            Id = templateId,
+            Name = name,
+            Version = 1,
+            IsPublished = true,
+            IsMasterDataCatalog = false,
+            Fields = fields,
+        };
+
+        try
+        {
+            await _templateSchema.SaveTemplateAsync(def, cancellationToken).ConfigureAwait(true);
+            var blanks = Enumerable.Range(0, defaultRows)
+                .Select(_ => (IReadOnlyDictionary<string, string>)fields.ToDictionary(f => f.Key, _ => string.Empty))
+                .ToList();
+            await _records.AppendRowsAsync(templateId, blanks, cancellationToken: cancellationToken).ConfigureAwait(true);
+            LastCreatedTemplateId = templateId;
+            await LoadAsync(cancellationToken).ConfigureAwait(true);
+            _activityLogger.LogTemplateChange(
+                "Template Created",
+                $"Template \"{name}\" created with {defaultColumns} columns and {defaultRows} rows");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            return ex.Message;
+        }
     }
 
     [RelayCommand]

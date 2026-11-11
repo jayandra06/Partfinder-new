@@ -134,6 +134,7 @@ public sealed class BulkTemplateImportService
                     Name = name,
                     Version = 1,
                     IsPublished = true,
+                    IsMasterDataCatalog = false,
                     Fields = fields,
                 };
 

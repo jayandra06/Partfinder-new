@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Dispatching;
 using PartFinder.Helpers;
+using PartFinder.Models;
 using PartFinder.Services;
 using SkiaSharp;
 using System.Collections.ObjectModel;
@@ -21,6 +22,8 @@ public partial class DashboardViewModel : ViewModelBase
     private readonly IThemeService _themeService;
     private readonly ITemplateSchemaService _templateSchema;
     private readonly IMasterDataRecordsService _masterData;
+    private readonly MongoInventoryService _inventory;
+    private readonly MongoAuditService _audit;
     private readonly IAppStateStore _appState;
     private readonly DispatcherQueue? _uiQueue;
     private PeriodicTimer? _refreshTimer;
@@ -38,6 +41,8 @@ public partial class DashboardViewModel : ViewModelBase
         IThemeService themeService,
         ITemplateSchemaService templateSchema,
         IMasterDataRecordsService masterData,
+        MongoInventoryService inventory,
+        MongoAuditService audit,
         IAppStateStore appState)
     {
         _api = api;
@@ -45,6 +50,8 @@ public partial class DashboardViewModel : ViewModelBase
         _themeService = themeService;
         _templateSchema = templateSchema;
         _masterData = masterData;
+        _inventory = inventory;
+        _audit = audit;
         _appState = appState;
         _uiQueue = DispatcherQueue.GetForCurrentThread();
 
@@ -180,90 +187,96 @@ public partial class DashboardViewModel : ViewModelBase
         {
             ct.ThrowIfCancellationRequested();
 
-            var statsTask = _api.GetDashboardStatsAsync(ct);
+            var statsTask = BuildWorkspaceStatsAsync(ct);
             var trendTask = _api.GetDashboardTrendAsync(ct);
             await Task.WhenAll(statsTask, trendTask).ConfigureAwait(true);
             ct.ThrowIfCancellationRequested();
 
-            var (statsOk, statsError, stats) = await statsTask.ConfigureAwait(true);
-            var (trendOk, _, trend) = await trendTask.ConfigureAwait(true);
+            var stats = await statsTask.ConfigureAwait(true);
+            var (trendOk, _, apiTrend) = await trendTask.ConfigureAwait(true);
 
-            if (!statsOk || stats is null)
+            if (stats is null)
             {
-                System.Diagnostics.Debug.WriteLine($"[Dashboard] Stats API failed: {statsError}");
-                stats = await BuildLocalStatsAsync(ct).ConfigureAwait(true);
-                if (stats is null)
-                {
-                    var friendly = ApiErrorFormatter.ToUserMessage(statsError);
-                    Kpis[0].Value = "0";
-                    Kpis[0].Delta = friendly;
-                    Kpis[1].Value = "0";
-                    Kpis[1].Delta = "—";
-                    Kpis[2].Value = "0";
-                    Kpis[2].Delta = "—";
-                    Kpis[3].Value = "—";
-                    Kpis[3].Delta = friendly;
-                    LastUpdated = "⚠ Offline summary";
-                }
+                Kpis[0].Value = "0";
+                Kpis[0].Delta = "Inventory unavailable";
+                Kpis[1].Value = "0";
+                Kpis[1].Delta = "—";
+                Kpis[2].Value = "0";
+                Kpis[2].Delta = "—";
+                Kpis[3].Value = "—";
+                Kpis[3].Delta = "—";
+                LastUpdated = "⚠ Could not read workspace data";
             }
-
-            if (stats is not null)
+            else
             {
                 TotalPartsRaw = stats.TotalParts;
                 LowStockRaw = stats.LowStock;
                 ActiveTemplatesRaw = stats.ActiveTemplates;
-                ImportSuccessRaw = stats.ImportSuccessRate;
+                ImportSuccessRaw = stats.HasImportHistory ? stats.ImportSuccessRate : 0;
 
-                // ── KPI values ────────────────────────────────────────────────
-                Kpis[0].Value      = stats.TotalParts.ToString("N0", CultureInfo.InvariantCulture);
-                Kpis[0].Delta      = $"{stats.TotalParts} items tracked";
+                Kpis[0].Value = stats.TotalParts.ToString("N0", CultureInfo.InvariantCulture);
+                Kpis[0].Delta = stats.PartsSource == "inventory"
+                    ? $"{stats.MasterDataRows:N0} master data rows"
+                    : "From master data";
                 Kpis[0].AlertLevel = KpiAlertLevel.Normal;
 
-                Kpis[1].Value      = stats.LowStock.ToString("N0", CultureInfo.InvariantCulture);
-                Kpis[1].Delta      = stats.LowStock > 0 ? "⚠ Attention needed" : "✓ All stocked";
+                Kpis[1].Value = stats.LowStock.ToString("N0", CultureInfo.InvariantCulture);
+                Kpis[1].Delta = stats.LowStock == 0
+                    ? "✓ All stocked"
+                    : stats.OutOfStock > 0 && stats.BelowMinimum > 0
+                        ? $"{stats.BelowMinimum} low · {stats.OutOfStock} out"
+                        : stats.OutOfStock > 0
+                            ? "Out of stock"
+                            : "⚠ Below minimum";
                 Kpis[1].AlertLevel = stats.LowStock > 0 ? KpiAlertLevel.Warning : KpiAlertLevel.Normal;
 
-                Kpis[2].Value      = stats.ActiveTemplates.ToString("N0", CultureInfo.InvariantCulture);
-                Kpis[2].Delta      = "Schemas active";
+                Kpis[2].Value = stats.ActiveTemplates.ToString("N0", CultureInfo.InvariantCulture);
+                Kpis[2].Delta = stats.LinkedTemplateCount > 0
+                    ? $"{stats.LinkedTemplateCount} linked"
+                    : "In master data";
                 Kpis[2].AlertLevel = KpiAlertLevel.Normal;
 
-                Kpis[3].Value      = $"{stats.ImportSuccessRate:0.0}%";
-                Kpis[3].Delta      = stats.ImportSuccessRate >= 90 ? "✓ Healthy" : "↓ Review needed";
-                Kpis[3].AlertLevel = stats.ImportSuccessRate < 80 ? KpiAlertLevel.Danger : KpiAlertLevel.Normal;
+                if (stats.HasImportHistory)
+                {
+                    Kpis[3].Value = $"{stats.ImportSuccessRate:0.0}%";
+                    Kpis[3].Delta = stats.ImportSuccessRate >= 90 ? "✓ Healthy" : "↓ Review needed";
+                    Kpis[3].AlertLevel = stats.ImportSuccessRate < 80 ? KpiAlertLevel.Danger : KpiAlertLevel.Normal;
+                    _lastImportSuccessRate = stats.ImportSuccessRate;
+                    HealthLabel = $"{stats.ImportSuccessRate:0.0}%";
+                }
+                else
+                {
+                    Kpis[3].Value = "—";
+                    Kpis[3].Delta = "No imports yet";
+                    Kpis[3].AlertLevel = KpiAlertLevel.Normal;
+                    _lastImportSuccessRate = 0;
+                    HealthLabel = "—";
+                }
 
-                // ── Health gauge ──────────────────────────────────────────────
-                _lastImportSuccessRate = stats.ImportSuccessRate;
-                HealthGaugeSeries = BuildHealthGaugeSeries(stats.ImportSuccessRate);
-                HealthLabel       = $"{stats.ImportSuccessRate:0.0}%";
+                HealthGaugeSeries = BuildHealthGaugeSeries(_lastImportSuccessRate);
                 OnPropertyChanged(nameof(HealthGaugeSeries));
 
-                // ── Recent activity ───────────────────────────────────────────
                 RecentActivity.Clear();
                 foreach (var line in stats.RecentActivity.Take(10))
                 {
                     RecentActivity.Add(ActivityItem.FromText(line));
                 }
 
-                // ── Low stock items ───────────────────────────────────────────
                 LowStockItems.Clear();
-                HasLowStock = stats.LowStock > 0;
-                if (HasLowStock)
+                foreach (var item in stats.LowStockItems)
                 {
-                    var sampleNames = new[] { "Fuel Filter", "Anchor Chain", "Shaft Seal", "Impeller", "O-Ring Kit" };
-                    var rng = new Random(stats.LowStock);
-                    for (int i = 0; i < Math.Min(stats.LowStock, 5); i++)
-                    {
-                        LowStockItems.Add(new LowStockItem(
-                            sampleNames[i % sampleNames.Length],
-                            rng.Next(0, 3),
-                            rng.Next(5, 15)));
-                    }
+                    LowStockItems.Add(item);
                 }
 
-                // ── Stock level bar chart ─────────────────────────────────────
-                StockLevelSeries  = BuildStockLevelSeries(stats, !_themeService.IsDark);
+                HasLowStock = stats.LowStock > 0;
+
+                StockLevelSeries = BuildStockLevelSeries(stats.LowStockItems, !_themeService.IsDark);
                 StockLevelYLabels = LowStockItems.Select(i => i.Name).Take(5).ToArray();
-                if (StockLevelYLabels.Length == 0) StockLevelYLabels = ["—"];
+                if (StockLevelYLabels.Length == 0)
+                {
+                    StockLevelYLabels = ["—"];
+                }
+
                 StockLevelYAxes = DashboardChartAppearance.BuildStockLevelYAxes(StockLevelYLabels, _themeService.IsDark);
                 OnPropertyChanged(nameof(StockLevelSeries));
                 OnPropertyChanged(nameof(StockLevelYLabels));
@@ -273,15 +286,16 @@ public partial class DashboardViewModel : ViewModelBase
                 loadDistributionAfter = true;
             }
 
-            if (!trendOk)
-            {
-                return;
-            }
-
             ct.ThrowIfCancellationRequested();
 
-            var points = trend.Select(t => t.Value).ToArray();
-            if (points.Length == 0) points = [0d];
+            IReadOnlyList<DashboardTrendPointDto> trendPoints = stats is { Trend.Count: > 0 }
+                ? stats.Trend
+                : trendOk ? apiTrend : [];
+            var points = trendPoints.Select(t => t.Value).ToArray();
+            if (points.Length == 0)
+            {
+                points = [0d];
+            }
 
             var trendAnim = animateCharts ? TimeSpan.FromMilliseconds(400) : TimeSpan.Zero;
             var avgAnim = animateCharts ? TimeSpan.FromMilliseconds(450) : TimeSpan.Zero;
@@ -319,7 +333,7 @@ public partial class DashboardViewModel : ViewModelBase
                 }
             ];
 
-            TrendXLabels = trend.Select(t => t.Label).ToArray();
+            TrendXLabels = trendPoints.Select(t => t.Label).ToArray();
             TrendXAxes = DashboardChartAppearance.BuildTrendXAxes(TrendXLabels, _themeService.IsDark);
             OnPropertyChanged(nameof(TrendSeries));
             OnPropertyChanged(nameof(TrendXLabels));
@@ -375,24 +389,24 @@ public partial class DashboardViewModel : ViewModelBase
         {
             ct.ThrowIfCancellationRequested();
 
-            var templates = await _templateSchema.GetTemplatesAsync().ConfigureAwait(true);
+            var templates = (await _templateSchema.GetTemplatesAsync(ct).ConfigureAwait(true)).ToList();
             ct.ThrowIfCancellationRequested();
 
-            var topTemplates = templates.Take(5).ToList();
-            if (topTemplates.Count == 0)
+            if (templates.Count == 0)
             {
                 DistributionSeries = BuildEmptyDistributionSeries();
                 OnPropertyChanged(nameof(DistributionSeries));
                 return;
             }
 
-            var countTasks = topTemplates
-                .Select(t => _masterData.GetRowCountAsync(t.Id, ct))
-                .ToArray();
-            var counts = await Task.WhenAll(countTasks).ConfigureAwait(true);
+            var counts = await Task.WhenAll(
+                templates.Select(t => _masterData.GetRowCountAsync(t.Id, ct))).ConfigureAwait(true);
             ct.ThrowIfCancellationRequested();
-            var slices = topTemplates
-                .Select((t, i) => (Name: t.Name, Count: counts[i]))
+            var slices = templates
+                .Select((template, index) => (Name: template.Name, Count: counts[index]))
+                .Where(slice => slice.Count > 0)
+                .OrderByDescending(slice => slice.Count)
+                .Take(5)
                 .ToList();
 
             if (slices.Count == 0)
@@ -414,7 +428,7 @@ public partial class DashboardViewModel : ViewModelBase
 
                 series[i] = new PieSeries<int>
                 {
-                    Values = [Math.Max(1, count)],
+                    Values = [count],
                     Name = name,
                     Fill = new SolidColorPaint(color),
                     Stroke = new SolidColorPaint(sliceStroke) { StrokeThickness = 2f },
@@ -458,10 +472,11 @@ public partial class DashboardViewModel : ViewModelBase
         ];
     }
 
-    private static ISeries[] BuildStockLevelSeries(DashboardStatsDto stats, bool isLight)
+    private static ISeries[] BuildStockLevelSeries(IReadOnlyList<LowStockItem> items, bool isLight)
     {
-        var rng = new Random(stats.LowStock + stats.TotalParts);
-        int[] values = [rng.Next(0, 5), rng.Next(0, 4), rng.Next(1, 6), rng.Next(2, 7), rng.Next(0, 5)];
+        int[] values = items.Count == 0
+            ? [0]
+            : items.Select(item => item.Current).ToArray();
         var labelColor = isLight ? new SKColor(33, 47, 66) : new SKColor(234, 242, 255);
         return
         [
@@ -552,31 +567,411 @@ public partial class DashboardViewModel : ViewModelBase
         ];
     }
 
-    private async Task<DashboardStatsDto?> BuildLocalStatsAsync(CancellationToken cancellationToken = default)
+    private async Task<WorkspaceDashboardStats?> BuildWorkspaceStatsAsync(CancellationToken cancellationToken)
     {
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var templates = await _templateSchema.GetTemplatesAsync().ConfigureAwait(true);
-            var activeTemplates = templates.Count;
-            var countTasks = templates.Take(12).Select(t => _masterData.GetRowCountAsync(t.Id, cancellationToken)).ToArray();
-            var counts = await Task.WhenAll(countTasks).ConfigureAwait(true);
-            var totalParts = counts.Sum();
+            var templatesTask = _templateSchema.GetTemplatesAsync(cancellationToken);
+            var inventoryTask = _inventory.GetAllAsync(cancellationToken);
+            var relationsTask = _api.GetRelationsAsync(cancellationToken);
+            var auditTask = _audit.GetRecentAsync(40, null, cancellationToken);
+            await Task.WhenAll(templatesTask, inventoryTask, relationsTask, auditTask).ConfigureAwait(true);
 
-            return new DashboardStatsDto
+            var templates = (await templatesTask.ConfigureAwait(true)).ToList();
+            var inventory = await inventoryTask.ConfigureAwait(true);
+            var (relationsOk, _, relations) = await relationsTask.ConfigureAwait(true);
+            var audits = await auditTask.ConfigureAwait(true);
+            var relationList = relationsOk ? relations : Array.Empty<WorksheetRelationDto>();
+
+            var linkedTemplateIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var relation in relationList)
+            {
+                if (!string.IsNullOrWhiteSpace(relation.PrimaryTemplateId))
+                {
+                    linkedTemplateIds.Add(relation.PrimaryTemplateId);
+                }
+
+                if (!string.IsNullOrWhiteSpace(relation.LookupTemplateId))
+                {
+                    linkedTemplateIds.Add(relation.LookupTemplateId);
+                }
+            }
+
+            var counts = templates.Count == 0
+                ? Array.Empty<int>()
+                : await Task.WhenAll(templates.Select(t => _masterData.GetRowCountAsync(t.Id, cancellationToken)))
+                    .ConfigureAwait(true);
+            var masterDataRows = counts.Sum();
+
+            var activeIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (var i = 0; i < templates.Count; i++)
+            {
+                if (counts[i] > 0 || linkedTemplateIds.Contains(templates[i].Id))
+                {
+                    activeIds.Add(templates[i].Id);
+                }
+            }
+
+            var activeTemplates = activeIds.Count > 0 ? activeIds.Count : templates.Count;
+
+            int totalParts;
+            int belowMinimum;
+            int outOfStock;
+            List<LowStockItem> lowItems;
+            string partsSource;
+
+            if (inventory.Count > 0)
+            {
+                partsSource = "inventory";
+                totalParts = inventory.Count;
+                (lowItems, belowMinimum, outOfStock) = CollectInventoryStock(inventory);
+            }
+            else
+            {
+                partsSource = "master data";
+                var partsRows = 0;
+                for (var i = 0; i < templates.Count; i++)
+                {
+                    if (IsPartsTemplate(templates[i]) || templates[i].Fields.Any(IsQuantityField))
+                    {
+                        partsRows += counts[i];
+                    }
+                }
+
+                totalParts = partsRows > 0 ? partsRows : masterDataRows;
+                (lowItems, belowMinimum, outOfStock) = await ScanMasterDataStockAsync(templates, cancellationToken)
+                    .ConfigureAwait(true);
+            }
+
+            lowItems = lowItems
+                .OrderBy(item => item.Current)
+                .ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+                .Take(5)
+                .ToList();
+
+            var (importRate, hasImports) = ComputeImportSuccess(audits);
+
+            return new WorkspaceDashboardStats
             {
                 TotalParts = totalParts,
-                LowStock = 0,
+                LowStock = belowMinimum + outOfStock,
+                BelowMinimum = belowMinimum,
+                OutOfStock = outOfStock,
                 ActiveTemplates = activeTemplates,
-                ImportSuccessRate = 100,
-                RecentActivity = ["Local database summary"],
+                LinkedTemplateCount = relationList.Count,
+                MasterDataRows = masterDataRows,
+                ImportSuccessRate = importRate,
+                HasImportHistory = hasImports,
+                PartsSource = partsSource,
+                RecentActivity = BuildActivityLines(audits, totalParts, masterDataRows, relationList.Count, partsSource),
+                LowStockItems = lowItems,
+                Trend = BuildInventoryTrend(inventory),
             };
         }
-        catch
+        catch (OperationCanceledException)
         {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Dashboard] BuildWorkspaceStatsAsync failed: {ex.Message}");
             return null;
         }
+    }
+
+    private static (List<LowStockItem> Items, int BelowMinimum, int OutOfStock) CollectInventoryStock(
+        IReadOnlyList<InventoryDoc> inventory)
+    {
+        var items = new List<LowStockItem>();
+        var belowMinimum = 0;
+        var outOfStock = 0;
+
+        foreach (var doc in inventory)
+        {
+            var minimum = doc.MinStock > 0 ? doc.MinStock : 10;
+            var quantity = doc.Quantity;
+            if (quantity >= minimum)
+            {
+                continue;
+            }
+
+            if (quantity == 0)
+            {
+                outOfStock++;
+            }
+            else
+            {
+                belowMinimum++;
+            }
+
+            var name = string.IsNullOrWhiteSpace(doc.PartName) ? doc.PartId : doc.PartName;
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                name = "Unnamed part";
+            }
+
+            items.Add(new LowStockItem(name.Trim(), quantity, minimum));
+        }
+
+        return (items, belowMinimum, outOfStock);
+    }
+
+    private async Task<(List<LowStockItem> Items, int BelowMinimum, int OutOfStock)> ScanMasterDataStockAsync(
+        IReadOnlyList<PartTemplateDefinition> templates,
+        CancellationToken cancellationToken)
+    {
+        var items = new List<LowStockItem>();
+        var belowMinimum = 0;
+        var outOfStock = 0;
+
+        foreach (var template in templates)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var quantityField = template.Fields.FirstOrDefault(IsQuantityField);
+            if (quantityField is null)
+            {
+                continue;
+            }
+
+            var minimumField = template.Fields.FirstOrDefault(IsMinimumField);
+            var nameField = template.Fields.FirstOrDefault(IsNameField);
+            var rows = await _masterData.GetRowsAsync(template.Id, cancellationToken).ConfigureAwait(true);
+
+            foreach (var row in rows)
+            {
+                if (!TryReadNumber(row.Values, quantityField, out var quantityValue))
+                {
+                    continue;
+                }
+
+                var quantity = (int)Math.Round(quantityValue);
+                double minimumValue = 0;
+                var hasMinimum = minimumField is not null
+                    && TryReadNumber(row.Values, minimumField, out minimumValue)
+                    && minimumValue > 0;
+                if (!hasMinimum)
+                {
+                    if (quantity > 0)
+                    {
+                        continue;
+                    }
+
+                    outOfStock++;
+                    items.Add(new LowStockItem(ReadRowName(row, nameField, template.Name), 0, 1));
+                    continue;
+                }
+
+                var minimum = (int)Math.Round(minimumValue);
+                if (quantity >= minimum)
+                {
+                    continue;
+                }
+
+                if (quantity <= 0)
+                {
+                    outOfStock++;
+                }
+                else
+                {
+                    belowMinimum++;
+                }
+
+                items.Add(new LowStockItem(
+                    ReadRowName(row, nameField, template.Name),
+                    Math.Max(0, quantity),
+                    minimum));
+            }
+        }
+
+        return (items, belowMinimum, outOfStock);
+    }
+
+    private static List<string> BuildActivityLines(
+        IReadOnlyList<AuditDoc> audits,
+        int totalParts,
+        int masterDataRows,
+        int linkedCount,
+        string partsSource)
+    {
+        var lines = new List<string>();
+        foreach (var doc in audits.Take(8))
+        {
+            var action = string.IsNullOrWhiteSpace(doc.Action) ? doc.EventType : doc.Action;
+            var details = doc.Details?.Trim();
+            var line = string.IsNullOrWhiteSpace(details) ? action : $"{action}: {details}";
+            if (!string.IsNullOrWhiteSpace(line))
+            {
+                lines.Add(line.Trim());
+            }
+        }
+
+        if (lines.Count == 0)
+        {
+            if (totalParts > 0)
+            {
+                lines.Add($"{totalParts} parts tracked in {partsSource}");
+            }
+
+            if (masterDataRows > 0)
+            {
+                lines.Add($"{masterDataRows} master data rows");
+            }
+
+            if (linkedCount > 0)
+            {
+                lines.Add($"{linkedCount} linked template relations");
+            }
+        }
+
+        if (lines.Count == 0)
+        {
+            lines.Add("No recent activity");
+        }
+
+        return lines;
+    }
+
+    private static (double Rate, bool HasHistory) ComputeImportSuccess(IReadOnlyList<AuditDoc> audits)
+    {
+        var imports = audits.Where(doc =>
+            ContainsText(doc, "import")).ToList();
+        if (imports.Count == 0)
+        {
+            return (0, false);
+        }
+
+        var failed = imports.Count(doc => ContainsText(doc, "fail") || ContainsText(doc, "error"));
+        var rate = 100.0 * (imports.Count - failed) / imports.Count;
+        return (rate, true);
+    }
+
+    private static bool ContainsText(AuditDoc doc, string term)
+    {
+        var text = $"{doc.EventType} {doc.Action} {doc.Details}";
+        return text.Contains(term, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static IReadOnlyList<DashboardTrendPointDto> BuildInventoryTrend(IReadOnlyList<InventoryDoc> inventory)
+    {
+        if (inventory.Count == 0)
+        {
+            return [];
+        }
+
+        var now = DateTime.UtcNow;
+        var start = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(-5);
+        var buckets = new int[6];
+        foreach (var doc in inventory)
+        {
+            var stamp = doc.LastUpdated == default ? now : doc.LastUpdated.ToUniversalTime();
+            var index = ((stamp.Year - start.Year) * 12) + stamp.Month - start.Month;
+            if (index is >= 0 and < 6)
+            {
+                buckets[index]++;
+            }
+        }
+
+        if (buckets.Sum() == 0)
+        {
+            buckets[5] = inventory.Count;
+        }
+
+        return Enumerable.Range(0, 6)
+            .Select(index => new DashboardTrendPointDto
+            {
+                Label = start.AddMonths(index).ToString("MMM", CultureInfo.InvariantCulture),
+                Value = buckets[index],
+            })
+            .ToList();
+    }
+
+    private static bool IsPartsTemplate(PartTemplateDefinition template) =>
+        MongoSharedPartsCatalog.IsCatalogTemplateName(template.Name)
+        || template.Name.Contains("part", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsQuantityField(TemplateFieldDefinition field) =>
+        MatchesField(field, QuantityFieldKeys);
+
+    private static bool IsMinimumField(TemplateFieldDefinition field) =>
+        MatchesField(field, MinimumFieldKeys);
+
+    private static bool IsNameField(TemplateFieldDefinition field) =>
+        MatchesField(field, NameFieldKeys);
+
+    private static readonly string[] QuantityFieldKeys =
+        ["quantity", "qty", "stock", "stocklevel", "onhand", "onhandqty", "availableqty"];
+
+    private static readonly string[] MinimumFieldKeys =
+        ["minstock", "minimumstock", "reorderlevel", "reorderqty", "threshold", "minqty", "minimumqty", "safetystock"];
+
+    private static readonly string[] NameFieldKeys =
+        ["partname", "itemname", "name", "description", "title"];
+
+    private static bool MatchesField(TemplateFieldDefinition field, string[] keys)
+    {
+        var key = NormalizeFieldName(field.Key);
+        var label = NormalizeFieldName(field.Label);
+        return keys.Contains(key) || keys.Contains(label);
+    }
+
+    private static string NormalizeFieldName(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return new string(value.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+    }
+
+    private static bool TryReadNumber(
+        IReadOnlyDictionary<string, string> values,
+        TemplateFieldDefinition field,
+        out double number)
+    {
+        number = 0;
+        if (!values.TryGetValue(field.Key, out var raw) || string.IsNullOrWhiteSpace(raw))
+        {
+            return false;
+        }
+
+        var cleaned = raw.Trim().Replace(",", string.Empty, StringComparison.Ordinal);
+        return double.TryParse(cleaned, NumberStyles.Float, CultureInfo.InvariantCulture, out number)
+            || double.TryParse(cleaned, NumberStyles.Float, CultureInfo.CurrentCulture, out number);
+    }
+
+    private static string ReadRowName(
+        MasterDataRowRecord row,
+        TemplateFieldDefinition? nameField,
+        string fallback)
+    {
+        if (nameField is not null
+            && row.Values.TryGetValue(nameField.Key, out var name)
+            && !string.IsNullOrWhiteSpace(name))
+        {
+            return name.Trim();
+        }
+
+        return string.IsNullOrWhiteSpace(fallback) ? "Unnamed part" : fallback.Trim();
+    }
+
+    private sealed class WorkspaceDashboardStats
+    {
+        public int TotalParts { get; init; }
+        public int LowStock { get; init; }
+        public int BelowMinimum { get; init; }
+        public int OutOfStock { get; init; }
+        public int ActiveTemplates { get; init; }
+        public int LinkedTemplateCount { get; init; }
+        public int MasterDataRows { get; init; }
+        public double ImportSuccessRate { get; init; }
+        public bool HasImportHistory { get; init; }
+        public string PartsSource { get; init; } = "inventory";
+        public List<string> RecentActivity { get; init; } = [];
+        public List<LowStockItem> LowStockItems { get; init; } = [];
+        public IReadOnlyList<DashboardTrendPointDto> Trend { get; init; } = [];
     }
 
     private void RefreshChartAppearance()

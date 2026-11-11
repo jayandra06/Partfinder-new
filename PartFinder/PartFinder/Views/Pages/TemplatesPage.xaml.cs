@@ -39,6 +39,8 @@ public sealed partial class TemplatesPage : Page
         DataContext = App.Services.GetRequiredService<TemplatesViewModel>();
         Loaded += OnLoaded;
         DataContextChanged += OnDataContextChanged;
+        AllTemplatesCarouselControl.TemplateDoubleTapped += OnTemplateDoubleTapped;
+        TemplateComposerControl.Closed += OnTemplateComposerClosed;
 
         // Ensure drag-pan still works when child controls mark events handled.
         TemplateCanvasScrollViewer.AddHandler(
@@ -124,16 +126,83 @@ public sealed partial class TemplatesPage : Page
         });
     }
 
-    private void OnCreateNewTemplateClick(object sender, RoutedEventArgs e)
+    private async void OnCreateNewTemplateClick(object sender, RoutedEventArgs e)
     {
-        if (DataContext is not TemplatesViewModel vm) return;
-        HideTemplateBrowsingPanels();
-        vm.StartNewCustomTemplateCommand.Execute(null);
-        vm.ColumnLabels.Clear();
-        vm.ColumnLabels.Add(new ColumnLabelDraft());
-        RefreshAllCanvasCellBorders();
-        CenterCanvasContent();
-        RefreshCanvasUiState(vm);
+        if (DataContext is not TemplatesViewModel vm || XamlRoot is null)
+        {
+            return;
+        }
+
+        CloseTemplateComposer();
+        var nameBox = new TextBox { PlaceholderText = "Template name" };
+        var dialog = new ContentDialog
+        {
+            Title = "Create template",
+            Content = nameBox,
+            PrimaryButtonText = "Create",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = XamlRoot,
+        };
+
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+        {
+            return;
+        }
+
+        var error = await vm.CreateDefaultTableTemplateAsync(nameBox.Text);
+        if (error is null)
+        {
+            if (!string.IsNullOrWhiteSpace(vm.LastCreatedTemplateId))
+            {
+                await ShowTemplateComposerAsync(vm.LastCreatedTemplateId, isCreating: true);
+            }
+
+            return;
+        }
+
+        var errorDialog = new ContentDialog
+        {
+            Title = "Could not create template",
+            Content = error,
+            CloseButtonText = "OK",
+            XamlRoot = XamlRoot,
+        };
+        await errorDialog.ShowAsync();
+    }
+
+    private async void OnTemplateDoubleTapped(object? sender, string templateId) =>
+        await ShowTemplateComposerAsync(templateId, isCreating: false);
+
+    private async Task ShowTemplateComposerAsync(string templateId, bool isCreating)
+    {
+        TemplatesBrowseHeader.Visibility = Visibility.Collapsed;
+        AllTemplatesCarouselControl.Visibility = Visibility.Collapsed;
+        EmptyTemplatesHint.Visibility = Visibility.Collapsed;
+        TemplateComposerControl.Visibility = Visibility.Visible;
+        await TemplateComposerControl.OpenAsync(templateId, isCreating);
+    }
+
+    private void OnTemplateComposerClosed(object? sender, EventArgs e)
+    {
+        CloseTemplateComposer();
+        if (DataContext is TemplatesViewModel vm)
+        {
+            _ = ReloadTemplatesAfterComposerAsync(vm);
+        }
+    }
+
+    private void CloseTemplateComposer()
+    {
+        TemplateComposerControl.Visibility = Visibility.Collapsed;
+        TemplatesBrowseHeader.Visibility = Visibility.Visible;
+        RefreshTemplatesListSource();
+    }
+
+    private async Task ReloadTemplatesAfterComposerAsync(TemplatesViewModel vm)
+    {
+        await vm.LoadAsync();
+        RefreshTemplatesListSource();
     }
 
     private async void OnBulkUploadClick(object sender, RoutedEventArgs e)
@@ -333,6 +402,11 @@ public sealed partial class TemplatesPage : Page
 
     private void RefreshTemplatesListSource()
     {
+        if (TemplateComposerControl.Visibility == Visibility.Visible)
+        {
+            return;
+        }
+
         if (DataContext is not TemplatesViewModel vm)
         {
             return;

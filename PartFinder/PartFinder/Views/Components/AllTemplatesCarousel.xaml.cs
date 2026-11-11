@@ -46,10 +46,39 @@ public sealed partial class AllTemplatesCarousel : UserControl
         Color.FromArgb(255, 244, 114, 182),
     };
 
+    public event EventHandler<string>? TemplateDoubleTapped;
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _cardFocusTimer;
+    private int _pendingCardIndex = -1;
+
     public AllTemplatesCarousel()
     {
         InitializeComponent();
         _records = App.Services.GetRequiredService<IMasterDataRecordsService>();
+    }
+
+    private void QueueCardFocus(int index)
+    {
+        _pendingCardIndex = index;
+        var queue = DispatcherQueue;
+        _cardFocusTimer ??= queue.CreateTimer();
+        _cardFocusTimer.Interval = TimeSpan.FromMilliseconds(280);
+        _cardFocusTimer.IsRepeating = false;
+        _cardFocusTimer.Tick -= OnCardFocusTimerTick;
+        _cardFocusTimer.Tick += OnCardFocusTimerTick;
+        _cardFocusTimer.Start();
+    }
+
+    private void OnCardFocusTimerTick(Microsoft.UI.Dispatching.DispatcherQueueTimer sender, object args)
+    {
+        if (_pendingCardIndex < 0 || _pendingCardIndex == _activeIndex)
+        {
+            return;
+        }
+
+        _activeIndex = _pendingCardIndex;
+        _pendingCardIndex = -1;
+        UpdateLayout(animate: true);
+        UpdateNav();
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
@@ -377,7 +406,7 @@ public sealed partial class AllTemplatesCarousel : UserControl
                     finalX = centerX + baseCenterWidth - (cardW * 0.68) + (stepOffset - (baseCenterWidth * 0.32));
                 }
 
-                opacity = Math.Max(0.45, 1.0 - (absDist * 0.15));
+                opacity = 1.0;
                 zIndex = 100 - (absDist * 10);
                 card.BorderBrush = new SolidColorBrush(Color.FromArgb((byte)(160 - absDist * 25), 42, 61, 88));
             }
@@ -532,7 +561,7 @@ public sealed partial class AllTemplatesCarousel : UserControl
         {
             Width = 300, Height = 400,
             CornerRadius    = new CornerRadius(24),
-            Background      = new SolidColorBrush(Color.FromArgb(224, 20, 29, 42)),
+            Background      = new SolidColorBrush(Color.FromArgb(255, 20, 29, 42)),
             BorderBrush     = new SolidColorBrush(Color.FromArgb(156, 104, 132, 168)),
             BorderThickness = new Thickness(1.5),
             Padding         = new Thickness(0),
@@ -540,24 +569,20 @@ public sealed partial class AllTemplatesCarousel : UserControl
         };
         card.Shadow = new ThemeShadow();
         card.Tag    = index;
-        card.Tapped += (s, _) =>
-        {
-            if (s is Border b && b.Tag is int idx)
+            card.Tapped += (s, _) =>
             {
-                if (idx == _activeIndex)
+                if (s is Border b && b.Tag is int idx && idx != _activeIndex)
                 {
-                    // Tapping the already-active centre card navigates into it
-                    App.Services.GetRequiredService<INavigationService>()
-                       .Navigate(AppPage.TemplateData, template.Id);
+                    QueueCardFocus(idx);
                 }
-                else
-                {
-                    _activeIndex = idx;
-                    UpdateLayout(animate: true);
-                    UpdateNav();
-                }
-            }
-        };
+            };
+            card.DoubleTapped += (_, args) =>
+            {
+                args.Handled = true;
+                _cardFocusTimer?.Stop();
+                _pendingCardIndex = -1;
+                TemplateDoubleTapped?.Invoke(this, template.Id);
+            };
 
         var mainGrid = new Grid();
         mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });

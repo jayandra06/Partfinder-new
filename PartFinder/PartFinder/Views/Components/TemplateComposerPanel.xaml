@@ -1,0 +1,189 @@
+<UserControl
+    x:Class="PartFinder.Views.Components.TemplateComposerPanel"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    HorizontalAlignment="Stretch"
+    VerticalAlignment="Stretch"
+    Background="{StaticResource PageBackgroundBrush}">
+    <Grid Padding="0,4,0,8" RowSpacing="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" MinHeight="240" />
+            <RowDefinition Height="220" />
+        </Grid.RowDefinitions>
+
+        <Border
+            Grid.Row="0"
+            Background="{StaticResource ElevatedCardBackgroundBrush}"
+            BorderBrush="{StaticResource GlassStrokeBrush}"
+            BorderThickness="1"
+            CornerRadius="14"
+            Padding="12,10">
+            <Grid VerticalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <Button
+                        Style="{StaticResource GhostButtonStyle}"
+                        Height="36"
+                        Padding="12,0"
+                        VerticalAlignment="Center"
+                        Click="OnBackClick"
+                        Content="Back" />
+                    <TextBlock
+                        x:Name="TitleText"
+                        FontSize="18"
+                        FontWeight="SemiBold"
+                        VerticalAlignment="Center"
+                        TextTrimming="CharacterEllipsis"
+                        MaxWidth="360" />
+                </StackPanel>
+
+                <StackPanel
+                    Grid.Column="2"
+                    Orientation="Horizontal"
+                    Spacing="8"
+                    VerticalAlignment="Center">
+                    <Button
+                        x:Name="CancelCreationButton"
+                        Style="{StaticResource OutlinedButtonStyle}"
+                        Height="36"
+                        MinWidth="0"
+                        Padding="12,0"
+                        VerticalAlignment="Center"
+                        Visibility="Collapsed"
+                        Click="OnCancelCreationClick"
+                        Content="Cancel creation" />
+                    <Border
+                        Width="1"
+                        Height="24"
+                        Margin="4,0"
+                        VerticalAlignment="Center"
+                        Background="{StaticResource BorderDefaultBrush}" />
+                    <TextBlock
+                        Text="Rows"
+                        VerticalAlignment="Center"
+                        Foreground="{StaticResource TextSecondaryBrush}" />
+                    <TextBox
+                        x:Name="RowCountBox"
+                        Width="64"
+                        Height="36"
+                        VerticalAlignment="Center"
+                        TextAlignment="Center" />
+                    <TextBlock
+                        Text="Columns"
+                        VerticalAlignment="Center"
+                        Foreground="{StaticResource TextSecondaryBrush}" />
+                    <TextBox
+                        x:Name="ColumnCountBox"
+                        Width="64"
+                        Height="36"
+                        VerticalAlignment="Center"
+                        TextAlignment="Center" />
+                    <Button
+                        Style="{StaticResource OutlinedButtonStyle}"
+                        Height="36"
+                        MinWidth="0"
+                        Padding="12,0"
+                        VerticalAlignment="Center"
+                        Click="OnApplySizeClick"
+                        Content="Apply size" />
+                    <Button
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        Height="36"
+                        MinWidth="0"
+                        Padding="14,0"
+                        VerticalAlignment="Center"
+                        Click="OnSaveClick"
+                        Content="Save" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <TextBlock
+            x:Name="StatusText"
+            Grid.Row="1"
+            Margin="4,0,4,0"
+            FontSize="12"
+            TextWrapping="WrapWholeWords"
+            Foreground="{StaticResource TextSecondaryBrush}"
+            Text="Select a column in this template, then choose a master data column below. Its values are copied in, and that master data column cannot be chosen again. Copy a new column duplicates a template column." />
+
+        <Border
+            Grid.Row="2"
+            Background="{StaticResource ElevatedCardBackgroundBrush}"
+            BorderBrush="{StaticResource GlassStrokeBrush}"
+            BorderThickness="1"
+            CornerRadius="14"
+            Padding="8">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <ScrollViewer
+                    x:Name="HeaderScroll"
+                    Grid.Row="0"
+                    HorizontalScrollBarVisibility="Hidden"
+                    HorizontalScrollMode="Enabled"
+                    VerticalScrollBarVisibility="Disabled"
+                    VerticalScrollMode="Disabled"
+                    IsTabStop="False" />
+                <ScrollViewer
+                    x:Name="TemplateScroll"
+                    Grid.Row="1"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch"
+                    HorizontalScrollBarVisibility="Auto"
+                    VerticalScrollBarVisibility="Auto"
+                    HorizontalScrollMode="Auto"
+                    VerticalScrollMode="Auto"
+                    IsTabStop="False"
+                    ViewChanged="OnTemplateViewChanged"
+                    SizeChanged="OnTemplateScrollSizeChanged" />
+            </Grid>
+        </Border>
+
+        <Border
+            Grid.Row="3"
+            Background="{StaticResource ElevatedCardBackgroundBrush}"
+            BorderBrush="{StaticResource GlassStrokeBrush}"
+            BorderThickness="1"
+            CornerRadius="14"
+            Padding="12,10">
+            <Grid RowSpacing="8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <TextBlock
+                    Grid.Row="0"
+                    Text="Master data columns"
+                    FontSize="14"
+                    FontWeight="SemiBold"
+                    VerticalAlignment="Center" />
+                <AutoSuggestBox
+                    x:Name="MasterDataSearchBox"
+                    Grid.Row="1"
+                    PlaceholderText="Search master data catalogs and columns…"
+                    QueryIcon="Find"
+                    TextChanged="OnMasterDataSearchTextChanged" />
+                <ScrollViewer
+                    x:Name="SourcesScroll"
+                    Grid.Row="2"
+                    HorizontalAlignment="Stretch"
+                    VerticalScrollBarVisibility="Auto"
+                    HorizontalScrollBarVisibility="Disabled"
+                    VerticalScrollMode="Auto"
+                    HorizontalScrollMode="Disabled"
+                    IsTabStop="False" />
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

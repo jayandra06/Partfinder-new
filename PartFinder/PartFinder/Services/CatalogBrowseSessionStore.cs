@@ -8,6 +8,7 @@ namespace PartFinder.Services;
 public sealed class CatalogBrowseSessionStore
 {
     private readonly Dictionary<string, MasterDataSheetCacheEntry> _sheetCache = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, CatalogGridBrowseState> _templateBrowse = new(StringComparer.Ordinal);
 
     public CatalogGridBrowseState MasterDataGrid { get; } = new();
     public CatalogGridBrowseState LinkedTemplatesGrid { get; } = new();
@@ -20,6 +21,20 @@ public sealed class CatalogBrowseSessionStore
         LinkedTemplatesGrid.Reset();
         LinkedTemplatesBrowseTemplateId = null;
         _sheetCache.Clear();
+        _templateBrowse.Clear();
+    }
+
+    /// <summary>Row, column, and page position for one catalog table until logout.</summary>
+    public CatalogGridBrowseState GetTemplateBrowseState(MasterDataSurfaceMode mode, string templateId)
+    {
+        var key = $"{(int)mode}:{templateId}";
+        if (!_templateBrowse.TryGetValue(key, out var state))
+        {
+            state = new CatalogGridBrowseState { TemplateId = templateId };
+            _templateBrowse[key] = state;
+        }
+
+        return state;
     }
 
     private static string SheetCacheKey(MasterDataSurfaceMode mode, string templateId) =>

@@ -2,6 +2,7 @@
     x:Class="PartFinder.Views.Pages.LinkedTemplatesPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:components="using:PartFinder.Views.Components"
     xmlns:converters="using:PartFinder.Converters"
     xmlns:models="using:PartFinder.Models">
 
@@ -132,7 +133,12 @@
                 Background="Transparent" />
 
             <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                <ProgressRing Width="16" Height="16" IsActive="{Binding IsLoading}" Foreground="{StaticResource AccentPrimaryBrush}" />
+                <components:LoadingSkeleton
+                    Kind="Inline"
+                    Width="140"
+                    Height="14"
+                    VerticalAlignment="Center"
+                    Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}" />
                 <TextBlock
                     Text="{Binding ErrorMessage}"
                     FontSize="12"
