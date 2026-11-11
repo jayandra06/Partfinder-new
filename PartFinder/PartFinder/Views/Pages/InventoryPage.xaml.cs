@@ -40,6 +40,10 @@ public sealed partial class InventoryPage : Page
 
     private async void OnPageLoaded(object sender, RoutedEventArgs e)
     {
+        var access = App.Services.GetRequiredService<ICurrentUserAccessService>();
+        await access.RefreshAsync().ConfigureAwait(true);
+        ViewModel.RefreshRoleChrome();
+
         if (ViewModel.FormMode == InventoryFormMode.None)
         {
             await ViewModel.LoadInventoryAsync();
@@ -48,12 +52,22 @@ public sealed partial class InventoryPage : Page
 
     private void OnAddStockClick(object sender, RoutedEventArgs e)
     {
+        if (!ViewModel.ShowInventoryAdminChrome)
+        {
+            return;
+        }
+
         ItemFormPanel.PrepareForAdd();
         ViewModel.BeginAddForm();
     }
 
     private void OnEditInventoryClick(object sender, RoutedEventArgs e)
     {
+        if (!ViewModel.ShowInventoryAdminChrome)
+        {
+            return;
+        }
+
         if (sender is not Button btn)
         {
             return;
@@ -76,6 +90,11 @@ public sealed partial class InventoryPage : Page
 
     private async void OnSaveFormClick(object sender, RoutedEventArgs e)
     {
+        if (!ViewModel.ShowInventoryAdminChrome)
+        {
+            return;
+        }
+
         ViewModel.FormStatusMessage = string.Empty;
 
         if (ViewModel.FormMode == InventoryFormMode.Add)

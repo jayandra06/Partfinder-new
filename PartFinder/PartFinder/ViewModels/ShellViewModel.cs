@@ -20,6 +20,7 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
     private readonly MongoAlertsService _alertsService;
     private readonly IThemeService _themeService;
     private readonly DashboardViewModel _dashboard;
+    private readonly CatalogBrowseSessionStore _catalogSession;
 
     private bool _suppressNavigation;
     private AppPage _lastSelectedPage = AppPage.Dashboard;

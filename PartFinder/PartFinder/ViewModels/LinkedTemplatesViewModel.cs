@@ -12,17 +12,20 @@ public partial class LinkedTemplatesViewModel : ViewModelBase
     private readonly BackendApiClient _api;
     private readonly ICurrentUserAccessService _access;
     private readonly IMasterDataRecordsService _records;
+    private readonly CatalogBrowseSessionStore _catalogSession;
 
     public LinkedTemplatesViewModel(
         ITemplateSchemaService templates,
         BackendApiClient api,
         ICurrentUserAccessService access,
-        IMasterDataRecordsService records)
+        IMasterDataRecordsService records,
+        CatalogBrowseSessionStore catalogSession)
     {
         _templates = templates;
         _api = api;
         _access = access;
         _records = records;
+        _catalogSession = catalogSession;
     }
 
     public ObservableCollection<PartTemplateDefinition> Templates { get; } = [];
@@ -84,14 +87,25 @@ public partial class LinkedTemplatesViewModel : ViewModelBase
         {
             var list = await _templates.GetTemplatesAsync(ct).ConfigureAwait(true);
             var filtered = _access.FilterTemplatesForParts(list);
+            var ordered = CatalogBrowseSessionStore.OrderForCatalogSidebar(filtered);
             Templates.Clear();
-            foreach (var item in filtered)
+            foreach (var item in ordered)
             {
                 Templates.Add(item);
             }
 
             await LoadAllRelationsAsync(ct).ConfigureAwait(true);
-            BrowseSourceTemplate ??= Templates.FirstOrDefault();
+
+            var savedId = _catalogSession.LinkedTemplatesBrowseTemplateId
+                            ?? _catalogSession.LinkedTemplatesGrid.TemplateId;
+            var pick = CatalogBrowseSessionStore.ResolveInitialTemplate(ordered, savedId);
+            if (pick is not null)
+            {
+                BrowseSourceTemplate = pick;
+                _catalogSession.LinkedTemplatesBrowseTemplateId = pick.Id;
+                _catalogSession.LinkedTemplatesGrid.TemplateId = pick.Id;
+            }
+
             RefreshLinkedTemplatesForBrowse();
         }
         catch (Exception ex)
@@ -106,6 +120,12 @@ public partial class LinkedTemplatesViewModel : ViewModelBase
 
     partial void OnBrowseSourceTemplateChanged(PartTemplateDefinition? value)
     {
+        if (value is not null)
+        {
+            _catalogSession.LinkedTemplatesBrowseTemplateId = value.Id;
+            _catalogSession.LinkedTemplatesGrid.TemplateId = value.Id;
+        }
+
         RefreshLinkedTemplatesForBrowse();
     }
 

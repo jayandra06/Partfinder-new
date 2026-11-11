@@ -24,7 +24,7 @@
                     <StackPanel Spacing="2">
                         <TextBlock Text="AUDIT" FontSize="10" Foreground="{StaticResource AccentPrimaryBrush}" CharacterSpacing="100" FontWeight="SemiBold" />
                         <TextBlock Text="Audit &amp; History" FontSize="32" FontWeight="Light" CharacterSpacing="20" />
-                        <TextBlock Text="Complete audit trail of all inventory changes, user actions, and system events for compliance and traceability." FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
+                        <TextBlock Text="{x:Bind ViewModel.PageDescription, Mode=OneWay}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="WrapWholeWords" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                         <Button Style="{StaticResource GhostButtonStyle}" FontSize="12" Click="OnDeleteAllClick">

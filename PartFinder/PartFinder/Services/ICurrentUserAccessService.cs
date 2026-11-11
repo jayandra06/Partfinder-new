@@ -10,4 +10,8 @@ public interface ICurrentUserAccessService
     /// <summary>Filters templates for the Parts page (Master Data template excluded for employees).</summary>
     IReadOnlyList<Models.PartTemplateDefinition> FilterTemplatesForParts(
         IReadOnlyList<Models.PartTemplateDefinition> templates);
+
+    string? GetCurrentUserEmail();
+
+    bool CanViewAllAuditHistory { get; }
 }

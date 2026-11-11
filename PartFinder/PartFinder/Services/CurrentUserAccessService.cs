@@ -25,6 +25,10 @@ public sealed class CurrentUserAccessService : ICurrentUserAccessService
 
     public UserAccessCapabilities Capabilities => _capabilities;
 
+    public bool CanViewAllAuditHistory => _capabilities.CanManageInventory;
+
+    public string? GetCurrentUserEmail() => ResolveCurrentEmail();
+
     public async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
         try
@@ -73,6 +77,9 @@ public sealed class CurrentUserAccessService : ICurrentUserAccessService
 
                     PartsAllTemplates = true,
                     AllowedTemplateIds = Array.Empty<string>(),
+
+                    CanViewInventory = true,
+                    CanManageInventory = true,
                 };
                 return;
             }
@@ -105,6 +112,9 @@ public sealed class CurrentUserAccessService : ICurrentUserAccessService
 
                     PartsAllTemplates = record.PartsAllTemplates,
                     AllowedTemplateIds = record.AllowedTemplateIds,
+
+                    CanViewInventory = true,
+                    CanManageInventory = false,
                 };
                 return;
             }

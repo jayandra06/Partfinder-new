@@ -95,6 +95,7 @@ namespace PartFinder
             services.AddSingleton<MongoAlertsService>();
             services.AddSingleton<MongoSessionService>();
             services.AddSingleton<ActivityLogger>();
+            services.AddSingleton<CatalogBrowseSessionStore>();
 
             services.AddSingleton<ShellViewModel>();
             services.AddSingleton<IShellNavCoordinator>(sp => sp.GetRequiredService<ShellViewModel>());

@@ -9,6 +9,20 @@
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
         <converters:StringToVisibilityConverter x:Key="StringToVisibilityConverter" />
 
+        <Style x:Key="LinkedTemplatesPageTitleStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="24" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        </Style>
+        <Style x:Key="CatalogNavListViewItemStyle" TargetType="ListViewItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,2" />
+            <Setter Property="MinHeight" Value="42" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+
         <Storyboard x:Name="PageEntranceStoryboard">
             <DoubleAnimation
                 Storyboard.TargetName="PageRoot"
@@ -28,68 +42,110 @@
     <Grid
         x:Name="PageRoot"
         Opacity="0"
-        Padding="24"
-        RowSpacing="14"
+        Padding="20"
         Background="Transparent"
         Transitions="{StaticResource LuxuryPanelTransitions}">
         <Grid.RenderTransform>
             <TranslateTransform x:Name="PageSlideTransform" Y="14" />
         </Grid.RenderTransform>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" MinHeight="360" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
-
-        <StackPanel Spacing="4">
-            <TextBlock
-                Text="LINKED TEMPLATES"
-                FontSize="10"
-                Foreground="{StaticResource AccentPrimaryBrush}"
-                CharacterSpacing="120"
-                FontWeight="SemiBold" />
-            <TextBlock
-                Text="Browse &amp; link"
-                FontSize="22"
-                FontWeight="SemiBold"
-                Foreground="{StaticResource TextPrimaryBrush}" />
-            <TextBlock
-                Text="Select a template, then click a linked value. In Linked data, choose columns and click View to open them beside this table."
-                FontSize="12"
-                Foreground="{StaticResource TextSecondaryBrush}"
-                TextWrapping="WrapWholeWords"
-                MaxWidth="920" />
-        </StackPanel>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition x:Name="CatalogNavColumn" Width="0" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
 
         <Border
-            Grid.Row="1"
-            Padding="10,8"
-            HorizontalAlignment="Left"
-            Background="{StaticResource ElevatedCardBackgroundBrush}"
-            BorderBrush="{StaticResource GlassStrokeBrush}"
+            x:Name="CatalogSidebar"
+            Grid.Column="0"
+            MinWidth="200"
+            MaxWidth="260"
+            Margin="0,0,16,0"
+            Padding="12,16"
+            Background="{StaticResource ShellSidebarBrush}"
+            BorderBrush="{StaticResource BorderDefaultBrush}"
             BorderThickness="1"
-            CornerRadius="16">
-            <ComboBox
-                x:Name="TemplatePicker"
-                MinWidth="280"
-                FontSize="12"
-                DisplayMemberPath="Name"
-                ItemsSource="{Binding Templates}"
-                PlaceholderText="Choose template…"
-                SelectedItem="{Binding BrowseSourceTemplate, Mode=TwoWay}" />
+            CornerRadius="12"
+            Visibility="Collapsed">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Spacing="6">
+                    <TextBlock
+                        Text="CATALOG"
+                        FontSize="10"
+                        FontWeight="Bold"
+                        CharacterSpacing="80"
+                        Foreground="{StaticResource TextTertiaryBrush}"
+                        Margin="4,0,0,8" />
+                    <ListView
+                        x:Name="CatalogListView"
+                        SelectionMode="Single"
+                        IsItemClickEnabled="True"
+                        ItemsSource="{Binding Templates}"
+                        SelectedItem="{Binding BrowseSourceTemplate, Mode=TwoWay}"
+                        ItemContainerStyle="{StaticResource CatalogNavListViewItemStyle}">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="models:PartTemplateDefinition">
+                                <TextBlock
+                                    Text="{x:Bind Name}"
+                                    FontSize="13"
+                                    FontWeight="SemiBold"
+                                    Foreground="{StaticResource TextSecondaryBrush}"
+                                    TextWrapping="WrapWholeWords" />
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </StackPanel>
+            </ScrollViewer>
         </Border>
 
-        <Frame
-            x:Name="BrowseDataFrame"
-            Grid.Row="2"
-            HorizontalAlignment="Stretch"
-            VerticalAlignment="Stretch"
-            Background="Transparent" />
+        <Grid x:Name="MainContentPane" Grid.Column="1" RowSpacing="12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" MinHeight="360" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-            <ProgressRing Width="16" Height="16" IsActive="{Binding IsLoading}" Foreground="{StaticResource AccentPrimaryBrush}" />
-            <TextBlock Text="{Binding ErrorMessage}" FontSize="12" Foreground="{StaticResource DangerBrush}" TextWrapping="WrapWholeWords" />
-        </StackPanel>
+            <StackPanel Spacing="6" Margin="0,0,0,4">
+                <TextBlock Text="Linked Templates" Style="{StaticResource LinkedTemplatesPageTitleStyle}" />
+                <TextBlock
+                    Text="Browse &amp; link"
+                    FontSize="14"
+                    FontWeight="SemiBold"
+                    Foreground="{StaticResource TextSecondaryBrush}" />
+                <TextBlock
+                    Text="{Binding BrowseSourceTemplateName}"
+                    FontSize="12"
+                    Foreground="{StaticResource TextTertiaryBrush}"
+                    TextTrimming="CharacterEllipsis"
+                    Visibility="{Binding HasBrowseSourceTemplate, Converter={StaticResource BoolToVisibilityConverter}}" />
+                <TextBlock
+                    Text="Select a catalog from the sidebar, then click a linked value. In Linked data, choose columns and click View to open them beside this table."
+                    FontSize="12"
+                    Foreground="{StaticResource TextSecondaryBrush}"
+                    TextWrapping="WrapWholeWords"
+                    MaxWidth="920" />
+            </StackPanel>
+
+            <Frame
+                x:Name="BrowseDataFrame"
+                Grid.Row="1"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"
+                Background="Transparent" />
+
+            <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <ProgressRing Width="16" Height="16" IsActive="{Binding IsLoading}" Foreground="{StaticResource AccentPrimaryBrush}" />
+                <TextBlock
+                    Text="{Binding ErrorMessage}"
+                    FontSize="12"
+                    Foreground="{StaticResource DangerBrush}"
+                    TextWrapping="WrapWholeWords"
+                    Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisibilityConverter}}" />
+                <TextBlock
+                    Text="{Binding StatusMessage}"
+                    FontSize="12"
+                    Foreground="{StaticResource TextSecondaryBrush}"
+                    TextWrapping="WrapWholeWords"
+                    Visibility="{Binding StatusMessage, Converter={StaticResource StringToVisibilityConverter}}" />
+            </StackPanel>
+        </Grid>
     </Grid>
 </Page>
