@@ -23,9 +23,71 @@
             <Setter Property="BorderBrush" Value="{StaticResource SuccessBrush}" />
             <Setter Property="BorderThickness" Value="1" />
         </Style>
+        <Style x:Key="MasterDataPageTitleStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="24" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        </Style>
+        <Style x:Key="CatalogNavListViewItemStyle" TargetType="ListViewItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,2" />
+            <Setter Property="MinHeight" Value="42" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
     </Page.Resources>
 
     <Grid x:Name="RootGrid" Padding="20" Background="Transparent" Transitions="{StaticResource LuxuryPanelTransitions}">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition x:Name="CatalogNavColumn" Width="0" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <Border
+            x:Name="CatalogSidebar"
+            Grid.Column="0"
+            MinWidth="200"
+            MaxWidth="260"
+            Margin="0,0,16,0"
+            Padding="12,16"
+            Background="{StaticResource ShellSidebarBrush}"
+            BorderBrush="{StaticResource BorderDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="12"
+            Visibility="Collapsed">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Spacing="6">
+                    <TextBlock
+                        Text="CATALOG"
+                        FontSize="10"
+                        FontWeight="Bold"
+                        CharacterSpacing="80"
+                        Foreground="{StaticResource TextTertiaryBrush}"
+                        Margin="4,0,0,8" />
+                    <ListView
+                        x:Name="CatalogListView"
+                        SelectionMode="Single"
+                        IsItemClickEnabled="True"
+                        ItemsSource="{Binding DataTemplates}"
+                        SelectedItem="{Binding SelectedDataTemplate, Mode=TwoWay}"
+                        ItemContainerStyle="{StaticResource CatalogNavListViewItemStyle}">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock
+                                    Text="{Binding Name}"
+                                    FontSize="13"
+                                    FontWeight="SemiBold"
+                                    Foreground="{StaticResource TextSecondaryBrush}"
+                                    TextWrapping="WrapWholeWords" />
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <Grid x:Name="MainContentPane" Grid.Column="1">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -48,34 +110,24 @@
             </StackPanel>
         </Button>
 
-        <Grid Grid.Row="1" Margin="0,0,0,8">
+        <Grid Grid.Row="1" Margin="0,0,0,12">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <Border
-                Grid.Column="0"
-                HorizontalAlignment="Left"
-                Padding="10,8"
-                Background="{StaticResource ElevatedCardBackgroundBrush}"
-                BorderBrush="{StaticResource GlassStrokeBrush}"
-                BorderThickness="1"
-                CornerRadius="16"
-                Visibility="{Binding ShowTemplatePickerInChrome, Converter={StaticResource BoolToVisibilityConverter}}">
-                <ComboBox
-                    MinWidth="260"
-                    HorizontalAlignment="Left"
+            <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                <TextBlock Text="Master Data" Style="{StaticResource MasterDataPageTitleStyle}" />
+                <TextBlock
+                    Text="{Binding SelectedDataTemplate.Name}"
                     FontSize="12"
-                    DisplayMemberPath="Name"
-                    ItemsSource="{Binding DataTemplates}"
-                    PlaceholderText="Choose template…"
-                    SelectedItem="{Binding SelectedDataTemplate, Mode=TwoWay}" />
-            </Border>
+                    Foreground="{StaticResource TextTertiaryBrush}"
+                    TextTrimming="CharacterEllipsis"
+                    Visibility="{Binding ShowTemplatePickerInChrome, Converter={StaticResource BoolToVisibilityConverter}}" />
+            </StackPanel>
 
             <StackPanel
-                Grid.Column="2"
+                Grid.Column="1"
                 Orientation="Horizontal"
                 Spacing="8"
                 HorizontalAlignment="Right"
@@ -98,7 +150,7 @@
             </StackPanel>
 
             <StackPanel
-                Grid.Column="2"
+                Grid.Column="1"
                 Orientation="Horizontal"
                 Spacing="8"
                 HorizontalAlignment="Right"
@@ -144,7 +196,7 @@
                 <TextBlock
                     Foreground="{StaticResource TextSecondaryBrush}"
                     FontSize="11"
-                    Text="Choose a template to view its data. This page is read-only."
+                    Text="Select a catalog from the sidebar to view its data. This page is read-only."
                     Visibility="{Binding IsCatalogReadOnly, Converter={StaticResource BoolToVisibilityConverter}}" />
                 <TextBlock
                     Foreground="{StaticResource TextSecondaryBrush}"
@@ -482,6 +534,7 @@
                     Visibility="Collapsed"
                     Fill="{StaticResource AccentPrimaryBrush}" />
             </Canvas>
+        </Grid>
         </Grid>
     </Grid>
 </Page>

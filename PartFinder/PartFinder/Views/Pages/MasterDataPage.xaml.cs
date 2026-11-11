@@ -85,7 +85,20 @@ public sealed partial class MasterDataPage : Page
             ConfigureEmbeddedBrowseChrome();
         }
 
+        UpdateCatalogNavChrome();
         RebuildSpreadsheet();
+    }
+
+    private void UpdateCatalogNavChrome()
+    {
+        if (_viewModel is null)
+        {
+            return;
+        }
+
+        var show = _viewModel.ShowTemplatePickerInChrome;
+        CatalogNavColumn.Width = show ? new GridLength(220) : new GridLength(0);
+        CatalogSidebar.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
     }
 
     protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -141,6 +154,11 @@ public sealed partial class MasterDataPage : Page
 
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(MasterDataViewModel.ShowTemplatePickerInChrome))
+        {
+            UpdateCatalogNavChrome();
+        }
+
         if (e.PropertyName is nameof(MasterDataViewModel.IsEditMode)
             or nameof(MasterDataViewModel.SurfaceMode)
             or nameof(MasterDataViewModel.EnableWorksheetHyperlinks))
@@ -150,6 +168,7 @@ public sealed partial class MasterDataPage : Page
                 NewColumnNameBox.Text = string.Empty;
             }
 
+            UpdateCatalogNavChrome();
             RebuildSpreadsheet();
             return;
         }
