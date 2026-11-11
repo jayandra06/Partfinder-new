@@ -46,6 +46,7 @@ public sealed partial class MasterDataPage : Page
     private Brush? _highlightedCellBackground;
     private Brush? _highlightedCellBorderBrush;
     private readonly HashSet<string> _openColumnSearchKeys = new(StringComparer.OrdinalIgnoreCase);
+    private Thickness _highlightedCellBorderThickness;
 
     public MasterDataPage()
     {
@@ -969,7 +970,7 @@ public sealed partial class MasterDataPage : Page
                         r % 2 == 0 ? "CardBackgroundBrush" : "GridRowAltBackgroundBrush"],
                     BorderBrush = borderBrush,
                     BorderThickness = new Thickness(0, 0, 1, 1),
-                    Tag = rowVm,
+                    Tag = new LinkSourceCellTag(rowVm, cellVm.FieldKey),
                     Visibility = rowVisible ? Visibility.Visible : Visibility.Collapsed,
                     Child = cellContent,
                 };
@@ -1079,7 +1080,6 @@ public sealed partial class MasterDataPage : Page
         if (LinkedViewPanel is { Visibility: Visibility.Visible })
         {
             HighlightLinkAnchor();
-            ScheduleLinkConnectorUpdate();
         }
     }
 
@@ -1650,6 +1650,11 @@ public sealed partial class MasterDataPage : Page
         var selectedKeys = new HashSet<string>(
             MasterDataViewModel.GetDefaultSelectedFieldKeysForBrowse(tab.LookupTemplate, tab.Relation),
             StringComparer.OrdinalIgnoreCase);
+        var lockedFieldKey = GetLockedLookupFieldKeyForActiveLink(tab, allFields);
+        if (!string.IsNullOrWhiteSpace(lockedFieldKey))
+        {
+            selectedKeys.Add(lockedFieldKey);
+        }
 
         var root = new StackPanel { Spacing = 4, Padding = new Thickness(0, 4, 0, 8) };
         root.Children.Add(new TextBlock
@@ -1684,12 +1689,23 @@ public sealed partial class MasterDataPage : Page
         foreach (var field in allFields)
         {
             var capturedField = field;
+            var isLocked =
+                !string.IsNullOrWhiteSpace(lockedFieldKey)
+                && string.Equals(field.Key, lockedFieldKey, StringComparison.OrdinalIgnoreCase);
             var check = new CheckBox
             {
                 Content = field.Label,
                 FontSize = 12,
-                IsChecked = selectedKeys.Contains(field.Key),
+                IsChecked = isLocked || selectedKeys.Contains(field.Key),
+                IsEnabled = !isLocked,
             };
+            if (isLocked)
+            {
+                ToolTipService.SetToolTip(
+                    check,
+                    "This column stays selected because you opened linked data from this field.");
+            }
+
             check.Checked += (_, _) =>
             {
                 selectedKeys.Add(capturedField.Key);
@@ -1697,6 +1713,12 @@ public sealed partial class MasterDataPage : Page
             };
             check.Unchecked += (_, _) =>
             {
+                if (isLocked)
+                {
+                    check.IsChecked = true;
+                    return;
+                }
+
                 selectedKeys.Remove(capturedField.Key);
                 viewButton.IsEnabled = selectedKeys.Count > 0;
             };
@@ -1713,6 +1735,65 @@ public sealed partial class MasterDataPage : Page
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
             Content = root,
         };
+    }
+
+    private string? GetLockedLookupFieldKeyForActiveLink(
+        LinkedDataTabModel tab,
+        IReadOnlyList<TemplateFieldDefinition> lookupFields)
+    {
+        if (_viewModel is null || string.IsNullOrWhiteSpace(_activeLinkFieldKey))
+        {
+            return null;
+        }
+
+        var sourceField = _viewModel.Columns.FirstOrDefault(c =>
+            string.Equals(c.Key, _activeLinkFieldKey, StringComparison.OrdinalIgnoreCase));
+        var sourceLabel = sourceField?.Label.Trim() ?? string.Empty;
+
+        if (tab.Relation is not null && !string.IsNullOrEmpty(sourceLabel))
+        {
+            foreach (var pair in tab.Relation.MatchKeys)
+            {
+                var pairSource = pair.SourceColumn?.Trim() ?? string.Empty;
+                if (!string.Equals(pairSource, sourceLabel, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var targetLabel = string.IsNullOrWhiteSpace(pair.TargetColumn)
+                    ? pairSource
+                    : pair.TargetColumn.Trim();
+                var targetField = lookupFields.FirstOrDefault(f =>
+                    string.Equals(f.Label, targetLabel, StringComparison.OrdinalIgnoreCase));
+                if (targetField is not null)
+                {
+                    return targetField.Key;
+                }
+            }
+
+            if (string.Equals(tab.Relation.TriggerColumn?.Trim(), sourceLabel, StringComparison.OrdinalIgnoreCase))
+            {
+                var triggerField = lookupFields.FirstOrDefault(f =>
+                    string.Equals(f.Label, sourceLabel, StringComparison.OrdinalIgnoreCase));
+                if (triggerField is not null)
+                {
+                    return triggerField.Key;
+                }
+            }
+        }
+
+        if (!string.IsNullOrEmpty(sourceLabel))
+        {
+            var sameLabel = lookupFields.FirstOrDefault(f =>
+                string.Equals(f.Label, sourceLabel, StringComparison.OrdinalIgnoreCase));
+            if (sameLabel is not null)
+            {
+                return sameLabel.Key;
+            }
+        }
+
+        return lookupFields.FirstOrDefault(f =>
+            string.Equals(f.Key, _activeLinkFieldKey, StringComparison.OrdinalIgnoreCase))?.Key;
     }
 
     private void ShowLinkedColumnView(
@@ -1742,13 +1823,13 @@ public sealed partial class MasterDataPage : Page
         LinkedViewColumn.Width = new GridLength(1.2, GridUnitType.Star);
         LinkedViewPanel.Visibility = Visibility.Visible;
         LinkedViewPanel.Opacity = 1;
+        HideConnectorGraphics();
         if (LinkConnectorCanvas is not null)
         {
-            LinkConnectorCanvas.Visibility = Visibility.Visible;
+            LinkConnectorCanvas.Visibility = Visibility.Collapsed;
         }
 
         HighlightLinkAnchor();
-        ScheduleLinkConnectorUpdate();
     }
 
     private static UIElement BuildLinkedResultGrid(
@@ -1897,7 +1978,7 @@ public sealed partial class MasterDataPage : Page
     private void HighlightLinkAnchor()
     {
         ClearLinkHighlight();
-        if (_linkAnchor is null)
+        if (_linkAnchor is null || _activeLinkRow is null || string.IsNullOrWhiteSpace(_activeLinkFieldKey))
         {
             return;
         }
@@ -1905,17 +1986,21 @@ public sealed partial class MasterDataPage : Page
         DependencyObject? node = _linkAnchor;
         while (node is not null)
         {
-            if (node is Border border && border.Tag is MasterDataRowViewModel)
+            if (node is Border border && border.Tag is LinkSourceCellTag tag
+                && ReferenceEquals(tag.Row, _activeLinkRow)
+                && string.Equals(tag.FieldKey, _activeLinkFieldKey, StringComparison.OrdinalIgnoreCase))
             {
                 _highlightedCell = border;
                 _highlightedCellBackground = border.Background;
                 _highlightedCellBorderBrush = border.BorderBrush;
+                _highlightedCellBorderThickness = border.BorderThickness;
                 border.BorderBrush = (Brush)Application.Current.Resources["AccentPrimaryBrush"];
+                border.BorderThickness = new Thickness(2);
                 if (Application.Current.Resources["AccentPrimaryBrush"] is SolidColorBrush accent)
                 {
                     var color = accent.Color;
                     border.Background = new SolidColorBrush(
-                        Microsoft.UI.ColorHelper.FromArgb(0x33, color.R, color.G, color.B));
+                        Microsoft.UI.ColorHelper.FromArgb(0x55, color.R, color.G, color.B));
                 }
 
                 return;
@@ -1934,6 +2019,7 @@ public sealed partial class MasterDataPage : Page
 
         _highlightedCell.Background = _highlightedCellBackground;
         _highlightedCell.BorderBrush = _highlightedCellBorderBrush;
+        _highlightedCell.BorderThickness = _highlightedCellBorderThickness;
         _highlightedCell = null;
         _highlightedCellBackground = null;
         _highlightedCellBorderBrush = null;
@@ -1950,12 +2036,27 @@ public sealed partial class MasterDataPage : Page
         DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
         {
             _connectorUpdateQueued = false;
-            UpdateLinkConnector();
+            HideConnectorGraphics();
+            if (LinkConnectorCanvas is not null)
+            {
+                LinkConnectorCanvas.Visibility = Visibility.Collapsed;
+            }
+
+            HighlightLinkAnchor();
         });
     }
 
     private void UpdateLinkConnector()
     {
+        HideConnectorGraphics();
+        if (LinkConnectorCanvas is not null)
+        {
+            LinkConnectorCanvas.Visibility = Visibility.Collapsed;
+        }
+
+        return;
+
+#pragma warning disable CS0162
         if (LinkConnectorCanvas is null || LinkConnectorPath is null || LinkConnectorGlow is null
             || LinkSourceNode is null || LinkSourceHalo is null
             || LinkTargetNode is null || LinkTargetHalo is null
@@ -1968,6 +2069,7 @@ public sealed partial class MasterDataPage : Page
         }
 
         LinkConnectorCanvas.Visibility = Visibility.Visible;
+#pragma warning restore CS0162
         if (_linkAnchor.ActualWidth <= 0 || _linkAnchor.ActualHeight <= 0
             || LinkedViewPanel.ActualWidth <= 0 || LinkedViewPanel.ActualHeight <= 0)
         {
@@ -2380,6 +2482,18 @@ public sealed partial class MasterDataPage : Page
         }
 
         return row.Id;
+    }
+
+    private sealed class LinkSourceCellTag
+    {
+        public LinkSourceCellTag(MasterDataRowViewModel row, string fieldKey)
+        {
+            Row = row;
+            FieldKey = fieldKey;
+        }
+
+        public MasterDataRowViewModel Row { get; }
+        public string FieldKey { get; }
     }
 
     private sealed class LinkPickItem
