@@ -25,6 +25,12 @@ public sealed partial class TemplateComposerPanel : UserControl
     private bool _applyingRender;
     private double _laidOutViewport;
     private string _masterDataSearchQuery = string.Empty;
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _masterDataSearchTimer;
+    private bool _masterDataSearchRenderQueued;
+    private const int MinEditingColumns = 12;
+    private const int MinEditingRows = 40;
+    private const int TrailingRowBuffer = 25;
+    private const int GrowRowsBatch = 20;
 
     public TemplateComposerPanel()
     {
@@ -36,6 +42,8 @@ public sealed partial class TemplateComposerPanel : UserControl
     }
 
     public event EventHandler? Closed;
+
+    public event EventHandler? Saved;
 
     public async Task OpenAsync(string templateId, bool isCreating = false)
     {
@@ -65,10 +73,7 @@ public sealed partial class TemplateComposerPanel : UserControl
 
         if (_columns.Count == 0)
         {
-            for (var i = 1; i <= 5; i++)
-            {
-                _columns.Add(new ColumnSlot { Key = $"column_{i}", Label = $"Column {i}" });
-            }
+            _columns.Add(new ColumnSlot { Key = NewKey(), Label = "Column 1" });
         }
 
         var stored = await _records.GetStoredRowsAsync(templateId).ConfigureAwait(true);
@@ -83,10 +88,7 @@ public sealed partial class TemplateComposerPanel : UserControl
             });
         }
 
-        if (_rows.Count == 0)
-        {
-            AddEmptyRows(10);
-        }
+        EnsureEditingBuffer();
 
         _sources.Clear();
         var catalogs = TemplateCatalogFilters.MasterDataCatalogs(
@@ -103,84 +105,67 @@ public sealed partial class TemplateComposerPanel : UserControl
 
         _selectedColumnKey = _columns[0].Key;
         TitleText.Text = template.Name;
-        RowCountBox.Text = _rows.Count.ToString();
-        ColumnCountBox.Text = _columns.Count.ToString();
         MasterDataSearchBox.Text = string.Empty;
         _masterDataSearchQuery = string.Empty;
         Render();
         StatusText.Text = isCreating
-            ? "Click a template column, then click a master data column once to fill it. Use ⋮ on a column for Copy or Delete. Cancel creation removes this new template."
-            : "Click a template column, then click a master data column once to fill it. Use ⋮ on a column for Copy or Delete.";
+            ? "Type in the grid like a spreadsheet. Use master data columns below to import. Cancel creation removes this new template."
+            : "Type in the grid like a spreadsheet. Select a column header, then pick a master data column below to import values.";
     }
 
-    private async void OnApplySizeClick(object sender, RoutedEventArgs e)
+    private async void OnSaveClick(object sender, RoutedEventArgs e)
     {
         if (_busy || _template is null)
         {
             return;
         }
 
-        if (!int.TryParse(RowCountBox.Text.Trim(), out var rows) || rows < 1 || rows > 500)
-        {
-            StatusText.Text = "Enter a row count from 1 to 500.";
-            return;
-        }
-
-        if (!int.TryParse(ColumnCountBox.Text.Trim(), out var columns) || columns < 1 || columns > 40)
-        {
-            StatusText.Text = "Enter a column count from 1 to 40.";
-            return;
-        }
-
-        while (_columns.Count < columns)
-        {
-            var number = _columns.Count + 1;
-            _columns.Add(new ColumnSlot { Key = NewKey(), Label = $"Column {number}" });
-        }
-
-        while (_columns.Count > columns)
-        {
-            var removed = _columns[^1];
-            _columns.RemoveAt(_columns.Count - 1);
-            foreach (var row in _rows)
-            {
-                row.Values.Remove(removed.Key);
-            }
-        }
-
-        if (_rows.Count < rows)
-        {
-            AddEmptyRows(rows - _rows.Count);
-        }
-        else if (_rows.Count > rows)
-        {
-            for (var i = _rows.Count - 1; i >= rows; i--)
-            {
-                if (!string.IsNullOrWhiteSpace(_rows[i].Id))
-                {
-                    _removedRowIds.Add(_rows[i].Id!);
-                }
-
-                _rows.RemoveAt(i);
-            }
-        }
-
-        if (_selectedColumnKey is null || _columns.All(c => c.Key != _selectedColumnKey))
-        {
-            _selectedColumnKey = _columns[0].Key;
-        }
-
-        ApplyRender();
-        await SaveAsync("Table size updated.").ConfigureAwait(true);
-    }
-
-    private async void OnSaveClick(object sender, RoutedEventArgs e) =>
+        TrimGridToUsedExtents();
         await SaveAsync("Template saved.").ConfigureAwait(true);
+        EnsureEditingBuffer();
+        ApplyRender();
+    }
 
     private void OnMasterDataSearchTextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
     {
-        _masterDataSearchQuery = sender.Text?.Trim() ?? string.Empty;
-        ApplyRender();
+        if (args.Reason == AutoSuggestionBoxTextChangeReason.ProgrammaticChange)
+        {
+            return;
+        }
+
+        _masterDataSearchQuery = sender.Text ?? string.Empty;
+        ScheduleMasterDataSearchRender();
+    }
+
+    private void ScheduleMasterDataSearchRender()
+    {
+        if (_masterDataSearchRenderQueued)
+        {
+            return;
+        }
+
+        _masterDataSearchRenderQueued = true;
+        _masterDataSearchTimer ??= DispatcherQueue.CreateTimer();
+        _masterDataSearchTimer.Interval = TimeSpan.FromMilliseconds(300);
+        _masterDataSearchTimer.IsRepeating = false;
+        _masterDataSearchTimer.Stop();
+        _masterDataSearchTimer.Tick -= OnMasterDataSearchRenderTick;
+        _masterDataSearchTimer.Tick += OnMasterDataSearchRenderTick;
+        _masterDataSearchTimer.Start();
+    }
+
+    private void OnMasterDataSearchRenderTick(
+        Microsoft.UI.Dispatching.DispatcherQueueTimer sender,
+        object args)
+    {
+        _masterDataSearchRenderQueued = false;
+        RenderSourcesOnly();
+        MasterDataSearchBox.Focus(FocusState.Programmatic);
+    }
+
+    private void RenderSourcesOnly()
+    {
+        SourcesScroll.Content = BuildSourceTables();
     }
 
     private void OnBackClick(object sender, RoutedEventArgs e) => Closed?.Invoke(this, EventArgs.Empty);
@@ -261,7 +246,6 @@ public sealed partial class TemplateComposerPanel : UserControl
             _selectedColumnKey = _columns[Math.Clamp(index - 1, 0, _columns.Count - 1)].Key;
         }
 
-        ColumnCountBox.Text = _columns.Count.ToString();
         ApplyRender();
         await SaveAsync($"Deleted column \"{column.Label}\".").ConfigureAwait(true);
     }
@@ -290,10 +274,9 @@ public sealed partial class TemplateComposerPanel : UserControl
         try
         {
             var sourceRows = await _records.GetRowsAsync(catalog.Id).ConfigureAwait(true);
-            if (sourceRows.Count > _rows.Count)
+            while (_rows.Count < sourceRows.Count)
             {
-                AddEmptyRows(Math.Min(500, sourceRows.Count) - _rows.Count);
-                RowCountBox.Text = _rows.Count.ToString();
+                AddEmptyRows(Math.Min(GrowRowsBatch, sourceRows.Count - _rows.Count));
             }
 
             for (var i = 0; i < _rows.Count; i++)
@@ -349,7 +332,6 @@ public sealed partial class TemplateComposerPanel : UserControl
             row.Values[copy.Key] = value ?? string.Empty;
         }
 
-        ColumnCountBox.Text = _columns.Count.ToString();
         _selectedColumnKey = copy.Key;
         ApplyRender();
         await SaveAsync($"Copied column \"{source.Label}\".").ConfigureAwait(true);
@@ -363,6 +345,7 @@ public sealed partial class TemplateComposerPanel : UserControl
         }
 
         _busy = true;
+        SaveButton.IsEnabled = false;
         try
         {
             var fields = _columns.Select((column, index) => new TemplateFieldDefinition
@@ -402,14 +385,41 @@ public sealed partial class TemplateComposerPanel : UserControl
                 payload.Add((_rows[i].Id, i, values));
             }
 
-            var ids = await _records.SaveRowsAsync(_template.Id, payload, _removedRowIds.ToList()).ConfigureAwait(true);
-            for (var i = 0; i < ids.Count && i < _rows.Count; i++)
+            const int rowBatchSize = 100;
+            var deleteIds = _removedRowIds.ToList();
+            _removedRowIds.Clear();
+            if (payload.Count == 0)
             {
-                _rows[i].Id = ids[i];
+                if (deleteIds.Count > 0)
+                {
+                    _ = await _records.SaveRowsAsync(
+                        _template.Id,
+                        Array.Empty<(string? Id, int RowOrder, IReadOnlyDictionary<string, string> Values)>(),
+                        deleteIds).ConfigureAwait(true);
+                }
+            }
+            else
+            {
+                var idBuffer = new string[payload.Count];
+                for (var offset = 0; offset < payload.Count; offset += rowBatchSize)
+                {
+                    var batch = payload.Skip(offset).Take(rowBatchSize).ToList();
+                    IReadOnlyList<string> deletes = offset == 0 ? deleteIds : Array.Empty<string>();
+                    var ids = await _records.SaveRowsAsync(_template.Id, batch, deletes).ConfigureAwait(true);
+                    for (var i = 0; i < ids.Count; i++)
+                    {
+                        idBuffer[offset + i] = ids[i];
+                    }
+                }
+
+                for (var i = 0; i < idBuffer.Length && i < _rows.Count; i++)
+                {
+                    _rows[i].Id = idBuffer[i];
+                }
             }
 
-            _removedRowIds.Clear();
             StatusText.Text = successMessage;
+            Saved?.Invoke(this, EventArgs.Empty);
         }
         catch (Exception ex)
         {
@@ -418,6 +428,7 @@ public sealed partial class TemplateComposerPanel : UserControl
         finally
         {
             _busy = false;
+            SaveButton.IsEnabled = true;
         }
     }
 
@@ -442,6 +453,22 @@ public sealed partial class TemplateComposerPanel : UserControl
         if (Math.Abs(HeaderScroll.HorizontalOffset - TemplateScroll.HorizontalOffset) > 1)
         {
             HeaderScroll.ChangeView(TemplateScroll.HorizontalOffset, null, null, true);
+        }
+
+        if (e.IsIntermediate || _busy)
+        {
+            return;
+        }
+
+        var viewport = TemplateScroll.ViewportHeight;
+        var extent = TemplateScroll.ExtentHeight;
+        if (viewport > 0 && extent > viewport)
+        {
+            var remaining = extent - (TemplateScroll.VerticalOffset + viewport);
+            if (remaining < 140)
+            {
+                GrowRowsNearEnd();
+            }
         }
     }
 
@@ -485,7 +512,7 @@ public sealed partial class TemplateComposerPanel : UserControl
     {
         var grid = new Grid
         {
-            Height = 44,
+            Height = 48,
             HorizontalAlignment = HorizontalAlignment.Left,
             Width = columnWidth * _columns.Count,
         };
@@ -505,35 +532,38 @@ public sealed partial class TemplateComposerPanel : UserControl
             inner.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             inner.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(36) });
 
-            var header = new Button
+            var captured = column;
+            var columnIndex = c;
+            var labelBox = new TextBox
             {
+                Text = column.Label,
+                FontSize = 13,
+                TextAlignment = TextAlignment.Center,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
-                VerticalAlignment = VerticalAlignment.Stretch,
-                HorizontalContentAlignment = HorizontalAlignment.Center,
-                VerticalContentAlignment = VerticalAlignment.Center,
-                ClickMode = ClickMode.Press,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalTextAlignment = TextAlignment.Center,
+                Foreground = Brush("TextPrimaryBrush"),
                 Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
                 BorderThickness = new Thickness(0),
-                Padding = new Thickness(8, 0, 4, 0),
-                Content = new TextBlock
-                {
-                    Text = column.Label,
-                    FontSize = 13,
-                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                    TextTrimming = TextTrimming.CharacterEllipsis,
-                    TextAlignment = TextAlignment.Center,
-                    Foreground = Brush("TextPrimaryBrush"),
-                },
+                Padding = new Thickness(8, 6, 4, 6),
+                PlaceholderText = "Column name",
+                IsEnabled = true,
+                IsReadOnly = false,
             };
-            var captured = column;
-            header.Click += (_, _) =>
+            labelBox.GotFocus += (_, _) =>
             {
-                _selectedColumnKey = captured.Key;
-                ApplyRender();
-                StatusText.Text = $"Column \"{captured.Label}\" is selected. Click a master data column to fill it.";
+                if (!string.Equals(_selectedColumnKey, captured.Key, StringComparison.Ordinal))
+                {
+                    _selectedColumnKey = captured.Key;
+                    ApplyRender();
+                }
+
+                StatusText.Text = "Select a column header, then choose a master data column below to import values.";
+                MaybeGrowColumnsForIndex(columnIndex);
             };
-            Grid.SetColumn(header, 0);
-            inner.Children.Add(header);
+            labelBox.TextChanged += (_, _) => captured.Label = labelBox.Text ?? string.Empty;
+            Grid.SetColumn(labelBox, 0);
+            inner.Children.Add(labelBox);
 
             var more = new Button
             {
@@ -596,6 +626,7 @@ public sealed partial class TemplateComposerPanel : UserControl
         {
             var row = (RowSlot)args.Data;
             var grid = args.Parent as Grid ?? CreateGrid();
+            grid.Tag = row;
             var index = _owner._rows.IndexOf(row);
             for (var c = 0; c < _owner._columns.Count && c < grid.Children.Count; c++)
             {
@@ -608,9 +639,13 @@ public sealed partial class TemplateComposerPanel : UserControl
                     : TemplateComposerPanel.Brush(index % 2 == 0 ? "CardBackgroundBrush" : "GridRowAltBackgroundBrush");
                 cell.BorderBrush = selected ? TemplateComposerPanel.Brush("AccentPrimaryBrush") : TemplateComposerPanel.Brush("BorderDefaultBrush");
                 cell.BorderThickness = new Thickness(selected ? 2 : 1, 0, selected ? 2 : 1, 1);
-                if (cell.Child is TextBlock label)
+                if (cell.Child is TextBox box)
                 {
-                    label.Text = string.IsNullOrWhiteSpace(text) ? "—" : text;
+                    var next = text ?? string.Empty;
+                    if (!string.Equals(box.Text, next, StringComparison.Ordinal))
+                    {
+                        box.Text = next;
+                    }
                 }
             }
 
@@ -631,18 +666,37 @@ public sealed partial class TemplateComposerPanel : UserControl
             };
             for (var c = 0; c < _owner._columns.Count; c++)
             {
+                var column = _owner._columns[c];
                 grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(_columnWidth) });
                 var cell = new Border
                 {
-                    Padding = new Thickness(10, 0, 10, 0),
-                    Child = new TextBlock
-                    {
-                        FontSize = 12,
-                        VerticalAlignment = VerticalAlignment.Center,
-                        TextTrimming = TextTrimming.CharacterEllipsis,
-                        Foreground = TemplateComposerPanel.Brush("TextPrimaryBrush"),
-                    },
+                    Padding = new Thickness(4, 0, 4, 0),
                 };
+                var box = new TextBox
+                {
+                    FontSize = 12,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    BorderThickness = new Thickness(0),
+                    Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
+                    Foreground = TemplateComposerPanel.Brush("TextPrimaryBrush"),
+                    PlaceholderText = "—",
+                    IsEnabled = true,
+                    IsReadOnly = false,
+                };
+                var columnKey = column.Key;
+                box.TextChanged += (_, _) =>
+                {
+                    if (grid.Tag is RowSlot rowSlot)
+                    {
+                        rowSlot.Values[columnKey] = box.Text ?? string.Empty;
+                        var rowIndex = _owner._rows.IndexOf(rowSlot);
+                        if (rowIndex >= 0)
+                        {
+                            _owner.MaybeGrowRowsForIndex(rowIndex);
+                        }
+                    }
+                };
+                cell.Child = box;
                 Grid.SetColumn(cell, c);
                 grid.Children.Add(cell);
             }
@@ -654,7 +708,7 @@ public sealed partial class TemplateComposerPanel : UserControl
     private UIElement BuildSourceTables()
     {
         var stack = new StackPanel { Spacing = 10, HorizontalAlignment = HorizontalAlignment.Stretch };
-        var query = _masterDataSearchQuery;
+        var query = _masterDataSearchQuery.Trim();
         var catalogs = string.IsNullOrWhiteSpace(query)
             ? _sources
             : _sources
@@ -678,7 +732,7 @@ public sealed partial class TemplateComposerPanel : UserControl
 
         foreach (var source in catalogs)
         {
-            var block = new StackPanel { Spacing = 4 };
+            var block = new StackPanel { Spacing = 4, Margin = new Thickness(0, 0, 0, 8) };
             block.Children.Add(new TextBlock
             {
                 Text = source.Name,
@@ -687,16 +741,18 @@ public sealed partial class TemplateComposerPanel : UserControl
                 Foreground = Brush("TextPrimaryBrush"),
             });
 
+            const double chipWidth = 148;
             var row = new Grid { Height = 40 };
             for (var i = 0; i < source.Fields.Count; i++)
             {
                 var field = source.Fields[i];
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(148) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(chipWidth) });
                 var used = IsSourceUsed(source.Id, field.Key);
                 var chip = new Border
                 {
                     Height = 40,
-                    MinWidth = 148,
+                    MinWidth = chipWidth,
+                    Width = chipWidth,
                     IsHitTestVisible = !used,
                     Opacity = used ? 0.4 : 1,
                     Background = Brush("GridHeaderBackgroundBrush"),
@@ -713,19 +769,24 @@ public sealed partial class TemplateComposerPanel : UserControl
                         Foreground = Brush("TextPrimaryBrush"),
                     },
                 };
-                ToolTipService.SetToolTip(chip, used ? $"{field.Label} is already used" : $"Click to copy {field.Label}");
+                ToolTipService.SetToolTip(
+                    chip,
+                    used ? $"{field.Label} is already used" : $"Import \"{field.Label}\" into the selected column");
                 var catalog = source;
                 var sourceField = field;
-                chip.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler((_, args) =>
-                {
-                    if (!args.GetCurrentPoint(chip).Properties.IsLeftButtonPressed || used)
+                chip.AddHandler(
+                    UIElement.PointerPressedEvent,
+                    new PointerEventHandler((_, args) =>
                     {
-                        return;
-                    }
+                        if (!args.GetCurrentPoint(chip).Properties.IsLeftButtonPressed || used)
+                        {
+                            return;
+                        }
 
-                    args.Handled = true;
-                    _ = ImportSourceColumnAsync(catalog, sourceField);
-                }), true);
+                        args.Handled = true;
+                        _ = ImportSourceColumnAsync(catalog, sourceField);
+                    }),
+                    true);
                 Grid.SetColumn(chip, i);
                 row.Children.Add(chip);
             }
@@ -771,6 +832,132 @@ public sealed partial class TemplateComposerPanel : UserControl
             _rows.Add(new RowSlot { Values = new Dictionary<string, string>(StringComparer.Ordinal) });
         }
     }
+
+    private void EnsureEditingBuffer()
+    {
+        while (_columns.Count < MinEditingColumns)
+        {
+            var number = _columns.Count + 1;
+            _columns.Add(new ColumnSlot { Key = NewKey(), Label = $"Column {number}" });
+        }
+
+        var targetRows = Math.Max(_rows.Count + TrailingRowBuffer, MinEditingRows);
+        if (_rows.Count < targetRows)
+        {
+            AddEmptyRows(targetRows - _rows.Count);
+        }
+
+        if (_selectedColumnKey is null || _columns.All(c => c.Key != _selectedColumnKey))
+        {
+            _selectedColumnKey = _columns[0].Key;
+        }
+    }
+
+    private void GrowRowsNearEnd()
+    {
+        if (_busy)
+        {
+            return;
+        }
+
+        AddEmptyRows(GrowRowsBatch);
+        ApplyRender();
+    }
+
+    private void MaybeGrowRowsForIndex(int rowIndex)
+    {
+        if (_busy || rowIndex < _rows.Count - 3)
+        {
+            return;
+        }
+
+        AddEmptyRows(GrowRowsBatch);
+        ApplyRender();
+    }
+
+    private void MaybeGrowColumnsForIndex(int columnIndex)
+    {
+        if (_busy || columnIndex < _columns.Count - 1)
+        {
+            return;
+        }
+
+        var number = _columns.Count + 1;
+        _columns.Add(new ColumnSlot { Key = NewKey(), Label = $"Column {number}" });
+        ApplyRender();
+    }
+
+    private void TrimGridToUsedExtents()
+    {
+        var lastRow = -1;
+        for (var r = 0; r < _rows.Count; r++)
+        {
+            if (RowHasContent(_rows[r]))
+            {
+                lastRow = r;
+            }
+        }
+
+        var lastCol = -1;
+        for (var c = 0; c < _columns.Count; c++)
+        {
+            if (ColumnHasContent(_columns[c], c))
+            {
+                lastCol = c;
+            }
+        }
+
+        lastRow = Math.Max(lastRow, 0);
+        lastCol = Math.Max(lastCol, 0);
+
+        while (_rows.Count > lastRow + 1)
+        {
+            var tail = _rows[^1];
+            if (!string.IsNullOrWhiteSpace(tail.Id))
+            {
+                _removedRowIds.Add(tail.Id!);
+            }
+
+            _rows.RemoveAt(_rows.Count - 1);
+        }
+
+        while (_columns.Count > lastCol + 1)
+        {
+            var removed = _columns[^1];
+            _columns.RemoveAt(_columns.Count - 1);
+            foreach (var row in _rows)
+            {
+                row.Values.Remove(removed.Key);
+            }
+        }
+
+        if (_selectedColumnKey is null || _columns.All(c => c.Key != _selectedColumnKey))
+        {
+            _selectedColumnKey = _columns[0].Key;
+        }
+    }
+
+    private static bool RowHasContent(RowSlot row) =>
+        row.Values.Values.Any(static value => !string.IsNullOrWhiteSpace(value));
+
+    private bool ColumnHasContent(ColumnSlot column, int columnIndex)
+    {
+        if (!string.IsNullOrWhiteSpace(column.SourceTemplateId) || !string.IsNullOrWhiteSpace(column.SourceFieldKey))
+        {
+            return true;
+        }
+
+        if (!IsDefaultColumnLabel(column.Label, columnIndex + 1))
+        {
+            return true;
+        }
+
+        return _rows.Any(row =>
+            row.Values.TryGetValue(column.Key, out var value) && !string.IsNullOrWhiteSpace(value));
+    }
+
+    private static bool IsDefaultColumnLabel(string label, int number) =>
+        string.Equals(label.Trim(), $"Column {number}", StringComparison.OrdinalIgnoreCase);
 
     private static string NewKey() => "col_" + Guid.NewGuid().ToString("N")[..8];
 

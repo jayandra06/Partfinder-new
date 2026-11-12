@@ -21,6 +21,7 @@ public sealed partial class AllTemplatesCarousel : UserControl
     private int _activeIndex = 0;
     private TemplatesViewModel? _vm;
     private readonly IMasterDataRecordsService _records;
+    private readonly IThemeService _themeService;
 
     private readonly Dictionary<Border, string> _cardTemplateIds = new();
     private readonly Dictionary<Border, IReadOnlyList<MasterDataRowRecord>> _cardRecords = new();
@@ -47,39 +48,17 @@ public sealed partial class AllTemplatesCarousel : UserControl
     };
 
     public event EventHandler<string>? TemplateDoubleTapped;
-    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _cardFocusTimer;
-    private int _pendingCardIndex = -1;
+    public event EventHandler<string>? TemplateEditRequested;
+    private int _layoutAnimationCount;
 
     public AllTemplatesCarousel()
     {
         InitializeComponent();
         _records = App.Services.GetRequiredService<IMasterDataRecordsService>();
+        _themeService = App.Services.GetRequiredService<IThemeService>();
     }
 
-    private void QueueCardFocus(int index)
-    {
-        _pendingCardIndex = index;
-        var queue = DispatcherQueue;
-        _cardFocusTimer ??= queue.CreateTimer();
-        _cardFocusTimer.Interval = TimeSpan.FromMilliseconds(280);
-        _cardFocusTimer.IsRepeating = false;
-        _cardFocusTimer.Tick -= OnCardFocusTimerTick;
-        _cardFocusTimer.Tick += OnCardFocusTimerTick;
-        _cardFocusTimer.Start();
-    }
-
-    private void OnCardFocusTimerTick(Microsoft.UI.Dispatching.DispatcherQueueTimer sender, object args)
-    {
-        if (_pendingCardIndex < 0 || _pendingCardIndex == _activeIndex)
-        {
-            return;
-        }
-
-        _activeIndex = _pendingCardIndex;
-        _pendingCardIndex = -1;
-        UpdateLayout(animate: true);
-        UpdateNav();
-    }
+    private static Brush ThemeBrush(string key) => (Brush)Application.Current.Resources[key];
 
     // ── Public API ────────────────────────────────────────────────────────────
 
@@ -201,7 +180,7 @@ public sealed partial class AllTemplatesCarousel : UserControl
         }
     }
 
-    private static ScrollViewer CreateHorizontalTableHost(Grid tableGrid)
+    private ScrollViewer CreateHorizontalTableHost(Grid tableGrid)
     {
         tableGrid.Name = "TableGrid";
         var scroll = new ScrollViewer
@@ -216,13 +195,18 @@ public sealed partial class AllTemplatesCarousel : UserControl
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             ZoomMode = ZoomMode.Disabled,
         };
-        scroll.Loaded += (_, _) => ApplyPreviewTableLayout(scroll, tableGrid);
-        scroll.SizeChanged += (_, _) => ApplyPreviewTableLayout(scroll, tableGrid);
+        scroll.Loaded += (_, _) => ApplyPreviewTableLayout(this, scroll, tableGrid);
+        scroll.SizeChanged += (_, _) => ApplyPreviewTableLayout(this, scroll, tableGrid);
         return scroll;
     }
 
-    private static void ApplyPreviewTableLayout(ScrollViewer scroll, Grid grid)
+    private static void ApplyPreviewTableLayout(AllTemplatesCarousel owner, ScrollViewer scroll, Grid grid)
     {
+        if (owner._layoutAnimationCount > 0)
+        {
+            return;
+        }
+
         var viewport = scroll.ActualWidth;
         if (viewport <= 0 || grid.ColumnDefinitions.Count == 0)
         {
@@ -288,11 +272,33 @@ public sealed partial class AllTemplatesCarousel : UserControl
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        Unloaded -= OnUnloaded;
+        Unloaded += OnUnloaded;
+        _themeService.ThemeChanged -= OnThemeChanged;
+        _themeService.ThemeChanged += OnThemeChanged;
+
         CarouselCanvas.SizeChanged += (_, args) =>
         {
             CarouselClip.Rect = new Windows.Foundation.Rect(0, 0, args.NewSize.Width, args.NewSize.Height);
             UpdateLayout(animate: false);
         };
+    }
+
+    private void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        _themeService.ThemeChanged -= OnThemeChanged;
+    }
+
+    private void OnThemeChanged(object? sender, EventArgs e)
+    {
+        if (_vm is not null && _cards.Count > 0)
+        {
+            var index = _activeIndex;
+            Load(_vm);
+            _activeIndex = Math.Clamp(index, 0, Math.Max(0, _cards.Count - 1));
+            UpdateLayout(animate: false);
+            UpdateNav();
+        }
     }
 
     // ── Navigation ────────────────────────────────────────────────────────────
@@ -356,8 +362,8 @@ public sealed partial class AllTemplatesCarousel : UserControl
 
         // Multi-tier cascading fan layout (matching reference 1, 2, 3)
         // Center card is largest, side cards stagger outwards with decreasing height, width, and z-index
-        var baseCenterWidth = Math.Clamp(canvasWidth * 0.42, 320.0, 560.0);
-        var baseCenterHeight = Math.Max(260.0, canvasHeight - 20.0);
+        var baseCenterWidth = Math.Clamp(canvasWidth * 0.50, 380.0, 640.0);
+        var baseCenterHeight = Math.Max(300.0, canvasHeight - 12.0);
         var centerX = (canvasWidth - baseCenterWidth) / 2.0;
 
         for (int i = 0; i < _cards.Count; i++)
@@ -408,7 +414,7 @@ public sealed partial class AllTemplatesCarousel : UserControl
 
                 opacity = 1.0;
                 zIndex = 100 - (absDist * 10);
-                card.BorderBrush = new SolidColorBrush(Color.FromArgb((byte)(160 - absDist * 25), 42, 61, 88));
+                card.BorderBrush = ThemeBrush("BorderDefaultBrush");
             }
             else
             {
@@ -426,15 +432,22 @@ public sealed partial class AllTemplatesCarousel : UserControl
             card.RenderTransform = null;
 
             if (animate)
+            {
                 AnimateCard(card, finalX, finalY, cardW, cardH, opacity, zIndex);
+            }
             else
+            {
                 ApplyCardTransform(card, finalX, finalY, cardW, cardH, opacity, zIndex);
+            }
+        }
 
-            RefreshPreviewTableLayoutForCard(card);
+        if (!animate && _cards.Count > 0 && _activeIndex >= 0 && _activeIndex < _cards.Count)
+        {
+            RefreshPreviewTableLayoutForCard(_cards[_activeIndex]);
         }
     }
 
-    private static void RefreshPreviewTableLayoutForCard(Border card)
+    private void RefreshPreviewTableLayoutForCard(Border card)
     {
         if (card.Child is not Grid mainGrid)
         {
@@ -452,7 +465,7 @@ public sealed partial class AllTemplatesCarousel : UserControl
             {
                 if (host is ScrollViewer scroll && scroll.Content is Grid grid)
                 {
-                    ApplyPreviewTableLayout(scroll, grid);
+                    ApplyPreviewTableLayout(this, scroll, grid);
                 }
             }
         }
@@ -487,9 +500,13 @@ public sealed partial class AllTemplatesCarousel : UserControl
 
                                 if (titleStack.Children.Count > 1 && titleStack.Children[1] is TextBlock title)
                                 {
-                                    title.FontSize = isCenter ? 15 : 13;
-                                    title.MaxWidth = isCenter ? 240 : 90;
-                                    title.TextAlignment = isLeft ? TextAlignment.Right : TextAlignment.Left;
+                                    title.FontSize = 14;
+                                    title.MaxWidth = isCenter ? 240 : 108;
+                                    title.TextAlignment = isCenter
+                                        ? TextAlignment.Center
+                                        : isLeft
+                                            ? TextAlignment.Right
+                                            : TextAlignment.Left;
                                 }
                             }
                         }
@@ -512,29 +529,52 @@ public sealed partial class AllTemplatesCarousel : UserControl
         }
     }
 
-    private static void AnimateCard(Border card, double x, double y,
+    private void AnimateCard(Border card, double x, double y,
         double width, double height, double opacity, double zIndex)
     {
         Canvas.SetZIndex(card, (int)zIndex);
+        _layoutAnimationCount++;
         var sb       = new Storyboard();
-        var duration = TimeSpan.FromMilliseconds(450);
-        var easing   = new CubicEase { EasingMode = EasingMode.EaseInOut };
+        var duration = TimeSpan.FromMilliseconds(520);
+        var easing   = new SineEase { EasingMode = EasingMode.EaseInOut };
 
         void Anim(string prop, double to, bool dep = false)
         {
+            var from = prop switch
+            {
+                "(Canvas.Left)" => Canvas.GetLeft(card),
+                "(Canvas.Top)" => Canvas.GetTop(card),
+                "Width" => double.IsNaN(card.Width) ? to : card.Width,
+                "Height" => double.IsNaN(card.Height) ? to : card.Height,
+                "Opacity" => card.Opacity,
+                _ => 0d,
+            };
             var a = new DoubleAnimation
-                { To = to, Duration = duration, EasingFunction = easing, EnableDependentAnimation = dep };
+            {
+                From = from,
+                To = to,
+                Duration = duration,
+                EasingFunction = easing,
+                EnableDependentAnimation = dep,
+            };
             Storyboard.SetTarget(a, card);
             Storyboard.SetTargetProperty(a, prop);
             sb.Children.Add(a);
         }
 
-        Anim("(Canvas.Left)", x,      true);
-        Anim("(Canvas.Top)",  y,      true);
-        Anim("Width",         width,  true);
-        Anim("Height",        height, true);
-        Anim("Opacity",       opacity);
-        sb.Completed += (_, _) => RefreshPreviewTableLayoutForCard(card);
+        Anim("(Canvas.Left)", x, true);
+        Anim("(Canvas.Top)", y, true);
+        Anim("Width", width, true);
+        Anim("Height", height, true);
+        Anim("Opacity", opacity);
+        sb.Completed += (_, _) =>
+        {
+            _layoutAnimationCount = Math.Max(0, _layoutAnimationCount - 1);
+            if (_layoutAnimationCount == 0 && _activeIndex >= 0 && _activeIndex < _cards.Count)
+            {
+                RefreshPreviewTableLayoutForCard(_cards[_activeIndex]);
+            }
+        };
         sb.Begin();
     }
 
@@ -561,8 +601,8 @@ public sealed partial class AllTemplatesCarousel : UserControl
         {
             Width = 300, Height = 400,
             CornerRadius    = new CornerRadius(24),
-            Background      = new SolidColorBrush(Color.FromArgb(255, 20, 29, 42)),
-            BorderBrush     = new SolidColorBrush(Color.FromArgb(156, 104, 132, 168)),
+            Background      = ThemeBrush("ElevatedCardBackgroundBrush"),
+            BorderBrush     = ThemeBrush("BorderDefaultBrush"),
             BorderThickness = new Thickness(1.5),
             Padding         = new Thickness(0),
             Translation     = new System.Numerics.Vector3(0, 0, 32),
@@ -573,14 +613,14 @@ public sealed partial class AllTemplatesCarousel : UserControl
             {
                 if (s is Border b && b.Tag is int idx && idx != _activeIndex)
                 {
-                    QueueCardFocus(idx);
+                    _activeIndex = idx;
+                    UpdateLayout(animate: true);
+                    UpdateNav();
                 }
             };
             card.DoubleTapped += (_, args) =>
             {
                 args.Handled = true;
-                _cardFocusTimer?.Stop();
-                _pendingCardIndex = -1;
                 TemplateDoubleTapped?.Invoke(this, template.Id);
             };
 
@@ -594,7 +634,7 @@ public sealed partial class AllTemplatesCarousel : UserControl
         {
             CornerRadius = new CornerRadius(24, 24, 0, 0), Height = 1,
             VerticalAlignment = VerticalAlignment.Top, IsHitTestVisible = false,
-            Opacity = 0.16, Background = new SolidColorBrush(Microsoft.UI.Colors.White),
+            Opacity = 0.16, Background = ThemeBrush("GlassStrokeBrush"),
             Margin = new Thickness(1, 0, 1, 0),
         });
 
@@ -626,7 +666,7 @@ public sealed partial class AllTemplatesCarousel : UserControl
         {
             Text = template.Name, FontSize = 15,
             FontWeight = Microsoft.UI.Text.FontWeights.Bold,
-            Foreground = new SolidColorBrush(Color.FromArgb(255, 234, 242, 255)),
+            Foreground = ThemeBrush("TextPrimaryBrush"),
             VerticalAlignment = VerticalAlignment.Center,
             TextWrapping = TextWrapping.NoWrap,
             TextTrimming = TextTrimming.CharacterEllipsis,
@@ -674,10 +714,10 @@ public sealed partial class AllTemplatesCarousel : UserControl
             Background = new SolidColorBrush(Color.FromArgb(28, 31, 122, 224)),
             BorderBrush = new SolidColorBrush(Color.FromArgb(120, 31, 122, 224)),
             BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10),
-            Content = new FontIcon { Glyph = "\uE70F", FontSize = 14, Foreground = new SolidColorBrush(Microsoft.UI.Colors.White) },
+            Content = new FontIcon { Glyph = "\uE70F", FontSize = 14, Foreground = ThemeBrush("AccentPrimaryBrush") },
         };
         ToolTipService.SetToolTip(editBtn, "Edit template");
-        editBtn.Click += (_, _) => { vm.SelectedTemplate = template; vm.BeginEditSelectedTemplateCommand.Execute(null); };
+        editBtn.Click += (_, _) => TemplateEditRequested?.Invoke(this, template.Id);
 
         var deleteBtn = new Button
         {
@@ -755,7 +795,7 @@ public sealed partial class AllTemplatesCarousel : UserControl
                 ? $"{rowCount} row{(rowCount == 1 ? "" : "s")} · {template.Fields.Count} column{(template.Fields.Count == 1 ? "" : "s")}"
                 : $"{template.Fields.Count} column{(template.Fields.Count == 1 ? "" : "s")}",
             FontSize = 14,
-            Foreground = new SolidColorBrush(Color.FromArgb(255, 123, 141, 168)),
+            Foreground = ThemeBrush("TextTertiaryBrush"),
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
             CharacterSpacing = 20,
@@ -777,6 +817,10 @@ public sealed partial class AllTemplatesCarousel : UserControl
         Color accent,
         IReadOnlyList<MasterDataRowRecord> records)
     {
+        var headerBg = ThemeBrush("GridHeaderBackgroundBrush");
+        var primaryText = ThemeBrush("TextPrimaryBrush");
+        var secondaryText = ThemeBrush("TextSecondaryBrush");
+        var borderDefault = ThemeBrush("BorderDefaultBrush");
         var colCount = fields.Count;
         var grid = new Grid
         {
@@ -794,7 +838,7 @@ public sealed partial class AllTemplatesCarousel : UserControl
 
             var colBorder = new Border
             {
-                BorderBrush     = new SolidColorBrush(Color.FromArgb(80, accent.R, accent.G, accent.B)),
+                BorderBrush     = borderDefault,
                 BorderThickness = new Thickness(1),
                 CornerRadius    = new CornerRadius(8),
                 HorizontalAlignment = HorizontalAlignment.Stretch,
@@ -805,7 +849,7 @@ public sealed partial class AllTemplatesCarousel : UserControl
             // Header
             var headerCell = new Border
             {
-                Background  = new SolidColorBrush(Color.FromArgb(50, accent.R, accent.G, accent.B)),
+                Background  = headerBg,
                 Padding     = new Thickness(10, 14, 10, 14),
                 MinHeight   = 48,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
@@ -848,7 +892,7 @@ public sealed partial class AllTemplatesCarousel : UserControl
                 Text = headerLabel.ToUpperInvariant(),
                 FontSize = 12,
                 FontWeight = Microsoft.UI.Text.FontWeights.Bold,
-                Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 255, 255)),
+                Foreground = primaryText,
                 VerticalAlignment = VerticalAlignment.Center,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 TextAlignment = TextAlignment.Center,
@@ -872,7 +916,7 @@ public sealed partial class AllTemplatesCarousel : UserControl
             colStack.Children.Add(new Border
             {
                 Height     = 1,
-                Background = new SolidColorBrush(Color.FromArgb(80, accent.R, accent.G, accent.B)),
+                Background = borderDefault,
             });
 
             // ── Scrollable data rows ──
@@ -884,7 +928,7 @@ public sealed partial class AllTemplatesCarousel : UserControl
                     dataStack.Children.Add(new Border
                     {
                         Height     = 1,
-                        Background = new SolidColorBrush(Color.FromArgb(20, 255, 255, 255)),
+                        Background = borderDefault,
                     });
 
                 var record = records[ri];
@@ -892,7 +936,7 @@ public sealed partial class AllTemplatesCarousel : UserControl
 
                 dataStack.Children.Add(new Border
                 {
-                    Background  = new SolidColorBrush(Color.FromArgb(ri % 2 == 0 ? (byte)10 : (byte)4, 255, 255, 255)),
+                    Background  = ThemeBrush(ri % 2 == 0 ? "CardBackgroundBrush" : "GridRowAltBackgroundBrush"),
                     Padding     = new Thickness(10, 14, 10, 14),
                     MinHeight   = DataRowMinHeight,
                     HorizontalAlignment = HorizontalAlignment.Stretch,
@@ -902,7 +946,7 @@ public sealed partial class AllTemplatesCarousel : UserControl
                         Text = string.IsNullOrWhiteSpace(cellValue) ? "—" : cellValue,
                         FontSize = DataRowFontSize,
                         LineHeight = 20,
-                        Foreground = new SolidColorBrush(Color.FromArgb(220, 255, 255, 255)),
+                        Foreground = secondaryText,
                         HorizontalAlignment = HorizontalAlignment.Stretch,
                         VerticalAlignment = VerticalAlignment.Center,
                         TextAlignment = TextAlignment.Center,

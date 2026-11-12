@@ -40,7 +40,10 @@ public sealed partial class TemplatesPage : Page
         Loaded += OnLoaded;
         DataContextChanged += OnDataContextChanged;
         AllTemplatesCarouselControl.TemplateDoubleTapped += OnTemplateDoubleTapped;
+        AllTemplatesCarouselControl.TemplateEditRequested += OnTemplateEditRequested;
+        FavouritesSubPageControl.TemplateEditRequested += OnTemplateEditRequested;
         TemplateComposerControl.Closed += OnTemplateComposerClosed;
+        TemplateComposerControl.Saved += OnTemplateComposerSaved;
 
         // Ensure drag-pan still works when child controls mark events handled.
         TemplateCanvasScrollViewer.AddHandler(
@@ -174,9 +177,14 @@ public sealed partial class TemplatesPage : Page
     private async void OnTemplateDoubleTapped(object? sender, string templateId) =>
         await ShowTemplateComposerAsync(templateId, isCreating: false);
 
+    private async void OnTemplateEditRequested(object? sender, string templateId) =>
+        await ShowTemplateComposerAsync(templateId, isCreating: false);
+
     private async Task ShowTemplateComposerAsync(string templateId, bool isCreating)
     {
         TemplatesBrowseHeader.Visibility = Visibility.Collapsed;
+        AllTemplatesPanel.Visibility = Visibility.Collapsed;
+        FavouritesSubPageControl.Visibility = Visibility.Collapsed;
         AllTemplatesCarouselControl.Visibility = Visibility.Collapsed;
         EmptyTemplatesHint.Visibility = Visibility.Collapsed;
         TemplateComposerControl.Visibility = Visibility.Visible;
@@ -189,6 +197,14 @@ public sealed partial class TemplatesPage : Page
         if (DataContext is TemplatesViewModel vm)
         {
             _ = ReloadTemplatesAfterComposerAsync(vm);
+        }
+    }
+
+    private async void OnTemplateComposerSaved(object? sender, EventArgs e)
+    {
+        if (DataContext is TemplatesViewModel vm)
+        {
+            await vm.LoadAsync().ConfigureAwait(true);
         }
     }
 

@@ -46,6 +46,7 @@ public sealed partial class FavouritesSubPage : UserControl
 
     // Raised when the user clicks "Back to Templates"
     public event EventHandler? BackRequested;
+    public event EventHandler<string>? TemplateEditRequested;
 
     public FavouritesSubPage()
     {
@@ -1021,18 +1022,7 @@ public sealed partial class FavouritesSubPage : UserControl
 
     private void OnEditTemplateRequested(object? sender, string templateId)
     {
-        if (_templatesVm is null) return;
-
-        // Set the correct template before calling BeginEdit so it edits the right one
-        var target = _templatesVm.Templates.FirstOrDefault(
-            t => string.Equals(t.Id, templateId, StringComparison.Ordinal));
-
-        if (target is not null)
-        {
-            _templatesVm.SelectedTemplate = target;
-        }
-
-        _templatesVm.BeginEditSelectedTemplateCommand.Execute(null);
+        TemplateEditRequested?.Invoke(this, templateId);
         BackRequested?.Invoke(this, EventArgs.Empty);
     }
 

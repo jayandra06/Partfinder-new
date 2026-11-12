@@ -59,41 +59,8 @@
                         Visibility="Collapsed"
                         Click="OnCancelCreationClick"
                         Content="Cancel creation" />
-                    <Border
-                        Width="1"
-                        Height="24"
-                        Margin="4,0"
-                        VerticalAlignment="Center"
-                        Background="{StaticResource BorderDefaultBrush}" />
-                    <TextBlock
-                        Text="Rows"
-                        VerticalAlignment="Center"
-                        Foreground="{StaticResource TextSecondaryBrush}" />
-                    <TextBox
-                        x:Name="RowCountBox"
-                        Width="64"
-                        Height="36"
-                        VerticalAlignment="Center"
-                        TextAlignment="Center" />
-                    <TextBlock
-                        Text="Columns"
-                        VerticalAlignment="Center"
-                        Foreground="{StaticResource TextSecondaryBrush}" />
-                    <TextBox
-                        x:Name="ColumnCountBox"
-                        Width="64"
-                        Height="36"
-                        VerticalAlignment="Center"
-                        TextAlignment="Center" />
                     <Button
-                        Style="{StaticResource OutlinedButtonStyle}"
-                        Height="36"
-                        MinWidth="0"
-                        Padding="12,0"
-                        VerticalAlignment="Center"
-                        Click="OnApplySizeClick"
-                        Content="Apply size" />
-                    <Button
+                        x:Name="SaveButton"
                         Style="{StaticResource PrimaryButtonStyle}"
                         Height="36"
                         MinWidth="0"
@@ -112,7 +79,7 @@
             FontSize="12"
             TextWrapping="WrapWholeWords"
             Foreground="{StaticResource TextSecondaryBrush}"
-            Text="Select a column in this template, then choose a master data column below. Its values are copied in, and that master data column cannot be chosen again. Copy a new column duplicates a template column." />
+            Text="Select a column in this template, then choose a master data column below. Its values are copied in, and that master data column cannot be chosen again." />
 
         <Border
             Grid.Row="2"

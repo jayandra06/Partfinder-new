@@ -55,7 +55,7 @@
                     <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="Transparent" />
                     <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="Transparent" />
                 </Button.Resources>
-                <FontIcon Glyph="&#xE76B;" FontSize="18" Foreground="White" />
+                <FontIcon Glyph="&#xE76B;" FontSize="18" Foreground="{StaticResource TextPrimaryBrush}" />
             </Button>
 
             <Border Grid.Column="2" Width="50" />
@@ -72,7 +72,7 @@
                     <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="Transparent" />
                     <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="Transparent" />
                 </Button.Resources>
-                <FontIcon Glyph="&#xE76C;" FontSize="18" Foreground="White" />
+                <FontIcon Glyph="&#xE76C;" FontSize="18" Foreground="{StaticResource TextPrimaryBrush}" />
             </Button>
         </Grid>
     </Grid>

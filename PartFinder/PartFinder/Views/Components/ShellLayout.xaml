@@ -12,10 +12,10 @@
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
         <converters:InvertedBoolToVisibilityConverter x:Key="InvertedBoolToVisibilityConverter" />
         <Style x:Key="TopNavIconButtonStyle" TargetType="Button" BasedOn="{StaticResource GhostButtonStyle}">
-            <Setter Property="Width" Value="44" />
-            <Setter Property="Height" Value="44" />
-            <Setter Property="MinHeight" Value="44" />
-            <Setter Property="Padding" Value="0" />
+            <Setter Property="Width" Value="76" />
+            <Setter Property="Height" Value="56" />
+            <Setter Property="MinHeight" Value="56" />
+            <Setter Property="Padding" Value="4,2" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
@@ -118,7 +118,7 @@
                 BorderBrush="{StaticResource GlassStrokeBrush}"
                 BorderThickness="0,0,0,1"
                 CornerRadius="0">
-            <Grid x:Name="AppTitleBarLayout" Height="84">
+            <Grid x:Name="AppTitleBarLayout" Height="92">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition x:Name="TitleBarLeftInsetColumn" Width="0" />
                     <ColumnDefinition Width="Auto" />
@@ -169,9 +169,9 @@
                             </ItemsRepeater.Layout>
                             <ItemsRepeater.ItemTemplate>
                                 <DataTemplate x:DataType="viewModels:NavItemViewModel">
-                                    <Grid Width="48" Height="44">
+                                    <Grid Width="76" MinHeight="60" Margin="0,2">
                                         <Border
-                                            Margin="3,5"
+                                            Margin="3,4"
                                             CornerRadius="12"
                                             Background="{StaticResource NavItemSelectedBrush}"
                                             BorderBrush="{StaticResource NavItemSelectedBorderBrush}"
@@ -179,7 +179,7 @@
                                             Visibility="{x:Bind IsSelected, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
                                         <Border
                                             Height="2"
-                                            Margin="10,0"
+                                            Margin="12,0"
                                             VerticalAlignment="Bottom"
                                             Background="{StaticResource AccentPrimaryBrush}"
                                             Visibility="{x:Bind IsSelected, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
@@ -188,19 +188,33 @@
                                             Click="OnTopNavItemClicked"
                                             DataContext="{x:Bind}"
                                             ToolTipService.ToolTip="{x:Bind Label}">
-                                            <Grid>
-                                                <FontIcon
-                                                    Glyph="{x:Bind IconGlyph}"
-                                                    FontSize="18"
-                                                    Foreground="{StaticResource TextSecondaryBrush}"
-                                                    Opacity="0.92"
-                                                    Visibility="{x:Bind IsSelected, Mode=OneWay, Converter={StaticResource InvertedBoolToVisibilityConverter}}" />
-                                                <FontIcon
-                                                    Glyph="{x:Bind IconGlyph}"
-                                                    FontSize="18"
-                                                    Foreground="{StaticResource AccentPrimaryBrush}"
-                                                    Visibility="{x:Bind IsSelected, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
-                                            </Grid>
+                                            <StackPanel
+                                                Spacing="2"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center">
+                                                <Grid Height="22" HorizontalAlignment="Center">
+                                                    <FontIcon
+                                                        Glyph="{x:Bind IconGlyph}"
+                                                        FontSize="18"
+                                                        Foreground="{StaticResource TextSecondaryBrush}"
+                                                        Opacity="0.92"
+                                                        Visibility="{x:Bind IsSelected, Mode=OneWay, Converter={StaticResource InvertedBoolToVisibilityConverter}}" />
+                                                    <FontIcon
+                                                        Glyph="{x:Bind IconGlyph}"
+                                                        FontSize="18"
+                                                        Foreground="{StaticResource AccentPrimaryBrush}"
+                                                        Visibility="{x:Bind IsSelected, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                </Grid>
+                                                <TextBlock
+                                                    Text="{x:Bind Label}"
+                                                    FontSize="10"
+                                                    LineHeight="12"
+                                                    TextAlignment="Center"
+                                                    TextTrimming="CharacterEllipsis"
+                                                    TextWrapping="NoWrap"
+                                                    MaxWidth="72"
+                                                    Foreground="{StaticResource TextSecondaryBrush}" />
+                                            </StackPanel>
                                         </Button>
                                     </Grid>
                                 </DataTemplate>

@@ -632,7 +632,7 @@ public partial class TemplatesViewModel : ViewModelBase
 
     public string? LastCreatedTemplateId { get; private set; }
 
-    /// <summary>Creates a named template with 5 columns and 10 empty rows. Returns an error message, or null on success.</summary>
+    /// <summary>Creates a named template with one column; rows are added in the composer. Returns an error message, or null on success.</summary>
     public async Task<string?> CreateDefaultTableTemplateAsync(string name, CancellationToken cancellationToken = default)
     {
         LastCreatedTemplateId = null;
@@ -652,8 +652,7 @@ public partial class TemplatesViewModel : ViewModelBase
             return "A template with this name already exists.";
         }
 
-        const int defaultColumns = 5;
-        const int defaultRows = 10;
+        const int defaultColumns = 1;
         var templateId = Guid.NewGuid().ToString("N");
         var fields = new List<TemplateFieldDefinition>(defaultColumns);
         for (var i = 1; i <= defaultColumns; i++)
@@ -681,15 +680,11 @@ public partial class TemplatesViewModel : ViewModelBase
         try
         {
             await _templateSchema.SaveTemplateAsync(def, cancellationToken).ConfigureAwait(true);
-            var blanks = Enumerable.Range(0, defaultRows)
-                .Select(_ => (IReadOnlyDictionary<string, string>)fields.ToDictionary(f => f.Key, _ => string.Empty))
-                .ToList();
-            await _records.AppendRowsAsync(templateId, blanks, cancellationToken: cancellationToken).ConfigureAwait(true);
             LastCreatedTemplateId = templateId;
             await LoadAsync(cancellationToken).ConfigureAwait(true);
             _activityLogger.LogTemplateChange(
                 "Template Created",
-                $"Template \"{name}\" created with {defaultColumns} columns and {defaultRows} rows");
+                $"Template \"{name}\" created with {defaultColumns} column (add rows in the editor)");
             return null;
         }
         catch (Exception ex)
