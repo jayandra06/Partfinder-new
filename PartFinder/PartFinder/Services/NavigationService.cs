@@ -164,8 +164,13 @@ public sealed class NavigationService : INavigationService
 
         if (_frame.Content?.GetType() == targetType)
         {
-            System.Diagnostics.Debug.WriteLine($"[NavigationService] Already on {targetType.Name}. Navigation skipped.");
-            return false;
+            if (parameter is not null && _frame.Content is INavigationParameterSink sink)
+            {
+                sink.ReceiveNavigationParameter(parameter);
+            }
+
+            System.Diagnostics.Debug.WriteLine($"[NavigationService] Already on {targetType.Name}. Parameter applied.");
+            return true;
         }
 
         System.Diagnostics.Debug.WriteLine($"[NavigationService] Navigating to {page} ({targetType.Name})...");

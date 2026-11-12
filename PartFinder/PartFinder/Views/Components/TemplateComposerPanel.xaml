@@ -117,6 +117,7 @@
         </Border>
 
         <Border
+            x:Name="MasterDataPanelBorder"
             Grid.Row="3"
             Background="{StaticResource ElevatedCardBackgroundBrush}"
             BorderBrush="{StaticResource GlassStrokeBrush}"

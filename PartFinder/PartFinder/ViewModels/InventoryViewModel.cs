@@ -33,16 +33,23 @@ public partial class InventoryViewModel : PaginatedViewModelBase
         _access = access;
     }
 
-    /// <summary>Export, import, add stock, KPI cards, and row edit actions (admin only).</summary>
+    /// <summary>Export, import, add stock, and row edit actions (admin only).</summary>
     public bool ShowInventoryAdminChrome => _access.Capabilities.CanManageInventory;
 
+    /// <summary>KPI summary cards (viewers and admins).</summary>
+    public bool ShowInventoryKpiRow => _access.Capabilities.CanViewInventory;
+
+    /// <summary>Warehouse quick action visible to employees only.</summary>
+    public bool ShowWarehouseSuggestAction =>
+        _access.Capabilities.CanViewInventory && !_access.Capabilities.CanManageInventory;
+
     public string InventoryPageTitle =>
-        ShowInventoryAdminChrome ? "Inventory Management" : "Inventory";
+        ShowInventoryAdminChrome ? "Warehouse Management" : "Warehouse";
 
     public string InventoryPageDescription =>
         ShowInventoryAdminChrome
-            ? "Track stock levels, monitor part availability, and manage inventory across your organisation."
-            : "Browse stock levels and part availability across your organisation.";
+            ? "Track stock levels, monitor part availability, and manage warehouse inventory across your organisation."
+            : "Browse stock levels and part availability in your warehouse.";
 
     private static string DemoInventoryPurgeFlagPath =>
         Path.Combine(
@@ -54,6 +61,8 @@ public partial class InventoryViewModel : PaginatedViewModelBase
     public void RefreshRoleChrome()
     {
         OnPropertyChanged(nameof(ShowInventoryAdminChrome));
+        OnPropertyChanged(nameof(ShowInventoryKpiRow));
+        OnPropertyChanged(nameof(ShowWarehouseSuggestAction));
         OnPropertyChanged(nameof(InventoryPageTitle));
         OnPropertyChanged(nameof(InventoryPageDescription));
     }

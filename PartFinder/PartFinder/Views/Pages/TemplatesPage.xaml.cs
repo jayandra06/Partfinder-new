@@ -12,10 +12,11 @@ using Windows.Storage;
 using Windows.Storage.Pickers;
 using System.Linq;
 using Microsoft.UI.Dispatching;
+using Microsoft.UI.Xaml.Navigation;
 
 namespace PartFinder.Views.Pages;
 
-public sealed partial class TemplatesPage : Page
+public sealed partial class TemplatesPage : Page, INavigationParameterSink
 {
     private readonly BackendApiClient _apiClient = App.Services.GetRequiredService<BackendApiClient>();
     private readonly ActivityLogger _activity = App.Services.GetRequiredService<ActivityLogger>();
@@ -30,7 +31,9 @@ public sealed partial class TemplatesPage : Page
     private bool _acceptBulkProgress;
     private int _bulkUploaded;
     private int _bulkUploadTotal;
-    private bool _showingFavouritesOnly;
+    private bool _initialLoadComplete;
+    private string? _pendingWorkspaceTemplateId;
+    private bool _pendingWorkspaceViewOnly;
 
     public TemplatesPage()
     {
@@ -64,15 +67,65 @@ public sealed partial class TemplatesPage : Page
             true);
     }
 
+    protected override void OnNavigatedTo(NavigationEventArgs e)
+    {
+        base.OnNavigatedTo(e);
+        if (!TryParseWorkspaceNavigation(e.Parameter, out var templateId, out var viewOnly))
+        {
+            return;
+        }
+
+        if (_initialLoadComplete)
+        {
+            _ = OpenTemplateWorkspaceAsync(templateId, viewOnly);
+        }
+        else
+        {
+            _pendingWorkspaceTemplateId = templateId;
+            _pendingWorkspaceViewOnly = viewOnly;
+        }
+    }
+
+    private static bool TryParseWorkspaceNavigation(object? parameter, out string templateId, out bool viewOnly)
+    {
+        templateId = string.Empty;
+        viewOnly = false;
+        switch (parameter)
+        {
+            case TemplateWorkspaceNavigationArgs args when !string.IsNullOrWhiteSpace(args.TemplateId):
+                templateId = args.TemplateId;
+                viewOnly = args.ViewOnly;
+                return true;
+            case string id when !string.IsNullOrWhiteSpace(id):
+                templateId = id;
+                return true;
+            default:
+                return false;
+        }
+    }
+
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         System.Diagnostics.Debug.WriteLine("[TemplatesPage] OnLoaded triggered.");
         var vm = (TemplatesViewModel)DataContext;
+        var appState = App.Services.GetRequiredService<IAppStateStore>();
+
+        var pendingOpenId = _pendingWorkspaceTemplateId ?? appState.TemplatesPendingOpenTemplateId;
+        var pendingViewOnly = _pendingWorkspaceViewOnly || appState.TemplatesPendingOpenViewOnly;
+        _pendingWorkspaceTemplateId = null;
+        _pendingWorkspaceViewOnly = false;
+        appState.TemplatesPendingOpenTemplateId = null;
+        appState.TemplatesPendingOpenViewOnly = false;
+
+        if (!string.IsNullOrWhiteSpace(pendingOpenId))
+        {
+            await OpenTemplateWorkspaceAsync(pendingOpenId, pendingViewOnly).ConfigureAwait(true);
+        }
 
         // IMPORTANT: Load favourite store FIRST before loading templates
         await vm.LoadFavouriteStoreAsync().ConfigureAwait(true);
 
-        // Then load templates
+        // Then load templates (carousel); composer can open before this finishes
         await vm.LoadAsync().ConfigureAwait(true);
         vm.Templates.CollectionChanged += (_, _) =>
         {
@@ -81,14 +134,16 @@ public sealed partial class TemplatesPage : Page
                 RefreshTemplatesListSource();
             }
         };
-        OnShowAllTemplatesClick(this, new RoutedEventArgs());
+        RefreshTemplatesListSource();
 
-        var pending = App.Services.GetRequiredService<IAppStateStore>().TemplatesPendingAction;
+        var pending = appState.TemplatesPendingAction;
         if (string.Equals(pending, "Create", StringComparison.Ordinal))
         {
-            App.Services.GetRequiredService<IAppStateStore>().TemplatesPendingAction = null;
+            appState.TemplatesPendingAction = null;
             OnCreateNewTemplateClick(this, new RoutedEventArgs());
         }
+
+        _initialLoadComplete = true;
 
         // Hook template save to log activity
         vm.PropertyChanged += (_, args) =>
@@ -174,13 +229,44 @@ public sealed partial class TemplatesPage : Page
         await errorDialog.ShowAsync();
     }
 
-    private async void OnTemplateDoubleTapped(object? sender, string templateId) =>
-        await ShowTemplateComposerAsync(templateId, isCreating: false);
+    public void ReceiveNavigationParameter(object? parameter)
+    {
+        if (!TryParseWorkspaceNavigation(parameter, out var templateId, out var viewOnly))
+        {
+            return;
+        }
+
+        var appState = App.Services.GetRequiredService<IAppStateStore>();
+        appState.TemplatesPendingOpenTemplateId = null;
+        appState.TemplatesPendingOpenViewOnly = false;
+        if (_initialLoadComplete)
+        {
+            _ = OpenTemplateWorkspaceAsync(templateId, viewOnly);
+        }
+        else
+        {
+            _pendingWorkspaceTemplateId = templateId;
+            _pendingWorkspaceViewOnly = viewOnly;
+        }
+    }
+
+    private async Task OpenTemplateWorkspaceAsync(string templateId, bool viewOnly = false) =>
+        await ShowTemplateComposerAsync(templateId, isCreating: false, viewOnly: viewOnly);
+
+    private void OnTemplateDoubleTapped(object? sender, string templateId)
+    {
+        if (string.IsNullOrWhiteSpace(templateId))
+        {
+            return;
+        }
+
+        App.Services.GetRequiredService<INavigationService>().Navigate(AppPage.TemplateData, templateId);
+    }
 
     private async void OnTemplateEditRequested(object? sender, string templateId) =>
-        await ShowTemplateComposerAsync(templateId, isCreating: false);
+        await OpenTemplateWorkspaceAsync(templateId, viewOnly: false);
 
-    private async Task ShowTemplateComposerAsync(string templateId, bool isCreating)
+    private async Task ShowTemplateComposerAsync(string templateId, bool isCreating, bool viewOnly = false)
     {
         TemplatesBrowseHeader.Visibility = Visibility.Collapsed;
         AllTemplatesPanel.Visibility = Visibility.Collapsed;
@@ -188,7 +274,7 @@ public sealed partial class TemplatesPage : Page
         AllTemplatesCarouselControl.Visibility = Visibility.Collapsed;
         EmptyTemplatesHint.Visibility = Visibility.Collapsed;
         TemplateComposerControl.Visibility = Visibility.Visible;
-        await TemplateComposerControl.OpenAsync(templateId, isCreating);
+        await TemplateComposerControl.OpenAsync(templateId, isCreating, viewOnly);
     }
 
     private void OnTemplateComposerClosed(object? sender, EventArgs e)
@@ -324,7 +410,7 @@ public sealed partial class TemplatesPage : Page
 
             if (result.HasWork)
             {
-                OnShowAllTemplatesClick(sender, e);
+                RefreshTemplatesListSource();
             }
         }
         catch (Exception ex)
@@ -382,40 +468,6 @@ public sealed partial class TemplatesPage : Page
         AllTemplatesPanel.Visibility = Visibility.Collapsed;
     }
 
-    private void OnShowAllTemplatesClick(object sender, RoutedEventArgs e)
-    {
-        if (DataContext is not TemplatesViewModel) return;
-
-        _showingFavouritesOnly = false;
-        FavouritesSubPageControl.Visibility = Visibility.Collapsed;
-        AllTemplatesPanel.Visibility = Visibility.Visible;
-
-        ViewAllTemplatesButton.Visibility = Visibility.Collapsed;
-        ViewFavouritesButton.Visibility = Visibility.Visible;
-
-        PageIndicatorIcon.Glyph = "\uE8A5";
-        PageIndicatorText.Text = "Your All Templates";
-
-        RefreshTemplatesListSource();
-    }
-
-    private void OnShowFavouritesClick(object sender, RoutedEventArgs e)
-    {
-        if (DataContext is not TemplatesViewModel) return;
-
-        _showingFavouritesOnly = true;
-        FavouritesSubPageControl.Visibility = Visibility.Collapsed;
-        AllTemplatesPanel.Visibility = Visibility.Visible;
-
-        ViewAllTemplatesButton.Visibility = Visibility.Visible;
-        ViewFavouritesButton.Visibility = Visibility.Collapsed;
-
-        PageIndicatorIcon.Glyph = "\uE735";
-        PageIndicatorText.Text = "Your Favourite Templates";
-
-        RefreshTemplatesListSource();
-    }
-
     private void RefreshTemplatesListSource()
     {
         if (TemplateComposerControl.Visibility == Visibility.Visible)
@@ -428,25 +480,14 @@ public sealed partial class TemplatesPage : Page
             return;
         }
 
-        IEnumerable<PartTemplateDefinition> source;
-        if (_showingFavouritesOnly)
-        {
-            var favouriteIds = App.Services.GetRequiredService<IFavouriteStore>().GetAll();
-            source = vm.Templates.Where(t => favouriteIds.Contains(t.Id));
-        }
-        else
-        {
-            source = vm.Templates;
-        }
-
-        var list = source.OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        var list = vm.Templates
+            .OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         if (list.Count == 0)
         {
             AllTemplatesCarouselControl.Visibility = Visibility.Collapsed;
-            EmptyTemplatesHint.Text = _showingFavouritesOnly
-                ? "No favourite templates yet. Star templates to see them here."
-                : "No templates yet. Use Create New Template or Bulk Upload.";
+            EmptyTemplatesHint.Text = "No analytics templates yet. Use Create New Template or Bulk Upload.";
             EmptyTemplatesHint.Visibility = Visibility.Visible;
         }
         else

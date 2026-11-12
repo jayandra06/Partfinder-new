@@ -1,5 +1,6 @@
-<Page
+﻿<Page
     x:Class="PartFinder.Views.Pages.DashboardPage"
+    x:Name="DashboardPageRoot"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:components="using:PartFinder.Views.Components"
@@ -9,6 +10,7 @@
 
     <Page.Resources>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <converters:InvertedBoolToVisibilityConverter x:Key="InvertedBoolToVisibilityConverter"/>
 
         <!-- In-page dashboard section (no floating card / shadow) -->
         <Style x:Key="DashboardSectionStyle" TargetType="Border">
@@ -28,7 +30,7 @@
             <Setter Property="Padding" Value="0,6,0,0"/>
         </Style>
 
-        <!-- Quick action rows — flat list on the page -->
+        <!-- Quick action rows â€” flat list on the page -->
         <Style x:Key="ActionRowStyle" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="{StaticResource BorderDefaultBrush}"/>
@@ -37,6 +39,32 @@
             <Setter Property="Padding" Value="4,12"/>
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        </Style>
+
+        <Style x:Key="FavouritePreviewCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource ElevatedCardBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource GlassStrokeBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="16"/>
+            <Setter Property="Padding" Value="16"/>
+            <Setter Property="Margin" Value="0,0,0,16"/>
+        </Style>
+
+        <Style x:Key="FavouritePreviewHeaderCellStyle" TargetType="TextBlock">
+            <Setter Property="Width" Value="132"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{StaticResource TextTertiaryBrush}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+        </Style>
+
+        <Style x:Key="FavouritePreviewDataCellStyle" TargetType="TextBlock">
+            <Setter Property="Width" Value="132"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
         </Style>
     </Page.Resources>
 
@@ -56,32 +84,6 @@
                         <VisualState.Setters>
                             <Setter Target="RootStack.Padding" Value="12,16,12,32" />
                             
-                            <!-- Row 1 stacking -->
-                            <Setter Target="Row1Def2.Height" Value="Auto" />
-                            <Setter Target="Row1Col1.Width" Value="*" />
-                            <Setter Target="Row1Col2.Width" Value="0" />
-                            <Setter Target="Row1ChartBorder.(Grid.Row)" Value="0" />
-                            <Setter Target="Row1ChartBorder.(Grid.Column)" Value="0" />
-                            <Setter Target="Row1DonutBorder.(Grid.Row)" Value="1" />
-                            <Setter Target="Row1DonutBorder.(Grid.Column)" Value="0" />
-                            
-                            <!-- Row 2 stacking -->
-                            <Setter Target="Row2Def2.Height" Value="Auto" />
-                            <Setter Target="Row2Col1.Width" Value="*" />
-                            <Setter Target="Row2Col2.Width" Value="0" />
-                            <Setter Target="Row2BarBorder.(Grid.Row)" Value="0" />
-                            <Setter Target="Row2BarBorder.(Grid.Column)" Value="0" />
-                            <Setter Target="Row2HealthBorder.(Grid.Row)" Value="1" />
-                            <Setter Target="Row2HealthBorder.(Grid.Column)" Value="0" />
-
-                            <!-- Row 3 stacking -->
-                            <Setter Target="Row3Def2.Height" Value="Auto" />
-                            <Setter Target="Row3Col1.Width" Value="*" />
-                            <Setter Target="Row3Col2.Width" Value="0" />
-                            <Setter Target="Row3ActivityBorder.(Grid.Row)" Value="0" />
-                            <Setter Target="Row3ActivityBorder.(Grid.Column)" Value="0" />
-                            <Setter Target="Row3ActionsBorder.(Grid.Row)" Value="1" />
-                            <Setter Target="Row3ActionsBorder.(Grid.Column)" Value="0" />
                         </VisualState.Setters>
                     </VisualState>
                 </VisualStateGroup>
@@ -90,9 +92,9 @@
             <StackPanel x:Name="RootStack" Padding="28,24,28,40" Spacing="18" HorizontalAlignment="Stretch"
                         Transitions="{StaticResource LuxuryPanelTransitions}">
 
-            <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+            <!-- Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â -->
             <!-- HEADER                                                         -->
-            <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+            <!-- Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â -->
             <Grid x:Name="HeaderGrid" Opacity="0" Transitions="{StaticResource LuxuryPanelTransitions}">
                 <Grid.RenderTransform><TranslateTransform x:Name="HeaderSlide" Y="-10"/></Grid.RenderTransform>
                 <Grid.ColumnDefinitions>
@@ -103,7 +105,7 @@
                 <StackPanel Spacing="3">
                     <TextBlock Text="OVERVIEW" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}"
                                CharacterSpacing="80" FontWeight="SemiBold"/>
-                    <TextBlock Text="Inventory Dashboard" FontSize="26" FontWeight="Bold">
+                    <TextBlock Text="Home" FontSize="26" FontWeight="Bold">
                         <TextBlock.Foreground>
                             <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
                                 <GradientStop Color="{ThemeResource AccentHoverColor}" Offset="0"/>
@@ -112,7 +114,7 @@
                             </LinearGradientBrush>
                         </TextBlock.Foreground>
                     </TextBlock>
-                    <TextBlock Text="Real-time overview of your parts inventory, templates, and system health."
+                    <TextBlock Text="Live previews of your starred catalogs and analytics templates."
                                FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
                 </StackPanel>
 
@@ -143,15 +145,15 @@
                 </Grid>
             </Grid>
 
-            <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-            <!-- LOW STOCK ALERT BANNER (visible only when HasLowStock = true)  -->
-            <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+            <!-- Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â -->
+            <!-- LOW STOCK ALERT BANNER (hidden on home â€” favourites only)      -->
+            <!-- Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â -->
             <Border x:Name="LowStockBanner"
                     CornerRadius="12" Padding="16,12"
                     Background="#0DFFB781"
                     BorderThickness="1"
                     Opacity="0"
-                    Visibility="{Binding HasLowStock, Converter={StaticResource BoolToVisibilityConverter}}">
+                    Visibility="Collapsed">
                 <Border.BorderBrush>
                     <SolidColorBrush x:Name="BannerBorderBrush" Color="#40FFB781"/>
                 </Border.BorderBrush>
@@ -217,7 +219,7 @@
 
                     <!-- View Parts button -->
                     <Button Grid.Column="2" VerticalAlignment="Center"
-                            Content="View Parts â†’"
+                            Content="View Parts Ã¢â€ â€™"
                             FontSize="11" FontWeight="SemiBold"
                             Foreground="#FFB781"
                             Background="#15FFB781"
@@ -228,384 +230,151 @@
                 </Grid>
             </Border>
 
-            <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+            <!-- Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â -->
             <!-- KPI CARDS ROW                                                  -->
-            <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-            <ItemsControl x:Name="KpiRow" ItemsSource="{Binding Kpis}" Opacity="0" Transitions="{StaticResource LuxuryListTransitions}">
-                <ItemsControl.RenderTransform><TranslateTransform x:Name="KpiSlide" Y="10"/></ItemsControl.RenderTransform>
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <ItemsWrapGrid Orientation="Horizontal" ItemWidth="270"/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="viewModels:KpiItem">
-                        <components:KpiCard
-                            Label="{x:Bind Label}"
-                            Value="{x:Bind Value, Mode=OneWay}"
-                            Delta="{x:Bind Delta, Mode=OneWay}"
-                            IconGlyph="{x:Bind Icon}"
-                            AccentHex="{x:Bind AccentHex}"
-                            AlertLevel="{x:Bind AlertLevel, Mode=OneWay}"/>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+            <!-- Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â -->
+            <ItemsControl x:Name="KpiRow" ItemsSource="{Binding Kpis}" Visibility="Collapsed"/>
 
-            <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-            <!-- ROW 1: Trend Chart + Distribution Donut                        -->
-            <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-            <Grid x:Name="Row1" ColumnSpacing="14" Opacity="0" Transitions="{StaticResource LuxuryPanelTransitions}">
-                <Grid.RenderTransform><TranslateTransform x:Name="Row1Slide" Y="12"/></Grid.RenderTransform>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition x:Name="Row1Def2" Height="0" />
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition x:Name="Row1Col1" Width="2.2*"/>
-                    <ColumnDefinition x:Name="Row1Col2" Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <!-- Parts Trend Chart -->
-                <Border x:Name="Row1ChartBorder" Grid.Column="0" Style="{StaticResource DashboardSectionStyle}">
-                    <StackPanel Spacing="12">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Spacing="2">
-                                <TextBlock Text="Parts Trend" FontSize="15" FontWeight="SemiBold"/>
-                                <TextBlock Text="Parts created over time with average baseline"
-                                           FontSize="11" Foreground="{StaticResource TextTertiaryBrush}"/>
-                            </StackPanel>
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                                <Border CornerRadius="6" Padding="8,3" Background="#101F7AE0">
-                                    <TextBlock Text="LAST 30 DAYS" FontSize="8" Foreground="{StaticResource AccentPrimaryBrush}"
-                                               CharacterSpacing="60" FontWeight="SemiBold"/>
-                                </Border>
-                                <Border CornerRadius="6" Padding="8,3" Background="#10FFFFFF">
-                                    <StackPanel Orientation="Horizontal" Spacing="4">
-                                        <Ellipse Width="5" Height="5" Fill="{StaticResource SuccessBrush}" VerticalAlignment="Center"/>
-                                        <TextBlock Text="LIVE" FontSize="8" Foreground="{StaticResource TextTertiaryBrush}"
-                                                   CharacterSpacing="60" FontWeight="SemiBold"/>
-                                    </StackPanel>
-                                </Border>
-                            </StackPanel>
-                        </Grid>
-
-                        <Border Style="{StaticResource DashboardInsetSurfaceStyle}">
-                            <Grid>
-                                <lvc:CartesianChart
-                                    x:Name="TrendChart"
-                                    Height="240"
-                                    Background="Transparent"
-                                    Series="{Binding TrendSeries}"
-                                    AnimationsSpeed="00:00:00.8"
-                                    EasingFunction="{x:Null}"/>
-                                <components:LoadingSkeleton
-                                    Kind="Block"
-                                    Height="240"
-                                    HorizontalAlignment="Stretch"
-                                    VerticalAlignment="Stretch"
-                                    IsHitTestVisible="False"
-                                    Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}" />
-                            </Grid>
-                        </Border>
-
-                        <!-- Legend -->
-                        <StackPanel Orientation="Horizontal" Spacing="18">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <Border Width="18" Height="3" CornerRadius="2" Background="#1F7AE0" VerticalAlignment="Center"/>
-                                <TextBlock Text="Trend" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}"/>
-                            </StackPanel>
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <Border Width="18" Height="1" CornerRadius="1" Background="#64647880" VerticalAlignment="Center"/>
-                                <TextBlock Text="Average" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}"/>
-                            </StackPanel>
-                        </StackPanel>
+            <!-- YOUR FAVOURITES -->
+            <Border x:Name="FavouritesRow" Opacity="0" Style="{StaticResource DashboardSectionStyle}">
+                <Border.RenderTransform><TranslateTransform x:Name="FavouritesSlide" Y="8"/></Border.RenderTransform>
+                <StackPanel Spacing="12">
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="Your Favourites" FontSize="15" FontWeight="SemiBold"/>
+                        <TextBlock Text="Scroll within each card for more columns. Tap the card footer to open the full workspace."
+                                   FontSize="11" Foreground="{StaticResource TextTertiaryBrush}"/>
                     </StackPanel>
-                </Border>
 
-                <!-- Template Distribution Donut -->
-                <Border x:Name="Row1DonutBorder" Grid.Column="1" Style="{StaticResource DashboardSectionStyle}">
-                    <StackPanel Spacing="10">
-                        <TextBlock Text="Template Distribution" FontSize="15" FontWeight="SemiBold"/>
-                        <TextBlock Text="Parts per schema category" FontSize="11"
-                                   Foreground="{StaticResource TextTertiaryBrush}"/>
-                        <Border Style="{StaticResource DashboardInsetSurfaceStyle}">
-                            <lvc:PieChart
-                                x:Name="DistributionChart"
-                                Height="190"
-                                Background="Transparent"
-                                Series="{Binding DistributionSeries}"
-                                AnimationsSpeed="00:00:00.9"
-                                InitialRotation="-90"/>
-                        </Border>
-                        <!-- Legend (bound to same data as pie slices) -->
-                        <ItemsControl ItemsSource="{Binding DistributionItems}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="viewModels:DistributionItem">
-                                    <StackPanel Orientation="Horizontal" Spacing="7" Margin="0,0,0,4">
-                                        <Border Width="10" Height="10" CornerRadius="5"
-                                                Background="{x:Bind ColorBrush}" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{x:Bind Name}" FontSize="11"
-                                                   Foreground="{StaticResource TextSecondaryBrush}"
-                                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="140"/>
-                                        <TextBlock Text="{x:Bind PercentDisplay}" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                </Border>
-            </Grid>
+                    <components:LoadingSkeleton Kind="Block" Height="120" Margin="0,8,0,0"
+                        Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
-            <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-            <!-- ROW 2: Stock Level Bar Chart + Health Gauge                    -->
-            <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-            <Grid x:Name="Row2" ColumnSpacing="14" Opacity="0" Transitions="{StaticResource LuxuryPanelTransitions}">
-                <Grid.RenderTransform><TranslateTransform x:Name="Row2Slide" Y="12"/></Grid.RenderTransform>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition x:Name="Row2Def2" Height="0" />
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition x:Name="Row2Col1" Width="1.6*"/>
-                    <ColumnDefinition x:Name="Row2Col2" Width="*"/>
-                </Grid.ColumnDefinitions>
+                    <TextBlock Text="No favourites yet. Use the star on any catalog or analytics template."
+                               FontSize="12"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               TextWrapping="WrapWholeWords"
+                               Visibility="{Binding HasFavourites, Converter={StaticResource InvertedBoolToVisibilityConverter}}"/>
 
-                <!-- Stock Level Bar Chart (NEW) -->
-                <Border x:Name="Row2BarBorder" Grid.Column="0" Style="{StaticResource DashboardSectionStyle}">
-                    <StackPanel Spacing="12">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Spacing="2">
-                                <TextBlock Text="Critical Stock Levels" FontSize="15" FontWeight="SemiBold"/>
-                                <TextBlock Text="Current quantity for low-stock parts"
-                                           FontSize="11" Foreground="{StaticResource TextTertiaryBrush}"/>
-                            </StackPanel>
-                            <Border Grid.Column="1" CornerRadius="6" Padding="8,3" Background="#10FFB781" VerticalAlignment="Top">
-                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                    <FontIcon Glyph="&#xE7BA;" FontSize="8" Foreground="#FFB781"/>
-                                    <TextBlock Text="NEEDS ATTENTION" FontSize="8" Foreground="#FFB781"
-                                               CharacterSpacing="40" FontWeight="SemiBold"/>
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-
-                        <Border Style="{StaticResource DashboardInsetSurfaceStyle}">
-                            <lvc:CartesianChart
-                                x:Name="StockLevelChart"
-                                Height="200"
-                                Background="Transparent"
-                                Series="{Binding StockLevelSeries}"
-                                AnimationsSpeed="00:00:00.9"
-                                EasingFunction="{x:Null}"/>
-                        </Border>
-
-                        <!-- Min stock threshold note -->
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Border Width="14" Height="3" CornerRadius="2" Background="#FFB781" VerticalAlignment="Center"/>
-                            <TextBlock Text="Current qty â€” below minimum threshold" FontSize="10"
-                                       Foreground="{StaticResource TextTertiaryBrush}"/>
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-
-                <!-- System Health Gauge -->
-                <Border x:Name="Row2HealthBorder" Grid.Column="1" Style="{StaticResource DashboardSectionStyle}">
-                    <StackPanel Spacing="10">
-                        <TextBlock Text="System Health" FontSize="15" FontWeight="SemiBold"/>
-                        <TextBlock Text="Import pipeline reliability" FontSize="11"
-                                   Foreground="{StaticResource TextTertiaryBrush}"/>
-                        <Grid>
-                            <Border Style="{StaticResource DashboardInsetSurfaceStyle}">
-                                <lvc:PieChart
-                                    x:Name="HealthGaugeChart"
-                                    Height="170"
-                                    Background="Transparent"
-                                    Series="{Binding HealthGaugeSeries}"
-                                    AnimationsSpeed="00:00:01.1"
-                                    InitialRotation="225"
-                                    MaxAngle="270"/>
-                            </Border>
-                            <!-- Center overlay -->
-                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="1">
-                                <TextBlock Text="{Binding HealthLabel}" FontSize="22" FontWeight="Bold"
-                                           HorizontalAlignment="Center" Foreground="{StaticResource TextPrimaryBrush}"/>
-                                <TextBlock Text="Success" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}"
-                                           HorizontalAlignment="Center"/>
-                            </StackPanel>
-                        </Grid>
-                        <!-- Health indicators -->
-                        <StackPanel Spacing="5">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <Ellipse Width="7" Height="7" Fill="{StaticResource SuccessBrush}" VerticalAlignment="Center"/>
-                                <TextBlock Text="Schema validation" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}"/>
-                            </StackPanel>
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <Ellipse Width="7" Height="7" Fill="{StaticResource SuccessBrush}" VerticalAlignment="Center"/>
-                                <TextBlock Text="API connectivity" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}"/>
-                            </StackPanel>
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <Ellipse Width="7" Height="7" Fill="{StaticResource SuccessBrush}" VerticalAlignment="Center"/>
-                                <TextBlock Text="Database sync" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}"/>
-                            </StackPanel>
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-            </Grid>
-
-            <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-            <!-- ROW 3: Activity Feed + Quick Actions                           -->
-            <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-            <Grid x:Name="Row3" ColumnSpacing="14" Opacity="0" Transitions="{StaticResource LuxuryPanelTransitions}">
-                <Grid.RenderTransform><TranslateTransform x:Name="Row3Slide" Y="12"/></Grid.RenderTransform>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition x:Name="Row3Def2" Height="0" />
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition x:Name="Row3Col1" Width="1.6*"/>
-                    <ColumnDefinition x:Name="Row3Col2" Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <!-- Recent Activity with icons -->
-                <Border x:Name="Row3ActivityBorder" Grid.Column="0" Style="{StaticResource DashboardSectionStyle}">
-                    <StackPanel Spacing="10">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Spacing="2">
-                                <TextBlock Text="Recent Activity" FontSize="15" FontWeight="SemiBold"/>
-                                <TextBlock Text="Latest operations and system events" FontSize="11"
-                                           Foreground="{StaticResource TextTertiaryBrush}"/>
-                            </StackPanel>
-                            <Border Grid.Column="1" CornerRadius="6" Padding="8,3" Background="#10FFFFFF" VerticalAlignment="Top">
-                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                    <Ellipse Width="5" Height="5" Fill="{StaticResource SuccessBrush}" VerticalAlignment="Center"/>
-                                    <TextBlock Text="AUTO-REFRESH 60S" FontSize="8" Foreground="{StaticResource TextTertiaryBrush}"
-                                               CharacterSpacing="40" FontWeight="SemiBold"/>
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-
-                        <Border Background="Transparent"
-                                CornerRadius="0" Padding="0,4,0,0"
-                                BorderBrush="Transparent" BorderThickness="0"
-                                MinHeight="200">
-                            <ItemsControl ItemsSource="{Binding RecentActivity}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="viewModels:ActivityItem">
-                                        <Border Padding="8,7" Margin="0,0,0,2" CornerRadius="6">
-                                            <StackPanel Orientation="Horizontal" Spacing="10">
-                                                <!-- Colored icon per event type -->
-                                                <Border Width="26" Height="26" CornerRadius="13"
-                                                        VerticalAlignment="Center">
-                                                    <Border.Background>
-                                                        <SolidColorBrush Color="#15FFFFFF"/>
-                                                    </Border.Background>
-                                                    <FontIcon Glyph="{x:Bind Glyph}" FontSize="11"
-                                                              Foreground="{x:Bind IconBrush}"
-                                                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                </Border>
-                                                <TextBlock Text="{x:Bind Text}" FontSize="11"
-                                                           Foreground="{StaticResource TextSecondaryBrush}"
-                                                           TextTrimming="CharacterEllipsis"
-                                                           VerticalAlignment="Center"/>
+                    <ItemsControl ItemsSource="{Binding FavouriteItems}"
+                                  Visibility="{Binding HasFavourites, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="viewModels:DashboardFavouriteItem">
+                                <Border Style="{StaticResource FavouritePreviewCardStyle}">
+                                    <StackPanel Spacing="12">
+                                        <Grid ColumnSpacing="12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Spacing="4">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <FontIcon Glyph="&#xE735;" FontSize="14" Foreground="#FFC107"/>
+                                                    <TextBlock Text="{x:Bind Name}" FontSize="17" FontWeight="SemiBold"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <Border CornerRadius="4" Padding="6,2" Background="#101F7AE0">
+                                                        <TextBlock Text="{x:Bind KindLabel}" FontSize="9"
+                                                                   Foreground="{StaticResource AccentPrimaryBrush}"
+                                                                   FontWeight="SemiBold"/>
+                                                    </Border>
+                                                    <TextBlock Text="{x:Bind SummaryLine}" FontSize="11"
+                                                               Foreground="{StaticResource TextTertiaryBrush}"
+                                                               VerticalAlignment="Center"/>
+                                                </StackPanel>
                                             </StackPanel>
+                                            <Button Grid.Column="1" Width="34" Height="34" Padding="0" CornerRadius="8"
+                                                    VerticalAlignment="Top"
+                                                    Background="Transparent"
+                                                    BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1"
+                                                    ToolTipService.ToolTip="Remove from favourites"
+                                                    Click="OnFavouriteRemoveClick"
+                                                    Tag="{x:Bind TemplateId}">
+                                                <FontIcon Glyph="&#xE711;" FontSize="11"
+                                                          Foreground="{StaticResource TextSecondaryBrush}"/>
+                                            </Button>
+                                        </Grid>
+
+                                        <Border Background="{StaticResource CardBackgroundBrush}"
+                                                BorderBrush="{StaticResource BorderDefaultBrush}"
+                                                BorderThickness="1" CornerRadius="10" Padding="10,8">
+                                            <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                                          VerticalScrollBarVisibility="Disabled"
+                                                          HorizontalScrollMode="Enabled">
+                                                <StackPanel Spacing="0" MinWidth="400">
+                                                    <ItemsControl ItemsSource="{x:Bind ColumnHeaders}"
+                                                                  Visibility="{x:Bind HasPreviewTable, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <StackPanel Orientation="Horizontal"/>
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate x:DataType="x:String">
+                                                                <TextBlock Text="{x:Bind}" Style="{StaticResource FavouritePreviewHeaderCellStyle}"/>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+
+                                                    <Border Height="1" Margin="0,6,0,4"
+                                                            Background="{StaticResource BorderDefaultBrush}"
+                                                            Visibility="{x:Bind HasPreviewTable, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                                                    <TextBlock Text="No columns defined yet."
+                                                               FontSize="12"
+                                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                                               Visibility="{x:Bind HasPreviewTable, Converter={StaticResource InvertedBoolToVisibilityConverter}}"/>
+
+                                                    <ItemsControl ItemsSource="{x:Bind PreviewRows}"
+                                                                  Visibility="{x:Bind HasRows, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate x:DataType="viewModels:DashboardFavouritePreviewRow">
+                                                                <Border Padding="0,5" BorderBrush="{StaticResource BorderDefaultBrush}"
+                                                                        BorderThickness="0,0,0,1">
+                                                                    <ItemsControl ItemsSource="{x:Bind Cells}">
+                                                                        <ItemsControl.ItemsPanel>
+                                                                            <ItemsPanelTemplate>
+                                                                                <StackPanel Orientation="Horizontal"/>
+                                                                            </ItemsPanelTemplate>
+                                                                        </ItemsControl.ItemsPanel>
+                                                                        <ItemsControl.ItemTemplate>
+                                                                            <DataTemplate x:DataType="x:String">
+                                                                                <TextBlock Text="{x:Bind}" Style="{StaticResource FavouritePreviewDataCellStyle}"/>
+                                                                            </DataTemplate>
+                                                                        </ItemsControl.ItemTemplate>
+                                                                    </ItemsControl>
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+
+                                                    <TextBlock Text="No rows yet — open the workspace to add data."
+                                                               FontSize="12" Margin="0,8,0,0"
+                                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                                               Visibility="{x:Bind ShowEmptyRowsHint, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                </StackPanel>
+                                            </ScrollViewer>
                                         </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </Border>
-                    </StackPanel>
-                </Border>
 
-                <!-- Quick Actions (animated buttons) -->
-                <Border x:Name="Row3ActionsBorder" Grid.Column="1" Style="{StaticResource DashboardSectionStyle}">
-                    <StackPanel Spacing="12">
-                        <TextBlock Text="Quick Actions" FontSize="15" FontWeight="SemiBold"/>
-                        <TextBlock Text="Common workflows at a glance" FontSize="11"
-                                   Foreground="{StaticResource TextTertiaryBrush}"/>
-                        <StackPanel Spacing="7">
-
-                            <Button Style="{StaticResource ActionRowStyle}" Command="{Binding QuickActionNewTemplateCommand}">
-                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <Border Width="32" Height="32" CornerRadius="8" Background="#151F7AE0">
-                                        <FontIcon Glyph="&#xE710;" FontSize="14" Foreground="{StaticResource AccentPrimaryBrush}"/>
-                                    </Border>
-                                    <StackPanel Spacing="1" VerticalAlignment="Center">
-                                        <TextBlock Text="New Template" FontSize="12" FontWeight="SemiBold"/>
-                                        <TextBlock Text="Create schema" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}"/>
+                                        <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                                Padding="12,8" CornerRadius="10"
+                                                Background="#101F7AE0"
+                                                BorderBrush="#301F7AE0" BorderThickness="1"
+                                                Click="OnFavouriteOpenClick"
+                                                Tag="{x:Bind TemplateId}">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <TextBlock Text="Open full workspace" FontSize="12" FontWeight="SemiBold"/>
+                                                <FontIcon Glyph="&#xE76C;" FontSize="11"/>
+                                            </StackPanel>
+                                        </Button>
                                     </StackPanel>
-                                    <FontIcon Glyph="&#xE76C;" FontSize="10" Foreground="{StaticResource TextTertiaryBrush}"
-                                              HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,0,0"/>
-                                </StackPanel>
-                            </Button>
-
-                            <Button Style="{StaticResource ActionRowStyle}" Command="{Binding QuickActionImportDataCommand}">
-                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <Border Width="32" Height="32" CornerRadius="8" Background="#152ABD8F">
-                                        <FontIcon Glyph="&#xE8B5;" FontSize="14" Foreground="{StaticResource SuccessBrush}"/>
-                                    </Border>
-                                    <StackPanel Spacing="1" VerticalAlignment="Center">
-                                        <TextBlock Text="Import Data" FontSize="12" FontWeight="SemiBold"/>
-                                        <TextBlock Text="CSV or Excel" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </Button>
-
-                            <Button Style="{StaticResource ActionRowStyle}" Command="{Binding QuickActionInviteMemberCommand}">
-                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <Border Width="32" Height="32" CornerRadius="8" Background="#15FEBC2E">
-                                        <FontIcon Glyph="&#xE8FA;" FontSize="14" Foreground="{StaticResource WarningBrush}"/>
-                                    </Border>
-                                    <StackPanel Spacing="1" VerticalAlignment="Center">
-                                        <TextBlock Text="Invite Member" FontSize="12" FontWeight="SemiBold"/>
-                                        <TextBlock Text="Team access" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </Button>
-
-                            <Button Style="{StaticResource ActionRowStyle}" Command="{Binding QuickActionExportReportCommand}">
-                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <Border Width="32" Height="32" CornerRadius="8" Background="#158B5CF6">
-                                        <FontIcon Glyph="&#xEDE1;" FontSize="14" Foreground="#8B5CF6"/>
-                                    </Border>
-                                    <StackPanel Spacing="1" VerticalAlignment="Center">
-                                        <TextBlock Text="Export Report" FontSize="12" FontWeight="SemiBold"/>
-                                        <TextBlock Text="Excel download" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </Button>
-
-                            <Button Style="{StaticResource ActionRowStyle}" Command="{Binding QuickActionScanQrCommand}">
-                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <Border Width="32" Height="32" CornerRadius="8" Background="#15FFB4AB">
-                                        <FontIcon Glyph="&#xE9D9;" FontSize="14" Foreground="{StaticResource DangerBrush}"/>
-                                    </Border>
-                                    <StackPanel Spacing="1" VerticalAlignment="Center">
-                                        <TextBlock Text="Scan QR Code" FontSize="12" FontWeight="SemiBold"/>
-                                        <TextBlock Text="Find part instantly" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </Button>
-
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-            </Grid>
-
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
             </StackPanel>
         </Grid>
     </ScrollViewer>
 </Page>
-
-
 

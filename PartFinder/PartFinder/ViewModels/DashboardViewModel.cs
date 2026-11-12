@@ -25,6 +25,7 @@ public partial class DashboardViewModel : ViewModelBase
     private readonly MongoInventoryService _inventory;
     private readonly MongoAuditService _audit;
     private readonly IAppStateStore _appState;
+    private readonly IFavouriteStore _favouriteStore;
     private readonly DispatcherQueue? _uiQueue;
     private PeriodicTimer? _refreshTimer;
     private CancellationTokenSource? _refreshCts;
@@ -43,7 +44,8 @@ public partial class DashboardViewModel : ViewModelBase
         IMasterDataRecordsService masterData,
         MongoInventoryService inventory,
         MongoAuditService audit,
-        IAppStateStore appState)
+        IAppStateStore appState,
+        IFavouriteStore favouriteStore)
     {
         _api = api;
         _nav = nav;
@@ -53,6 +55,7 @@ public partial class DashboardViewModel : ViewModelBase
         _inventory = inventory;
         _audit = audit;
         _appState = appState;
+        _favouriteStore = favouriteStore;
         _uiQueue = DispatcherQueue.GetForCurrentThread();
 
         // Greeting based on time of day
@@ -71,6 +74,7 @@ public partial class DashboardViewModel : ViewModelBase
         RecentActivity = [];
         LowStockItems  = [];
         DistributionItems = [];
+        FavouriteItems = [];
 
         TrendSeries        = [];
         TrendXLabels       = [];
@@ -81,6 +85,16 @@ public partial class DashboardViewModel : ViewModelBase
         LazyLoadTrendCommand = new AsyncRelayCommand(() => PrepareForPageDisplayAsync());
 
         _themeService.ThemeChanged += (_, _) => OnAppThemeChanged();
+        _favouriteStore.FavouritesChanged += (_, _) =>
+        {
+            if (_uiQueue is not null && !_uiQueue.HasThreadAccess)
+            {
+                _uiQueue.TryEnqueue(() => _ = RefreshFavouritesAsync());
+                return;
+            }
+
+            _ = RefreshFavouritesAsync();
+        };
         RefreshChartAppearance();
     }
 
@@ -94,6 +108,7 @@ public partial class DashboardViewModel : ViewModelBase
     public ObservableCollection<ActivityItem>         RecentActivity    { get; }
     public ObservableCollection<LowStockItem>         LowStockItems     { get; }
     public ObservableCollection<DistributionItem>     DistributionItems { get; }
+    public ObservableCollection<DashboardFavouriteItem> FavouriteItems { get; }
 
     // ── Chart series ─────────────────────────────────────────────────────────
     public ISeries[]  TrendSeries        { get; private set; }
@@ -116,6 +131,7 @@ public partial class DashboardViewModel : ViewModelBase
     [ObservableProperty] private int _lowStockRaw;
     [ObservableProperty] private int _activeTemplatesRaw;
     [ObservableProperty] private double _importSuccessRaw;
+    [ObservableProperty] private bool _hasFavourites;
 
     // ── Navigation Commands ───────────────────────────────────────────────────
     [RelayCommand]
@@ -152,20 +168,163 @@ public partial class DashboardViewModel : ViewModelBase
     [RelayCommand]
     private void GoToSettings() => _nav.Navigate(AppPage.Settings);
 
+    [RelayCommand]
+    public void OpenFavourite(DashboardFavouriteItem? item)
+    {
+        if (item is null || string.IsNullOrWhiteSpace(item.TemplateId))
+        {
+            return;
+        }
+
+        if (item.IsMasterDataCatalog)
+        {
+            var args = new MasterDataNavigationArgs
+            {
+                Mode = MasterDataSurfaceMode.ReadOnlyCatalog,
+                TemplateId = item.TemplateId,
+            };
+            _nav.Navigate(AppPage.MasterData, args);
+            return;
+        }
+
+        _nav.Navigate(AppPage.TemplateData, item.TemplateId);
+    }
+
+    [RelayCommand]
+    public async Task RemoveFavouriteAsync(DashboardFavouriteItem? item)
+    {
+        if (item is null || string.IsNullOrWhiteSpace(item.TemplateId))
+        {
+            return;
+        }
+
+        await _favouriteStore.ToggleAsync(item.TemplateId).ConfigureAwait(true);
+        await RefreshFavouritesAsync().ConfigureAwait(true);
+    }
+
+    public async Task RefreshFavouritesAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _favouriteStore.LoadAsync(cancellationToken).ConfigureAwait(true);
+            var templates = await _templateSchema.GetTemplatesAsync(cancellationToken).ConfigureAwait(true);
+            var favouriteIds = _favouriteStore.GetAll();
+
+            var built = new List<DashboardFavouriteItem>();
+            foreach (var id in favouriteIds)
+            {
+                var template = templates.FirstOrDefault(t => string.Equals(t.Id, id, StringComparison.Ordinal));
+                if (template is null)
+                {
+                    continue;
+                }
+
+                var item = await BuildFavouriteItemAsync(template, cancellationToken).ConfigureAwait(true);
+                if (item is not null)
+                {
+                    built.Add(item);
+                }
+            }
+
+            FavouriteItems.Clear();
+            foreach (var item in built.OrderBy(f => f.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                FavouriteItems.Add(item);
+            }
+
+            HasFavourites = FavouriteItems.Count > 0;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Dashboard] RefreshFavouritesAsync failed: {ex.Message}");
+        }
+    }
+
+    private static async Task<DashboardFavouriteItem?> BuildFavouriteItemAsync(
+        PartTemplateDefinition template,
+        IMasterDataRecordsService records,
+        CancellationToken cancellationToken)
+    {
+        const int maxCols = 6;
+        const int maxRows = 8;
+
+        var fields = template.Fields.OrderBy(f => f.DisplayOrder).ToList();
+        var visibleFields = fields.Take(maxCols).ToList();
+        var headers = visibleFields.Select(f => string.IsNullOrWhiteSpace(f.Label) ? f.Key : f.Label).ToList();
+
+        IReadOnlyList<MasterDataRowRecord> rows;
+        int totalCount;
+        try
+        {
+            (rows, totalCount) = await records
+                .GetRowsPageAsync(template.Id, 0, maxRows, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch
+        {
+            rows = Array.Empty<MasterDataRowRecord>();
+            totalCount = 0;
+        }
+
+        var previewRows = rows
+            .OrderBy(r => r.RowOrder)
+            .Select(r => new DashboardFavouritePreviewRow
+            {
+                Cells = visibleFields
+                    .Select(f =>
+                    {
+                        if (r.Values.TryGetValue(f.Key, out var v) && !string.IsNullOrWhiteSpace(v))
+                        {
+                            return v.Trim();
+                        }
+
+                        return "—";
+                    })
+                    .ToList(),
+            })
+            .ToList();
+
+        return new DashboardFavouriteItem
+        {
+            TemplateId = template.Id,
+            Name = template.Name,
+            KindLabel = template.IsMasterDataCatalog ? "Master Data" : "Analytics",
+            IsMasterDataCatalog = template.IsMasterDataCatalog,
+            ColumnHeaders = headers,
+            PreviewRows = previewRows,
+            TotalRowCount = totalCount > 0 ? totalCount : rows.Count,
+            TotalColumnCount = fields.Count,
+        };
+    }
+
+    private Task<DashboardFavouriteItem?> BuildFavouriteItemAsync(
+        PartTemplateDefinition template,
+        CancellationToken cancellationToken) =>
+        BuildFavouriteItemAsync(template, _masterData, cancellationToken);
+
     // ── Load ──────────────────────────────────────────────────────────────────
     public Task WarmUpAsync() => LoadDashboardCoreAsync(showLoadingIndicator: false);
 
-    /// <summary>Show cached dashboard instantly when fresh; otherwise load without blocking navigation.</summary>
-    public Task PrepareForPageDisplayAsync()
+    /// <summary>Home is favourites-only — load starred templates and their row previews.</summary>
+    public async Task PrepareForPageDisplayAsync()
     {
-        var hasCached = _hasCompletedInitialLoad && Kpis[0].Value != "-";
-        var isFresh = _lastLoadUtc > DateTimeOffset.UtcNow.AddSeconds(-25);
-        if (hasCached && isFresh)
+        var isFresh = _hasCompletedInitialLoad && _lastLoadUtc > DateTimeOffset.UtcNow.AddSeconds(-25);
+        if (isFresh)
         {
-            return Task.CompletedTask;
+            return;
         }
 
-        return LoadDashboardCoreAsync(showLoadingIndicator: !hasCached);
+        IsLoading = !_hasCompletedInitialLoad;
+        try
+        {
+            await RefreshFavouritesAsync().ConfigureAwait(true);
+            _hasCompletedInitialLoad = true;
+            _lastLoadUtc = DateTimeOffset.UtcNow;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
     }
 
     private async Task LoadDashboardCoreAsync(bool showLoadingIndicator)
@@ -186,6 +345,8 @@ public partial class DashboardViewModel : ViewModelBase
         try
         {
             ct.ThrowIfCancellationRequested();
+
+            await RefreshFavouritesAsync(ct).ConfigureAwait(true);
 
             var statsTask = BuildWorkspaceStatsAsync(ct);
             var trendTask = _api.GetDashboardTrendAsync(ct);

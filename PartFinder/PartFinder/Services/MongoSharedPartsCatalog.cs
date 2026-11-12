@@ -39,6 +39,23 @@ internal static class MongoSharedPartsCatalog
         return MapDocuments(docs, fields, rowOrderOffset: 0);
     }
 
+    public static async Task<int> CountRowsAsync(
+        MongoClient client,
+        string orgCode,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(orgCode))
+        {
+            return 0;
+        }
+
+        var coll = client.GetDatabase(SharedDatabaseName).GetCollection<BsonDocument>(PartsCollectionName);
+        var filter = Builders<BsonDocument>.Filter.Eq(OrgCodeField, orgCode.Trim());
+        return (int)await coll
+            .CountDocumentsAsync(filter, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public static async Task<(IReadOnlyList<MasterDataRowRecord> Rows, bool HasMore)> LoadPageAsync(
         MongoClient client,
         string orgCode,

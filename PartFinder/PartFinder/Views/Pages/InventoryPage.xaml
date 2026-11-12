@@ -32,6 +32,7 @@
                         <Setter Target="KpiCol2.Width" Value="0" />
                         <Setter Target="KpiCol3.Width" Value="0" />
                         <Setter Target="KpiCol4.Width" Value="0" />
+                        <Setter Target="KpiCol5.Width" Value="0" />
 
                         <Setter Target="Kpi1.(Grid.Row)" Value="0" />
                         <Setter Target="Kpi1.(Grid.Column)" Value="0" />
@@ -41,6 +42,8 @@
                         <Setter Target="Kpi3.(Grid.Column)" Value="0" />
                         <Setter Target="Kpi4.(Grid.Row)" Value="3" />
                         <Setter Target="Kpi4.(Grid.Column)" Value="0" />
+                        <Setter Target="WarehouseQuickActions.(Grid.Row)" Value="4" />
+                        <Setter Target="WarehouseQuickActions.(Grid.Column)" Value="0" />
                         <Setter Target="KpiGrid.RowSpacing" Value="12" />
                     </VisualState.Setters>
                 </VisualState>
@@ -162,103 +165,120 @@
                 <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
                 <!-- KPI CARDS ROW                              -->
                 <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-                <Grid x:Name="KpiGrid" ColumnSpacing="14" Visibility="{x:Bind ViewModel.ShowInventoryAdminChrome, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Grid x:Name="KpiGrid" ColumnSpacing="10" Visibility="{x:Bind ViewModel.ShowInventoryKpiRow, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition x:Name="KpiGridDef2" Height="0" />
                         <RowDefinition x:Name="KpiGridDef3" Height="0" />
                         <RowDefinition x:Name="KpiGridDef4" Height="0" />
+                        <RowDefinition Height="0" />
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition x:Name="KpiCol1" Width="*" />
-                        <ColumnDefinition x:Name="KpiCol2" Width="*" />
-                        <ColumnDefinition x:Name="KpiCol3" Width="*" />
-                        <ColumnDefinition x:Name="KpiCol4" Width="*" />
+                        <ColumnDefinition x:Name="KpiCol1" Width="Auto" MaxWidth="152" />
+                        <ColumnDefinition x:Name="KpiCol2" Width="Auto" MaxWidth="152" />
+                        <ColumnDefinition x:Name="KpiCol3" Width="Auto" MaxWidth="152" />
+                        <ColumnDefinition x:Name="KpiCol4" Width="Auto" MaxWidth="152" />
+                        <ColumnDefinition x:Name="KpiCol5" Width="Auto" MinWidth="188" />
                     </Grid.ColumnDefinitions>
 
                     <!-- Total Parts -->
-                    <Border x:Name="Kpi1" Grid.Column="0" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="16,14" Translation="0,0,32">
+                    <Border x:Name="Kpi1" Grid.Column="0" Width="148" MaxHeight="72" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="8,6" Translation="0,0,12">
                             <Border.Shadow><ThemeShadow/></Border.Shadow>
-                            <StackPanel Spacing="8">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel Spacing="2">
-                                    <TextBlock Text="TOTAL PARTS" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" />
-                                    <TextBlock Text="{x:Bind ViewModel.TotalItems, Mode=OneWay}" FontSize="32" FontWeight="Light" CharacterSpacing="20" Foreground="{StaticResource TextPrimaryBrush}" />
+                                <StackPanel Spacing="1" VerticalAlignment="Center">
+                                    <TextBlock Text="TOTAL PARTS" FontSize="8" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="50" FontWeight="SemiBold" />
+                                    <TextBlock Text="{x:Bind ViewModel.TotalItems, Mode=OneWay}" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                    <TextBlock Text="Live from inventory" FontSize="9" Foreground="{StaticResource TextSecondaryBrush}" />
                                 </StackPanel>
-                                <Border Grid.Column="1" Width="48" Height="48" CornerRadius="4" Background="#101F7AE0" VerticalAlignment="Top">
-                                    <FontIcon Glyph="&#xE80A;" FontSize="20" Foreground="{StaticResource AccentPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <Border Grid.Column="1" Width="28" Height="28" CornerRadius="4" Background="#101F7AE0" VerticalAlignment="Center" Margin="4,0,0,0">
+                                    <FontIcon Glyph="&#xE80A;" FontSize="12" Foreground="{StaticResource AccentPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Border>
                             </Grid>
-                            <TextBlock Text="Live from inventory" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
-                        </StackPanel>
                     </Border>
 
                     <!-- Low Stock Alert -->
-                    <Border x:Name="Kpi2" Grid.Column="1" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="16,14" Translation="0,0,32">
+                    <Border x:Name="Kpi2" Grid.Column="1" Width="148" MaxHeight="72" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="8,6" Translation="0,0,12">
                             <Border.Shadow><ThemeShadow/></Border.Shadow>
-                            <StackPanel Spacing="8">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel Spacing="2">
-                                    <TextBlock Text="LOW STOCK" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" />
-                                    <TextBlock Text="{x:Bind ViewModel.LowStockItems, Mode=OneWay}" FontSize="32" FontWeight="Light" CharacterSpacing="20" Foreground="{StaticResource WarningBrush}" />
+                                <StackPanel Spacing="1" VerticalAlignment="Center">
+                                    <TextBlock Text="LOW STOCK" FontSize="8" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="50" FontWeight="SemiBold" />
+                                    <TextBlock Text="{x:Bind ViewModel.LowStockItems, Mode=OneWay}" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource WarningBrush}" />
+                                    <TextBlock Text="Requires attention" FontSize="9" Foreground="{StaticResource WarningBrush}" />
                                 </StackPanel>
-                                <Border Grid.Column="1" Width="48" Height="48" CornerRadius="4" Background="#10FEBC2E" VerticalAlignment="Top">
-                                    <FontIcon Glyph="&#xE7BA;" FontSize="20" Foreground="{StaticResource WarningBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <Border Grid.Column="1" Width="28" Height="28" CornerRadius="4" Background="#10FEBC2E" VerticalAlignment="Center" Margin="4,0,0,0">
+                                    <FontIcon Glyph="&#xE7BA;" FontSize="12" Foreground="{StaticResource WarningBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Border>
                             </Grid>
-                            <TextBlock Text="Requires attention" FontSize="10" Foreground="{StaticResource WarningBrush}" />
-                        </StackPanel>
                     </Border>
 
                     <!-- Out of Stock -->
-                    <Border x:Name="Kpi3" Grid.Column="2" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="16,14" Translation="0,0,32">
+                    <Border x:Name="Kpi3" Grid.Column="2" Width="148" MaxHeight="72" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="8,6" Translation="0,0,12">
                             <Border.Shadow><ThemeShadow/></Border.Shadow>
-                            <StackPanel Spacing="8">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel Spacing="2">
-                                    <TextBlock Text="OUT OF STOCK" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" />
-                                    <TextBlock Text="{x:Bind ViewModel.OutOfStockItems, Mode=OneWay}" FontSize="32" FontWeight="Light" CharacterSpacing="20" Foreground="{StaticResource DangerBrush}" />
+                                <StackPanel Spacing="1" VerticalAlignment="Center">
+                                    <TextBlock Text="OUT OF STOCK" FontSize="8" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="50" FontWeight="SemiBold" />
+                                    <TextBlock Text="{x:Bind ViewModel.OutOfStockItems, Mode=OneWay}" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource DangerBrush}" />
+                                    <TextBlock Text="Critical" FontSize="9" Foreground="{StaticResource DangerBrush}" />
                                 </StackPanel>
-                                <Border Grid.Column="1" Width="48" Height="48" CornerRadius="4" Background="#10FF5F57" VerticalAlignment="Top">
-                                    <FontIcon Glyph="&#xE7BA;" FontSize="20" Foreground="{StaticResource DangerBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <Border Grid.Column="1" Width="28" Height="28" CornerRadius="4" Background="#10FF5F57" VerticalAlignment="Center" Margin="4,0,0,0">
+                                    <FontIcon Glyph="&#xE7BA;" FontSize="12" Foreground="{StaticResource DangerBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Border>
                             </Grid>
-                            <TextBlock Text="Critical" FontSize="10" Foreground="{StaticResource DangerBrush}" />
-                        </StackPanel>
                     </Border>
 
                     <!-- Inventory Value -->
-                    <Border x:Name="Kpi4" Grid.Column="3" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="16,14" Translation="0,0,32">
+                    <Border x:Name="Kpi4" Grid.Column="3" Width="148" MaxHeight="72" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="8,6" Translation="0,0,12">
                             <Border.Shadow><ThemeShadow/></Border.Shadow>
-                            <StackPanel Spacing="8">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel Spacing="2">
-                                    <TextBlock Text="TOTAL VALUE" FontSize="9" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="60" FontWeight="SemiBold" />
-                                    <TextBlock Text="{x:Bind ViewModel.TotalValueFormatted, Mode=OneWay}" FontSize="32" FontWeight="Light" CharacterSpacing="20" />
+                                <StackPanel Spacing="1" VerticalAlignment="Center">
+                                    <TextBlock Text="TOTAL VALUE" FontSize="8" Foreground="{StaticResource TextTertiaryBrush}" CharacterSpacing="50" FontWeight="SemiBold" />
+                                    <TextBlock Text="{x:Bind ViewModel.TotalValueFormatted, Mode=OneWay}" FontSize="18" FontWeight="SemiBold" />
+                                    <TextBlock Text="Across all parts" FontSize="9" Foreground="{StaticResource TextSecondaryBrush}" />
                                 </StackPanel>
-                                <Border Grid.Column="1" Width="48" Height="48" CornerRadius="4" Background="#102ABD8F" VerticalAlignment="Top">
-                                    <FontIcon Glyph="&#xE8B5;" FontSize="20" Foreground="{StaticResource SuccessBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <Border Grid.Column="1" Width="28" Height="28" CornerRadius="4" Background="#102ABD8F" VerticalAlignment="Center" Margin="4,0,0,0">
+                                    <FontIcon Glyph="&#xE8B5;" FontSize="12" Foreground="{StaticResource SuccessBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Border>
                             </Grid>
-                            <TextBlock Text="Across all parts" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
-                        </StackPanel>
                     </Border>
+
+                    <StackPanel x:Name="WarehouseQuickActions" Grid.Column="4" Spacing="8" VerticalAlignment="Stretch" MinWidth="188">
+                        <Button Style="{StaticResource PrimaryButtonStyle}" FontSize="13" Padding="14,10" MinHeight="40" HorizontalAlignment="Stretch" Click="OnWarehouseTemplatesClick">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE8A5;" FontSize="14" />
+                                <TextBlock Text="Templates" FontSize="13" FontWeight="SemiBold" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource OutlinedButtonStyle}" FontSize="12" Padding="12,8" MinHeight="36" HorizontalAlignment="Stretch"
+                                Visibility="{x:Bind ViewModel.ShowWarehouseSuggestAction, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
+                                Click="OnWarehouseSuggestClick">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE734;" FontSize="13" />
+                                <TextBlock Text="Suggest" FontSize="12" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource PrimaryButtonStyle}" FontSize="13" Padding="14,10" MinHeight="40" HorizontalAlignment="Stretch" Click="OnWarehouseOrderClick">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE7BF;" FontSize="14" />
+                                <TextBlock Text="Order" FontSize="13" FontWeight="SemiBold" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
                 </Grid>
 
                 <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->

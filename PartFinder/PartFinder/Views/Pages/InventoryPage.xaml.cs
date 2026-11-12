@@ -669,4 +669,55 @@ public sealed partial class InventoryPage : Page
         };
         _ = await dialog.ShowAsync();
     }
+
+    private async void OnWarehouseTemplatesClick(object sender, RoutedEventArgs e) =>
+        await ShowComingSoonDialogAsync(
+            "Templates",
+            "Jump from warehouse stock to your analytics templates in one place.",
+            "This shortcut is planned for the next release.");
+
+    private async void OnWarehouseSuggestClick(object sender, RoutedEventArgs e) =>
+        await ShowComingSoonDialogAsync(
+            "Suggest",
+            "Share improvement ideas tied to parts and stock levels.",
+            "Suggest is coming in the next version.");
+
+    private async void OnWarehouseOrderClick(object sender, RoutedEventArgs e) =>
+        await ShowComingSoonDialogAsync(
+            "Order",
+            "Reorder parts and track purchase requests from the warehouse.",
+            "Ordering tools are coming in the next version.");
+
+    private async Task ShowComingSoonDialogAsync(string feature, string summary, string detail)
+    {
+        if (XamlRoot is null)
+        {
+            return;
+        }
+
+        var content = new StackPanel { Spacing = 8 };
+        content.Children.Add(new TextBlock
+        {
+            Text = summary,
+            TextWrapping = TextWrapping.WrapWholeWords,
+            FontSize = 14,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+        });
+        content.Children.Add(new TextBlock
+        {
+            Text = detail,
+            TextWrapping = TextWrapping.WrapWholeWords,
+            FontSize = 13,
+            Foreground = (Brush)Application.Current.Resources["TextSecondaryBrush"],
+        });
+
+        var dialog = new ContentDialog
+        {
+            Title = $"{feature} · Coming soon",
+            Content = content,
+            CloseButtonText = "OK",
+            XamlRoot = XamlRoot,
+        };
+        _ = await dialog.ShowAsync();
+    }
 }

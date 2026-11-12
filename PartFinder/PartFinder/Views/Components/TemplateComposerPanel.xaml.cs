@@ -22,6 +22,7 @@ public sealed partial class TemplateComposerPanel : UserControl
     private string? _selectedColumnKey;
     private bool _busy;
     private bool _isCreating;
+    private bool _viewOnly;
     private bool _applyingRender;
     private double _laidOutViewport;
     private string _masterDataSearchQuery = string.Empty;
@@ -45,12 +46,17 @@ public sealed partial class TemplateComposerPanel : UserControl
 
     public event EventHandler? Saved;
 
-    public async Task OpenAsync(string templateId, bool isCreating = false)
+    public async Task OpenAsync(string templateId, bool isCreating = false, bool viewOnly = false)
     {
         _isCreating = isCreating;
+        _viewOnly = viewOnly && !isCreating;
         CancelCreationButton.Visibility = isCreating ? Visibility.Visible : Visibility.Collapsed;
+        SaveButton.Visibility = _viewOnly ? Visibility.Collapsed : Visibility.Visible;
+        MasterDataPanelBorder.Visibility = _viewOnly ? Visibility.Collapsed : Visibility.Visible;
         StatusText.Text = "Loading template…";
-        var template = await _templates.GetTemplateAsync(templateId).ConfigureAwait(true);
+        var templateTask = _templates.GetTemplateAsync(templateId);
+        var storedTask = _records.GetStoredRowsAsync(templateId);
+        var template = await templateTask.ConfigureAwait(true);
         if (template is null)
         {
             StatusText.Text = "Template was not found.";
@@ -76,7 +82,7 @@ public sealed partial class TemplateComposerPanel : UserControl
             _columns.Add(new ColumnSlot { Key = NewKey(), Label = "Column 1" });
         }
 
-        var stored = await _records.GetStoredRowsAsync(templateId).ConfigureAwait(true);
+        var stored = await storedTask.ConfigureAwait(true);
         _rows.Clear();
         _removedRowIds.Clear();
         foreach (var record in stored.OrderBy(r => r.RowOrder))
@@ -88,29 +94,52 @@ public sealed partial class TemplateComposerPanel : UserControl
             });
         }
 
-        EnsureEditingBuffer();
-
-        _sources.Clear();
-        var catalogs = TemplateCatalogFilters.MasterDataCatalogs(
-            await _templates.GetTemplatesAsync().ConfigureAwait(true));
-        foreach (var catalog in CatalogBrowseSessionStore.OrderForCatalogSidebar(catalogs))
+        if (_viewOnly)
         {
-            if (string.Equals(catalog.Id, templateId, StringComparison.Ordinal) || catalog.Fields.Count == 0)
-            {
-                continue;
-            }
+            TrimEmptyTrailingRows();
+        }
+        else
+        {
+            EnsureEditingBuffer();
+        }
 
-            _sources.Add(new SourceCatalog(catalog.Id, catalog.Name, catalog.Fields.OrderBy(f => f.DisplayOrder).ToList()));
+        if (!_viewOnly)
+        {
+            _sources.Clear();
+            var catalogs = TemplateCatalogFilters.MasterDataCatalogs(
+                await _templates.GetTemplatesAsync().ConfigureAwait(true));
+            foreach (var catalog in CatalogBrowseSessionStore.OrderForCatalogSidebar(catalogs))
+            {
+                if (string.Equals(catalog.Id, templateId, StringComparison.Ordinal) || catalog.Fields.Count == 0)
+                {
+                    continue;
+                }
+
+                _sources.Add(new SourceCatalog(catalog.Id, catalog.Name, catalog.Fields.OrderBy(f => f.DisplayOrder).ToList()));
+            }
         }
 
         _selectedColumnKey = _columns[0].Key;
-        TitleText.Text = template.Name;
+        TitleText.Text = _viewOnly ? $"{template.Name} (view)" : template.Name;
         MasterDataSearchBox.Text = string.Empty;
         _masterDataSearchQuery = string.Empty;
         Render();
         StatusText.Text = isCreating
             ? "Type in the grid like a spreadsheet. Use master data columns below to import. Cancel creation removes this new template."
-            : "Type in the grid like a spreadsheet. Select a column header, then pick a master data column below to import values.";
+            : _viewOnly
+                ? "View-only workspace — browse template data here. Use Edit on Analytics to change structure or values."
+                : "Type in the grid like a spreadsheet. Select a column header, then pick a master data column below to import values.";
+    }
+
+    private void TrimEmptyTrailingRows()
+    {
+        static bool IsEmptyRow(RowSlot row) =>
+            row.Values.Values.All(string.IsNullOrWhiteSpace);
+
+        while (_rows.Count > 1 && IsEmptyRow(_rows[^1]))
+        {
+            _rows.RemoveAt(_rows.Count - 1);
+        }
     }
 
     private async void OnSaveClick(object sender, RoutedEventArgs e)
@@ -547,8 +576,8 @@ public sealed partial class TemplateComposerPanel : UserControl
                 BorderThickness = new Thickness(0),
                 Padding = new Thickness(8, 6, 4, 6),
                 PlaceholderText = "Column name",
-                IsEnabled = true,
-                IsReadOnly = false,
+                IsEnabled = !_viewOnly,
+                IsReadOnly = _viewOnly,
             };
             labelBox.GotFocus += (_, _) =>
             {
@@ -558,40 +587,52 @@ public sealed partial class TemplateComposerPanel : UserControl
                     ApplyRender();
                 }
 
-                StatusText.Text = "Select a column header, then choose a master data column below to import values.";
-                MaybeGrowColumnsForIndex(columnIndex);
+                StatusText.Text = _viewOnly
+                    ? "View-only workspace — browse template data here. Use Edit on Analytics to change structure or values."
+                    : "Select a column header, then choose a master data column below to import values.";
+                if (!_viewOnly)
+                {
+                    MaybeGrowColumnsForIndex(columnIndex);
+                }
             };
-            labelBox.TextChanged += (_, _) => captured.Label = labelBox.Text ?? string.Empty;
+            if (!_viewOnly)
+            {
+                labelBox.TextChanged += (_, _) => captured.Label = labelBox.Text ?? string.Empty;
+            }
+
             Grid.SetColumn(labelBox, 0);
             inner.Children.Add(labelBox);
 
-            var more = new Button
+            if (!_viewOnly)
             {
-                Width = 32,
-                Height = 32,
-                Padding = new Thickness(0),
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-                Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
-                BorderThickness = new Thickness(0),
-                Content = new FontIcon
+                var more = new Button
                 {
-                    Glyph = "\uE712",
-                    FontSize = 14,
-                    Foreground = Brush("TextSecondaryBrush"),
-                },
-            };
-            ToolTipService.SetToolTip(more, "Column actions");
-            var menu = new MenuFlyout();
-            var copyItem = new MenuFlyoutItem { Text = "Copy a new column" };
-            copyItem.Click += async (_, _) => await DuplicateColumnAsync(captured).ConfigureAwait(true);
-            var deleteItem = new MenuFlyoutItem { Text = "Delete" };
-            deleteItem.Click += async (_, _) => await DeleteColumnAsync(captured).ConfigureAwait(true);
-            menu.Items.Add(copyItem);
-            menu.Items.Add(deleteItem);
-            more.Flyout = menu;
-            Grid.SetColumn(more, 1);
-            inner.Children.Add(more);
+                    Width = 32,
+                    Height = 32,
+                    Padding = new Thickness(0),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
+                    BorderThickness = new Thickness(0),
+                    Content = new FontIcon
+                    {
+                        Glyph = "\uE712",
+                        FontSize = 14,
+                        Foreground = Brush("TextSecondaryBrush"),
+                    },
+                };
+                ToolTipService.SetToolTip(more, "Column actions");
+                var menu = new MenuFlyout();
+                var copyItem = new MenuFlyoutItem { Text = "Copy a new column" };
+                copyItem.Click += async (_, _) => await DuplicateColumnAsync(captured).ConfigureAwait(true);
+                var deleteItem = new MenuFlyoutItem { Text = "Delete" };
+                deleteItem.Click += async (_, _) => await DeleteColumnAsync(captured).ConfigureAwait(true);
+                menu.Items.Add(copyItem);
+                menu.Items.Add(deleteItem);
+                more.Flyout = menu;
+                Grid.SetColumn(more, 1);
+                inner.Children.Add(more);
+            }
 
             Grid.SetColumn(cell, c);
             grid.Children.Add(cell);
@@ -680,22 +721,25 @@ public sealed partial class TemplateComposerPanel : UserControl
                     Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
                     Foreground = TemplateComposerPanel.Brush("TextPrimaryBrush"),
                     PlaceholderText = "—",
-                    IsEnabled = true,
-                    IsReadOnly = false,
+                    IsEnabled = !_owner._viewOnly,
+                    IsReadOnly = _owner._viewOnly,
                 };
-                var columnKey = column.Key;
-                box.TextChanged += (_, _) =>
+                if (!_owner._viewOnly)
                 {
-                    if (grid.Tag is RowSlot rowSlot)
+                    var columnKey = column.Key;
+                    box.TextChanged += (_, _) =>
                     {
-                        rowSlot.Values[columnKey] = box.Text ?? string.Empty;
-                        var rowIndex = _owner._rows.IndexOf(rowSlot);
-                        if (rowIndex >= 0)
+                        if (grid.Tag is RowSlot rowSlot)
                         {
-                            _owner.MaybeGrowRowsForIndex(rowIndex);
+                            rowSlot.Values[columnKey] = box.Text ?? string.Empty;
+                            var rowIndex = _owner._rows.IndexOf(rowSlot);
+                            if (rowIndex >= 0)
+                            {
+                                _owner.MaybeGrowRowsForIndex(rowIndex);
+                            }
                         }
-                    }
-                };
+                    };
+                }
                 cell.Child = box;
                 Grid.SetColumn(cell, c);
                 grid.Children.Add(cell);

@@ -19,7 +19,7 @@ using WinRT.Interop;
 
 namespace PartFinder.Views.Pages;
 
-public sealed partial class MasterDataPage : Page
+public sealed partial class MasterDataPage : Page, INavigationParameterSink
 {
     private const double GridCellTextWidth = 160d;
     private const double GridCellHorizontalPadding = 10d;
@@ -91,6 +91,8 @@ public sealed partial class MasterDataPage : Page
         {
             theme.ThemeChanged += OnAppThemeChanged;
         }
+
+        await vm.LoadFavouriteStoreAsync().ConfigureAwait(true);
 
         _navigationArgs ??= new MasterDataNavigationArgs { Mode = MasterDataSurfaceMode.ReadOnlyCatalog };
         if (!_surfaceInitialized)
@@ -229,6 +231,35 @@ public sealed partial class MasterDataPage : Page
         _navigationArgs = e.Parameter as MasterDataNavigationArgs
                           ?? new MasterDataNavigationArgs { Mode = MasterDataSurfaceMode.ReadOnlyCatalog };
         _surfaceInitialized = false;
+
+        if (_viewModel is not null)
+        {
+            _ = ApplyNavigationArgsAsync();
+        }
+    }
+
+    public void ReceiveNavigationParameter(object? parameter)
+    {
+        if (parameter is MasterDataNavigationArgs args)
+        {
+            _navigationArgs = args;
+            _ = ApplyNavigationArgsAsync();
+        }
+    }
+
+    private async Task ApplyNavigationArgsAsync()
+    {
+        if (_viewModel is null || _navigationArgs is null)
+        {
+            return;
+        }
+
+        await _viewModel.InitializeSurfaceAsync(_navigationArgs).ConfigureAwait(true);
+        _displayedTemplateId = _viewModel.SelectedDataTemplate?.Id;
+        _gridPageIndex = 0;
+        RestorePageIndexFromSession();
+        UpdateCatalogNavChrome();
+        RebuildSpreadsheet();
     }
 
     public void ConfigureEmbeddedBrowseChrome()
@@ -464,7 +495,7 @@ public sealed partial class MasterDataPage : Page
         ScheduleRebuildSpreadsheet();
     }
 
-    private void OnMasterDataPrevPageClick(object sender, RoutedEventArgs e)
+    private async void OnMasterDataPrevPageClick(object sender, RoutedEventArgs e)
     {
         if (_gridPageIndex <= 0)
         {
@@ -472,14 +503,24 @@ public sealed partial class MasterDataPage : Page
         }
 
         _gridPageIndex--;
+        if (_viewModel?.IsCatalogReadOnly == true)
+        {
+            await _viewModel.LoadCatalogRowsPageAsync(_gridPageIndex, MasterDataPageSize).ConfigureAwait(true);
+        }
+
         _suspendBrowsePersist = false;
         WriteBrowseState(includeScrollOffsets: true);
         RebuildSpreadsheet();
     }
 
-    private void OnMasterDataNextPageClick(object sender, RoutedEventArgs e)
+    private async void OnMasterDataNextPageClick(object sender, RoutedEventArgs e)
     {
         _gridPageIndex++;
+        if (_viewModel?.IsCatalogReadOnly == true)
+        {
+            await _viewModel.LoadCatalogRowsPageAsync(_gridPageIndex, MasterDataPageSize).ConfigureAwait(true);
+        }
+
         _suspendBrowsePersist = false;
         WriteBrowseState(includeScrollOffsets: true);
         RebuildSpreadsheet();
@@ -749,7 +790,9 @@ public sealed partial class MasterDataPage : Page
         var visibleRows = _viewModel.Rows.Where(_viewModel.IsRowVisible).ToList();
         UpdatePager(visibleRows.Count);
         var pageStart = _gridPageIndex * MasterDataPageSize;
-        var pageRows = visibleRows.Skip(pageStart).Take(MasterDataPageSize).ToList();
+        var pageRows = _viewModel.IsCatalogReadOnly
+            ? visibleRows
+            : visibleRows.Skip(pageStart).Take(MasterDataPageSize).ToList();
         var colCount = _viewModel.Columns.Count;
         var showDeleteCol = _viewModel.ShowSpreadsheetEditChrome && _viewModel.IsEditMode && _viewModel.CanDeleteRows;
         var gridColCount = colCount + (showDeleteCol ? 1 : 0);
@@ -1267,7 +1310,9 @@ public sealed partial class MasterDataPage : Page
             return;
         }
 
-        var pageCount = Math.Max(1, (visibleCount + MasterDataPageSize - 1) / MasterDataPageSize);
+        var totalRows = _viewModel?.GetPagerTotalRowCount(visibleCount) ?? visibleCount;
+
+        var pageCount = Math.Max(1, (totalRows + MasterDataPageSize - 1) / MasterDataPageSize);
         if (visibleCount > 0 && _gridPageIndex >= pageCount)
         {
             _gridPageIndex = pageCount - 1;
@@ -1278,19 +1323,19 @@ public sealed partial class MasterDataPage : Page
             _gridPageIndex = 0;
         }
 
-        if (visibleCount == 0)
+        if (totalRows == 0)
         {
             MasterDataPageStatusText.Text = "No rows";
         }
         else
         {
             var start = _gridPageIndex * MasterDataPageSize + 1;
-            var end = Math.Min(visibleCount, (_gridPageIndex + 1) * MasterDataPageSize);
-            MasterDataPageStatusText.Text = $"Showing {start}–{end} of {visibleCount}";
+            var end = Math.Min(totalRows, (_gridPageIndex + 1) * MasterDataPageSize);
+            MasterDataPageStatusText.Text = $"Showing {start}–{end} of {totalRows:N0}";
         }
 
         MasterDataPrevPageButton.IsEnabled = _gridPageIndex > 0;
-        MasterDataNextPageButton.IsEnabled = visibleCount > 0 && _gridPageIndex < pageCount - 1;
+        MasterDataNextPageButton.IsEnabled = totalRows > 0 && _gridPageIndex < pageCount - 1;
     }
 
     private async Task ConfirmAndRemoveColumnAsync(int columnIndex, string columnLabel)
@@ -2627,6 +2672,77 @@ public sealed partial class MasterDataPage : Page
 
         public string Id { get; }
         public string Display { get; }
+    }
+
+    private void OnCatalogContainerContentChanging(
+        ListViewBase sender,
+        ContainerContentChangingEventArgs args)
+    {
+        if (args.InRecycleQueue || _viewModel is null)
+        {
+            return;
+        }
+
+        if (args.Item is not PartTemplateDefinition template)
+        {
+            return;
+        }
+
+        if (args.Phase == 0)
+        {
+            args.RegisterUpdateCallback(OnCatalogContainerContentChanging);
+            return;
+        }
+
+        if (args.ItemContainer is null || args.ItemContainer.ContentTemplateRoot is not Grid root)
+        {
+            return;
+        }
+
+        if (root.FindName("CatalogFavouriteIcon") is not FontIcon icon)
+        {
+            return;
+        }
+
+        var isFav = _viewModel.IsFavouriteFor(template.Id);
+        icon.Glyph = isFav ? "\uE735" : "\uE734";
+
+        if (root.FindName("CatalogFavouriteButton") is Button btn)
+        {
+            ToolTipService.SetToolTip(btn, isFav ? "Remove from favourites" : "Add to favourites");
+        }
+    }
+
+    private async void OnCatalogFavouriteClick(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel is null || sender is not Button btn)
+        {
+            return;
+        }
+
+        var template = btn.DataContext as PartTemplateDefinition;
+        if (template is null)
+        {
+            return;
+        }
+
+        btn.IsEnabled = false;
+        try
+        {
+            await _viewModel.ToggleFavouritePublicAsync(template.Id).ConfigureAwait(true);
+            var nowFav = _viewModel.IsFavouriteFor(template.Id);
+
+            if (btn.Content is FontIcon icon)
+            {
+                icon.Glyph = nowFav ? "\uE735" : "\uE734";
+            }
+
+            ToolTipService.SetToolTip(btn, nowFav ? "Remove from favourites" : "Add to favourites");
+        }
+        finally
+        {
+            btn.IsEnabled = true;
+        }
     }
 
 }
