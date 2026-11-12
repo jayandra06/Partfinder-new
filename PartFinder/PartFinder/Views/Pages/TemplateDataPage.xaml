@@ -26,7 +26,7 @@
             Click="OnBackClick">
             <StackPanel Orientation="Horizontal" Spacing="6">
                 <FontIcon Glyph="&#xE72B;" FontSize="12" />
-                <TextBlock Text="Back to templates" FontSize="12" />
+                <TextBlock Text="Back" FontSize="12" />
             </StackPanel>
         </Button>
 
@@ -41,6 +41,10 @@
                     FontSize="20"
                     FontWeight="SemiBold"
                     Foreground="{StaticResource TextPrimaryBrush}" />
+                <TextBlock
+                    Text="View-only workspace — browse template data. Use Edit data to change values."
+                    FontSize="12"
+                    Foreground="{StaticResource TextSecondaryBrush}" />
                 <TextBlock
                     Text="{Binding StatusMessage}"
                     FontSize="12"

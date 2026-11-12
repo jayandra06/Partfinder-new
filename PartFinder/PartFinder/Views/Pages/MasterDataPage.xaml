@@ -3,7 +3,8 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:components="using:PartFinder.Views.Components"
-    xmlns:converters="using:PartFinder.Converters">
+    xmlns:converters="using:PartFinder.Converters"
+    xmlns:models="using:PartFinder.Models">
     <Page.Resources>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
         <converters:InvertedBoolToVisibilityConverter x:Key="InvertedBoolToVisibilityConverter" />
@@ -71,15 +72,38 @@
                         IsItemClickEnabled="True"
                         ItemsSource="{Binding DataTemplates}"
                         SelectedItem="{Binding SelectedDataTemplate, Mode=TwoWay}"
+                        ContainerContentChanging="OnCatalogContainerContentChanging"
                         ItemContainerStyle="{StaticResource CatalogNavListViewItemStyle}">
                         <ListView.ItemTemplate>
-                            <DataTemplate>
-                                <TextBlock
-                                    Text="{Binding Name}"
-                                    FontSize="13"
-                                    FontWeight="SemiBold"
-                                    Foreground="{StaticResource TextSecondaryBrush}"
-                                    TextWrapping="WrapWholeWords" />
+                            <DataTemplate x:DataType="models:PartTemplateDefinition">
+                                <Grid ColumnSpacing="6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Text="{x:Bind Name}"
+                                        FontSize="13"
+                                        FontWeight="SemiBold"
+                                        Foreground="{StaticResource TextSecondaryBrush}"
+                                        TextWrapping="WrapWholeWords"
+                                        VerticalAlignment="Center" />
+                                    <Button
+                                        x:Name="CatalogFavouriteButton"
+                                        Grid.Column="1"
+                                        Width="30"
+                                        Height="30"
+                                        Padding="0"
+                                        CornerRadius="8"
+                                        Background="Transparent"
+                                        BorderBrush="{StaticResource BorderDefaultBrush}"
+                                        BorderThickness="1"
+                                        Click="OnCatalogFavouriteClick"
+                                        ToolTipService.ToolTip="Add to favourites">
+                                        <FontIcon x:Name="CatalogFavouriteIcon" Glyph="&#xE734;" FontSize="11" Foreground="#FFC107" />
+                                    </Button>
+                                </Grid>
                             </DataTemplate>
                         </ListView.ItemTemplate>
                     </ListView>

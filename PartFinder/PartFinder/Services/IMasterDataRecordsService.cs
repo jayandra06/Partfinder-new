@@ -13,6 +13,13 @@ public interface IMasterDataRecordsService
 
     Task<int> GetRowCountAsync(string templateId, CancellationToken cancellationToken = default);
 
+    /// <summary>Returns a page of rows and total row count without loading the full catalog.</summary>
+    Task<(IReadOnlyList<MasterDataRowRecord> Rows, int TotalCount)> GetRowsPageAsync(
+        string templateId,
+        int skip,
+        int take,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<MasterDataRowRecord>> GetRowsByIdsAsync(
         string templateId,
         IReadOnlyList<string> rowIds,

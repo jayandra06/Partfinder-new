@@ -174,13 +174,9 @@ public sealed class MongoMasterDataRecordsService : IMasterDataRecordsService
                 && MongoSharedPartsCatalog.IsCatalogTemplateName(template.Name)
                 && orgCode is not null)
             {
-                var rows = await MongoSharedPartsCatalog.LoadRowsAsync(
-                        client,
-                        orgCode,
-                        template.Fields,
-                        cancellationToken)
+                return await MongoSharedPartsCatalog
+                    .CountRowsAsync(client, orgCode, cancellationToken)
                     .ConfigureAwait(false);
-                return rows.Count;
             }
 
             var coll = TryGetCollection(client);
@@ -197,6 +193,69 @@ public sealed class MongoMasterDataRecordsService : IMasterDataRecordsService
         {
             System.Diagnostics.Debug.WriteLine($"[MongoMasterDataRecordsService] GetRowCountAsync failed: {ex.Message}");
             return 0;
+        }
+    }
+
+    public async Task<(IReadOnlyList<MasterDataRowRecord> Rows, int TotalCount)> GetRowsPageAsync(
+        string templateId,
+        int skip,
+        int take,
+        CancellationToken cancellationToken = default)
+    {
+        if (take <= 0)
+        {
+            return (Array.Empty<MasterDataRowRecord>(), 0);
+        }
+
+        try
+        {
+            if (!TryGetClient(out var client))
+            {
+                return (Array.Empty<MasterDataRowRecord>(), 0);
+            }
+
+            var template = await _templateSchema
+                .GetTemplateAsync(templateId, cancellationToken)
+                .ConfigureAwait(false);
+            var orgCode = GetOrgCodeOrNull();
+
+            if (template is not null
+                && MongoSharedPartsCatalog.IsCatalogTemplateName(template.Name)
+                && orgCode is not null)
+            {
+                var total = await MongoSharedPartsCatalog
+                    .CountRowsAsync(client, orgCode, cancellationToken)
+                    .ConfigureAwait(false);
+                var (rows, _) = await MongoSharedPartsCatalog
+                    .LoadPageAsync(client, orgCode, template.Fields, skip, take, cancellationToken)
+                    .ConfigureAwait(false);
+                return (rows, total);
+            }
+
+            var coll = TryGetCollection(client);
+            if (coll is null)
+            {
+                return (Array.Empty<MasterDataRowRecord>(), 0);
+            }
+
+            var filter = Builders<MasterDataRowDoc>.Filter.Eq(d => d.TemplateId, templateId);
+            var totalCount = (int)await coll
+                .CountDocumentsAsync(filter, cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+
+            var docs = await coll.Find(filter)
+                .SortBy(d => d.RowOrder)
+                .Skip(skip)
+                .Limit(take)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            return (docs.Select(Map).ToList(), totalCount);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MongoMasterDataRecordsService] GetRowsPageAsync failed: {ex.Message}");
+            return (Array.Empty<MasterDataRowRecord>(), 0);
         }
     }
 

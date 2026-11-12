@@ -4,6 +4,8 @@
     <PackageReference Include="System.Security.Permissions" Version="8.0.0" GeneratePathProperty="true" PrivateAssets="all" />
   </ItemGroup>
   <PropertyGroup>
+    <!-- WinUI / packaged app: default VS "Any CPU" to x64 so Core + app references resolve. -->
+    <Platform Condition="'$(Platform)' == 'AnyCPU' or '$(Platform)' == ''">x64</Platform>
     <_PartFinderMsixTaskDeps>$(MSBuildThisFileDirectory).msix-task-deps\</_PartFinderMsixTaskDeps>
   </PropertyGroup>
 </Project>

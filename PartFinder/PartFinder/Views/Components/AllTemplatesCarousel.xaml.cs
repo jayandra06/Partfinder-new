@@ -412,7 +412,7 @@ public sealed partial class AllTemplatesCarousel : UserControl
                     finalX = centerX + baseCenterWidth - (cardW * 0.68) + (stepOffset - (baseCenterWidth * 0.32));
                 }
 
-                opacity = 1.0;
+                opacity = Math.Max(0.72, 1.0 - (absDist * 0.08));
                 zIndex = 100 - (absDist * 10);
                 card.BorderBrush = ThemeBrush("BorderDefaultBrush");
             }
@@ -512,7 +512,10 @@ public sealed partial class AllTemplatesCarousel : UserControl
                         }
                     }
                     break;
-                case "FieldsSection": fe.Visibility = Visibility.Visible; fe.Opacity = 1.0; break;
+                case "FieldsSection":
+                    fe.Visibility = isCenter ? Visibility.Visible : Visibility.Collapsed;
+                    fe.Opacity = 1.0;
+                    break;
                 case "BottomSection" when fe is Grid bottomGrid:
                     foreach (var gc in bottomGrid.Children)
                     {
@@ -601,7 +604,7 @@ public sealed partial class AllTemplatesCarousel : UserControl
         {
             Width = 300, Height = 400,
             CornerRadius    = new CornerRadius(24),
-            Background      = ThemeBrush("ElevatedCardBackgroundBrush"),
+            Background      = ThemeBrush("CardBackgroundBrush"),
             BorderBrush     = ThemeBrush("BorderDefaultBrush"),
             BorderThickness = new Thickness(1.5),
             Padding         = new Thickness(0),
@@ -624,7 +627,10 @@ public sealed partial class AllTemplatesCarousel : UserControl
                 TemplateDoubleTapped?.Invoke(this, template.Id);
             };
 
-        var mainGrid = new Grid();
+        var mainGrid = new Grid
+        {
+            Background = ThemeBrush("CardBackgroundBrush"),
+        };
         mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });

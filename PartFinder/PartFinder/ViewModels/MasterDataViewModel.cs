@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.UI.Dispatching;
 using MongoDB.Bson;
 using PartFinder.Models;
 using PartFinder.Services;
@@ -24,6 +25,8 @@ public sealed partial class MasterDataViewModel : ViewModelBase
 
     private readonly ICurrentUserAccessService _access;
     private readonly CatalogBrowseSessionStore _catalogSession;
+    private readonly IFavouriteStore _favouriteStore;
+    private readonly DispatcherQueue? _dispatcherQueue;
 
     public event EventHandler? ColumnFiltersChanged;
 
@@ -34,7 +37,8 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         BackendApiClient api,
         ActivityLogger activityLogger,
         ICurrentUserAccessService access,
-        CatalogBrowseSessionStore catalogSession)
+        CatalogBrowseSessionStore catalogSession,
+        IFavouriteStore favouriteStore)
     {
         _templateSchema = templateSchema;
         _records = records;
@@ -43,6 +47,39 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         _activityLogger = activityLogger;
         _access = access;
         _catalogSession = catalogSession;
+        _favouriteStore = favouriteStore;
+        _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
+
+        _favouriteStore.FavouritesChanged += (_, _) => BumpFavouritesStoreVersion();
+    }
+
+    public int FavouritesStoreVersion { get; private set; }
+
+    private void BumpFavouritesStoreVersion()
+    {
+        if (_dispatcherQueue is not null && !_dispatcherQueue.HasThreadAccess)
+        {
+            _dispatcherQueue.TryEnqueue(BumpFavouritesStoreVersion);
+            return;
+        }
+
+        FavouritesStoreVersion++;
+        OnPropertyChanged(nameof(FavouritesStoreVersion));
+    }
+
+    public bool IsFavouriteFor(string templateId) => _favouriteStore.IsFavourite(templateId);
+
+    public Task LoadFavouriteStoreAsync() => _favouriteStore.LoadAsync();
+
+    public async Task ToggleFavouritePublicAsync(string templateId)
+    {
+        if (string.IsNullOrWhiteSpace(templateId))
+        {
+            return;
+        }
+
+        await _favouriteStore.ToggleAsync(templateId).ConfigureAwait(true);
+        BumpFavouritesStoreVersion();
     }
 
     public ObservableCollection<PartTemplateDefinition> DataTemplates { get; } = new();
@@ -82,6 +119,20 @@ public sealed partial class MasterDataViewModel : ViewModelBase
     public bool EnableWorksheetHyperlinks => SurfaceMode == MasterDataSurfaceMode.LinkedBrowse;
 
     public bool IsCatalogReadOnly => SurfaceMode == MasterDataSurfaceMode.ReadOnlyCatalog;
+
+    private int _catalogTotalRowCount;
+
+    /// <summary>Total rows in the catalog when browsing read-only with server paging.</summary>
+    public int CatalogTotalRowCount
+    {
+        get => _catalogTotalRowCount;
+        set => SetProperty(ref _catalogTotalRowCount, value);
+    }
+
+    public int GetPagerTotalRowCount(int visibleRowCount) =>
+        IsCatalogReadOnly && CatalogTotalRowCount > 0
+            ? CatalogTotalRowCount
+            : visibleRowCount;
 
     public bool ShowSpreadsheetEditChrome => SurfaceMode == MasterDataSurfaceMode.TemplateEdit;
 
@@ -225,6 +276,10 @@ public sealed partial class MasterDataViewModel : ViewModelBase
     {
         args ??= new MasterDataNavigationArgs();
         SurfaceMode = args.Mode;
+        if (SurfaceMode is MasterDataSurfaceMode.ReadOnlyCatalog or MasterDataSurfaceMode.LinkedBrowse)
+        {
+            IsEditMode = false;
+        }
 
         switch (args.Mode)
         {
@@ -241,14 +296,117 @@ public sealed partial class MasterDataViewModel : ViewModelBase
                 await LoadCatalogAsync(cancellationToken).ConfigureAwait(true);
                 return;
             default:
-                await LoadCatalogAsync(cancellationToken).ConfigureAwait(true);
+                var deferDefaultGrid = !string.IsNullOrWhiteSpace(args.TemplateId);
+                await LoadCatalogAsync(cancellationToken, loadInitialGrid: !deferDefaultGrid).ConfigureAwait(true);
+                if (!string.IsNullOrWhiteSpace(args.TemplateId))
+                {
+                    await SelectCatalogByIdAsync(args.TemplateId, cancellationToken).ConfigureAwait(true);
+                }
+
                 return;
         }
     }
 
-    /// <summary>Initial load: all templates + first grid selection (catalog / linked browse).</summary>
-    public async Task LoadCatalogAsync(CancellationToken cancellationToken = default) =>
-        await LoadAsync(cancellationToken).ConfigureAwait(true);
+    public async Task SelectCatalogByIdAsync(string templateId, CancellationToken cancellationToken = default)
+    {
+        var pick = DataTemplates.FirstOrDefault(t => t.Id == templateId)
+                   ?? _cachedTemplates.FirstOrDefault(t => t.Id == templateId);
+        if (pick is null)
+        {
+            return;
+        }
+
+        _suppressTemplateSelectionChange = true;
+        SelectedDataTemplate = pick;
+        _suppressTemplateSelectionChange = false;
+        _catalogSession.GetGridStateFor(SurfaceMode).TemplateId = templateId;
+        await LoadForTemplateAsync(templateId, cancellationToken).ConfigureAwait(true);
+    }
+
+    private async Task LoadCatalogRowsPageCoreAsync(
+        int pageIndex,
+        int pageSize,
+        string templateId,
+        CancellationToken loadCt)
+    {
+        var skip = pageIndex * pageSize;
+        var (pageRows, total) = await _records
+            .GetRowsPageAsync(templateId, skip, pageSize, loadCt)
+            .ConfigureAwait(true);
+
+        if (!IsLoadStillCurrent(templateId))
+        {
+            return;
+        }
+
+        CatalogTotalRowCount = total;
+        Rows.Clear();
+        foreach (var rec in pageRows)
+        {
+            Rows.Add(MapRecordToRow(rec));
+        }
+
+        if (Rows.Count == 0)
+        {
+            Rows.Add(CreateEmptyRow());
+        }
+
+        await ResolveRecordLinkLabelsAsync(loadCt).ConfigureAwait(true);
+    }
+
+    public async Task LoadCatalogRowsPageAsync(int pageIndex, int pageSize, CancellationToken cancellationToken = default)
+    {
+        if (SelectedDataTemplate is null || pageSize <= 0)
+        {
+            return;
+        }
+
+        var templateId = SelectedDataTemplate.Id;
+        var reuseActiveLoad = _templateLoadCts is not null
+                              && cancellationToken != default
+                              && cancellationToken == _templateLoadCts.Token;
+
+        CancellationToken loadCt;
+        if (reuseActiveLoad)
+        {
+            loadCt = _templateLoadCts!.Token;
+        }
+        else
+        {
+            _templateLoadCts?.Cancel();
+            _templateLoadCts?.Dispose();
+            _templateLoadCts = cancellationToken == default
+                ? new CancellationTokenSource()
+                : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            loadCt = _templateLoadCts.Token;
+        }
+
+        var showLoading = !reuseActiveLoad;
+        if (showLoading)
+        {
+            IsLoading = true;
+        }
+
+        try
+        {
+            await LoadCatalogRowsPageCoreAsync(pageIndex, pageSize, templateId, loadCt).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException) when (loadCt.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Error: " + ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    /// <summary>Initial load: all templates + optional first grid selection (catalog / linked browse).</summary>
+    public async Task LoadCatalogAsync(CancellationToken cancellationToken = default, bool loadInitialGrid = true) =>
+        await LoadAsync(cancellationToken, loadInitialGrid).ConfigureAwait(true);
 
     public async Task LoadForTemplateEditAsync(
         string templateId,
@@ -298,8 +456,8 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         }
     }
 
-    /// <summary>Initial load: templates list + default grid.</summary>
-    public async Task LoadAsync(CancellationToken cancellationToken = default)
+    /// <summary>Initial load: templates list + optional default grid.</summary>
+    public async Task LoadAsync(CancellationToken cancellationToken = default, bool loadInitialGrid = true)
     {
         IsLoading = true;
         StatusMessage = null;
@@ -336,6 +494,12 @@ public sealed partial class MasterDataViewModel : ViewModelBase
             }
 
             ShowTemplatePicker = DataTemplates.Count > 0;
+
+            if (!loadInitialGrid)
+            {
+                OnPropertyChanged(nameof(ShowTemplatePickerInChrome));
+                return;
+            }
 
             var savedId = _catalogSession.GetGridStateFor(SurfaceMode).TemplateId;
             var pick = CatalogBrowseSessionStore.ResolveInitialTemplate(ordered, savedId);
@@ -398,7 +562,8 @@ public sealed partial class MasterDataViewModel : ViewModelBase
 
         try
         {
-            if (IsCatalogBrowseSurface()
+            if (!IsCatalogReadOnly
+                && IsCatalogBrowseSurface()
                 && _catalogSession.TryGetSheetCache(SurfaceMode, loadForId, out var cached))
             {
                 ApplySheetCache(cached);
@@ -461,14 +626,50 @@ public sealed partial class MasterDataViewModel : ViewModelBase
                 return;
             }
 
-            var persisted = await _records
-                .GetStoredRowsAsync(template.Id, loadCt)
-                .ConfigureAwait(true);
-            if (persisted.Count == 0)
+            if (IsCatalogReadOnly)
             {
-                persisted = await _records
-                    .GetRowsAsync(template.Id, loadCt)
+                await LoadCatalogRowsPageAsync(0, 50, loadCt).ConfigureAwait(true);
+            }
+            else
+            {
+                var persisted = await _records
+                    .GetStoredRowsAsync(template.Id, loadCt)
                     .ConfigureAwait(true);
+                if (persisted.Count == 0)
+                {
+                    persisted = await _records
+                        .GetRowsAsync(template.Id, loadCt)
+                        .ConfigureAwait(true);
+                }
+
+                loadCt.ThrowIfCancellationRequested();
+                if (!IsLoadStillCurrent(loadForId))
+                {
+                    return;
+                }
+
+                if (persisted.Count == 0)
+                {
+                    Rows.Add(CreateEmptyRow());
+                }
+                else
+                {
+                    var added = 0;
+                    foreach (var rec in persisted)
+                    {
+                        if (loadCt.IsCancellationRequested || !IsLoadStillCurrent(loadForId))
+                        {
+                            return;
+                        }
+
+                        Rows.Add(MapRecordToRow(rec));
+                        added++;
+                        if (added % 250 == 0)
+                        {
+                            await Task.Yield();
+                        }
+                    }
+                }
             }
 
             loadCt.ThrowIfCancellationRequested();
@@ -477,32 +678,12 @@ public sealed partial class MasterDataViewModel : ViewModelBase
                 return;
             }
 
-            if (persisted.Count == 0)
+            if (!IsCatalogReadOnly)
             {
-                Rows.Add(CreateEmptyRow());
-            }
-            else
-            {
-                var added = 0;
-                foreach (var rec in persisted)
-                {
-                    if (loadCt.IsCancellationRequested || !IsLoadStillCurrent(loadForId))
-                    {
-                        return;
-                    }
-
-                    Rows.Add(MapRecordToRow(rec));
-                    added++;
-                    if (added % 250 == 0)
-                    {
-                        await Task.Yield();
-                    }
-                }
+                await ResolveRecordLinkLabelsAsync(loadCt).ConfigureAwait(true);
             }
 
-            await ResolveRecordLinkLabelsAsync(loadCt).ConfigureAwait(true);
-
-            if (IsCatalogBrowseSurface())
+            if (IsCatalogBrowseSurface() && !IsCatalogReadOnly)
             {
                 SaveSheetCache(loadForId);
             }

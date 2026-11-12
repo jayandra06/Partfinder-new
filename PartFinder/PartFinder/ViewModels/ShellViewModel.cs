@@ -391,7 +391,7 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
             NavigationItems.Add(
                 new NavItemViewModel
                 {
-                    Label = "Inventory",
+                    Label = "Warehouse Management",
                     IconGlyph = "\uE179",
                     Page = AppPage.Inventory,
                     IsEnabled = true,
@@ -415,7 +415,7 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
             NavigationItems.Add(
                 new NavItemViewModel
                 {
-                    Label = "Templates",
+                    Label = "Analytics",
                     IconGlyph = "\uE8A5",
                     Page = AppPage.Templates,
                     IsEnabled = true,
