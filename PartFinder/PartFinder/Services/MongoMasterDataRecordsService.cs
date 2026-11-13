@@ -385,6 +385,31 @@ public sealed class MongoMasterDataRecordsService : IMasterDataRecordsService
         return result.DeletedCount > 0;
     }
 
+    public async Task<long> DeleteAllRowsForTemplateAsync(
+        string templateId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(templateId))
+        {
+            return 0;
+        }
+
+        if (!TryGetClient(out var client))
+        {
+            return 0;
+        }
+
+        var coll = TryGetCollection(client);
+        if (coll is null)
+        {
+            return 0;
+        }
+
+        var filter = Builders<MasterDataRowDoc>.Filter.Eq(d => d.TemplateId, templateId);
+        var result = await coll.DeleteManyAsync(filter, cancellationToken).ConfigureAwait(false);
+        return result.DeletedCount;
+    }
+
     public async Task<IReadOnlyList<string>> SaveRowsAsync(
         string templateId,
         IReadOnlyList<(string? Id, int RowOrder, IReadOnlyDictionary<string, string> Values)> rows,
@@ -455,6 +480,12 @@ public sealed class MongoMasterDataRecordsService : IMasterDataRecordsService
         CancellationToken cancellationToken = default)
     {
         var rowList = rows as IReadOnlyList<IReadOnlyDictionary<string, string>> ?? rows.ToList();
+        if (rowList.Count == 0)
+        {
+            return 0;
+        }
+
+        rowList = rowList.Where(r => r is not null).ToList();
         if (rowList.Count == 0)
         {
             return 0;

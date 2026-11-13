@@ -59,13 +59,35 @@
             Visibility="Collapsed">
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel Spacing="6">
-                    <TextBlock
-                        Text="CATALOG"
-                        FontSize="10"
-                        FontWeight="Bold"
-                        CharacterSpacing="80"
-                        Foreground="{StaticResource TextTertiaryBrush}"
-                        Margin="4,0,0,8" />
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            Grid.Column="0"
+                            Text="CATALOG"
+                            FontSize="10"
+                            FontWeight="Bold"
+                            CharacterSpacing="80"
+                            Foreground="{StaticResource TextTertiaryBrush}"
+                            VerticalAlignment="Center"
+                            Margin="4,0,0,0" />
+                        <Button
+                            Grid.Column="1"
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            FontSize="11"
+                            Padding="10,6"
+                            MinHeight="32"
+                            Click="OnAddCatalogClicked"
+                            Visibility="{Binding CanAddMasterDataCatalog, Converter={StaticResource BoolToVisibilityConverter}}"
+                            ToolTipService.ToolTip="Add a new master data catalog">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE710;" FontSize="11" />
+                                <TextBlock Text="Add" FontSize="11" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
                     <ListView
                         x:Name="CatalogListView"
                         SelectionMode="Single"
@@ -80,6 +102,7 @@
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock
                                         Grid.Column="0"
@@ -90,8 +113,24 @@
                                         TextWrapping="WrapWholeWords"
                                         VerticalAlignment="Center" />
                                     <Button
-                                        x:Name="CatalogFavouriteButton"
+                                        x:Name="CatalogDeleteButton"
                                         Grid.Column="1"
+                                        Width="30"
+                                        Height="30"
+                                        Padding="0"
+                                        Margin="0,0,4,0"
+                                        CornerRadius="8"
+                                        Background="Transparent"
+                                        BorderBrush="{StaticResource DangerBrush}"
+                                        BorderThickness="1"
+                                        Click="OnCatalogDeleteClick"
+                                        Visibility="Collapsed"
+                                        ToolTipService.ToolTip="Delete catalog">
+                                        <FontIcon Glyph="&#xE74D;" FontSize="11" Foreground="{StaticResource DangerBrush}" />
+                                    </Button>
+                                    <Button
+                                        x:Name="CatalogFavouriteButton"
+                                        Grid.Column="2"
                                         Width="30"
                                         Height="30"
                                         Padding="0"
@@ -179,13 +218,27 @@
                     Height="40"
                     Padding="14,0"
                     Click="OnImportExcelClicked"
-                    IsEnabled="{Binding CanAddMasterData}"
-                    ToolTipService.ToolTip="Import catalog data from Excel">
+                    IsEnabled="{Binding CanImportMasterData}"
+                    ToolTipService.ToolTip="Import catalog data from Excel or CSV (row 1 = column names)">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <FontIcon Glyph="&#xE896;" FontSize="13" />
                         <TextBlock Text="Import data" FontSize="13" />
                     </StackPanel>
                 </Button>
+
+                <Button
+                    Style="{StaticResource DangerOutlinedButtonStyle}"
+                    Height="40"
+                    Padding="14,0"
+                    Click="OnPurgeMasterDataClicked"
+                    Visibility="{Binding CanPurgeMasterDataForTemplate, Converter={StaticResource BoolToVisibilityConverter}}"
+                    ToolTipService.ToolTip="Delete all data rows for this template (admin only). The template columns are kept.">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE74D;" FontSize="13" />
+                        <TextBlock Text="Delete data" FontSize="13" />
+                    </StackPanel>
+                </Button>
+
             </StackPanel>
 
             <StackPanel
@@ -200,6 +253,7 @@
                     Padding="16,8"
                     MinHeight="40"
                     Click="OnSaveGridClicked"
+                    Visibility="{Binding ShowSpreadsheetManualSaveButton, Converter={StaticResource BoolToVisibilityConverter}}"
                     ToolTipService.ToolTip="Save grid data">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <FontIcon Glyph="&#xE74E;" FontSize="13" />
@@ -219,6 +273,54 @@
         </Grid>
 
         <StackPanel Grid.Row="2" Margin="0,0,0,6" Spacing="6" Visibility="{Binding IsEmbeddedLinkedBrowse, Converter={StaticResource InvertedBoolToVisibilityConverter}}">
+            <Border
+                Padding="14,10"
+                CornerRadius="12"
+                Background="{StaticResource ElevatedCardBackgroundBrush}"
+                BorderBrush="{StaticResource GlassStrokeBrush}"
+                BorderThickness="1"
+                Visibility="{Binding ShowOperationProgress, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <ProgressRing
+                        Width="28"
+                        Height="28"
+                        VerticalAlignment="Center"
+                        IsActive="True" />
+                    <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
+                        <TextBlock
+                            Text="{Binding OperationProgressHeadline}"
+                            FontSize="13"
+                            FontWeight="SemiBold"
+                            Foreground="{StaticResource TextPrimaryBrush}"
+                            TextWrapping="WrapWholeWords" />
+                        <ProgressBar
+                            Height="10"
+                            Minimum="0"
+                            Maximum="100"
+                            Value="{Binding OperationProgressPercent, Mode=OneWay}"
+                            Foreground="{StaticResource AccentPrimaryBrush}" />
+                        <TextBlock
+                            Text="{Binding OperationProgressDetail}"
+                            FontSize="12"
+                            Foreground="{StaticResource TextSecondaryBrush}"
+                            TextWrapping="WrapWholeWords" />
+                    </StackPanel>
+                    <TextBlock
+                        Grid.Column="2"
+                        MinWidth="52"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        FontSize="14"
+                        FontWeight="SemiBold"
+                        Foreground="{StaticResource AccentPrimaryBrush}"
+                        Text="{Binding OperationProgressPercentLabel}" />
+                </Grid>
+            </Border>
             <!-- Status messages -->
             <StackPanel Spacing="4">
                 <TextBlock
@@ -231,7 +333,13 @@
                     Foreground="{StaticResource TextSecondaryBrush}"
                     FontSize="11"
                     Text="Select a catalog from the sidebar to view its data. This page is read-only."
-                    Visibility="{Binding IsCatalogReadOnly, Converter={StaticResource BoolToVisibilityConverter}}" />
+                    Visibility="{Binding ShowMasterDataReadOnlyHint, Converter={StaticResource BoolToVisibilityConverter}}" />
+                <TextBlock
+                    Foreground="{StaticResource TextSecondaryBrush}"
+                    FontSize="11"
+                    TextWrapping="WrapWholeWords"
+                    Text="Excel-style setup: type column names in the highlighted header row, fill cells below, or use Import data. Changes save automatically."
+                    Visibility="{Binding ShowCatalogCanvasToolbar, Converter={StaticResource BoolToVisibilityConverter}}" />
                 <TextBlock
                     Foreground="{StaticResource TextSecondaryBrush}"
                     FontSize="11"
@@ -244,12 +352,32 @@
                     Visibility="{Binding ShowSpreadsheetEditChrome, Converter={StaticResource BoolToVisibilityConverter}}" />
             </StackPanel>
 
-            <TextBlock
-                Foreground="{StaticResource TextSecondaryBrush}"
-                FontSize="11"
-                Text="Create and save a Master Data template under Templates to see columns here."
-                TextWrapping="Wrap"
-                Visibility="{Binding ShowNoTemplateHint, Converter={StaticResource BoolToVisibilityConverter}}" />
+            <StackPanel
+                Spacing="10"
+                Visibility="{Binding ShowNoMasterDataCatalogsInList, Converter={StaticResource BoolToVisibilityConverter}}">
+                <TextBlock
+                    Foreground="{StaticResource TextSecondaryBrush}"
+                    FontSize="13"
+                    Text="No master data catalogs yet."
+                    TextWrapping="Wrap" />
+                <TextBlock
+                    Foreground="{StaticResource TextTertiaryBrush}"
+                    FontSize="11"
+                    Text="Create a catalog, name your columns, and add or import rows."
+                    TextWrapping="Wrap" />
+                <Button
+                    Style="{StaticResource PrimaryButtonStyle}"
+                    FontSize="12"
+                    Padding="14,10"
+                    HorizontalAlignment="Left"
+                    Click="OnAddCatalogClicked"
+                    Visibility="{Binding ShowEmptyMasterDataAddButton, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE710;" FontSize="12" />
+                        <TextBlock Text="Add master data" FontSize="12" FontWeight="SemiBold" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
             <TextBlock
                 Foreground="{StaticResource TextSecondaryBrush}"
                 FontSize="11"
@@ -306,6 +434,21 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
+                    <StackPanel
+                        Orientation="Horizontal"
+                        Spacing="8"
+                        Visibility="{Binding ShowCatalogCanvasChrome, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Button
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            Padding="16,8"
+                            Command="{Binding AddRowCommand}"
+                            Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE710;" FontSize="12" />
+                                <TextBlock Text="Add row" FontSize="13" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
                     <StackPanel
                         Orientation="Horizontal"
                         Spacing="8"

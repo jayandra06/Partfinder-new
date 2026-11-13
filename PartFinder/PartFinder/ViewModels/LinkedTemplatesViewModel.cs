@@ -13,22 +13,28 @@ public partial class LinkedTemplatesViewModel : ViewModelBase
     private readonly ICurrentUserAccessService _access;
     private readonly IMasterDataRecordsService _records;
     private readonly CatalogBrowseSessionStore _catalogSession;
+    private readonly WorksheetRelationCleanupService _relationCleanup;
 
     public LinkedTemplatesViewModel(
         ITemplateSchemaService templates,
         BackendApiClient api,
         ICurrentUserAccessService access,
         IMasterDataRecordsService records,
-        CatalogBrowseSessionStore catalogSession)
+        CatalogBrowseSessionStore catalogSession,
+        WorksheetRelationCleanupService relationCleanup)
     {
         _templates = templates;
         _api = api;
         _access = access;
         _records = records;
         _catalogSession = catalogSession;
+        _relationCleanup = relationCleanup;
     }
 
-    public ObservableCollection<PartTemplateDefinition> Templates { get; } = [];
+    private readonly List<PartTemplateDefinition> _organizationTemplates = [];
+
+    public ObservableCollection<PartTemplateDefinition> LinkedSidebarTemplates { get; } = [];
+    public ObservableCollection<PartTemplateDefinition> NonLinkedSidebarTemplates { get; } = [];
     public ObservableCollection<LinkedTemplateBrowseItem> LinkedTemplatesForBrowse { get; } = [];
     public ObservableCollection<RelationColumnPickItem> PreviewColumnPicks { get; } = [];
     public ObservableCollection<LinkedTemplatePreviewRow> PreviewRows { get; } = [];
@@ -70,6 +76,10 @@ public partial class LinkedTemplatesViewModel : ViewModelBase
 
     public bool HasBrowseSourceTemplate => BrowseSourceTemplate is not null;
     public string BrowseSourceTemplateName => BrowseSourceTemplate?.Name ?? string.Empty;
+    public bool HasTemplatesToBrowse => _organizationTemplates.Count > 0;
+    public bool ShowNoTemplatesAvailableMessage => !IsLoading && !HasTemplatesToBrowse;
+    public bool HasLinkedSidebarTemplates => LinkedSidebarTemplates.Count > 0;
+    public bool HasNonLinkedSidebarTemplates => NonLinkedSidebarTemplates.Count > 0;
     public bool HasLinkedTemplatesForBrowse => LinkedTemplatesForBrowse.Count > 0;
     public bool ShowNoLinksForBrowseMessage => HasBrowseSourceTemplate && !HasLinkedTemplatesForBrowse;
     public bool HasSelectedLinkedTemplate => SelectedLinkedBrowseItem is not null;
@@ -77,6 +87,7 @@ public partial class LinkedTemplatesViewModel : ViewModelBase
     public bool ShowColumnEditor => HasSelectedLinkedTemplate && PreviewColumnPicks.Count > 0;
     public bool ShowColumnEditorPlaceholder => HasBrowseSourceTemplate && !HasSelectedLinkedTemplate;
     public bool HasPreviewData => PreviewRows.Count > 0;
+    public bool CanUnlinkTemplates => _access.Capabilities.CanEditTemplate;
 
     public async Task InitializeAsync(CancellationToken ct = default)
     {
@@ -86,27 +97,34 @@ public partial class LinkedTemplatesViewModel : ViewModelBase
         try
         {
             var list = await _templates.GetTemplatesAsync(ct).ConfigureAwait(true);
-            var filtered = _access.FilterTemplatesForParts(list);
+            var filtered = TemplateCatalogFilters.OrganizationTemplates(
+                _access.FilterTemplatesForParts(list));
             var ordered = CatalogBrowseSessionStore.OrderForCatalogSidebar(filtered);
-            Templates.Clear();
-            foreach (var item in ordered)
-            {
-                Templates.Add(item);
-            }
+            _organizationTemplates.Clear();
+            _organizationTemplates.AddRange(ordered);
 
             await LoadAllRelationsAsync(ct).ConfigureAwait(true);
+            RefreshSidebarTemplateGroups();
 
             var savedId = _catalogSession.LinkedTemplatesBrowseTemplateId
                             ?? _catalogSession.LinkedTemplatesGrid.TemplateId;
-            var pick = CatalogBrowseSessionStore.ResolveInitialTemplate(ordered, savedId);
+            var pick = CatalogBrowseSessionStore.ResolveInitialTemplate(ordered, savedId)
+                       ?? LinkedSidebarTemplates.FirstOrDefault()
+                       ?? NonLinkedSidebarTemplates.FirstOrDefault();
             if (pick is not null)
             {
                 BrowseSourceTemplate = pick;
                 _catalogSession.LinkedTemplatesBrowseTemplateId = pick.Id;
                 _catalogSession.LinkedTemplatesGrid.TemplateId = pick.Id;
             }
+            else
+            {
+                BrowseSourceTemplate = null;
+            }
 
             RefreshLinkedTemplatesForBrowse();
+            OnPropertyChanged(nameof(HasTemplatesToBrowse));
+            OnPropertyChanged(nameof(ShowNoTemplatesAvailableMessage));
         }
         catch (Exception ex)
         {
@@ -115,7 +133,61 @@ public partial class LinkedTemplatesViewModel : ViewModelBase
         finally
         {
             IsLoading = false;
+            OnPropertyChanged(nameof(HasTemplatesToBrowse));
+            OnPropertyChanged(nameof(ShowNoTemplatesAvailableMessage));
         }
+    }
+
+    private void RefreshSidebarTemplateGroups()
+    {
+        LinkedSidebarTemplates.Clear();
+        NonLinkedSidebarTemplates.Clear();
+
+        var linkedIds = BuildLinkedTemplateIds();
+        foreach (var template in _organizationTemplates)
+        {
+            if (linkedIds.Contains(template.Id))
+            {
+                LinkedSidebarTemplates.Add(template);
+            }
+            else
+            {
+                NonLinkedSidebarTemplates.Add(template);
+            }
+        }
+
+        OnPropertyChanged(nameof(HasLinkedSidebarTemplates));
+        OnPropertyChanged(nameof(HasNonLinkedSidebarTemplates));
+        OnPropertyChanged(nameof(HasTemplatesToBrowse));
+        OnPropertyChanged(nameof(ShowNoTemplatesAvailableMessage));
+    }
+
+    private HashSet<string> BuildLinkedTemplateIds()
+    {
+        var byId = _organizationTemplates.ToDictionary(t => t.Id, StringComparer.Ordinal);
+        var linked = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var relation in _allRelations)
+        {
+            if (!byId.TryGetValue(relation.PrimaryTemplateId, out var primary))
+            {
+                continue;
+            }
+
+            if (!byId.TryGetValue(relation.LookupTemplateId, out var lookup))
+            {
+                continue;
+            }
+
+            if (!TemplateCatalogFilters.HasSharedColumnLabels(primary, lookup))
+            {
+                continue;
+            }
+
+            linked.Add(primary.Id);
+            linked.Add(lookup.Id);
+        }
+
+        return linked;
     }
 
     partial void OnBrowseSourceTemplateChanged(PartTemplateDefinition? value)
@@ -191,7 +263,17 @@ public partial class LinkedTemplatesViewModel : ViewModelBase
             _allRelations);
         foreach (var relation in outbound)
         {
-            var lookup = Templates.FirstOrDefault(t => t.Id == relation.LookupTemplateId);
+            var lookup = _organizationTemplates.FirstOrDefault(t => t.Id == relation.LookupTemplateId);
+            if (lookup is null)
+            {
+                continue;
+            }
+
+            if (!TemplateCatalogFilters.HasSharedColumnLabels(BrowseSourceTemplate, lookup))
+            {
+                continue;
+            }
+
             var relationId = relation.Id.EndsWith(":mirror", StringComparison.OrdinalIgnoreCase)
                 ? relation.Id[..^":mirror".Length]
                 : relation.Id;
@@ -199,7 +281,7 @@ public partial class LinkedTemplatesViewModel : ViewModelBase
             {
                 RelationId = relationId,
                 TemplateId = relation.LookupTemplateId,
-                TemplateName = lookup?.Name ?? relation.LookupTemplateId,
+                TemplateName = lookup.Name,
                 Relation = relation,
                 LookupTemplate = lookup,
             });
@@ -214,7 +296,7 @@ public partial class LinkedTemplatesViewModel : ViewModelBase
         PreviewColumnPicks.Clear();
 
         var template = item.LookupTemplate
-                         ?? Templates.FirstOrDefault(t => t.Id == item.TemplateId);
+                         ?? _organizationTemplates.FirstOrDefault(t => t.Id == item.TemplateId);
         if (template is null)
         {
             ErrorMessage = "Linked template columns could not be loaded.";
@@ -300,6 +382,64 @@ public partial class LinkedTemplatesViewModel : ViewModelBase
 
     private bool CanSaveViewColumns() => HasSelectedLinkedTemplate && !IsSavingColumns;
 
+    [RelayCommand(CanExecute = nameof(CanUnlinkTemplates))]
+    private async Task DeleteLinkAsync(LinkedTemplateBrowseItem? item, CancellationToken ct = default)
+    {
+        var target = item ?? SelectedLinkedBrowseItem;
+        if (target is null || !CanUnlinkTemplates)
+        {
+            return;
+        }
+
+        var relation = _allRelations.FirstOrDefault(r =>
+            string.Equals(r.Id, target.RelationId, StringComparison.OrdinalIgnoreCase))
+                       ?? _allRelations.FirstOrDefault(r =>
+                           string.Equals(r.PrimaryTemplateId, BrowseSourceTemplate?.Id, StringComparison.OrdinalIgnoreCase)
+                           && string.Equals(r.LookupTemplateId, target.TemplateId, StringComparison.OrdinalIgnoreCase));
+        if (relation is null)
+        {
+            ErrorMessage = "Could not find that link to remove.";
+            return;
+        }
+
+        IsLoading = true;
+        ErrorMessage = string.Empty;
+        StatusMessage = string.Empty;
+        try
+        {
+            var (ok, error) = await _relationCleanup
+                .DeleteRelationLinkAsync(relation, _allRelations, ct)
+                .ConfigureAwait(true);
+            if (!ok)
+            {
+                ErrorMessage = error ?? "Failed to remove link.";
+                return;
+            }
+
+            await LoadAllRelationsAsync(ct).ConfigureAwait(true);
+            RefreshSidebarTemplateGroups();
+            if (SelectedLinkedBrowseItem?.RelationId == target.RelationId)
+            {
+                SelectedLinkedBrowseItem = null;
+            }
+
+            if (BrowseSourceTemplate is not null
+                && !LinkedSidebarTemplates.Any(t => t.Id == BrowseSourceTemplate.Id)
+                && !NonLinkedSidebarTemplates.Any(t => t.Id == BrowseSourceTemplate.Id))
+            {
+                BrowseSourceTemplate = LinkedSidebarTemplates.FirstOrDefault()
+                                       ?? NonLinkedSidebarTemplates.FirstOrDefault();
+            }
+
+            RefreshLinkedTemplatesForBrowse();
+            StatusMessage = $"Removed link to \"{target.TemplateName}\".";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
     [RelayCommand(CanExecute = nameof(CanRefreshPreview))]
     private Task RefreshPreviewAsync(CancellationToken ct = default) => LoadLinkedPreviewDataAsync(ct);
 
@@ -313,7 +453,7 @@ public partial class LinkedTemplatesViewModel : ViewModelBase
         }
 
         var template = SelectedLinkedBrowseItem.LookupTemplate
-                       ?? Templates.FirstOrDefault(t => t.Id == SelectedLinkedBrowseItem.TemplateId);
+                       ?? _organizationTemplates.FirstOrDefault(t => t.Id == SelectedLinkedBrowseItem.TemplateId);
         if (template is null)
         {
             ErrorMessage = "Linked template not found.";

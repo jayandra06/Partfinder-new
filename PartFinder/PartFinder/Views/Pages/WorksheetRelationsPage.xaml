@@ -229,11 +229,29 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="viewmodels:RelationChipItem">
-                                <Button
-                                    Content="{Binding Label}"
-                                    Style="{StaticResource RelationChipStyle}"
-                                    Command="{Binding ElementName=PageRoot, Path=DataContext.SelectRelationCommand}"
-                                    CommandParameter="{Binding}" />
+                                <Grid ColumnSpacing="4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Button
+                                        Grid.Column="0"
+                                        Content="{Binding Label}"
+                                        Style="{StaticResource RelationChipStyle}"
+                                        Command="{Binding ElementName=PageRoot, Path=DataContext.SelectRelationCommand}"
+                                        CommandParameter="{Binding}" />
+                                    <Button
+                                        Grid.Column="1"
+                                        Content="✕"
+                                        FontSize="11"
+                                        MinWidth="28"
+                                        MinHeight="28"
+                                        Padding="4"
+                                        Style="{StaticResource GhostButtonStyle}"
+                                        ToolTipService.ToolTip="Remove link"
+                                        Command="{Binding ElementName=PageRoot, Path=DataContext.DeleteRelationChipCommand}"
+                                        CommandParameter="{Binding}" />
+                                </Grid>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>

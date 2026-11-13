@@ -37,6 +37,11 @@ public interface IMasterDataRecordsService
         string rowId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Removes every data row for the template; does not change the template schema.</summary>
+    Task<long> DeleteAllRowsForTemplateAsync(
+        string templateId,
+        CancellationToken cancellationToken = default);
+
     /// <summary>Upserts every row and deletes the listed row ids in one write.</summary>
     Task<IReadOnlyList<string>> SaveRowsAsync(
         string templateId,

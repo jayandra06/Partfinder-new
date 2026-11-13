@@ -77,6 +77,7 @@ namespace PartFinder
             services.AddSingleton<ILocalSetupContext, LocalSetupContext>();
             services.AddSingleton<LocalProfileStore>();
             services.AddSingleton<BackendApiClient>();
+            services.AddSingleton<WorksheetRelationCleanupService>();
             services.AddSingleton<IOrgUserDirectoryService, MongoOrgUserDirectoryService>();
             services.AddSingleton<ICurrentUserAccessService, CurrentUserAccessService>();
             services.AddSingleton<ITemplateSchemaService, MongoTemplateSchemaService>();
@@ -96,6 +97,7 @@ namespace PartFinder
             services.AddSingleton<MongoSessionService>();
             services.AddSingleton<ActivityLogger>();
             services.AddSingleton<CatalogBrowseSessionStore>();
+            services.AddSingleton<MasterDataCatalogCascadeService>();
 
             services.AddSingleton<ShellViewModel>();
             services.AddSingleton<IShellNavCoordinator>(sp => sp.GetRequiredService<ShellViewModel>());

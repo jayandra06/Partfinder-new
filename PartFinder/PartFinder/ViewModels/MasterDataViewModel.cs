@@ -22,10 +22,17 @@ public sealed partial class MasterDataViewModel : ViewModelBase
     private readonly List<WorksheetRelationDto> _worksheetRelations = [];
     private CancellationTokenSource? _templateLoadCts;
     private readonly Dictionary<string, string> _columnFilters = new(StringComparer.OrdinalIgnoreCase);
+    private CancellationTokenSource? _catalogAutoSaveCts;
+    private int _catalogAutoSaveVersion;
+    private bool _catalogAutoSaveRunning;
+    private bool _catalogImportInProgress;
 
     private readonly ICurrentUserAccessService _access;
     private readonly CatalogBrowseSessionStore _catalogSession;
     private readonly IFavouriteStore _favouriteStore;
+    private readonly WorksheetRelationCleanupService _relationCleanup;
+    private readonly MasterDataCatalogCascadeService _catalogCascade;
+    private readonly IShellNavCoordinator _shellNav;
     private readonly DispatcherQueue? _dispatcherQueue;
 
     public event EventHandler? ColumnFiltersChanged;
@@ -38,7 +45,10 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         ActivityLogger activityLogger,
         ICurrentUserAccessService access,
         CatalogBrowseSessionStore catalogSession,
-        IFavouriteStore favouriteStore)
+        IFavouriteStore favouriteStore,
+        WorksheetRelationCleanupService relationCleanup,
+        MasterDataCatalogCascadeService catalogCascade,
+        IShellNavCoordinator shellNav)
     {
         _templateSchema = templateSchema;
         _records = records;
@@ -48,6 +58,9 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         _access = access;
         _catalogSession = catalogSession;
         _favouriteStore = favouriteStore;
+        _relationCleanup = relationCleanup;
+        _catalogCascade = catalogCascade;
+        _shellNav = shellNav;
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
 
         _favouriteStore.FavouritesChanged += (_, _) => BumpFavouritesStoreVersion();
@@ -98,9 +111,13 @@ public sealed partial class MasterDataViewModel : ViewModelBase
     private string? statusMessage;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowEmptyMasterDataAddButton))]
+    [NotifyPropertyChangedFor(nameof(ShowNoMasterDataCatalogsInList))]
     private bool showNoTemplateHint;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowEmptyMasterDataAddButton))]
+    [NotifyPropertyChangedFor(nameof(ShowNoMasterDataCatalogsInList))]
     private bool showNoDatabaseHint;
 
     [ObservableProperty]
@@ -110,7 +127,39 @@ public sealed partial class MasterDataViewModel : ViewModelBase
     private bool isEditMode;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowCatalogCanvasChrome))]
+    [NotifyPropertyChangedFor(nameof(ShowCatalogCanvasToolbar))]
+    [NotifyPropertyChangedFor(nameof(ShowImportExportToolbar))]
+    [NotifyPropertyChangedFor(nameof(UseExcelStyleCatalogGrid))]
+    private bool isCatalogCanvasMode;
+
+    [ObservableProperty]
     private bool isAddColumnPanelVisible;
+
+    private const int CanvasMinColumns = 12;
+    private const int CanvasMinRows = 40;
+    private const int CanvasTrailingRows = 25;
+    private const int CanvasGrowBatch = 20;
+    private const int LargeImportRowThreshold = 400;
+
+    /// <summary>Skip building the on-screen canvas when the file has very many columns.</summary>
+    private const int LargeImportColumnThreshold = 80;
+    private const int SaveBatchSize = 250;
+
+    [ObservableProperty]
+    private bool _showOperationProgress;
+
+    [ObservableProperty]
+    private double _operationProgressPercent;
+
+    [ObservableProperty]
+    private string _operationProgressHeadline = string.Empty;
+
+    [ObservableProperty]
+    private string _operationProgressDetail = string.Empty;
+
+    [ObservableProperty]
+    private string _operationProgressPercentLabel = string.Empty;
 
     [ObservableProperty]
     private MasterDataSurfaceMode surfaceMode = MasterDataSurfaceMode.ReadOnlyCatalog;
@@ -136,10 +185,19 @@ public sealed partial class MasterDataViewModel : ViewModelBase
 
     public bool ShowSpreadsheetEditChrome => SurfaceMode == MasterDataSurfaceMode.TemplateEdit;
 
+    public bool ShowCatalogCanvasChrome => IsCatalogCanvasMode;
+
+    public bool ShowCatalogCanvasToolbar => IsCatalogCanvasMode;
+
+    public bool UseExcelStyleCatalogGrid => IsCatalogCanvasMode && IsEditMode;
+
+    public bool ShowCatalogPager => !IsCatalogCanvasMode;
+
     public bool ShowImportExportToolbar =>
         SelectedDataTemplate is not null
         && CanViewMasterData
-        && SurfaceMode is MasterDataSurfaceMode.ReadOnlyCatalog or MasterDataSurfaceMode.LinkedBrowse;
+        && (IsCatalogCanvasMode
+            || SurfaceMode is MasterDataSurfaceMode.ReadOnlyCatalog or MasterDataSurfaceMode.LinkedBrowse);
 
     public bool IsEmbeddedLinkedBrowse => SurfaceMode == MasterDataSurfaceMode.LinkedBrowse;
 
@@ -153,9 +211,58 @@ public sealed partial class MasterDataViewModel : ViewModelBase
 
     public bool CanEditMasterData => _access.Capabilities.CanEditMasterData;
     public bool CanAddMasterData => _access.Capabilities.CanAddMasterData;
+
+    public bool CanImportMasterData =>
+        CanAddMasterData || CanEditCatalogCanvas || _access.IsOrganizationAdministrator;
     public bool CanCopyMasterData => _access.Capabilities.CanCopyMasterData;
     public bool CanViewMasterData => _access.Capabilities.CanViewMasterData;
     public bool CanDeleteMasterData => _access.Capabilities.CanDeleteMasterData;
+
+    /// <summary>Org admins may purge all rows for the selected catalog template from the browse toolbar.</summary>
+    public bool CanPurgeMasterDataForTemplate =>
+        _access.IsOrganizationAdministrator
+        && ShowImportExportToolbar
+        && SelectedDataTemplate is not null;
+
+    public bool CanAddMasterDataCatalog =>
+        !IsEmbeddedLinkedBrowse
+        && SurfaceMode == MasterDataSurfaceMode.ReadOnlyCatalog
+        && _access.Capabilities.CanAddTemplate;
+
+    public bool ShowNoMasterDataCatalogsInList => DataTemplates.Count == 0;
+
+    public bool ShowEmptyMasterDataAddButton =>
+        ShowNoMasterDataCatalogsInList && CanAddMasterDataCatalog && !ShowNoDatabaseHint;
+
+    public bool ShowMasterDataReadOnlyHint =>
+        IsCatalogReadOnly && SelectedDataTemplate is null;
+
+    /// <summary>Master Data catalog pages save in the background (no Save button).</summary>
+    public bool ShowMasterDataManualSaveButtons =>
+        SurfaceMode != MasterDataSurfaceMode.ReadOnlyCatalog;
+
+    public bool ShowSpreadsheetManualSaveButton =>
+        ShowSpreadsheetEditChrome && ShowMasterDataManualSaveButtons;
+
+    public bool AutoSaveMasterDataCatalog =>
+        SurfaceMode == MasterDataSurfaceMode.ReadOnlyCatalog
+        && IsEditMode
+        && SelectedDataTemplate is not null
+        && Columns.Count > 0
+        && (CanEditMasterData || CanAddMasterData);
+
+    public bool ShowCatalogManagementChrome => CanAddMasterDataCatalog || CanDeleteMasterDataCatalogItems;
+
+    public bool CanDeleteMasterDataCatalogItems => _access.IsOrganizationAdministrator;
+
+    public bool CanDeleteCatalogTemplate(PartTemplateDefinition template) =>
+        CanDeleteMasterDataCatalogItems
+        && !string.Equals(
+            template.Id,
+            MongoTemplateSchemaService.MasterDataTemplateId,
+            StringComparison.OrdinalIgnoreCase);
+
+    public string? LastCreatedCatalogId { get; private set; }
 
     public IReadOnlyList<MasterDataRowViewModel> GetVisibleRows() =>
         Rows.Where(IsRowVisible).ToList();
@@ -221,12 +328,20 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         return true;
     }
 
+    public bool CanEditCatalogCanvas =>
+        IsCatalogCanvasMode
+        && (_access.Capabilities.CanAddTemplate || _access.IsOrganizationAdministrator);
+
     public bool CanAddRows =>
-        IsEditMode && Columns.Count > 0 && (CanEditMasterData || CanAddMasterData);
+        IsEditMode
+        && Columns.Count > 0
+        && (CanEditCatalogCanvas || CanEditMasterData || CanAddMasterData);
 
     partial void OnIsEditModeChanged(bool value)
     {
+        OnPropertyChanged(nameof(AutoSaveMasterDataCatalog));
         OnPropertyChanged(nameof(EditModeButtonText));
+        OnPropertyChanged(nameof(UseExcelStyleCatalogGrid));
         OnPropertyChanged(nameof(CanAddRows));
         OnPropertyChanged(nameof(CanDeleteRows));
         OnPropertyChanged(nameof(CanManageColumns));
@@ -234,9 +349,24 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         AddRowCommand.NotifyCanExecuteChanged();
     }
 
+    partial void OnIsCatalogCanvasModeChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowCatalogCanvasChrome));
+        OnPropertyChanged(nameof(ShowCatalogCanvasToolbar));
+        OnPropertyChanged(nameof(ShowImportExportToolbar));
+        OnPropertyChanged(nameof(ShowCatalogPager));
+        OnPropertyChanged(nameof(UseExcelStyleCatalogGrid));
+        OnPropertyChanged(nameof(CanEditCatalogCanvas));
+        OnPropertyChanged(nameof(CanAddRows));
+        OnPropertyChanged(nameof(CanDeleteRows));
+        OnPropertyChanged(nameof(CanManageColumns));
+        OnPropertyChanged(nameof(CanRemoveColumns));
+    }
+
     partial void OnSurfaceModeChanged(MasterDataSurfaceMode value)
     {
-        if (value is MasterDataSurfaceMode.ReadOnlyCatalog or MasterDataSurfaceMode.LinkedBrowse)
+        if (value is MasterDataSurfaceMode.ReadOnlyCatalog or MasterDataSurfaceMode.LinkedBrowse
+            && !IsCatalogCanvasMode)
         {
             IsEditMode = false;
         }
@@ -250,10 +380,14 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanAddRows));
         OnPropertyChanged(nameof(CanManageColumns));
         OnPropertyChanged(nameof(CanRemoveColumns));
+        OnPropertyChanged(nameof(CanAddMasterDataCatalog));
+        OnPropertyChanged(nameof(ShowCatalogManagementChrome));
+        OnPropertyChanged(nameof(CanDeleteMasterDataCatalogItems));
     }
 
     partial void OnSelectedDataTemplateChanged(PartTemplateDefinition? value)
     {
+        OnPropertyChanged(nameof(ShowMasterDataReadOnlyHint));
         if (_suppressTemplateSelectionChange || value is null)
         {
             return;
@@ -267,6 +401,7 @@ public sealed partial class MasterDataViewModel : ViewModelBase
 
         OnPropertyChanged(nameof(ShowTemplatePickerInChrome));
         OnPropertyChanged(nameof(ShowImportExportToolbar));
+        OnPropertyChanged(nameof(CanPurgeMasterDataForTemplate));
         _ = LoadForTemplateAsync(value.Id);
     }
 
@@ -293,7 +428,7 @@ public sealed partial class MasterDataViewModel : ViewModelBase
                 await LoadForTemplateEditAsync(args.TemplateId, args.StartInEditMode, cancellationToken).ConfigureAwait(true);
                 return;
             case MasterDataSurfaceMode.LinkedBrowse:
-                await LoadCatalogAsync(cancellationToken).ConfigureAwait(true);
+                await InitializeLinkedBrowseSurfaceAsync(cancellationToken).ConfigureAwait(true);
                 return;
             default:
                 var deferDefaultGrid = !string.IsNullOrWhiteSpace(args.TemplateId);
@@ -408,6 +543,82 @@ public sealed partial class MasterDataViewModel : ViewModelBase
     public async Task LoadCatalogAsync(CancellationToken cancellationToken = default, bool loadInitialGrid = true) =>
         await LoadAsync(cancellationToken, loadInitialGrid).ConfigureAwait(true);
 
+    /// <summary>Embedded linked-templates grid — analytics template rows only (not master data catalogs).</summary>
+    public async Task InitializeLinkedBrowseSurfaceAsync(CancellationToken cancellationToken = default)
+    {
+        IsLoading = true;
+        StatusMessage = null;
+        ShowNoTemplateHint = false;
+        ShowNoDatabaseHint = false;
+        DataTemplates.Clear();
+        Columns.Clear();
+        Rows.Clear();
+
+        try
+        {
+            var templateId = _catalogSession.LinkedTemplatesBrowseTemplateId
+                             ?? _catalogSession.LinkedTemplatesGrid.TemplateId;
+            if (string.IsNullOrWhiteSpace(templateId))
+            {
+                ShowNoTemplateHint = true;
+                return;
+            }
+
+            await ApplyLinkedBrowseTemplateAsync(templateId, cancellationToken).ConfigureAwait(true);
+        }
+        catch (InvalidOperationException)
+        {
+            ShowNoDatabaseHint = true;
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Error: " + ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    public async Task ApplyLinkedBrowseTemplateAsync(string templateId, CancellationToken cancellationToken = default)
+    {
+        SurfaceMode = MasterDataSurfaceMode.LinkedBrowse;
+        IsEditMode = false;
+
+        var template = await _templateSchema
+            .GetTemplateAsync(templateId, cancellationToken)
+            .ConfigureAwait(true);
+        if (template is null || template.IsMasterDataCatalog)
+        {
+            ShowNoTemplateHint = true;
+            StatusMessage = "Template not found.";
+            Columns.Clear();
+            Rows.Clear();
+            SelectedDataTemplate = null;
+            return;
+        }
+
+        ShowNoTemplateHint = false;
+        _catalogSession.LinkedTemplatesBrowseTemplateId = templateId;
+        _catalogSession.LinkedTemplatesGrid.TemplateId = templateId;
+
+        _suppressTemplateSelectionChange = true;
+        SelectedDataTemplate = template;
+        _suppressTemplateSelectionChange = false;
+
+        await LoadForTemplateAsync(templateId, cancellationToken).ConfigureAwait(true);
+    }
+
+    public async Task ClearLinkedBrowseSurfaceAsync(CancellationToken cancellationToken = default)
+    {
+        _templateLoadCts?.Cancel();
+        Columns.Clear();
+        Rows.Clear();
+        SelectedDataTemplate = null;
+        ShowNoTemplateHint = true;
+        await Task.CompletedTask.ConfigureAwait(false);
+    }
+
     public async Task LoadForTemplateEditAsync(
         string templateId,
         bool startInEditMode,
@@ -484,6 +695,7 @@ public sealed partial class MasterDataViewModel : ViewModelBase
             if (_cachedTemplates.Count == 0)
             {
                 ShowNoTemplateHint = true;
+                NotifyMasterDataCatalogListChrome();
                 return;
             }
 
@@ -494,6 +706,7 @@ public sealed partial class MasterDataViewModel : ViewModelBase
             }
 
             ShowTemplatePicker = DataTemplates.Count > 0;
+            NotifyMasterDataCatalogListChrome();
 
             if (!loadInitialGrid)
             {
@@ -546,11 +759,13 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         var loadCt = _templateLoadCts.Token;
         var loadForId = templateId;
         var preserveEditMode = restoreEditModeAfterLoad && IsEditMode;
+        var preserveCanvasEdit = IsCatalogCanvasMode
+            && string.Equals(templateId, SelectedDataTemplate?.Id, StringComparison.OrdinalIgnoreCase);
 
         IsLoading = true;
         StatusMessage = null;
         ShowNoTemplateHint = false;
-        if (!(preserveEditMode && SurfaceMode == MasterDataSurfaceMode.TemplateEdit))
+        if (!(preserveEditMode && SurfaceMode == MasterDataSurfaceMode.TemplateEdit) && !preserveCanvasEdit)
         {
             IsEditMode = false;
         }
@@ -597,11 +812,38 @@ public sealed partial class MasterDataViewModel : ViewModelBase
                 return;
             }
 
-            if (template is null || template.Fields.Count == 0)
+            if (template is null)
             {
                 ShowNoTemplateHint = true;
                 return;
             }
+
+            if (template.Fields.Count == 0)
+            {
+                if (IsCatalogCanvasMode && string.Equals(template.Id, loadForId, StringComparison.Ordinal))
+                {
+                    InitializeCatalogCanvasGrid();
+                    ShowNoTemplateHint = false;
+                    return;
+                }
+
+                if (SurfaceMode == MasterDataSurfaceMode.ReadOnlyCatalog && template.IsMasterDataCatalog)
+                {
+                    _suppressTemplateSelectionChange = true;
+                    SelectedDataTemplate = template;
+                    _suppressTemplateSelectionChange = false;
+                    IsCatalogCanvasMode = true;
+                    IsEditMode = true;
+                    InitializeCatalogCanvasGrid();
+                    ShowNoTemplateHint = false;
+                    return;
+                }
+
+                ShowNoTemplateHint = true;
+                return;
+            }
+
+            ShowNoTemplateHint = false;
 
             foreach (var f in template.Fields.OrderBy(x => x.DisplayOrder))
             {
@@ -872,7 +1114,11 @@ public sealed partial class MasterDataViewModel : ViewModelBase
     }
 
     public bool CanDeleteRows =>
-        ShowSpreadsheetEditChrome && IsEditMode && CanDeleteMasterData && SelectedDataTemplate is not null;
+        IsEditMode
+        && SelectedDataTemplate is not null
+        && (IsCatalogCanvasMode
+            ? CanEditCatalogCanvas
+            : ShowSpreadsheetEditChrome && CanDeleteMasterData);
 
     public async Task<bool> DeleteRowAsync(
         MasterDataRowViewModel row,
@@ -912,11 +1158,593 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         return true;
     }
 
+    public async Task<string?> CreateMasterDataCatalogAsync(string name, CancellationToken cancellationToken = default)
+    {
+        LastCreatedCatalogId = null;
+        name = name.Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return "Enter a catalog name.";
+        }
+
+        if (!CanAddMasterDataCatalog)
+        {
+            return "You do not have permission to add a catalog.";
+        }
+
+        if (_cachedTemplates.Any(t => string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase)))
+        {
+            return "A catalog with this name already exists.";
+        }
+
+        var templateId = Guid.NewGuid().ToString("N");
+        var def = new PartTemplateDefinition
+        {
+            Id = templateId,
+            Name = name,
+            Version = 1,
+            IsPublished = true,
+            IsMasterDataCatalog = true,
+            Fields = Array.Empty<TemplateFieldDefinition>(),
+        };
+
+        try
+        {
+            await _templateSchema.SaveTemplateAsync(def, cancellationToken).ConfigureAwait(true);
+            LastCreatedCatalogId = templateId;
+            _activityLogger.LogTemplateChange(
+                "Master Data Catalog Created",
+                $"Catalog \"{name}\" created — open canvas to define columns and data");
+            await LoadAsync(cancellationToken, loadInitialGrid: false).ConfigureAwait(true);
+            var created = DataTemplates.FirstOrDefault(t => t.Id == templateId)
+                          ?? def;
+            _suppressTemplateSelectionChange = true;
+            SelectedDataTemplate = created;
+            _suppressTemplateSelectionChange = false;
+            _cachedTemplates = DataTemplates.ToList();
+            IsCatalogCanvasMode = true;
+            IsEditMode = true;
+            ShowNoTemplateHint = false;
+            InitializeCatalogCanvasGrid();
+            StatusMessage = "Name your columns in the highlighted header row, enter data in the cells, or import — changes save automatically.";
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            return ex.Message;
+        }
+    }
+
+    public async Task<(bool Ok, string? Error)> DeleteMasterDataCatalogAsync(
+        PartTemplateDefinition template,
+        CancellationToken cancellationToken = default)
+    {
+        if (!CanDeleteCatalogTemplate(template))
+        {
+            return (false, "You do not have permission to delete this catalog.");
+        }
+
+        try
+        {
+            await _relationCleanup
+                .DeleteAllRelationsInvolvingTemplateAsync(template.Id, cancellationToken)
+                .ConfigureAwait(true);
+            _ = await _records
+                .DeleteAllRowsForTemplateAsync(template.Id, cancellationToken)
+                .ConfigureAwait(true);
+            await _templateSchema.DeleteTemplateAsync(template.Id, cancellationToken).ConfigureAwait(true);
+            var cascade = await _catalogCascade
+                .OnMasterDataCatalogDeletedAsync(template.Id, cancellationToken)
+                .ConfigureAwait(true);
+            if (cascade.DeletedAllAnalyticsTemplates)
+            {
+                _activityLogger.LogTemplateChange(
+                    "Analytics Templates Removed",
+                    $"All {cascade.AnalyticsTemplatesDeleted} analytics template(s) removed because no master data catalogs remain.");
+                await _shellNav.NotifyTemplatesChangedAsync().ConfigureAwait(true);
+            }
+            else if (cascade.ColumnsRemoved > 0)
+            {
+                await _shellNav.NotifyTemplatesChangedAsync().ConfigureAwait(true);
+            }
+
+            _activityLogger.LogTemplateChange(
+                "Master Data Catalog Deleted",
+                $"Catalog \"{template.Name}\" removed");
+
+            var wasSelected = string.Equals(
+                SelectedDataTemplate?.Id,
+                template.Id,
+                StringComparison.OrdinalIgnoreCase);
+            var item = DataTemplates.FirstOrDefault(t => t.Id == template.Id);
+            if (item is not null)
+            {
+                DataTemplates.Remove(item);
+            }
+
+            _cachedTemplates = DataTemplates.ToList();
+            if (wasSelected)
+            {
+                SelectedDataTemplate = DataTemplates.FirstOrDefault();
+                if (SelectedDataTemplate is not null)
+                {
+                    await LoadForTemplateAsync(SelectedDataTemplate.Id, cancellationToken).ConfigureAwait(true);
+                }
+                else
+                {
+                    Columns.Clear();
+                    Rows.Clear();
+                    ShowNoTemplateHint = DataTemplates.Count == 0;
+                }
+            }
+            else if (DataTemplates.Count == 0)
+            {
+                ShowNoTemplateHint = true;
+            }
+
+            OnPropertyChanged(nameof(ShowTemplatePickerInChrome));
+            OnPropertyChanged(nameof(ShowCatalogManagementChrome));
+            NotifyMasterDataCatalogListChrome();
+            var cascadeNote = cascade.DeletedAllAnalyticsTemplates
+                ? $" Removed {cascade.AnalyticsTemplatesDeleted} analytics template(s) (no master data left)."
+                : cascade.ColumnsRemoved > 0
+                    ? $" Removed {cascade.ColumnsRemoved} linked column(s) from {cascade.AnalyticsTemplatesUpdated} analytics template(s)."
+                    : string.Empty;
+            StatusMessage = $"Catalog \"{template.Name}\" deleted.{cascadeNote}";
+            return (true, null);
+        }
+        catch (Exception ex)
+        {
+            return (false, ex.Message);
+        }
+    }
+
+    public async Task<(bool Ok, long DeletedCount, string? Error)> PurgeAllRowsForCurrentTemplateAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (!CanPurgeMasterDataForTemplate || SelectedDataTemplate is null)
+        {
+            return (false, 0, "You do not have permission to delete all master data.");
+        }
+
+        var templateId = SelectedDataTemplate.Id;
+        try
+        {
+            var deleted = await _records.DeleteAllRowsForTemplateAsync(templateId, cancellationToken)
+                .ConfigureAwait(true);
+            Rows.Clear();
+            CatalogTotalRowCount = 0;
+            InvalidateCurrentSheetCache();
+            await LoadForTemplateAsync(templateId, cancellationToken).ConfigureAwait(true);
+            StatusMessage = deleted > 0
+                ? $"Removed {deleted} row(s) from \"{SelectedDataTemplate.Name}\"."
+                : "No data rows were stored for this template.";
+            return (true, deleted, null);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Error: " + ex.Message;
+            return (false, 0, ex.Message);
+        }
+    }
+
+    public void InitializeCatalogCanvasGrid()
+    {
+        Columns.Clear();
+        Rows.Clear();
+        for (var i = 0; i < CanvasMinColumns; i++)
+        {
+            Columns.Add(new TemplateFieldDefinition
+            {
+                Key = $"column_{i + 1}",
+                Label = string.Empty,
+                Type = TemplateFieldType.Text,
+                IsRequired = false,
+                DisplayOrder = i,
+            });
+        }
+
+        EnsureCanvasRowBuffer();
+        ShowNoTemplateHint = false;
+    }
+
+    public void EnsureCanvasRowBuffer()
+    {
+        var target = Math.Max(CanvasMinRows, Rows.Count + CanvasTrailingRows);
+        while (Rows.Count < target)
+        {
+            Rows.Add(CreateEmptyRow());
+        }
+    }
+
+    public void MaybeGrowCanvas(int rowIndex, int columnIndex)
+    {
+        if (!IsCatalogCanvasMode || !IsEditMode)
+        {
+            return;
+        }
+
+        if (rowIndex >= Rows.Count - 3)
+        {
+            for (var i = 0; i < CanvasGrowBatch; i++)
+            {
+                Rows.Add(CreateEmptyRow());
+            }
+        }
+
+        if (columnIndex >= Columns.Count - 1)
+        {
+            var number = Columns.Count + 1;
+            Columns.Add(new TemplateFieldDefinition
+            {
+                Key = $"column_{number}",
+                Label = string.Empty,
+                Type = TemplateFieldType.Text,
+                IsRequired = false,
+                DisplayOrder = Columns.Count,
+            });
+            ColumnFiltersChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        RequestCatalogAutoSave();
+    }
+
+    public void SetColumnLabelAt(int columnIndex, string? label)
+    {
+        if (columnIndex < 0 || columnIndex >= Columns.Count)
+        {
+            return;
+        }
+
+        var field = Columns[columnIndex];
+        Columns[columnIndex] = new TemplateFieldDefinition
+        {
+            Key = field.Key,
+            Label = label?.Trim() ?? string.Empty,
+            Type = field.Type,
+            IsRequired = field.IsRequired,
+            DisplayOrder = field.DisplayOrder,
+            ValidationPattern = field.ValidationPattern,
+            Options = field.Options,
+            LinkedTemplateId = field.LinkedTemplateId,
+            LinkedDisplayFieldKey = field.LinkedDisplayFieldKey,
+        };
+
+        RequestCatalogAutoSave();
+    }
+
+    private void NotifyMasterDataCatalogListChrome()
+    {
+        OnPropertyChanged(nameof(ShowNoMasterDataCatalogsInList));
+        OnPropertyChanged(nameof(ShowEmptyMasterDataAddButton));
+    }
+
+    public void RequestCatalogAutoSave()
+    {
+        if (_catalogImportInProgress || !AutoSaveMasterDataCatalog)
+        {
+            return;
+        }
+
+        _catalogAutoSaveCts?.Cancel();
+        _catalogAutoSaveCts?.Dispose();
+        _catalogAutoSaveCts = new CancellationTokenSource();
+        var token = _catalogAutoSaveCts.Token;
+        var version = Interlocked.Increment(ref _catalogAutoSaveVersion);
+        _ = ScheduleCatalogAutoSaveDebouncedAsync(version, token);
+    }
+
+    private async Task ScheduleCatalogAutoSaveDebouncedAsync(int version, CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(750, token).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            return;
+        }
+
+        if (version != _catalogAutoSaveVersion || token.IsCancellationRequested)
+        {
+            return;
+        }
+
+        await FlushCatalogAutoSaveAsync(token).ConfigureAwait(true);
+    }
+
+    public Task FlushCatalogAutoSaveAsync(CancellationToken cancellationToken = default)
+    {
+        if (!AutoSaveMasterDataCatalog || _catalogAutoSaveRunning)
+        {
+            return Task.CompletedTask;
+        }
+
+        return SaveGridCoreAsync(null, cancellationToken, autoSave: true);
+    }
+
+    public void ApplyOperationProgress(MasterDataOperationProgress progress)
+    {
+        ShowOperationProgress = true;
+        OperationProgressPercent = Math.Clamp(progress.Percent, 0, 100);
+        OperationProgressHeadline = progress.Headline;
+        OperationProgressDetail = progress.Detail;
+        OperationProgressPercentLabel = progress.PercentLabel;
+    }
+
+    public void ClearOperationProgress()
+    {
+        ShowOperationProgress = false;
+        OperationProgressPercent = 0;
+        OperationProgressHeadline = string.Empty;
+        OperationProgressDetail = string.Empty;
+        OperationProgressPercentLabel = string.Empty;
+    }
+
+    private static void ReportProgress(
+        IProgress<MasterDataOperationProgress>? progress,
+        double percent,
+        string headline,
+        string detail)
+    {
+        progress?.Report(new MasterDataOperationProgress(
+            percent,
+            headline,
+            detail,
+            $"{(int)Math.Round(percent)}%"));
+    }
+
+    public async Task ApplySchemaImportAsync(
+        ExcelSchemaImportParseResult parsed,
+        IProgress<MasterDataOperationProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (parsed.Fields.Count == 0)
+        {
+            StatusMessage = parsed.Warnings.FirstOrDefault() ?? "No columns detected in the file.";
+            return;
+        }
+
+        if (IsCatalogCanvasMode
+            && SelectedDataTemplate is not null
+            && (parsed.Rows.Count > LargeImportRowThreshold
+                || parsed.Fields.Count > LargeImportColumnThreshold))
+        {
+            await ImportLargeCatalogFromFileAsync(parsed, progress, cancellationToken).ConfigureAwait(true);
+            return;
+        }
+
+        ReportProgress(progress, 5, "Importing", "Preparing columns…");
+        Columns.Clear();
+        foreach (var field in parsed.Fields.OrderBy(f => f.DisplayOrder))
+        {
+            Columns.Add(field);
+        }
+
+        Rows.Clear();
+        var total = parsed.Rows.Count;
+        for (var index = 0; index < total; index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var source = parsed.Rows[index];
+            var row = new MasterDataRowViewModel();
+            foreach (var col in Columns)
+            {
+                var text = source.TryGetValue(col.Key, out var v) ? v ?? string.Empty : string.Empty;
+                row.Cells.Add(CreateCell(col, text, null));
+            }
+
+            Rows.Add(row);
+            if (index % 25 == 0 || index == total - 1)
+            {
+                var pct = total == 0 ? 40 : 10 + 80.0 * (index + 1) / total;
+                ReportProgress(progress, pct, "Importing", $"Loaded {index + 1} of {total} rows…");
+                if (index % 100 == 0)
+                {
+                    await Task.Yield();
+                }
+            }
+        }
+
+        if (Rows.Count < CanvasMinRows)
+        {
+            EnsureCanvasRowBuffer();
+        }
+
+        IsEditMode = true;
+        ReportProgress(progress, 100, "Import complete", total > 0 ? $"{total} rows loaded into the grid." : "Columns ready.");
+        StatusMessage = parsed.Rows.Count > 0
+            ? $"Loaded {parsed.Rows.Count} row(s) from file. Saving to catalog…"
+            : "Columns loaded from file header row.";
+        if (parsed.Warnings.Count > 0)
+        {
+            StatusMessage += " " + string.Join(" ", parsed.Warnings);
+        }
+
+        await CompleteSchemaImportPersistenceAsync(progress, cancellationToken).ConfigureAwait(true);
+    }
+
+    private async Task CompleteSchemaImportPersistenceAsync(
+        IProgress<MasterDataOperationProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        if (SelectedDataTemplate is null || Columns.Count == 0)
+        {
+            ClearOperationProgress();
+            return;
+        }
+
+        _catalogImportInProgress = true;
+        try
+        {
+            ReportProgress(progress, 92, "Importing", "Saving to catalog…");
+            var canvasMode = IsCatalogCanvasMode;
+            if (canvasMode)
+            {
+                var commitError = await CommitCanvasSchemaAsync(cancellationToken).ConfigureAwait(true);
+                if (commitError is not null)
+                {
+                    StatusMessage = commitError;
+                    return;
+                }
+            }
+
+            var templateId = SelectedDataTemplate.Id;
+            var rowsToSave = canvasMode ? TrimCanvasRowsForSave() : Rows.ToList();
+            await PersistRowsBatchedAsync(templateId, rowsToSave, progress, cancellationToken).ConfigureAwait(true);
+
+            IsCatalogCanvasMode = false;
+            IsEditMode = false;
+            ShowNoTemplateHint = false;
+            ReportProgress(progress, 100, "Import complete", "Catalog updated.");
+            StatusMessage = "Import saved.";
+            await LoadCatalogRowsPageAsync(0, 50, cancellationToken).ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Import save failed: " + ex.Message;
+        }
+        finally
+        {
+            _catalogImportInProgress = false;
+            ClearOperationProgress();
+        }
+    }
+
+    private async Task ImportLargeCatalogFromFileAsync(
+        ExcelSchemaImportParseResult parsed,
+        IProgress<MasterDataOperationProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        if (SelectedDataTemplate is null)
+        {
+            return;
+        }
+
+        var templateId = SelectedDataTemplate.Id;
+        var templateName = SelectedDataTemplate.Name ?? "catalog";
+        var importRows = parsed.Rows ?? Array.Empty<IReadOnlyDictionary<string, string>>();
+        var totalRows = Math.Max(1, importRows.Count);
+
+        if (string.IsNullOrWhiteSpace(templateId))
+        {
+            StatusMessage = "This catalog has no id. Save the catalog name first, then import again.";
+            return;
+        }
+
+        IsLoading = true;
+        _suppressTemplateSelectionChange = true;
+        try
+        {
+            ReportProgress(progress, 8, "Importing", "Saving column layout…");
+            var commitError = await CommitCatalogSchemaFieldsAsync(parsed.Fields, cancellationToken).ConfigureAwait(true);
+            if (commitError is not null)
+            {
+                StatusMessage = commitError;
+                return;
+            }
+
+            templateId = SelectedDataTemplate?.Id ?? templateId;
+            templateName = SelectedDataTemplate?.Name ?? templateName;
+            if (string.IsNullOrWhiteSpace(templateId))
+            {
+                StatusMessage = "Catalog was cleared while importing. Please select the catalog and try again.";
+                return;
+            }
+
+            ReportProgress(progress, 20, "Importing", "Writing rows to the database…");
+            var rowProgress = new Progress<int>(inserted =>
+            {
+                var pct = 20 + 75.0 * inserted / totalRows;
+                ReportProgress(progress, pct, "Importing", $"Stored {inserted} of {totalRows} rows…");
+            });
+
+            var inserted = await _records
+                .AppendRowsAsync(templateId, importRows, rowProgress, cancellationToken)
+                .ConfigureAwait(true);
+
+            IsCatalogCanvasMode = false;
+            IsEditMode = false;
+            ReportProgress(progress, 100, "Import complete", $"Stored {inserted} row(s).");
+            StatusMessage = $"Imported {inserted} row(s) into \"{templateName}\".";
+            ShowNoTemplateHint = false;
+            await LoadCatalogRowsPageAsync(0, 50, cancellationToken).ConfigureAwait(true);
+        }
+        finally
+        {
+            _suppressTemplateSelectionChange = false;
+            IsLoading = false;
+            ClearOperationProgress();
+        }
+    }
+
+    private async Task<string?> CommitCatalogSchemaFieldsAsync(
+        IReadOnlyList<TemplateFieldDefinition> fields,
+        CancellationToken cancellationToken)
+    {
+        if (SelectedDataTemplate is null || fields.Count == 0)
+        {
+            return "No catalog or columns to save.";
+        }
+
+        var patched = new PartTemplateDefinition
+        {
+            Id = SelectedDataTemplate.Id,
+            Name = SelectedDataTemplate.Name,
+            Version = SelectedDataTemplate.Version + 1,
+            IsPublished = true,
+            IsMasterDataCatalog = true,
+            Fields = fields.OrderBy(f => f.DisplayOrder).ToList(),
+        };
+
+        await _templateSchema.SaveTemplateAsync(patched, cancellationToken).ConfigureAwait(true);
+        var suppressReload = _suppressTemplateSelectionChange;
+        if (!suppressReload)
+        {
+            _suppressTemplateSelectionChange = true;
+        }
+
+        try
+        {
+            SelectedDataTemplate = patched;
+        }
+        finally
+        {
+            if (!suppressReload)
+            {
+                _suppressTemplateSelectionChange = false;
+            }
+        }
+
+        Columns.Clear();
+        foreach (var field in patched.Fields.OrderBy(f => f.DisplayOrder))
+        {
+            Columns.Add(field);
+        }
+
+        var index = DataTemplates.ToList().FindIndex(t => t.Id == patched.Id);
+        if (index >= 0)
+        {
+            DataTemplates[index] = patched;
+        }
+
+        return null;
+    }
+
+    public bool ShouldInferImportSchema() =>
+        IsCatalogCanvasMode
+        || SelectedDataTemplate?.Fields.Count == 0
+        || Columns.All(c => string.IsNullOrWhiteSpace(c.Label));
+
     [RelayCommand(CanExecute = nameof(CanAddRows))]
     private void AddRow()
     {
         Rows.Add(CreateEmptyRow());
-        StatusMessage = $"Added row {Rows.Count}. Click Save when finished.";
+        StatusMessage = SurfaceMode == MasterDataSurfaceMode.ReadOnlyCatalog
+            ? $"Added row {Rows.Count}."
+            : $"Added row {Rows.Count}. Click Save when finished.";
+        RequestCatalogAutoSave();
     }
 
     public void InsertRowAt(int index)
@@ -928,13 +1756,18 @@ public sealed partial class MasterDataViewModel : ViewModelBase
 
         var clamped = Math.Clamp(index, 0, Rows.Count);
         Rows.Insert(clamped, CreateEmptyRow());
+        RequestCatalogAutoSave();
     }
 
     public bool CanManageColumns =>
-        ShowSpreadsheetEditChrome && IsEditMode && Columns.Count > 0 && (CanEditMasterData || CanAddMasterData);
+        IsEditMode
+        && Columns.Count > 0
+        && (CanEditCatalogCanvas || (ShowSpreadsheetEditChrome && (CanEditMasterData || CanAddMasterData)));
 
     public bool CanRemoveColumns =>
-        ShowSpreadsheetEditChrome && IsEditMode && CanEditMasterData && Columns.Count > 1;
+        IsEditMode
+        && Columns.Count > 1
+        && (CanEditCatalogCanvas || (ShowSpreadsheetEditChrome && CanEditMasterData));
 
     public async Task<bool> InsertColumnAtAsync(int index, string columnName, CancellationToken cancellationToken = default)
     {
@@ -1099,40 +1932,230 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         }
     }
 
-    [RelayCommand]
-    private async Task SaveGrid(CancellationToken cancellationToken = default)
+    private async Task<string?> CommitCanvasSchemaAsync(CancellationToken cancellationToken)
     {
-        if (!IsEditMode || Columns.Count == 0 || SelectedDataTemplate is null)
+        if (SelectedDataTemplate is null)
+        {
+            return "No catalog selected.";
+        }
+
+        var fields = BuildFieldsFromCanvasColumns();
+        if (fields.Count == 0)
+        {
+            return "Add at least one column name in the header row, enter data, or import a file.";
+        }
+
+        var patched = new PartTemplateDefinition
+        {
+            Id = SelectedDataTemplate.Id,
+            Name = SelectedDataTemplate.Name,
+            Version = SelectedDataTemplate.Version + 1,
+            IsPublished = true,
+            IsMasterDataCatalog = true,
+            Fields = fields,
+        };
+
+        await _templateSchema.SaveTemplateAsync(patched, cancellationToken).ConfigureAwait(true);
+        SelectedDataTemplate = patched;
+        var oldByIndex = Columns.ToList();
+        Columns.Clear();
+        foreach (var field in fields)
+        {
+            Columns.Add(field);
+        }
+
+        RemapRowCellsAfterSchemaCommit(fields, oldByIndex);
+        var index = DataTemplates.ToList().FindIndex(t => t.Id == patched.Id);
+        if (index >= 0)
+        {
+            DataTemplates[index] = patched;
+        }
+
+        return null;
+    }
+
+    private List<TemplateFieldDefinition> BuildFieldsFromCanvasColumns()
+    {
+        var fields = new List<TemplateFieldDefinition>();
+        var usedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < Columns.Count; i++)
+        {
+            var col = Columns[i];
+            var hasData = Rows.Any(row =>
+            {
+                if (i >= row.Cells.Count)
+                {
+                    return false;
+                }
+
+                return !string.IsNullOrWhiteSpace(row.Cells[i].Text);
+            });
+            var label = col.Label.Trim();
+            if (string.IsNullOrWhiteSpace(label) && !hasData)
+            {
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(label))
+            {
+                label = $"Column {fields.Count + 1}";
+            }
+
+            var key = !string.IsNullOrWhiteSpace(col.Key) && !usedKeys.Contains(col.Key)
+                ? col.Key
+                : SlugFieldKeyFromLabel(label, usedKeys);
+            usedKeys.Add(key);
+            fields.Add(new TemplateFieldDefinition
+            {
+                Key = key,
+                Label = label,
+                Type = TemplateFieldType.Text,
+                IsRequired = false,
+                DisplayOrder = fields.Count,
+            });
+        }
+
+        return fields;
+    }
+
+    private static string SlugFieldKeyFromLabel(string label, HashSet<string> usedKeys)
+    {
+        var slug = new string(label
+            .Trim()
+            .ToLowerInvariant()
+            .Select(ch => char.IsLetterOrDigit(ch) ? ch : '_')
+            .ToArray())
+            .Trim('_');
+        if (string.IsNullOrWhiteSpace(slug))
+        {
+            slug = "column";
+        }
+
+        var key = slug;
+        var n = 2;
+        while (usedKeys.Contains(key))
+        {
+            key = $"{slug}_{n++}";
+        }
+
+        return key;
+    }
+
+    private void RemapRowCellsAfterSchemaCommit(
+        IReadOnlyList<TemplateFieldDefinition> fields,
+        IReadOnlyList<TemplateFieldDefinition> oldColumns)
+    {
+        foreach (var row in Rows)
+        {
+            var oldTexts = row.Cells.Select(c => c.Text ?? string.Empty).ToList();
+            row.Cells.Clear();
+            for (var i = 0; i < fields.Count; i++)
+            {
+                var text = i < oldTexts.Count ? oldTexts[i] : string.Empty;
+                row.Cells.Add(CreateCell(fields[i], text, row.RowId));
+            }
+        }
+    }
+
+    private List<MasterDataRowViewModel> TrimCanvasRowsForSave()
+    {
+        var lastUsed = -1;
+        for (var r = 0; r < Rows.Count; r++)
+        {
+            if (Rows[r].Cells.Any(c => !string.IsNullOrWhiteSpace(c.Text)))
+            {
+                lastUsed = r;
+            }
+        }
+
+        return lastUsed < 0 ? new List<MasterDataRowViewModel>() : Rows.Take(lastUsed + 1).ToList();
+    }
+
+    [RelayCommand]
+    private Task SaveGrid(CancellationToken cancellationToken = default) =>
+        SaveGridCoreAsync(null, cancellationToken);
+
+    public Task SaveGridWithProgressAsync(
+        IProgress<MasterDataOperationProgress>? progress,
+        CancellationToken cancellationToken = default) =>
+        SaveGridCoreAsync(progress, cancellationToken);
+
+    private async Task SaveGridCoreAsync(
+        IProgress<MasterDataOperationProgress>? progress,
+        CancellationToken cancellationToken,
+        bool autoSave = false)
+    {
+        var catalog = SelectedDataTemplate;
+        if (!IsEditMode || Columns.Count == 0 || catalog is null)
         {
             return;
         }
 
-        IsLoading = true;
-        StatusMessage = null;
+        if (autoSave && !AutoSaveMasterDataCatalog)
+        {
+            return;
+        }
+
+        var canvasMode = IsCatalogCanvasMode;
+        var masterDataAutoSave = autoSave && SurfaceMode == MasterDataSurfaceMode.ReadOnlyCatalog;
+        if (!masterDataAutoSave)
+        {
+            IsLoading = true;
+        }
+        else
+        {
+            _catalogAutoSaveRunning = true;
+        }
+
         try
         {
-            var templateId = SelectedDataTemplate.Id;
-            for (var i = 0; i < Rows.Count; i++)
+            ReportProgress(progress, 5, "Saving catalog", "Validating columns…");
+            if (canvasMode)
             {
-                var row = Rows[i];
-                var dict = new Dictionary<string, string>(StringComparer.Ordinal);
-                foreach (var cell in row.Cells)
+                var commitError = await CommitCanvasSchemaAsync(cancellationToken).ConfigureAwait(true);
+                if (commitError is not null)
                 {
-                    // RecordLink supports both linked IDs and direct typed values.
-                    dict[cell.FieldKey] = cell.IsRecordLink
-                        ? (!string.IsNullOrWhiteSpace(cell.LinkedRowId) ? cell.LinkedRowId : cell.Text)
-                        : cell.Text;
+                    if (!masterDataAutoSave)
+                    {
+                        StatusMessage = commitError;
+                    }
+
+                    return;
                 }
 
-                var newId = await _records
-                    .UpsertRowAsync(templateId, row.RowId, i, dict, cancellationToken)
-                    .ConfigureAwait(true);
-                row.RowId = newId;
+                catalog = SelectedDataTemplate ?? catalog;
+                if (catalog is null)
+                {
+                    if (!masterDataAutoSave)
+                    {
+                        StatusMessage = "Catalog could not be saved (template missing after commit).";
+                    }
+
+                    return;
+                }
             }
+
+            var templateId = catalog.Id;
+            var templateName = catalog.Name;
+            var rowsToSave = canvasMode ? TrimCanvasRowsForSave() : Rows.ToList();
+            await PersistRowsBatchedAsync(templateId, rowsToSave, progress, cancellationToken).ConfigureAwait(true);
 
             await ResolveRecordLinkLabelsAsync(cancellationToken).ConfigureAwait(true);
             IsAddColumnPanelVisible = false;
-            if (SurfaceMode == MasterDataSurfaceMode.TemplateEdit)
+
+            if (masterDataAutoSave)
+            {
+                StatusMessage = "All changes saved.";
+            }
+            else if (canvasMode)
+            {
+                IsCatalogCanvasMode = false;
+                IsEditMode = false;
+                await LoadForTemplateAsync(templateId, cancellationToken).ConfigureAwait(true);
+                catalog = SelectedDataTemplate ?? catalog;
+                StatusMessage = "Catalog saved.";
+            }
+            else if (SurfaceMode == MasterDataSurfaceMode.TemplateEdit)
             {
                 StatusMessage = "Saved.";
             }
@@ -1142,14 +2165,19 @@ public sealed partial class MasterDataViewModel : ViewModelBase
                 StatusMessage = "Saved. You're back in view mode.";
             }
 
-            _activityLogger.LogUserAction("Master Data Saved",
-                $"Saved {Rows.Count} rows for template \"{SelectedDataTemplate.Name}\"");
+            if (!masterDataAutoSave)
+            {
+                ReportProgress(progress, 100, "Save complete", "Your catalog is ready.");
+                _activityLogger.LogUserAction(
+                    "Master Data Saved",
+                    $"Saved master data for template \"{templateName}\"");
+            }
 
             if (IsCatalogBrowseSurface())
             {
                 SaveSheetCache(templateId);
             }
-            else
+            else if (!masterDataAutoSave)
             {
                 InvalidateCurrentSheetCache();
             }
@@ -1160,7 +2188,78 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         }
         finally
         {
-            IsLoading = false;
+            if (!masterDataAutoSave)
+            {
+                IsLoading = false;
+            }
+            else
+            {
+                _catalogAutoSaveRunning = false;
+            }
+        }
+    }
+
+    private async Task PersistRowsBatchedAsync(
+        string templateId,
+        IReadOnlyList<MasterDataRowViewModel> rowsToSave,
+        IProgress<MasterDataOperationProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        var payloads = new List<(MasterDataRowViewModel Row, string? Id, int RowOrder, IReadOnlyDictionary<string, string> Values)>();
+        foreach (var row in rowsToSave)
+        {
+            if (row?.Cells is null)
+            {
+                continue;
+            }
+
+            var dict = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var cell in row.Cells)
+            {
+                if (cell is null)
+                {
+                    continue;
+                }
+
+                dict[cell.FieldKey] = cell.IsRecordLink
+                    ? (!string.IsNullOrWhiteSpace(cell.LinkedRowId) ? cell.LinkedRowId : cell.Text)
+                    : cell.Text ?? string.Empty;
+            }
+
+            if (dict.Values.All(string.IsNullOrWhiteSpace))
+            {
+                continue;
+            }
+
+            payloads.Add((row, row.RowId, payloads.Count, dict));
+        }
+
+        if (payloads.Count == 0)
+        {
+            ReportProgress(progress, 95, "Saving catalog", "No data rows to store.");
+            return;
+        }
+
+        var total = payloads.Count;
+        for (var offset = 0; offset < total; offset += SaveBatchSize)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var slice = payloads.Skip(offset).Take(SaveBatchSize).ToList();
+            var chunk = slice
+                .Select(p => (p.Id, p.RowOrder, p.Values))
+                .ToList();
+            var ids = await _records
+                .SaveRowsAsync(templateId, chunk, Array.Empty<string>(), cancellationToken)
+                .ConfigureAwait(true);
+
+            for (var i = 0; i < ids.Count && i < slice.Count; i++)
+            {
+                slice[i].Row.RowId = ids[i];
+            }
+
+            var done = Math.Min(offset + slice.Count, total);
+            var pct = 15 + 80.0 * done / total;
+            ReportProgress(progress, pct, "Saving catalog", $"Stored {done} of {total} rows…");
         }
     }
 
@@ -1175,7 +2274,9 @@ public sealed partial class MasterDataViewModel : ViewModelBase
 
         IsEditMode = !IsEditMode;
         StatusMessage = IsEditMode
-            ? "Edit mode: use Add row / Add column below the table, then Save."
+            ? SurfaceMode == MasterDataSurfaceMode.ReadOnlyCatalog
+                ? "Edit mode: changes save automatically as you work."
+                : "Edit mode: use Add row / Add column below the table, then Save."
             : "View mode: browse data only.";
     }
 
@@ -1452,8 +2553,14 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         return (targetDef, filtered);
     }
 
+    public Task<int> ImportRowsAsync(
+        IReadOnlyList<IReadOnlyDictionary<string, string>> importedRows,
+        CancellationToken cancellationToken = default) =>
+        ImportRowsAsync(importedRows, progress: null, cancellationToken);
+
     public async Task<int> ImportRowsAsync(
         IReadOnlyList<IReadOnlyDictionary<string, string>> importedRows,
+        IProgress<MasterDataOperationProgress>? progress,
         CancellationToken cancellationToken = default)
     {
         if (SelectedDataTemplate is null || importedRows.Count == 0)
@@ -1462,8 +2569,7 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         }
 
         var templateId = SelectedDataTemplate.Id;
-        var startOrder = Rows.Count;
-        var importedCount = 0;
+        var normalized = new List<IReadOnlyDictionary<string, string>>(importedRows.Count);
         foreach (var source in importedRows)
         {
             var values = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -1474,16 +2580,39 @@ public sealed partial class MasterDataViewModel : ViewModelBase
                     : string.Empty;
             }
 
-            await _records.UpsertRowAsync(templateId, null, startOrder + importedCount, values, cancellationToken)
-                .ConfigureAwait(true);
-            importedCount++;
+            if (values.Values.Any(v => !string.IsNullOrWhiteSpace(v)))
+            {
+                normalized.Add(values);
+            }
         }
 
-        await LoadForTemplateAsync(templateId, cancellationToken).ConfigureAwait(true);
+        if (normalized.Count == 0)
+        {
+            return 0;
+        }
+
+        ReportProgress(progress, 10, "Importing", "Writing rows…");
+        var rowProgress = new Progress<int>(inserted =>
+        {
+            var total = Math.Max(1, normalized.Count);
+            var pct = 10 + 85.0 * inserted / total;
+            ReportProgress(progress, pct, "Importing", $"Stored {inserted} of {total} rows…");
+        });
+
+        var importedCount = await _records
+            .AppendRowsAsync(templateId, normalized, rowProgress, cancellationToken)
+            .ConfigureAwait(true);
+
+        ReportProgress(progress, 98, "Importing", "Refreshing grid…");
+        ShowNoTemplateHint = false;
+        await LoadCatalogRowsPageAsync(0, 50, cancellationToken).ConfigureAwait(true);
+        ReportProgress(progress, 100, "Import complete", $"{importedCount} row(s) stored.");
+        ClearOperationProgress();
 
         if (importedCount > 0)
         {
-            _activityLogger.LogUserAction("Rows Imported",
+            _activityLogger.LogUserAction(
+                "Rows Imported",
                 $"Imported {importedCount} rows into template \"{SelectedDataTemplate.Name}\"");
         }
 
@@ -1771,6 +2900,12 @@ public sealed partial class MasterDataViewModel : ViewModelBase
         return $"{baseKey}_{index}";
     }
 }
+
+public readonly record struct MasterDataOperationProgress(
+    double Percent,
+    string Headline,
+    string Detail,
+    string PercentLabel);
 
 public sealed class WorksheetRelationMatchResult(
     string tabHeader,

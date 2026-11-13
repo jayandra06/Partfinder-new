@@ -19,6 +19,23 @@ public interface IExcelTemplateService
         PartTemplateDefinition template,
         string sourcePath,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Row 1 = column headers; following rows = values (Excel or CSV).</summary>
+    Task<ExcelSchemaImportParseResult> ParseImportFileInferSchemaAsync(
+        string sourcePath,
+        CancellationToken cancellationToken = default);
+}
+
+public sealed class ExcelSchemaImportParseResult
+{
+    public IReadOnlyList<TemplateFieldDefinition> Fields { get; init; } = Array.Empty<TemplateFieldDefinition>();
+
+    public IReadOnlyList<IReadOnlyDictionary<string, string>> Rows { get; init; } =
+        Array.Empty<IReadOnlyDictionary<string, string>>();
+
+    public IReadOnlyList<string> Warnings { get; init; } = Array.Empty<string>();
+
+    public int EmptyRowsSkipped { get; init; }
 }
 
 public sealed class ExcelImportParseResult

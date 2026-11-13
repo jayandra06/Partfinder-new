@@ -12,6 +12,7 @@ public sealed class CurrentUserAccessService : ICurrentUserAccessService
     private readonly IOrgUserDirectoryService _users;
 
     private UserAccessCapabilities _capabilities = UserAccessCapabilities.FullAdmin;
+    private bool _isOrganizationAdministrator = true;
 
     public CurrentUserAccessService(
         ILocalSetupContext setupContext,
@@ -24,6 +25,8 @@ public sealed class CurrentUserAccessService : ICurrentUserAccessService
     }
 
     public UserAccessCapabilities Capabilities => _capabilities;
+
+    public bool IsOrganizationAdministrator => _isOrganizationAdministrator;
 
     public bool CanViewAllAuditHistory => _capabilities.CanManageInventory;
 
@@ -39,6 +42,7 @@ public sealed class CurrentUserAccessService : ICurrentUserAccessService
             var email = ResolveCurrentEmail();
             if (string.IsNullOrWhiteSpace(email))
             {
+                _isOrganizationAdministrator = true;
                 _capabilities = UserAccessCapabilities.FullAdmin;
                 return;
             }
@@ -48,12 +52,14 @@ public sealed class CurrentUserAccessService : ICurrentUserAccessService
             {
                 // No record in org_app_users means this is the org creator (in org_admins collection).
                 // Org creator gets full access including User Management.
+                _isOrganizationAdministrator = true;
                 _capabilities = UserAccessCapabilities.FullAdmin;
                 return;
             }
 
             if (string.Equals(record.Role, "Admin", StringComparison.OrdinalIgnoreCase))
             {
+                _isOrganizationAdministrator = true;
                 // Invited admin — full access EXCEPT User Management (only org creator can manage users).
                 _capabilities = new UserAccessCapabilities
                 {
@@ -86,6 +92,7 @@ public sealed class CurrentUserAccessService : ICurrentUserAccessService
 
             if (string.Equals(record.Role, "Employee", StringComparison.OrdinalIgnoreCase))
             {
+                _isOrganizationAdministrator = false;
                 _capabilities = new UserAccessCapabilities
                 {
                     // Page-level access (navbar visibility) — Employee sees all standard pages.
@@ -121,11 +128,13 @@ public sealed class CurrentUserAccessService : ICurrentUserAccessService
             }
 
             // Unknown role — default to FullAdmin for backward compatibility.
+            _isOrganizationAdministrator = true;
             _capabilities = UserAccessCapabilities.FullAdmin;
         }
         catch (Exception ex)
         {
             DebugLogClient.Post("warn", "CurrentUserAccessService.RefreshAsync", ex.Message);
+            _isOrganizationAdministrator = true;
             _capabilities = UserAccessCapabilities.FullAdmin;
         }
     }
