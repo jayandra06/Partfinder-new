@@ -1,5 +1,9 @@
 # Changelog
 
+## [3.0.7.0] - 2026-11-13
+
+Master data auto-save, import and cascade cleanup; warehouse admin quick actions; linked/non-linked template linking improvements. Microsoft Store package **3.0.7.0** for Partner Center.
+
 ## [3.0.6.0] - 2026-11-02
 
 Microsoft Store package (revision segment 0): same fixes as 3.0.5.1; manifest version **3.0.6.0** for Partner Center validation.
