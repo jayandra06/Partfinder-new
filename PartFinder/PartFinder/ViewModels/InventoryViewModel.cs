@@ -43,6 +43,9 @@ public partial class InventoryViewModel : PaginatedViewModelBase
     public bool ShowWarehouseSuggestAction =>
         _access.Capabilities.CanViewInventory && !_access.Capabilities.CanManageInventory;
 
+    /// <summary>Middle KPI card — Order for admins (Suggest is shown for employees in the same slot).</summary>
+    public bool ShowWarehouseOrderQuickAction => ShowInventoryAdminChrome;
+
     public string InventoryPageTitle =>
         ShowInventoryAdminChrome ? "Warehouse Management" : "Warehouse";
 
@@ -63,6 +66,7 @@ public partial class InventoryViewModel : PaginatedViewModelBase
         OnPropertyChanged(nameof(ShowInventoryAdminChrome));
         OnPropertyChanged(nameof(ShowInventoryKpiRow));
         OnPropertyChanged(nameof(ShowWarehouseSuggestAction));
+        OnPropertyChanged(nameof(ShowWarehouseOrderQuickAction));
         OnPropertyChanged(nameof(InventoryPageTitle));
         OnPropertyChanged(nameof(InventoryPageDescription));
     }

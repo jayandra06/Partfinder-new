@@ -13,17 +13,20 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
     private readonly BackendApiClient _api;
     private readonly ExplorerNavigationCoordinator _explorerNav;
     private readonly ICurrentUserAccessService _access;
+    private readonly WorksheetRelationCleanupService _relationCleanup;
 
     public WorksheetRelationsViewModel(
         ITemplateSchemaService templates,
         BackendApiClient api,
         ExplorerNavigationCoordinator explorerNav,
-        ICurrentUserAccessService access)
+        ICurrentUserAccessService access,
+        WorksheetRelationCleanupService relationCleanup)
     {
         _templates = templates;
         _api = api;
         _explorerNav = explorerNav;
         _access = access;
+        _relationCleanup = relationCleanup;
     }
 
     public ObservableCollection<PartTemplateDefinition> Templates { get; } = [];
@@ -103,7 +106,8 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
         try
         {
             var list = await _templates.GetTemplatesAsync(ct).ConfigureAwait(true);
-            var filtered = _access.FilterTemplatesForParts(list);
+            var filtered = TemplateCatalogFilters.OrganizationTemplates(
+                _access.FilterTemplatesForParts(list));
             Templates.Clear();
             foreach (var item in filtered)
             {
@@ -251,21 +255,13 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
         StatusMessage = string.Empty;
         try
         {
-            var reverse = WorksheetRelationBidirectional.FindRelationBetween(
-                AllRelations.ToList(),
-                LookupTemplate!.Id,
-                PrimaryTemplate!.Id);
-
-            var (ok, error) = await _api.DeleteRelationAsync(LoadedRelation.Id).ConfigureAwait(true);
+            var (ok, error) = await _relationCleanup
+                .DeleteRelationLinkAsync(LoadedRelation, AllRelations.ToList())
+                .ConfigureAwait(true);
             if (!ok)
             {
                 ErrorMessage = error ?? "Failed to delete relation.";
                 return;
-            }
-
-            if (reverse is not null && !string.Equals(reverse.Id, LoadedRelation.Id, StringComparison.Ordinal))
-            {
-                _ = await _api.DeleteRelationAsync(reverse.Id).ConfigureAwait(true);
             }
 
             LoadedRelation = null;
@@ -273,6 +269,60 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
             StatusMessage = "Relation deleted.";
             await LoadAllRelationsAsync().ConfigureAwait(true);
             BuildColumnLists();
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task DeleteRelationChipAsync(RelationChipItem? chip)
+    {
+        if (chip is null)
+        {
+            return;
+        }
+
+        var relation = AllRelations.FirstOrDefault(r =>
+            string.Equals(r.Id, chip.RelationId, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(r.Id, chip.RelationId + ":mirror", StringComparison.OrdinalIgnoreCase));
+        if (relation is null)
+        {
+            relation = AllRelations.FirstOrDefault(r =>
+                string.Equals(r.PrimaryTemplateId, chip.PrimaryTemplateId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(r.LookupTemplateId, chip.LookupTemplateId, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (relation is null)
+        {
+            ErrorMessage = "Could not find that link to delete.";
+            return;
+        }
+
+        IsLoading = true;
+        ErrorMessage = string.Empty;
+        StatusMessage = string.Empty;
+        try
+        {
+            var (ok, error) = await _relationCleanup
+                .DeleteRelationLinkAsync(relation, AllRelations.ToList())
+                .ConfigureAwait(true);
+            if (!ok)
+            {
+                ErrorMessage = error ?? "Failed to delete relation.";
+                return;
+            }
+
+            if (string.Equals(SelectedRelationId, chip.RelationId, StringComparison.OrdinalIgnoreCase))
+            {
+                LoadedRelation = null;
+                SelectedRelationId = null;
+                BuildColumnLists();
+            }
+
+            StatusMessage = "Link removed.";
+            await LoadAllRelationsAsync().ConfigureAwait(true);
         }
         finally
         {
@@ -567,6 +617,18 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
         {
             AllRelations.Add(r);
 
+            var primary = Templates.FirstOrDefault(t => t.Id == r.PrimaryTemplateId);
+            var lookup = Templates.FirstOrDefault(t => t.Id == r.LookupTemplateId);
+            if (primary is null || lookup is null)
+            {
+                continue;
+            }
+
+            if (!TemplateCatalogFilters.HasSharedColumnLabels(primary, lookup))
+            {
+                continue;
+            }
+
             var pairKey = string.Join(
                 "|",
                 new[] { r.PrimaryTemplateId, r.LookupTemplateId }.OrderBy(id => id, StringComparer.OrdinalIgnoreCase));
@@ -575,9 +637,12 @@ public partial class WorksheetRelationsViewModel : ViewModelBase
                 continue;
             }
 
-            var primaryName = Templates.FirstOrDefault(t => t.Id == r.PrimaryTemplateId)?.Name ?? r.PrimaryTemplateId;
-            var lookupName = Templates.FirstOrDefault(t => t.Id == r.LookupTemplateId)?.Name ?? r.LookupTemplateId;
-            RelationChips.Add(new RelationChipItem(r.Id, r.PrimaryTemplateId, r.LookupTemplateId, primaryName, lookupName));
+            RelationChips.Add(new RelationChipItem(
+                r.Id,
+                r.PrimaryTemplateId,
+                r.LookupTemplateId,
+                primary.Name,
+                lookup.Name));
         }
 
         OnPropertyChanged(nameof(RelationCount));

@@ -276,22 +276,29 @@ public sealed partial class MasterDataPage : Page, INavigationParameterSink
         }
     }
 
-    public void ApplyBrowseTemplate(string? templateId)
+    public async Task ApplyBrowseTemplateAsync(string? templateId)
     {
         if (_viewModel is null || string.IsNullOrWhiteSpace(templateId))
         {
             return;
         }
 
-        _viewModel.SurfaceMode = MasterDataSurfaceMode.LinkedBrowse;
-        var existing = _viewModel.DataTemplates.FirstOrDefault(t => t.Id == templateId);
-        if (existing is not null)
+        await _viewModel.ApplyLinkedBrowseTemplateAsync(templateId).ConfigureAwait(true);
+        _displayedTemplateId = templateId;
+        _gridPageIndex = 0;
+        RebuildSpreadsheet();
+    }
+
+    public async Task ClearLinkedBrowseAsync()
+    {
+        if (_viewModel is null)
         {
-            _viewModel.SelectedDataTemplate = existing;
             return;
         }
 
-        _ = _viewModel.LoadForTemplateAsync(templateId);
+        await _viewModel.ClearLinkedBrowseSurfaceAsync().ConfigureAwait(true);
+        _displayedTemplateId = null;
+        RebuildSpreadsheet();
     }
 
     private void OnMasterDataPageUnloaded(object sender, RoutedEventArgs e)
@@ -607,13 +614,15 @@ public sealed partial class MasterDataPage : Page, INavigationParameterSink
             return;
         }
 
-        if (_viewModel.SaveGridCommand is IAsyncRelayCommand saveAsync)
+        var saveProgress = new Progress<MasterDataOperationProgress>(_viewModel.ApplyOperationProgress);
+        try
         {
-            await saveAsync.ExecuteAsync(null).ConfigureAwait(true);
+            await _viewModel.SaveGridWithProgressAsync(saveProgress).ConfigureAwait(true);
         }
-        else
+        finally
         {
-            _viewModel.SaveGridCommand.Execute(null);
+            await Task.Delay(400).ConfigureAwait(true);
+            _viewModel.ClearOperationProgress();
         }
 
         var templateName = _viewModel.SelectedDataTemplate?.Name ?? "Unknown";
@@ -695,10 +704,61 @@ public sealed partial class MasterDataPage : Page, INavigationParameterSink
 
         var picker = new FileOpenPicker();
         picker.FileTypeFilter.Add(".xlsx");
+        picker.FileTypeFilter.Add(".csv");
         InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainAppWindow));
         var file = await picker.PickSingleFileAsync();
         if (file is null)
         {
+            return;
+        }
+
+        _viewModel.ApplyOperationProgress(new MasterDataOperationProgress(2, "Importing", "Reading file…", "2%"));
+        var importProgress = new Progress<MasterDataOperationProgress>(_viewModel.ApplyOperationProgress);
+
+        if (_viewModel.ShouldInferImportSchema())
+        {
+            var inferred = await _excelTemplateService.ParseImportFileInferSchemaAsync(file.Path).ConfigureAwait(true);
+            if (inferred.Fields.Count == 0)
+            {
+                var noneDlg = new ContentDialog
+                {
+                    Title = "Could not read file",
+                    Content = inferred.Warnings.FirstOrDefault() ?? "No columns were found in row 1.",
+                    CloseButtonText = "Close",
+                    XamlRoot = XamlRoot,
+                };
+                _ = await noneDlg.ShowAsync();
+                return;
+            }
+
+            var confirmSchema = new ContentDialog
+            {
+                Title = "Import into catalog?",
+                Content = $"Use {inferred.Fields.Count} column(s) from the file header and load {inferred.Rows.Count} data row(s)?",
+                PrimaryButtonText = "Import",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = XamlRoot,
+            };
+            if (await confirmSchema.ShowAsync() != ContentDialogResult.Primary)
+            {
+                return;
+            }
+
+            try
+            {
+                await _viewModel.ApplySchemaImportAsync(inferred, importProgress).ConfigureAwait(true);
+            }
+            finally
+            {
+                await Task.Delay(400).ConfigureAwait(true);
+                _viewModel.ClearOperationProgress();
+            }
+
+            RebuildSpreadsheet();
+            _activity.LogStockChange(
+                "Catalog Import",
+                $"Loaded {inferred.Rows.Count} row(s) and {inferred.Fields.Count} columns from file into '{_viewModel.SelectedDataTemplate.Name}'");
             return;
         }
 
@@ -730,7 +790,18 @@ public sealed partial class MasterDataPage : Page, INavigationParameterSink
             return;
         }
 
-        var imported = await _viewModel.ImportRowsAsync(parsed.Rows);
+        int imported;
+        try
+        {
+            imported = await _viewModel.ImportRowsAsync(parsed.Rows, importProgress).ConfigureAwait(true);
+        }
+        finally
+        {
+            await Task.Delay(400).ConfigureAwait(true);
+            _viewModel.ClearOperationProgress();
+        }
+
+        RebuildSpreadsheet();
         var dlg = new ContentDialog
         {
             Title = "Import completed",
@@ -742,6 +813,48 @@ public sealed partial class MasterDataPage : Page, INavigationParameterSink
 
         _activity.LogStockChange("Excel Import", $"Imported {imported} rows into template '{_viewModel.SelectedDataTemplate.Name}'");
         _ = await dlg.ShowAsync();
+    }
+
+    private async void OnPurgeMasterDataClicked(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel?.SelectedDataTemplate is null || XamlRoot is null || !_viewModel.CanPurgeMasterDataForTemplate)
+        {
+            return;
+        }
+
+        var templateName = _viewModel.SelectedDataTemplate.Name;
+        var confirm = new ContentDialog
+        {
+            Title = "Delete all master data?",
+            Content = $"Permanently remove every data row in \"{templateName}\"? Column definitions are not removed. This cannot be undone.",
+            PrimaryButtonText = "Delete all data",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = XamlRoot,
+        };
+        if (await confirm.ShowAsync() != ContentDialogResult.Primary)
+        {
+            return;
+        }
+
+        var (ok, deleted, error) = await _viewModel.PurgeAllRowsForCurrentTemplateAsync().ConfigureAwait(true);
+        if (!ok)
+        {
+            var errDlg = new ContentDialog
+            {
+                Title = "Delete failed",
+                Content = error ?? "Could not delete master data.",
+                CloseButtonText = "OK",
+                XamlRoot = XamlRoot,
+            };
+            _ = await errDlg.ShowAsync();
+            return;
+        }
+
+        _activity.LogStockChange(
+            "Master Data Purge",
+            $"Deleted {deleted} row(s) from template '{templateName}'");
+        RebuildSpreadsheet();
     }
 
     private static UIElement BuildImportSummaryContent(ExcelImportParseResult parsed, int detectedRows, int imported)
@@ -794,7 +907,8 @@ public sealed partial class MasterDataPage : Page, INavigationParameterSink
             ? visibleRows
             : visibleRows.Skip(pageStart).Take(MasterDataPageSize).ToList();
         var colCount = _viewModel.Columns.Count;
-        var showDeleteCol = _viewModel.ShowSpreadsheetEditChrome && _viewModel.IsEditMode && _viewModel.CanDeleteRows;
+        var showDeleteCol = _viewModel.IsEditMode && _viewModel.CanDeleteRows
+            && (_viewModel.ShowSpreadsheetEditChrome || _viewModel.IsCatalogCanvasMode);
         var gridColCount = colCount + (showDeleteCol ? 1 : 0);
         var rowCount = pageRows.Count;
 
@@ -938,7 +1052,9 @@ public sealed partial class MasterDataPage : Page, INavigationParameterSink
         }
 
         var headerBg = (Brush)Application.Current.Resources["GridHeaderBackgroundBrush"];
+        var canvasHeaderBg = (Brush)Application.Current.Resources["AccentPrimaryBrush"];
         var borderBrush = (Brush)Application.Current.Resources["BorderDefaultBrush"];
+        var useCanvasHeaders = _viewModel.UseExcelStyleCatalogGrid;
 
         for (var c = 0; c < colCount; c++)
         {
@@ -948,9 +1064,13 @@ public sealed partial class MasterDataPage : Page, INavigationParameterSink
                 : field.Label;
             var headerBorder = new Border
             {
-                Background = headerBg,
-                BorderBrush = borderBrush,
-                BorderThickness = new Thickness(0, 0, 1, 1),
+                Background = useCanvasHeaders
+                    ? new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(0x2E, 0x1F, 0x7A, 0xE0))
+                    : headerBg,
+                BorderBrush = useCanvasHeaders
+                    ? (Brush)Application.Current.Resources["AccentPrimaryBrush"]
+                    : borderBrush,
+                BorderThickness = new Thickness(0, 0, 1, useCanvasHeaders ? 2 : 1),
                 Padding = new Thickness(10, 10, 10, 10),
             };
             Grid.SetRow(headerBorder, 0);
@@ -967,17 +1087,42 @@ public sealed partial class MasterDataPage : Page, INavigationParameterSink
                 headerHost.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             }
 
-            var titleBlock = new TextBlock
+            if (useCanvasHeaders)
             {
-                Text = headerLabel,
-                FontSize = 12,
-                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                Foreground = (Brush)Application.Current.Resources["TextPrimaryBrush"],
-                TextTrimming = TextTrimming.CharacterEllipsis,
-                VerticalAlignment = VerticalAlignment.Center,
-            };
-            Grid.SetColumn(titleBlock, 0);
-            headerHost.Children.Add(titleBlock);
+                var columnIndex = c;
+                var headerBox = new TextBox
+                {
+                    Text = headerLabel,
+                    PlaceholderText = $"Column {columnIndex + 1}",
+                    FontSize = 12,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    MinHeight = 30,
+                    BorderThickness = new Thickness(0),
+                    Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
+                    Foreground = (Brush)Application.Current.Resources["TextPrimaryBrush"],
+                };
+                headerBox.TextChanged += (_, _) =>
+                {
+                    _viewModel?.SetColumnLabelAt(columnIndex, headerBox.Text);
+                };
+                headerBox.LostFocus += (_, _) => _viewModel?.RequestCatalogAutoSave();
+                Grid.SetColumn(headerBox, 0);
+                headerHost.Children.Add(headerBox);
+            }
+            else
+            {
+                var titleBlock = new TextBlock
+                {
+                    Text = headerLabel,
+                    FontSize = 12,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    Foreground = (Brush)Application.Current.Resources["TextPrimaryBrush"],
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    VerticalAlignment = VerticalAlignment.Center,
+                };
+                Grid.SetColumn(titleBlock, 0);
+                headerHost.Children.Add(titleBlock);
+            }
 
             var fieldKey = field.Key;
             var showColumnSearchUi = _viewModel is { IsEditMode: false };
@@ -1310,6 +1455,18 @@ public sealed partial class MasterDataPage : Page, INavigationParameterSink
             return;
         }
 
+        if (_viewModel is { IsCatalogCanvasMode: true })
+        {
+            MasterDataPageStatusText.Visibility = Visibility.Collapsed;
+            MasterDataPrevPageButton.Visibility = Visibility.Collapsed;
+            MasterDataNextPageButton.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        MasterDataPageStatusText.Visibility = Visibility.Visible;
+        MasterDataPrevPageButton.Visibility = Visibility.Visible;
+        MasterDataNextPageButton.Visibility = Visibility.Visible;
+
         var totalRows = _viewModel?.GetPagerTotalRowCount(visibleCount) ?? visibleCount;
 
         var pageCount = Math.Max(1, (totalRows + MasterDataPageSize - 1) / MasterDataPageSize);
@@ -1469,6 +1626,17 @@ public sealed partial class MasterDataPage : Page, INavigationParameterSink
         }
     }
 
+    private void WireCatalogAutoSave(TextBox box)
+    {
+        if (_viewModel?.AutoSaveMasterDataCatalog != true)
+        {
+            return;
+        }
+
+        box.LostFocus += (_, _) => _viewModel.RequestCatalogAutoSave();
+        box.TextChanged += (_, _) => _viewModel.RequestCatalogAutoSave();
+    }
+
     private UIElement BuildTextCell(MasterDataCellViewModel cellVm, MasterDataRowViewModel rowVm)
     {
         var isViewMode = _viewModel is not null && !_viewModel.IsEditMode;
@@ -1516,6 +1684,21 @@ public sealed partial class MasterDataPage : Page, INavigationParameterSink
                 UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged,
             });
         box.IsReadOnly = _viewModel is null || !_viewModel.IsEditMode;
+        if (_viewModel?.IsCatalogCanvasMode == true && _viewModel.IsEditMode)
+        {
+            var rowIndex = _viewModel.Rows.IndexOf(rowVm);
+            var colIndex = rowVm.Cells.IndexOf(cellVm);
+            box.TextChanged += (_, _) =>
+            {
+                _viewModel.MaybeGrowCanvas(rowIndex, colIndex);
+                _viewModel.RequestCatalogAutoSave();
+            };
+        }
+        else
+        {
+            WireCatalogAutoSave(box);
+        }
+
         if (_viewModel?.IsCatalogReadOnly != true)
         {
             box.ContextFlyout = BuildTextCellMenu(cellVm, rowVm);
@@ -1589,7 +1772,10 @@ public sealed partial class MasterDataPage : Page, INavigationParameterSink
             {
                 cellVm.LinkedRowId = null;
             }
+
+            _viewModel?.RequestCatalogAutoSave();
         };
+        WireCatalogAutoSave(box);
 
         var pickBtn = new Button
         {
@@ -2711,6 +2897,104 @@ public sealed partial class MasterDataPage : Page, INavigationParameterSink
         {
             ToolTipService.SetToolTip(btn, isFav ? "Remove from favourites" : "Add to favourites");
         }
+
+        if (root.FindName("CatalogDeleteButton") is Button deleteBtn)
+        {
+            var canDelete = _viewModel.CanDeleteCatalogTemplate(template);
+            deleteBtn.Visibility = canDelete ? Visibility.Visible : Visibility.Collapsed;
+        }
+    }
+
+    private async void OnAddCatalogClicked(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel is null || XamlRoot is null)
+        {
+            return;
+        }
+
+        var nameBox = new TextBox { PlaceholderText = "Catalog name" };
+        var dialog = new ContentDialog
+        {
+            Title = "Add master data catalog",
+            Content = nameBox,
+            PrimaryButtonText = "Create",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = XamlRoot,
+        };
+
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+        {
+            return;
+        }
+
+        var error = await _viewModel.CreateMasterDataCatalogAsync(nameBox.Text).ConfigureAwait(true);
+        if (error is not null)
+        {
+            var errDlg = new ContentDialog
+            {
+                Title = "Could not create catalog",
+                Content = error,
+                CloseButtonText = "OK",
+                XamlRoot = XamlRoot,
+            };
+            _ = await errDlg.ShowAsync();
+            return;
+        }
+
+        UpdateCatalogNavChrome();
+        RebuildSpreadsheet();
+    }
+
+    private async void OnCatalogDeleteClick(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel is null || XamlRoot is null || sender is not Button btn)
+        {
+            return;
+        }
+
+        if (btn.DataContext is not PartTemplateDefinition template)
+        {
+            return;
+        }
+
+        if (!_viewModel.CanDeleteCatalogTemplate(template))
+        {
+            return;
+        }
+
+        var confirm = new ContentDialog
+        {
+            Title = "Delete catalog?",
+            Content =
+                $"Remove catalog \"{template.Name}\" and all of its data rows? Linked templates and relations involving this catalog will be removed. This cannot be undone.",
+            PrimaryButtonText = "Delete catalog",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = XamlRoot,
+        };
+        if (await confirm.ShowAsync() != ContentDialogResult.Primary)
+        {
+            return;
+        }
+
+        var (ok, error) = await _viewModel.DeleteMasterDataCatalogAsync(template).ConfigureAwait(true);
+        if (!ok)
+        {
+            var errDlg = new ContentDialog
+            {
+                Title = "Delete failed",
+                Content = error ?? "Could not delete catalog.",
+                CloseButtonText = "OK",
+                XamlRoot = XamlRoot,
+            };
+            _ = await errDlg.ShowAsync();
+            return;
+        }
+
+        _activity.LogTemplateChange("Catalog Deleted", $"Master data catalog '{template.Name}' removed");
+        UpdateCatalogNavChrome();
+        RebuildSpreadsheet();
     }
 
     private async void OnCatalogFavouriteClick(object sender, RoutedEventArgs e)

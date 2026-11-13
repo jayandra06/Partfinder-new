@@ -21,6 +21,7 @@ public partial class TemplatesViewModel : ViewModelBase
 
     private readonly ICurrentUserAccessService _access;
     private readonly BulkTemplateImportService _bulkImport;
+    private readonly WorksheetRelationCleanupService _relationCleanup;
 
     public TemplatesViewModel(
         ITemplateSchemaService templateSchema,
@@ -31,7 +32,8 @@ public partial class TemplatesViewModel : ViewModelBase
         IFavouriteStore favouriteStore,
         ICurrentUserAccessService access,
         BulkTemplateImportService bulkImport,
-        IMasterDataRecordsService records)
+        IMasterDataRecordsService records,
+        WorksheetRelationCleanupService relationCleanup)
     {
         _templateSchema = templateSchema;
         _shellNav = shellNav;
@@ -42,6 +44,7 @@ public partial class TemplatesViewModel : ViewModelBase
         _access = access;
         _bulkImport = bulkImport;
         _records = records;
+        _relationCleanup = relationCleanup;
         _dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
         
         ColumnLabels.Add(new ColumnLabelDraft());
@@ -132,6 +135,7 @@ public partial class TemplatesViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(templateId) || !_access.Capabilities.CanDeleteTemplate) return;
         try
         {
+            await _relationCleanup.DeleteAllRelationsInvolvingTemplateAsync(templateId).ConfigureAwait(true);
             await _templateSchema.DeleteTemplateAsync(templateId).ConfigureAwait(true);
             _activityLogger.LogTemplateChange("Template Deleted", $"Template {templateId} deleted");
             ExitTemplateEditor();

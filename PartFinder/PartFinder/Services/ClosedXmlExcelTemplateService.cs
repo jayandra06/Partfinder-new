@@ -141,4 +141,215 @@ public sealed class ClosedXmlExcelTemplateService : IExcelTemplateService
             EmptyRowsSkipped = emptyRowsSkipped,
         });
     }
+
+    public Task<ExcelSchemaImportParseResult> ParseImportFileInferSchemaAsync(
+        string sourcePath,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var extension = Path.GetExtension(sourcePath);
+        if (string.Equals(extension, ".csv", StringComparison.OrdinalIgnoreCase))
+        {
+            return Task.FromResult(ParseCsvInferSchema(sourcePath, cancellationToken));
+        }
+
+        using var workbook = new XLWorkbook(sourcePath);
+        var sheet = workbook.Worksheets.FirstOrDefault();
+        if (sheet is null)
+        {
+            return Task.FromResult(new ExcelSchemaImportParseResult
+            {
+                Warnings = new[] { "No worksheet found in the selected file." },
+            });
+        }
+
+        var lastRow = sheet.LastRowUsed()?.RowNumber() ?? 0;
+        var lastColumn = sheet.LastColumnUsed()?.ColumnNumber() ?? 0;
+        if (lastRow < 1 || lastColumn < 1)
+        {
+            return Task.FromResult(new ExcelSchemaImportParseResult
+            {
+                Warnings = new[] { "The file has no header row." },
+            });
+        }
+
+        var headerCells = new List<(int Col, string Label)>();
+        for (var c = 1; c <= lastColumn; c++)
+        {
+            var label = sheet.Cell(1, c).GetString().Trim();
+            if (string.IsNullOrWhiteSpace(label))
+            {
+                continue;
+            }
+
+            headerCells.Add((c, label));
+        }
+
+        if (headerCells.Count == 0)
+        {
+            return Task.FromResult(new ExcelSchemaImportParseResult
+            {
+                Warnings = new[] { "Row 1 has no column labels." },
+            });
+        }
+
+        var fields = BuildInferredFields(headerCells.Select(h => h.Label).ToList());
+        var rows = new List<IReadOnlyDictionary<string, string>>();
+        var emptyRowsSkipped = 0;
+        for (var r = 2; r <= lastRow; r++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var rowMap = new Dictionary<string, string>(StringComparer.Ordinal);
+            for (var i = 0; i < headerCells.Count; i++)
+            {
+                var col = headerCells[i].Col;
+                rowMap[fields[i].Key] = sheet.Cell(r, col).GetString().Trim();
+            }
+
+            if (rowMap.Values.All(string.IsNullOrWhiteSpace))
+            {
+                emptyRowsSkipped++;
+                continue;
+            }
+
+            rows.Add(rowMap);
+        }
+
+        return Task.FromResult(new ExcelSchemaImportParseResult
+        {
+            Fields = fields,
+            Rows = rows,
+            EmptyRowsSkipped = emptyRowsSkipped,
+        });
+    }
+
+    private static ExcelSchemaImportParseResult ParseCsvInferSchema(string sourcePath, CancellationToken cancellationToken)
+    {
+        var lines = File.ReadAllLines(sourcePath);
+        if (lines.Length == 0)
+        {
+            return new ExcelSchemaImportParseResult { Warnings = new[] { "The CSV file is empty." } };
+        }
+
+        var headers = SplitCsvLine(lines[0]);
+        if (headers.Count == 0 || headers.All(string.IsNullOrWhiteSpace))
+        {
+            return new ExcelSchemaImportParseResult { Warnings = new[] { "Row 1 has no column labels." } };
+        }
+
+        var fields = BuildInferredFields(headers);
+        var rows = new List<IReadOnlyDictionary<string, string>>();
+        var emptyRowsSkipped = 0;
+        for (var r = 1; r < lines.Length; r++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var cells = SplitCsvLine(lines[r]);
+            var rowMap = new Dictionary<string, string>(StringComparer.Ordinal);
+            for (var c = 0; c < fields.Count; c++)
+            {
+                rowMap[fields[c].Key] = c < cells.Count ? cells[c].Trim() : string.Empty;
+            }
+
+            if (rowMap.Values.All(string.IsNullOrWhiteSpace))
+            {
+                emptyRowsSkipped++;
+                continue;
+            }
+
+            rows.Add(rowMap);
+        }
+
+        return new ExcelSchemaImportParseResult
+        {
+            Fields = fields,
+            Rows = rows,
+            EmptyRowsSkipped = emptyRowsSkipped,
+        };
+    }
+
+    private static List<string> SplitCsvLine(string line)
+    {
+        var result = new List<string>();
+        if (string.IsNullOrEmpty(line))
+        {
+            return result;
+        }
+
+        var current = new System.Text.StringBuilder();
+        var inQuotes = false;
+        for (var i = 0; i < line.Length; i++)
+        {
+            var ch = line[i];
+            if (ch == '"')
+            {
+                if (inQuotes && i + 1 < line.Length && line[i + 1] == '"')
+                {
+                    current.Append('"');
+                    i++;
+                }
+                else
+                {
+                    inQuotes = !inQuotes;
+                }
+
+                continue;
+            }
+
+            if (ch == ',' && !inQuotes)
+            {
+                result.Add(current.ToString());
+                current.Clear();
+                continue;
+            }
+
+            current.Append(ch);
+        }
+
+        result.Add(current.ToString());
+        return result;
+    }
+
+    private static List<TemplateFieldDefinition> BuildInferredFields(IReadOnlyList<string> headerLabels)
+    {
+        var usedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var fields = new List<TemplateFieldDefinition>(headerLabels.Count);
+        for (var i = 0; i < headerLabels.Count; i++)
+        {
+            var label = string.IsNullOrWhiteSpace(headerLabels[i]) ? $"Column {i + 1}" : headerLabels[i].Trim();
+            var key = SlugFieldKey(label, usedKeys);
+            fields.Add(new TemplateFieldDefinition
+            {
+                Key = key,
+                Label = label,
+                Type = TemplateFieldType.Text,
+                IsRequired = false,
+                DisplayOrder = i,
+            });
+        }
+
+        return fields;
+    }
+
+    private static string SlugFieldKey(string label, HashSet<string> usedKeys)
+    {
+        var slug = new string(label
+            .Trim()
+            .ToLowerInvariant()
+            .Select(ch => char.IsLetterOrDigit(ch) ? ch : '_')
+            .ToArray())
+            .Trim('_');
+        if (string.IsNullOrWhiteSpace(slug))
+        {
+            slug = "column";
+        }
+
+        var key = slug;
+        var n = 2;
+        while (!usedKeys.Add(key))
+        {
+            key = $"{slug}_{n++}";
+        }
+
+        return key;
+    }
 }

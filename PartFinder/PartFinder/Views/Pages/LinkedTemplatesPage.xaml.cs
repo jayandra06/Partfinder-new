@@ -11,6 +11,7 @@ public sealed partial class LinkedTemplatesPage : Page
 {
     private LinkedTemplatesViewModel? _vm;
     private bool _browseFrameReady;
+    private bool _syncingSidebarSelection;
 
     public LinkedTemplatesPage()
     {
@@ -31,10 +32,12 @@ public sealed partial class LinkedTemplatesPage : Page
 
         _vm = vm;
         vm.PropertyChanged += OnBrowseVmPropertyChanged;
-        vm.Templates.CollectionChanged += OnTemplatesCollectionChanged;
+        vm.LinkedSidebarTemplates.CollectionChanged += OnSidebarTemplatesCollectionChanged;
+        vm.NonLinkedSidebarTemplates.CollectionChanged += OnSidebarTemplatesCollectionChanged;
         await vm.InitializeAsync().ConfigureAwait(true);
         UpdateCatalogNavChrome();
         EnsureBrowseFrame();
+        SyncSidebarListSelection();
         SyncBrowseTemplate();
     }
 
@@ -44,17 +47,18 @@ public sealed partial class LinkedTemplatesPage : Page
         if (_vm is not null)
         {
             _vm.PropertyChanged -= OnBrowseVmPropertyChanged;
-            _vm.Templates.CollectionChanged -= OnTemplatesCollectionChanged;
+            _vm.LinkedSidebarTemplates.CollectionChanged -= OnSidebarTemplatesCollectionChanged;
+            _vm.NonLinkedSidebarTemplates.CollectionChanged -= OnSidebarTemplatesCollectionChanged;
             _vm = null;
         }
     }
 
-    private void OnTemplatesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
+    private void OnSidebarTemplatesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
         UpdateCatalogNavChrome();
 
     private void UpdateCatalogNavChrome()
     {
-        var show = _vm is { Templates.Count: > 0 };
+        var show = _vm is { HasTemplatesToBrowse: true };
         CatalogNavColumn.Width = show ? new GridLength(220) : new GridLength(0);
         CatalogSidebar.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -66,10 +70,81 @@ public sealed partial class LinkedTemplatesPage : Page
             UpdateCatalogNavChrome();
         }
 
+        if (e.PropertyName is nameof(LinkedTemplatesViewModel.HasTemplatesToBrowse)
+            or nameof(LinkedTemplatesViewModel.ShowNoTemplatesAvailableMessage))
+        {
+            UpdateCatalogNavChrome();
+        }
+
         if (e.PropertyName is nameof(LinkedTemplatesViewModel.BrowseSourceTemplate)
             or nameof(LinkedTemplatesViewModel.BrowseSourceTemplateName))
         {
+            SyncSidebarListSelection();
             SyncBrowseTemplate();
+        }
+    }
+
+    private void SyncSidebarListSelection()
+    {
+        if (_vm is null)
+        {
+            return;
+        }
+
+        _syncingSidebarSelection = true;
+        try
+        {
+            var pick = _vm.BrowseSourceTemplate;
+            LinkedTemplatesListView.SelectedItem = pick is null
+                ? null
+                : _vm.LinkedSidebarTemplates.FirstOrDefault(t => t.Id == pick.Id);
+            NonLinkedTemplatesListView.SelectedItem = pick is null
+                ? null
+                : _vm.NonLinkedSidebarTemplates.FirstOrDefault(t => t.Id == pick.Id);
+        }
+        finally
+        {
+            _syncingSidebarSelection = false;
+        }
+    }
+
+    private void OnSidebarTemplateSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_syncingSidebarSelection || _vm is null || sender is not ListView list)
+        {
+            return;
+        }
+
+        if (list.SelectedItem is PartTemplateDefinition template)
+        {
+            if (_vm.BrowseSourceTemplate?.Id != template.Id)
+            {
+                _vm.BrowseSourceTemplate = template;
+            }
+
+            if (!ReferenceEquals(sender, LinkedTemplatesListView))
+            {
+                LinkedTemplatesListView.SelectedItem = null;
+            }
+
+            if (!ReferenceEquals(sender, NonLinkedTemplatesListView))
+            {
+                NonLinkedTemplatesListView.SelectedItem = null;
+            }
+
+            return;
+        }
+
+        if (e.RemovedItems.Count > 0 && e.AddedItems.Count == 0 && _vm.BrowseSourceTemplate is not null)
+        {
+            var clearedFromLinked = ReferenceEquals(sender, LinkedTemplatesListView)
+                && _vm.LinkedSidebarTemplates.Any(t => t.Id == _vm.BrowseSourceTemplate.Id);
+            var clearedFromNonLinked = ReferenceEquals(sender, NonLinkedTemplatesListView)
+                && _vm.NonLinkedSidebarTemplates.Any(t => t.Id == _vm.BrowseSourceTemplate.Id);
+            if (clearedFromLinked || clearedFromNonLinked)
+            {
+                _vm.BrowseSourceTemplate = null;
+            }
         }
     }
 
@@ -96,16 +171,19 @@ public sealed partial class LinkedTemplatesPage : Page
         }
     }
 
-    private void SyncBrowseTemplate()
+    private async void SyncBrowseTemplate()
     {
-        if (_vm?.BrowseSourceTemplate is null)
+        if (BrowseDataFrame?.Content is not MasterDataPage page)
         {
             return;
         }
 
-        if (BrowseDataFrame?.Content is MasterDataPage page)
+        if (_vm?.BrowseSourceTemplate is null)
         {
-            page.ApplyBrowseTemplate(_vm.BrowseSourceTemplate.Id);
+            await page.ClearLinkedBrowseAsync().ConfigureAwait(true);
+            return;
         }
+
+        await page.ApplyBrowseTemplateAsync(_vm.BrowseSourceTemplate.Id).ConfigureAwait(true);
     }
 }

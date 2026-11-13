@@ -10,7 +10,7 @@ namespace PartFinder.Views.Components;
 
 public sealed partial class TemplateComposerPanel : UserControl
 {
-    private const string SourcePrefix = "pfsrc|";
+    private const string SourcePrefix = MasterDataSourceFieldEncoding.SourcePrefix;
     private readonly ITemplateSchemaService _templates;
     private readonly IMasterDataRecordsService _records;
 
@@ -231,6 +231,8 @@ public sealed partial class TemplateComposerPanel : UserControl
                 }
             }
 
+            var relationCleanup = App.Services.GetRequiredService<WorksheetRelationCleanupService>();
+            await relationCleanup.DeleteAllRelationsInvolvingTemplateAsync(_template.Id).ConfigureAwait(true);
             await _templates.DeleteTemplateAsync(_template.Id).ConfigureAwait(true);
             _isCreating = false;
             Closed?.Invoke(this, EventArgs.Empty);
@@ -1014,16 +1016,10 @@ public sealed partial class TemplateComposerPanel : UserControl
     {
         templateId = null;
         fieldKey = null;
-        if (string.IsNullOrWhiteSpace(pattern) || !pattern.StartsWith(SourcePrefix, StringComparison.Ordinal))
+        if (MasterDataSourceFieldEncoding.TryParse(pattern, out var catalogId, out var sourceFieldKey))
         {
-            return;
-        }
-
-        var parts = pattern[SourcePrefix.Length..].Split('|', 2);
-        if (parts.Length == 2)
-        {
-            templateId = parts[0];
-            fieldKey = parts[1];
+            templateId = catalogId;
+            fieldKey = sourceFieldKey;
         }
     }
 
