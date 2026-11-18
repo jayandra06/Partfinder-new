@@ -1,0 +1,34 @@
+# One-node MongoDB replica set for local WMS staging-lab (transactions enabled).
+# Not for production. Start: docker compose -f docker/wms-staging-mongo-compose.yml up -d
+services:
+  mongo-staging:
+    image: mongo:7
+    command: ['mongod', '--replSet', 'wmsStagingRs', '--bind_ip_all']
+    ports:
+      - '27018:27017'
+    volumes:
+      - wms_staging_mongo:/data/db
+    healthcheck:
+      test: echo "try { rs.status() } catch (e) { quit(1) }" | mongosh --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  mongo-init-rs:
+    image: mongo:7
+    depends_on:
+      mongo-staging:
+        condition: service_started
+    restart: 'no'
+    entrypoint: >
+      bash -c "
+      sleep 3 &&
+      mongosh --host mongo-staging:27017 --eval \"
+        try { rs.status(); }
+        catch(e) {
+          rs.initiate({ _id: 'wmsStagingRs', members: [{ _id: 0, host: 'localhost:27017' }] });
+        }
+      \" || true"
+
+volumes:
+  wms_staging_mongo:

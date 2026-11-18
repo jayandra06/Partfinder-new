@@ -54,7 +54,7 @@
 1. **JWT** validated by `AuthGuard('jwt')` (`email`, optional `orgCode`).
 2. **`X-Org-Id`** must be 6-digit org code; must match JWT `orgCode` when present.
 3. **`verifyLicense`** — active subscription, not banned.
-4. **`wmsEnabled`** on organization (default `true` for rollout).
+4. **`wmsEnabled`** on organization (**opt-in** — `true` only when sold; see 02A.1).
 5. User must exist in tenant **`org_admin_users`** or **`org_app_users`** for that org DB.
 6. **Writes** require **Admin** role (`isWmsAdmin`).
 7. **Reads** filter warehouses/owners by `wms_operator_grants` when not admin (collection ready; grants UI later).
@@ -118,3 +118,10 @@ Run from app: **WMS Setup** → transaction probe line after refresh, or:
 - Opening balance dry-run tool only after B1+B6.
 
 **STOP:** No ledger/reserve/pick/pack/dispatch in this delivery.
+
+---
+
+## 9. Gate sign-off
+
+**Formal acceptance:** `02A-gate-signoff.md` (manual tests + B1–B7 record).  
+**B6 interim doc:** `02B-sku-key-mapping.md` (PO sign-off required before live balances).

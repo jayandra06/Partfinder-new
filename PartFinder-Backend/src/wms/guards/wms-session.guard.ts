@@ -6,9 +6,19 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { OrganizationsService } from '../../organizations/organizations.service';
+import { isWmsProductEntitled } from '../../organizations/wms-entitlement.util';
 import { TenantMongoService } from '../../setup/tenant-mongo.service';
-import type { WmsRequestContext, WmsRole } from '../wms.types';
+import type {
+  WmsOperatorGrants,
+  WmsRequestContext,
+  WmsRole,
+} from '../wms.types';
 import { WMS_COLLECTIONS } from '../wms.types';
+import {
+  adminOperatorGrants,
+  defaultOperatorGrants,
+} from '../wms-operator-permissions.util';
+import { resolveAuthoritativeOrgCode } from './wms-org-resolution.util';
 
 @Injectable()
 export class WmsSessionGuard implements CanActivate {
@@ -19,7 +29,11 @@ export class WmsSessionGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<{
-      user?: { userId: string; email: string };
+      user?: {
+        userId: string;
+        email: string;
+        orgCode?: string;
+      };
       headers: Record<string, string | string[] | undefined>;
       wmsContext?: WmsRequestContext;
     }>();
@@ -30,27 +44,28 @@ export class WmsSessionGuard implements CanActivate {
     }
 
     const headerOrg = this.headerString(req.headers['x-org-id']);
-    if (!headerOrg || !/^\d{6}$/.test(headerOrg)) {
-      throw new ForbiddenException('Valid X-Org-Id header is required.');
-    }
+    const orgCode = resolveAuthoritativeOrgCode(
+      { email: jwtUser.email, orgCode: jwtUser.orgCode },
+      headerOrg,
+    );
 
-    const payload = req.user as { email: string; orgCode?: string };
-    if (payload.orgCode && payload.orgCode !== headerOrg) {
-      throw new ForbiddenException('Organization does not match session token.');
-    }
-
-    const license = await this.orgs.verifyLicense(headerOrg);
+    const license = await this.orgs.verifyLicense(orgCode);
     if (!license.valid) {
       throw new ForbiddenException(license.message ?? 'License invalid.');
     }
 
-    const org = await this.orgs.findByOrgCode(headerOrg);
+    if (!license.wmsEnabled) {
+      throw new ForbiddenException(
+        'Warehouse Management is not enabled for this subscription.',
+      );
+    }
+
+    const org = await this.orgs.findByOrgCode(orgCode);
     if (!org?.orgDatabaseUri?.trim()) {
       throw new ForbiddenException('Organization database is not configured.');
     }
 
-    const wmsEnabled = org.wmsEnabled !== false;
-    if (!wmsEnabled) {
+    if (!isWmsProductEntitled(org)) {
       throw new ForbiddenException(
         'Warehouse Management is not enabled for this subscription.',
       );
@@ -63,8 +78,20 @@ export class WmsSessionGuard implements CanActivate {
     const grants = await this.loadGrants(uri, email);
 
     const isWmsAdmin = role === 'Admin';
+    if (
+      !isWmsAdmin &&
+      grants.warehouseIds.length === 0 &&
+      grants.ownerIds.length === 0
+    ) {
+      throw new ForbiddenException('No WMS operator grants assigned.');
+    }
+
+    const operatorPermissions = isWmsAdmin
+      ? adminOperatorGrants()
+      : this.mapPermissions(grants.raw);
+
     const ctx: WmsRequestContext = {
-      orgCode: headerOrg,
+      orgCode,
       organizationName: org.name,
       tenantUri: uri,
       email,
@@ -72,9 +99,10 @@ export class WmsSessionGuard implements CanActivate {
       isWmsAdmin,
       allowedWarehouseIds: isWmsAdmin ? 'all' : grants.warehouseIds,
       allowedOwnerIds: isWmsAdmin ? 'all' : grants.ownerIds,
-      wmsEnabled,
+      wmsEnabled: true,
       maxWmsWarehouses: org.maxWmsWarehouses ?? 10,
       maxStockOwners: org.maxStockOwners ?? 50,
+      operatorPermissions,
     };
 
     req.wmsContext = ctx;
@@ -110,11 +138,15 @@ export class WmsSessionGuard implements CanActivate {
   private async loadGrants(
     uri: string,
     email: string,
-  ): Promise<{ warehouseIds: string[]; ownerIds: string[] }> {
+  ): Promise<{
+    warehouseIds: string[];
+    ownerIds: string[];
+    raw: Record<string, unknown> | null;
+  }> {
     const conn = await this.tenant.getConnection(uri);
     const db = conn.db;
     if (!db) {
-      return { warehouseIds: [], ownerIds: [] };
+      return { warehouseIds: [], ownerIds: [], raw: null };
     }
     const doc = await db.collection(WMS_COLLECTIONS.operatorGrants).findOne({ email });
     const warehouseIds = Array.isArray(doc?.warehouseIds)
@@ -123,6 +155,23 @@ export class WmsSessionGuard implements CanActivate {
     const ownerIds = Array.isArray(doc?.ownerIds)
       ? doc.ownerIds.map(String)
       : [];
-    return { warehouseIds, ownerIds };
+    return {
+      warehouseIds,
+      ownerIds,
+      raw: doc as Record<string, unknown> | null,
+    };
+  }
+
+  private mapPermissions(doc: Record<string, unknown> | null): WmsOperatorGrants {
+    const base = defaultOperatorGrants();
+    if (!doc) return base;
+    const p = doc.permissions as Record<string, unknown> | undefined;
+    if (!p) return base;
+    return {
+      receiving: p.receiving === true,
+      qc: p.qc === true,
+      putaway: p.putaway === true,
+      supervise: p.supervise === true,
+    };
   }
 }

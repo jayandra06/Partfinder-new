@@ -403,7 +403,7 @@ public partial class ShellViewModel : ViewModelBase, IShellNavCoordinator
             NavigationItems.Add(
                 new NavItemViewModel
                 {
-                    Label = "WMS Setup",
+                    Label = "Warehouse Workbook",
                     IconGlyph = "\uE7B8",
                     Page = AppPage.WmsWorkbook,
                     IsEnabled = true,

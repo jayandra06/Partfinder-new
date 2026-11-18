@@ -16,6 +16,7 @@ import { resolveInviteDownloadLink } from '../common/invite-download-link.util';
 import { computeValidity } from './org.constants';
 import { PlatformSettingsService } from '../platform/platform-settings.service';
 import { Organization, OrganizationDocument } from './schemas/organization.schema';
+import { isWmsProductEntitled } from './wms-entitlement.util';
 
 @Injectable()
 export class OrganizationsService {
@@ -54,6 +55,11 @@ export class OrganizationsService {
         orgDatabaseUri: row.orgDatabaseUri != null ? String(row.orgDatabaseUri) : null,
         maxUsers: typeof row.maxUsers === 'number' ? row.maxUsers : 50,
         maxParts: typeof row.maxParts === 'number' ? row.maxParts : 100000,
+        wmsEnabled: row.wmsEnabled === true,
+        maxWmsWarehouses:
+          typeof row.maxWmsWarehouses === 'number' ? row.maxWmsWarehouses : 10,
+        maxStockOwners:
+          typeof row.maxStockOwners === 'number' ? row.maxStockOwners : 50,
         createdAt: row.createdAt as Date,
       };
     });
@@ -159,7 +165,7 @@ export class OrganizationsService {
       validUntil: validity.toISOString(),
       maxUsers: org.maxUsers ?? 50,
       maxParts: org.maxParts ?? 100000,
-      wmsEnabled: org.wmsEnabled !== false,
+      wmsEnabled: isWmsProductEntitled(org),
       maxWmsWarehouses: org.maxWmsWarehouses ?? 10,
       maxStockOwners: org.maxStockOwners ?? 50,
     };
@@ -273,6 +279,9 @@ export class OrganizationsService {
     if (dto.plan !== undefined) {
       org.plan = dto.plan;
       org.validity = computeValidity(dto.plan);
+    }
+    if (dto.wmsEnabled !== undefined) {
+      org.wmsEnabled = dto.wmsEnabled;
     }
     await org.save();
     return this.findAll();

@@ -1,5 +1,5 @@
-import * as dns from 'node:dns';
 import mongoose, { type Connection } from 'mongoose';
+import { configureAtlasFriendlyDns } from './test-utils/mongodb-atlas-dns';
 
 export function isLikelySrvDnsFailure(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
@@ -20,7 +20,7 @@ function runSerializedDnsOp<T>(fn: () => Promise<T>): Promise<T> {
 
 /**
  * Opens a Mongoose connection. For `mongodb+srv://`, if the first attempt fails with a
- * typical SRV/DNS error, retries once while temporarily using Cloudflare + Google DNS.
+ * typical SRV/DNS error, retries once with Google DNS (8.8.8.8) left in place.
  */
 export async function createMongooseConnectionWithSrvDnsRetry(
   uri: string,
@@ -35,8 +35,7 @@ export async function createMongooseConnectionWithSrvDnsRetry(
       throw e1;
     }
     return runSerializedDnsOp(async () => {
-      const previous = dns.getServers();
-      dns.setServers(['1.1.1.1', '8.8.8.8']);
+      configureAtlasFriendlyDns();
       let conn2: Connection | undefined;
       try {
         conn2 = mongoose.createConnection(uri);
@@ -45,8 +44,6 @@ export async function createMongooseConnectionWithSrvDnsRetry(
       } catch (e2) {
         await conn2?.close().catch(() => undefined);
         throw e2;
-      } finally {
-        dns.setServers(previous);
       }
     });
   }

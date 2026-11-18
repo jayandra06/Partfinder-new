@@ -21,6 +21,10 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "seed:admin": "ts-node -r tsconfig-paths/register src/seed/seed-admin.ts",
     "seed:demo-org": "ts-node -r tsconfig-paths/register src/seed/seed-demo-org.ts",
+    "wms:staging-preflight": "ts-node -r tsconfig-paths/register scripts/wms-record-staging-preflight.ts",
+    "wms:staging-acceptance": "ts-node -r tsconfig-paths/register scripts/staging-03a2-acceptance-execute.ts",
+    "wms:03a2-staging-acceptance": "node scripts/run-03a2-staging-acceptance.mjs",
+    "wms:mongodb-dns-preflight": "node scripts/mongodb-dns-preflight.mjs",
     "config:diagnostics": "ts-node -r tsconfig-paths/register scripts/print-env-diagnostics.ts"
   },
   "dependencies": {
@@ -48,7 +52,8 @@
     "razorpay": "^2.9.6",
     "redis": "^5.12.1",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "ulid": "^3.0.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
@@ -69,6 +74,7 @@
     "eslint-plugin-prettier": "^5.2.2",
     "globals": "^17.0.0",
     "jest": "^30.0.0",
+    "mongodb-memory-server": "^10.4.3",
     "prettier": "^3.4.2",
     "source-map-support": "^0.5.21",
     "supertest": "^7.0.0",
@@ -88,7 +94,12 @@
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
+      "^.+\\.(t|j)s$": [
+        "ts-jest",
+        {
+          "tsconfig": "tsconfig.spec.json"
+        }
+      ]
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s"

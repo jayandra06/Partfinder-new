@@ -16,8 +16,12 @@ import { CreateWmsStockOwnerDto, UpdateWmsStockOwnerDto } from './dto/wms-stock-
 import { CreateWmsZoneDto, UpdateWmsZoneDto } from './dto/wms-zone.dto';
 import { CreateWmsLocationDto, UpdateWmsLocationDto } from './dto/wms-location.dto';
 import { WmsSetupService } from './services/wms-setup.service';
+import { UpsertOperatorGrantDto } from './dto/wms-operator-grant.dto';
+import { WmsOperatorGrantsService } from './services/wms-operator-grants.service';
 import { WmsDiagnosticsService } from './services/wms-diagnostics.service';
 import type { WmsRequestContext } from './wms.types';
+import { isWmsLiveStockPostingEnabled } from './wms-live-stock.util';
+import { isWmsStagingStockPostingEnabled } from './wms-staging-stock.util';
 
 @Controller('wms/v1')
 @UseGuards(AuthGuard('jwt'), WmsSessionGuard)
@@ -25,15 +29,58 @@ export class WmsSetupController {
   constructor(
     private readonly setup: WmsSetupService,
     private readonly diagnostics: WmsDiagnosticsService,
+    private readonly operatorGrants: WmsOperatorGrantsService,
   ) {}
+
+  @Get('session/profile')
+  sessionProfile(@WmsCtx() ctx: WmsRequestContext) {
+    return {
+      data: {
+        email: ctx.email,
+        role: ctx.role,
+        isWmsAdmin: ctx.isWmsAdmin,
+        operatorPermissions: ctx.operatorPermissions,
+        allowedWarehouseIds: ctx.allowedWarehouseIds,
+        allowedOwnerIds: ctx.allowedOwnerIds,
+      },
+      success: true,
+    };
+  }
+
+  @Get('operator-grants')
+  async listOperatorGrants(@WmsCtx() ctx: WmsRequestContext) {
+    const data = await this.operatorGrants.list(ctx);
+    return { data, success: true };
+  }
+
+  @Post('operator-grants')
+  async upsertOperatorGrant(
+    @WmsCtx() ctx: WmsRequestContext,
+    @Body() dto: UpsertOperatorGrantDto,
+  ) {
+    const data = await this.operatorGrants.upsert(ctx, dto);
+    return { data, success: true };
+  }
+
+  @Post('operator-grants/:email/remove')
+  async removeOperatorGrant(
+    @WmsCtx() ctx: WmsRequestContext,
+    @Param('email') email: string,
+  ) {
+    const data = await this.operatorGrants.remove(ctx, email);
+    return { data, success: true };
+  }
 
   @Get('health')
   health(@WmsCtx() ctx: WmsRequestContext) {
     return {
       ok: true,
       orgCode: ctx.orgCode,
-      phase: '02A',
-      stockMutations: false,
+      phase: '02B.1',
+      stockMutations:
+        isWmsStagingStockPostingEnabled() || isWmsLiveStockPostingEnabled(),
+      stagingStockPosting: isWmsStagingStockPostingEnabled(),
+      liveStockPosting: isWmsLiveStockPostingEnabled(),
     };
   }
 

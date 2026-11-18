@@ -13,6 +13,12 @@ import {
   readRazorpayKeys,
 } from '../src/license-purchase/license-purchase.config';
 import { ConfigService } from '@nestjs/config';
+import { getWmsDeploymentTier } from '../src/wms/wms-deployment-tier.util';
+import {
+  isWmsStagingStockPostingEnabled,
+  isWmsStockPostingAllowed,
+} from '../src/wms/wms-staging-stock.util';
+import { isWmsLiveStockPostingEnabled } from '../src/wms/wms-live-stock.util';
 
 const envFiles = backendEnvFilePaths();
 for (const file of envFiles) {
@@ -37,3 +43,16 @@ const message = razorpayConfigurationMessage(config);
 if (message) {
   console.log('  note:', message);
 }
+
+console.log('  WMS_DEPLOYMENT_TIER:', getWmsDeploymentTier());
+console.log(
+  '  WMS_STAGING_STOCK_POSTING (raw):',
+  process.env.WMS_STAGING_STOCK_POSTING === 'true' ? 'true' : 'false/unset',
+);
+console.log(
+  '  WMS_LIVE_STOCK_POSTING (raw):',
+  process.env.WMS_LIVE_STOCK_POSTING === 'true' ? 'true' : 'false/unset',
+);
+console.log('  wmsStagingPostingEffective:', isWmsStagingStockPostingEnabled());
+console.log('  wmsLivePostingEffective:', isWmsLiveStockPostingEnabled());
+console.log('  wmsStockPostingAllowed:', isWmsStockPostingAllowed());

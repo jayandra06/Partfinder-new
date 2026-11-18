@@ -45,8 +45,8 @@ export class Organization {
   @Prop({ default: 100000 })
   maxParts: number;
 
-  /** Warehouse Management Workbook feature (Phase 02A+). */
-  @Prop({ default: true })
+  /** Warehouse Management product (sold separately) — must be explicitly true. */
+  @Prop({ default: false })
   wmsEnabled: boolean;
 
   @Prop({ default: 10 })

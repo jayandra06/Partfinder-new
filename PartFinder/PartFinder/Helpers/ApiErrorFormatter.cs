@@ -48,6 +48,13 @@ internal static class ApiErrorFormatter
             return "Session expired. Sign out and sign in again.";
         }
 
+        if (trimmed.Contains("wmsEnabled", StringComparison.OrdinalIgnoreCase) ||
+            (trimmed.Contains("WMS", StringComparison.OrdinalIgnoreCase) &&
+             trimmed.Contains("Forbidden", StringComparison.OrdinalIgnoreCase)))
+        {
+            return "Warehouse Management is not enabled for this organisation or your role cannot access it.";
+        }
+
         if (trimmed.Contains("/api/wms/", StringComparison.OrdinalIgnoreCase) &&
             (trimmed.Contains("Cannot GET", StringComparison.OrdinalIgnoreCase) ||
              trimmed.Contains("Cannot POST", StringComparison.OrdinalIgnoreCase) ||

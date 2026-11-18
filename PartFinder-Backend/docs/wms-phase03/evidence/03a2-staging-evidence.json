@@ -1,0 +1,30 @@
+{
+  "phase": "03A.2",
+  "executedAt": "2026-11-18T11:13:56.066Z",
+  "orgCode": "900152",
+  "tenantDatabase": "wms_staging_acceptance_900152",
+  "winuiManual": "NOT_EXECUTED",
+  "preflight": {
+    "orgCode": "900152",
+    "tenantDatabase": "wms_staging_acceptance_900152",
+    "replicaSetName": "atlas-52zzyo-shard-0",
+    "supported": true,
+    "commitProbe": true,
+    "rollbackProbe": true,
+    "deploymentTier": "staging",
+    "stagingStockPosting": true,
+    "liveStockPosting": false,
+    "postingGateOpen": true
+  },
+  "scenario": {
+    "idempotencyKey": "03a2-staging-900152-1795000461841",
+    "duplicateSecondPost": true,
+    "onHandWarehouseTotal": 60,
+    "onHandReceiving": 5,
+    "onHandStorage": 55,
+    "blockedAtReceiving": 5,
+    "qtyExpectedRemaining": 40,
+    "expectedStatus": "partially_received",
+    "crossOwner403": true
+  }
+}

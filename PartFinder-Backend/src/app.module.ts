@@ -7,6 +7,7 @@ import { backendEnvFilePaths } from './config/backend-env';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { assertMongoUri, normalizeMongoUri } from './mongo-uri';
+import { configureAtlasFriendlyDns } from './test-utils/mongodb-atlas-dns';
 import { DbClustersModule } from './db-clusters/db-clusters.module';
 import { DebugModule } from './debug/debug.module';
 import { ImportModule } from './import/import.module';
@@ -37,6 +38,9 @@ import { WmsModule } from './wms/wms.module';
       useFactory: (config: ConfigService) => {
         const uri = normalizeMongoUri(config.get<string>('MONGODB_URI'));
         assertMongoUri(uri);
+        if (uri.startsWith('mongodb+srv://')) {
+          configureAtlasFriendlyDns();
+        }
         return { uri };
       },
       inject: [ConfigService],

@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
 import { ORG_PLANS, ORG_STATUSES, ORG_TYPES } from '../org.constants';
 
 export class UpdateOrganizationDto {
@@ -18,4 +18,9 @@ export class UpdateOrganizationDto {
   @IsOptional()
   @IsIn([...ORG_STATUSES])
   status?: string;
+
+  /** Explicit opt-in for Warehouse Management product (WMS API). */
+  @IsOptional()
+  @IsBoolean()
+  wmsEnabled?: boolean;
 }

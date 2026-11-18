@@ -1,0 +1,57 @@
+{
+  "classification": "STAGING_LAB_MongoMemoryReplSet",
+  "notNamedHostedStaging": true,
+  "winUiExecuted": false,
+  "executedAt": "2026-11-18T10:08:35.842Z",
+  "productionPostingEnabled": false,
+  "deploymentTier": "staging",
+  "preflight": {
+    "orgCode": "900200",
+    "tenantDatabase": "wms_staging_lab_03a2",
+    "replicaSetName": "testset",
+    "commitProbe": true,
+    "rollbackProbe": true,
+    "supported": true,
+    "deploymentTier": "staging",
+    "stagingStockPosting": true,
+    "liveStockPosting": false,
+    "postingGateOpen": true
+  },
+  "scenario": {
+    "qtyExpected": 100,
+    "qtyReceived": 60,
+    "qtyAccepted": 55,
+    "qtyRejected": 5,
+    "expectedRemaining": 40,
+    "expectedStatus": "partially_received"
+  },
+  "reconciliation": {
+    "warehouseOnHand": 60,
+    "blockedAtReceiving": 5,
+    "availableAtStorage": 55,
+    "atpFromService": {
+      "ownerId": "6afd7921e4c4723c32aeca99",
+      "warehouseId": "6afd7921e4c4723c32aeca98",
+      "skuId": "01HWMSSTAGINGFILTER",
+      "onHand": 60,
+      "reserved": 0,
+      "blockedQty": 5,
+      "available": 55
+    }
+  },
+  "idempotency": {
+    "key": "03a2-lab-idem-filter-100",
+    "firstDuplicate": false,
+    "secondDuplicate": true
+  },
+  "authorization": {
+    "operatorBCrossOwnerA": "403"
+  },
+  "ledgerTransactionTypes": [
+    "move",
+    "qcBlock",
+    "qcRelease",
+    "receive"
+  ],
+  "productionTierStagingFlagIgnored": true
+}

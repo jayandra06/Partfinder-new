@@ -110,7 +110,7 @@ export class DbClustersService {
       let message = `Could not connect: ${msg}`;
       if (/querySrv|ECONNREFUSED|ENOTFOUND/i.test(msg)) {
         message +=
-          ' SRV DNS failed (default resolver and 1.1.1.1/8.8.8.8). Use Atlas "Drivers" -> standard connection string (mongodb://host:27017,...), or fix VPN/DNS/firewall.';
+          ' SRV DNS failed (default resolver and 8.8.8.8). Use Atlas "Drivers" -> standard connection string (mongodb://host:27017,...), or fix VPN/DNS/firewall.';
       }
       return { ok: false, message };
     } finally {

@@ -59,15 +59,10 @@
 | `name` | string | |
 | `notificationEmails` | string[] | Procurement alerts |
 
-### `wms_skus` (optional link layer)
+### `wms_skus` + `wms_sku_identifiers` (approved direction for 02B)
 
-| Field | Type | Notes |
-|-------|------|-------|
-| `partId` / `masterDataRowId` | string | Link to existing catalogue |
-| `ownerId` | ObjectId | Stock ownership |
-| `barcode` | string | |
-
-*Alternative:* Derive SKU from master data + owner without duplicate table — **PO decision**.
+Immutable **`skuId`** (ULID) registry + identifier cross-refs — **not** master data `_id` as stock key.  
+**See:** `docs/wms-phase02/02B-database-proposal.md`, `02B-sku-key-mapping.md`.
 
 ---
 
