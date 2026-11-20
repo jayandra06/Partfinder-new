@@ -1,0 +1,115 @@
+      );
+      evidence.preflight = {
+        orgCode: preflightDoc.orgCode,
+        tenantDatabase: preflightDoc.tenantDatabase,
+        replicaSetName: preflightDoc.replicaSetName,
+        supported: preflightDoc.supported,
+        commitProbe: preflightDoc.commitProbe,
+        rollbackProbe: preflightDoc.rollbackProbe,
+        deploymentTier: (preflightDoc as { deploymentTier?: string }).deploymentTier,
+        stagingStockPosting: preflightDoc.stagingStockPosting,
+        liveStockPosting: preflightDoc.liveStockPosting,
+        postingGateOpen: preflightDoc.postingGateOpen,
+      };
+      expect(preflightDoc.supported).toBe(true);
+      expect(preflightDoc.commitProbe).toBe(true);
+      expect(preflightDoc.rollbackProbe).toBe(true);
+
+      const expected = await receiving.createExpectedReceipt(operatorACtx(), {
+        ownerId: ownerA,
+        warehouseId: whId,
+        externalPoId: `PO-100-FILTERS-${runSuffix}`,
+      });
+      await receiving.addExpectedLines(operatorACtx(), expected.expectedReceiptId, {
+        lines: [{ skuId, qtyExpected: 100, primaryUom: 'EA' }],
+      });
+
+      const idem = `03a2-staging-${ORG_CODE}-${runSuffix}`;
+      const first = await receiving.confirmGoodsReceipt(operatorACtx(), {
+        idempotencyKey: idem,
+        ownerId: ownerA,
+        warehouseId: whId,
+        receivingLocationId: recvLoc,
+        expectedReceiptId: expected.expectedReceiptId,
+        lines: [{ skuId, qtyReceived: 60 }],
+      });
+      expect(first.duplicate).toBe(false);
+
+      const dup = await receiving.confirmGoodsReceipt(operatorACtx(), {
+        idempotencyKey: idem,
+        ownerId: ownerA,
+        warehouseId: whId,
+        receivingLocationId: recvLoc,
+        expectedReceiptId: expected.expectedReceiptId,
+        lines: [{ skuId, qtyReceived: 60 }],
+      });
+      expect(dup.duplicate).toBe(true);
+
+      const lines = await receiving.listReceiptLines(operatorACtx(), first.goodsReceiptId);
+      const lineId = String((lines.items[0] as { receiptLineId: string }).receiptLineId);
+      await receiving.applyQc(operatorACtx(), lineId, {
+        status: 'partial',
+        qtyAccepted: 55,
+        qtyRejected: 5,
+        note: `03A.2 acceptance run ${runSuffix}`,
+      });
+
+      const putaways = await receiving.listPutaway(operatorACtx(), whId);
+      const taskId = String((putaways.items[0] as { putawayTaskId: string }).putawayTaskId);
+      await receiving.completePutaway(operatorACtx(), taskId, {
+        idempotencyKey: `put-${idem}`,
+        toLocationId: storeLoc,
+      });
+
+      const balColl = await collections.stockBalances(tenantUri);
+      const recvBal = await balColl.findOne({ skuKey: skuId, locationId: recvLoc });
+      const storeBal = await balColl.findOne({ skuKey: skuId, locationId: storeLoc });
+      const onHandRecv = Number(recvBal?.onHand ?? 0);
+      const blockedRecv = Number(recvBal?.blockedQty ?? 0);
+      const onHandStore = Number(storeBal?.onHand ?? 0);
+
+      const expectedDoc = await (await collections.expectedReceipts(tenantUri)).findOne({
+        expectedReceiptId: expected.expectedReceiptId,
+      });
+      const row = (expectedDoc?.lines as Array<Record<string, unknown>> | undefined)?.[0];
+
+      let crossOwnerBlocked = false;
+      try {
+        await receiving.createExpectedReceipt(operatorBCtx(), {
+          ownerId: ownerA,
+          warehouseId: whId,
+        });
+      } catch (error) {
+        crossOwnerBlocked = error instanceof ForbiddenException;
+      }
+      expect(crossOwnerBlocked).toBe(true);
+
+      evidence.scenario = {
+        idempotencyKey: idem,
+        duplicateSecondPost: dup.duplicate,
+        onHandWarehouseTotal: onHandRecv + onHandStore,
+        onHandReceiving: onHandRecv,
+        onHandStorage: onHandStore,
+        blockedAtReceiving: blockedRecv,
+        qtyExpectedRemaining: 100 - Number(row?.qtyReceivedTotal ?? 0),
+        expectedStatus: expectedDoc?.status,
+        crossOwner403: crossOwnerBlocked,
+      };
+
+      expect(onHandRecv + onHandStore).toBe(60);
+      expect(blockedRecv).toBe(5);
+      expect(onHandStore).toBe(55);
+      expect(Number(row?.qtyReceivedTotal)).toBe(60);
+      expect(String(expectedDoc?.status)).toBe('partially_received');
+      expect(100 - Number(row?.qtyReceivedTotal ?? 0)).toBe(40);
+
+      const outDir = join(__dirname, '..', '..', '..', 'docs', 'wms-phase03', 'evidence');
+      mkdirSync(outDir, { recursive: true });
+      writeFileSync(
+        join(outDir, '03a2-staging-evidence.json'),
+        JSON.stringify(evidence, null, 2),
+        'utf8',
+      );
+    }, 300_000);
+  },
+);

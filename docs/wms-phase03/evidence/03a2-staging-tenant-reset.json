@@ -1,0 +1,44 @@
+{
+  "executedAt": "2026-11-20T11:02:30.028Z",
+  "mode": "execute",
+  "orgCode": "900152",
+  "tenantDatabase": "wms_staging_acceptance_900152",
+  "collectionsToClear": {
+    "wms_locations": 13,
+    "wms_operator_grants": 4,
+    "wms_warehouses": 5,
+    "wms_uom_template_mappings": 0,
+    "wms_uom_definitions": 0,
+    "wms_staging_gate_evidence": 12,
+    "wms_qc_inspections": 9,
+    "wms_putaway_tasks": 5,
+    "wms_inbound_messages": 0,
+    "wms_outbox_events": 26,
+    "wms_receiving_audit_log": 38,
+    "wms_receipt_lines": 9,
+    "wms_goods_receipts": 5,
+    "wms_idempotency_keys": 19,
+    "wms_sku_identifiers": 0,
+    "wms_zones": 0,
+    "wms_skus": 4,
+    "wms_stock_transactions": 35,
+    "wms_erp_sku_mappings": 0,
+    "wms_expected_receipts": 8,
+    "wms_erp_location_mappings": 0,
+    "wms_erp_connectors": 0,
+    "wms_sku_audit_log": 2,
+    "wms_stock_owners": 5,
+    "wms_stock_balances": 9,
+    "wms_transaction_preflight_probe": 0
+  },
+  "preservedUsers": {
+    "adminUsers": 1,
+    "appUsers": 2
+  },
+  "preservedCollections": [
+    "org_admin_users",
+    "org_app_users",
+    "_partfinder_setup"
+  ],
+  "deleted": true
+}

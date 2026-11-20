@@ -114,6 +114,25 @@ internal static class MongoConnectionStringUtil
     /// <summary>
     /// Normalizes TLS settings and guarantees the tenant database is present in the URI.
     /// </summary>
+    public static bool TryPrepare(string? connectionString, string? orgCode, out string prepared)
+    {
+        prepared = connectionString?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(prepared))
+        {
+            return true;
+        }
+
+        try
+        {
+            prepared = Prepare(connectionString, orgCode);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
     public static string Prepare(string? connectionString, string? orgCode = null)
     {
         var normalized = Normalize(connectionString);

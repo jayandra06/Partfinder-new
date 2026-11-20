@@ -1149,14 +1149,7 @@ public sealed partial class MainWindow : Window
     {
         var st = LoadSetupState();
         st.orgCode = code;
-        try
-        {
-            st.dbUri = MongoConnectionStringUtil.Prepare(uri, code);
-        }
-        catch (ArgumentException)
-        {
-            st.dbUri = uri;
-        }
+        st.dbUri = MongoConnectionStringUtil.TryPrepare(uri, code, out var prepared) ? prepared : uri;
 
         SaveSetupState(st);
     }
@@ -1168,16 +1161,10 @@ public sealed partial class MainWindow : Window
         st.completed = true;
         st.orgCode = _workingOrgCode;
         var storedUri = _cachedOrgDatabaseUri;
-        if (!string.IsNullOrWhiteSpace(storedUri))
+        if (!string.IsNullOrWhiteSpace(storedUri) &&
+            MongoConnectionStringUtil.TryPrepare(storedUri, _workingOrgCode, out var preparedUri))
         {
-            try
-            {
-                storedUri = MongoConnectionStringUtil.Prepare(storedUri, _workingOrgCode);
-            }
-            catch (ArgumentException)
-            {
-                // Keep the URI that was entered when it is not a Mongo connection string.
-            }
+            storedUri = preparedUri;
         }
 
         st.dbUri = storedUri;
@@ -1471,8 +1458,16 @@ public sealed partial class MainWindow : Window
 
                         if (!string.IsNullOrWhiteSpace(inviteLoginResponse?.AccessToken))
                         {
-                            var adminSession = App.Services.GetRequiredService<AdminSessionStore>();
-                            adminSession.Save(inviteLoginResponse.AccessToken, invitedEmail);
+                            try
+                            {
+                                var adminSession = App.Services.GetRequiredService<AdminSessionStore>();
+                                adminSession.Save(inviteLoginResponse.AccessToken, invitedEmail);
+                            }
+                            catch (ArgumentException ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine(
+                                    $"[Login] Admin session not saved: {ex.Message}");
+                            }
                         }
 
                         var savedLoginStore = App.Services.GetRequiredService<SavedLoginCredentialStore>();

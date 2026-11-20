@@ -188,10 +188,10 @@ public partial class WmsWorkbookViewModel : ViewModelBase
     private bool _receivingListSortAscending;
 
     [ObservableProperty]
-    private int _receivingColSku = 160;
+    private double _receivingColSku = 160;
 
     [ObservableProperty]
-    private int _receivingColQty = 88;
+    private double _receivingColQty = 88;
 
     [ObservableProperty]
     private int _receivingColStatus = 100;
@@ -598,7 +598,7 @@ public partial class WmsWorkbookViewModel : ViewModelBase
         var owners = await _wms.ListStockOwnersAsync(ct).ConfigureAwait(true);
         if (owners.Ok)
         {
-            foreach (var o in owners.Items)
+            foreach (var o in owners.Items.GroupBy(x => x.Id).Select(g => g.First()))
             {
                 StockOwners.Add(o);
             }
@@ -736,7 +736,7 @@ public partial class WmsWorkbookViewModel : ViewModelBase
         var locs = await _wms.ListLocationsAsync(SelectedWarehouse.Id, ct).ConfigureAwait(true);
         if (locs.Ok)
         {
-            foreach (var l in locs.Items)
+            foreach (var l in locs.Items.GroupBy(x => x.Id).Select(g => g.First()))
             {
                 Locations.Add(l);
             }

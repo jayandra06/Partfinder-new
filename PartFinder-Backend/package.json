@@ -26,6 +26,7 @@
     "wms:03a2-staging-acceptance": "node scripts/run-03a2-staging-acceptance.mjs",
     "wms:mongodb-dns-preflight": "node scripts/mongodb-dns-preflight.mjs",
     "wms:staging-hosted-identities": "node scripts/staging-hosted-identities.mjs",
+    "wms:staging-reset-tenant": "node scripts/staging-reset-tenant-data.mjs",
     "config:diagnostics": "ts-node -r tsconfig-paths/register scripts/print-env-diagnostics.ts"
   },
   "dependencies": {

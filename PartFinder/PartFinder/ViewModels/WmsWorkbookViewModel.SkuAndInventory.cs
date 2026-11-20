@@ -286,4 +286,7 @@ public sealed class WmsUnmappedRowDisplay
     public string PartName { get; init; } = string.Empty;
     public string PartId { get; init; } = string.Empty;
     public double Quantity { get; init; }
+
+    public string SummaryLine =>
+        $"{PartName} · {PartId} qty {Quantity.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
 }
