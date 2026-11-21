@@ -384,20 +384,87 @@ function AdminPortalPage() {
   )
 }
 
+type PlatformPublicSummary = {
+  totalOrganizations: number
+  activeOrganizations: number
+  platformAdminCount: number
+  organizationsCreatedToday: number
+}
+
+function formatKpi(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) {
+    return '—'
+  }
+  return value.toLocaleString()
+}
+
 function DashboardSection() {
+  const [summary, setSummary] = useState<PlatformPublicSummary | null>(null)
+  const [loadError, setLoadError] = useState('')
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoadError('')
+      setLoading(true)
+      try {
+        const response = await fetch(`${apiBase}/api/public/platform/summary`)
+        const body: unknown = await response.json().catch(() => null)
+        if (!response.ok) {
+          if (!cancelled) {
+            setLoadError(parseApiErrorMessage(body))
+          }
+          return
+        }
+        const data = (body as { data?: PlatformPublicSummary }).data
+        if (!cancelled && data) {
+          setSummary(data)
+        }
+      } catch {
+        if (!cancelled) {
+          setLoadError('Live metrics unavailable. Is the API running?')
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    }
+    void load()
+    const id = window.setInterval(() => void load(), 60_000)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
+  }, [])
+
   return (
-    <section className="admin-kpi-grid">
+    <section className="admin-kpi-grid" aria-busy={loading} aria-live="polite">
+      {loadError ? <p className="form-error kpi-grid-error">{loadError}</p> : null}
       <article className="card">
-        <h3>Total Organisations</h3>
-        <p className="kpi-value">42</p>
+        <h3>Total organisations</h3>
+        <p className="kpi-value">
+          {loading && !summary ? '…' : formatKpi(summary?.totalOrganizations)}
+        </p>
       </article>
       <article className="card">
-        <h3>Active Users</h3>
-        <p className="kpi-value">1,268</p>
+        <h3>Active organisations</h3>
+        <p className="kpi-value">
+          {loading && !summary ? '…' : formatKpi(summary?.activeOrganizations)}
+        </p>
       </article>
       <article className="card">
-        <h3>New Sign-ins Today</h3>
-        <p className="kpi-value">87</p>
+        <h3>Platform admins</h3>
+        <p className="kpi-value">
+          {loading && !summary ? '…' : formatKpi(summary?.platformAdminCount)}
+        </p>
+      </article>
+      <article className="card">
+        <h3>New organisations today</h3>
+        <p className="kpi-value">
+          {loading && !summary ? '…' : formatKpi(summary?.organizationsCreatedToday)}
+        </p>
       </article>
     </section>
   )
