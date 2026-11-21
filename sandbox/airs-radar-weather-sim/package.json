@@ -1,0 +1,14 @@
+{
+  "name": "@partfinder/sandbox-airs-radar-weather-sim",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Isolated simulation — not linked to production API or UI",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}
