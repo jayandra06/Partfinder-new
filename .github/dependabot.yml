@@ -1,0 +1,12 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /Partfinder-Portfolio
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+  - package-ecosystem: npm
+    directory: /PartFinder-Backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

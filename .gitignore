@@ -19,6 +19,7 @@
 **/AppPackages/
 
 # Node / frontend
+analyzer-smoke-tests/jest.config.js
 **/node_modules/
 **/dist/
 **/dist-ssr/

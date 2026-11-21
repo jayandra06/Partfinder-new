@@ -1,0 +1,35 @@
+name: Bug report
+description: Something broken in desktop, API, or admin portal
+title: "[bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - PartFinder Windows app
+        - PartFinder-Backend (API)
+        - Partfinder-Portfolio (admin)
+        - Tooling / CI
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. …"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true

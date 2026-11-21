@@ -1,0 +1,25 @@
+name: Enhancement
+description: Small improvement (ideal size for one PR)
+title: "[enhancement]: "
+labels: ["enhancement", "good first issue"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What should improve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+    validations:
+      required: true
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Suggested PR size
+      options:
+        - Tiny (< 50 lines)
+        - Small (< 200 lines)
+        - Medium (needs design review)

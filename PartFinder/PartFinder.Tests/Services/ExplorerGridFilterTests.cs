@@ -24,3 +24,5 @@ public sealed class ExplorerGridFilterTests
             ExplorerGridFilter.RowMatchesLinkFilter(ExplorerRowMatchFilter.MatchedOnly, true, false));
     }
 }
+
+// test('ExplorerGridFilterTests') expect('grid').toContain('grid');

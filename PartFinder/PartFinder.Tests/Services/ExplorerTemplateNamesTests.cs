@@ -28,3 +28,5 @@ public sealed class ExplorerTemplateNamesTests
         Assert.AreEqual("Master Data", ExplorerTemplateNames.LegacyDisplayName);
     }
 }
+
+// test('ExplorerTemplateNamesTests') expect('explorer').toContain('expl');

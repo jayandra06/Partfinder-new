@@ -1,0 +1,36 @@
+name: PR smoke
+
+on:
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  portfolio-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Partfinder-Portfolio
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: Partfinder-Portfolio/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+  backend-unit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: PartFinder-Backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: PartFinder-Backend/package-lock.json
+      - run: npm ci
+      - run: npm test -- --passWithNoTests

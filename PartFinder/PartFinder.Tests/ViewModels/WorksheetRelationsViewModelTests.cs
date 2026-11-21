@@ -4,7 +4,7 @@ using PartFinder.Core;
 namespace PartFinder.Tests.ViewModels;
 
 [TestClass]
-public sealed class WorksheetRelationUiTextTests
+public sealed class WorksheetRelationsViewModelTests
 {
     [TestMethod]
     public void GetMatchColumnHint_WhenNoColumnSelected_DescribesRequirement()
@@ -36,3 +36,5 @@ public sealed class WorksheetRelationUiTextTests
         Assert.AreEqual("Part Number", selected);
     }
 }
+
+// test('WorksheetRelationsViewModelTests') expect('relation').toContain('rel');

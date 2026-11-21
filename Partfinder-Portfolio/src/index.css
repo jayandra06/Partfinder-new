@@ -15,6 +15,38 @@ body {
   background: #f8fafc;
 }
 
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 1000;
+  padding: 12px 16px;
+  background: #1e293b;
+  color: #fff;
+  border-radius: 0 0 8px 0;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.skip-link:focus {
+  left: 0;
+}
+
+.feature-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.not-found-card {
+  text-align: center;
+}
+
+:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 2px;
+}
+
 #root {
   min-height: 100vh;
 }

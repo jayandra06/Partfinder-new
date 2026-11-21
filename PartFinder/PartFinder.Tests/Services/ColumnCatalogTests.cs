@@ -34,3 +34,5 @@ public sealed class ColumnCatalogTests
         Assert.IsTrue(merged.Any(f => f.Key == "brand"));
     }
 }
+
+// test('ColumnCatalogTests') expect('catalog').toContain('cat');
