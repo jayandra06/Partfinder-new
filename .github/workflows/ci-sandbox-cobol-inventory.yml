@@ -1,0 +1,21 @@
+name: Sandbox — COBOL stub inventory
+
+on:
+  pull_request:
+    paths:
+      - 'sandbox/cobol-stubs/**'
+  push:
+    branches: [main]
+    paths:
+      - 'sandbox/cobol-stubs/**'
+  workflow_dispatch:
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: List COBOL stubs (no compile — archival only)
+        run: |
+          find sandbox/cobol-stubs -name '*.cbl' -type f | sort | tee cobol-inventory.txt
+          wc -l sandbox/cobol-stubs/*.cbl || true
