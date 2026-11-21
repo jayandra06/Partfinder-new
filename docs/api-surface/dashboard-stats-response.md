@@ -1,0 +1,5 @@
+# `dashboard-stats` — response
+
+Org dashboard stats
+
+_Documentation shard for incremental API catalog._
