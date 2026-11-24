@@ -23,6 +23,7 @@ using Windows.Storage;
 using Windows.Storage.Pickers;
 
 using System.Collections.Specialized;
+using System.Threading.Tasks;
 
 
 
@@ -35,6 +36,8 @@ public sealed partial class SettingsPage : Page
 {
 
     private readonly ActivityLogger _activity = App.Services.GetRequiredService<ActivityLogger>();
+
+    private bool _suppressAppLockToggleEvent;
 
 
 
@@ -106,25 +109,19 @@ public sealed partial class SettingsPage : Page
 
     private void OnNavProfileClick(object sender, RoutedEventArgs e) =>
 
-        ShowSection(profile: true, security: false, password: false, appLock: false, loginMgmt: false);
+        ShowSection(profile: true, security: false, password: false, loginMgmt: false);
 
 
 
     private void OnNavSecurityClick(object sender, RoutedEventArgs e) =>
 
-        ShowSection(profile: false, security: true, password: false, appLock: false, loginMgmt: false);
+        ShowSection(profile: false, security: true, password: false, loginMgmt: false);
 
 
 
     private void OnNavPasswordClick(object sender, RoutedEventArgs e) =>
 
-        ShowSection(profile: false, security: false, password: true, appLock: false, loginMgmt: false);
-
-
-
-    private void OnNavAppLockClick(object sender, RoutedEventArgs e) =>
-
-        ShowSection(profile: false, security: false, password: false, appLock: true, loginMgmt: false);
+        ShowSection(profile: false, security: false, password: true, loginMgmt: false);
 
 
 
@@ -132,7 +129,7 @@ public sealed partial class SettingsPage : Page
 
     {
 
-        ShowSection(profile: false, security: false, password: false, appLock: false, loginMgmt: true);
+        ShowSection(profile: false, security: false, password: false, loginMgmt: true);
 
         // Auto-load sessions when navigating to this section
 
@@ -486,7 +483,7 @@ public sealed partial class SettingsPage : Page
 
 
 
-    private void ShowSection(bool profile, bool security, bool password, bool appLock, bool loginMgmt)
+    private void ShowSection(bool profile, bool security, bool password, bool loginMgmt)
 
     {
 
@@ -497,8 +494,6 @@ public sealed partial class SettingsPage : Page
         SecuritySection.Visibility = security ? Visibility.Visible : Visibility.Collapsed;
 
         PasswordSection.Visibility = password ? Visibility.Visible : Visibility.Collapsed;
-
-        AppLockSection.Visibility = appLock ? Visibility.Visible : Visibility.Collapsed;
 
         LoginMgmtSection.Visibility = loginMgmt ? Visibility.Visible : Visibility.Collapsed;
 
@@ -513,8 +508,6 @@ public sealed partial class SettingsPage : Page
         SetNavSelected(NavTwoFactorItem, security);
 
         SetNavSelected(NavPasswordItem, password);
-
-        SetNavSelected(NavAppLockItem, appLock);
 
         SetNavSelected(NavLoginMgmtItem, loginMgmt);
 
@@ -842,6 +835,8 @@ public sealed partial class SettingsPage : Page
 
             vm.RefreshOrgInfo();
 
+            SyncProfileAppLockToggle(vm.AppLockEnabled);
+
         }
 
     }
@@ -872,7 +867,10 @@ public sealed partial class SettingsPage : Page
 
         if (DataContext is not SettingsViewModel vm) return;
 
-
+        if (e.PropertyName == nameof(SettingsViewModel.AppLockEnabled))
+        {
+            SyncProfileAppLockToggle(vm.AppLockEnabled);
+        }
 
         // Auto-fill password boxes when Generate button sets ChangeNewPassword
 
@@ -1104,82 +1102,82 @@ public sealed partial class SettingsPage : Page
 
 
 
-    private async void OnAppLockToggleClick(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
-
+    private void SyncProfileAppLockToggle(bool isOn)
     {
+        _suppressAppLockToggleEvent = true;
+        ProfileAppLockToggle.IsOn = isOn;
+        _suppressAppLockToggleEvent = false;
+    }
 
-        if (DataContext is not SettingsViewModel vm) return;
-
-
-
-        if (!vm.AppLockEnabled)
-
+    private async void OnProfileAppLockToggled(object sender, RoutedEventArgs e)
+    {
+        if (_suppressAppLockToggleEvent || sender is not ToggleSwitch toggle)
         {
+            return;
+        }
 
-            // Turning ON — verify Windows Hello is available first
+        var desired = toggle.IsOn;
+        var applied = await TryApplyAppLockChangeAsync(desired).ConfigureAwait(true);
+        if (!applied)
+        {
+            SyncProfileAppLockToggle(!desired);
+        }
+    }
+
+    private async void OnAppLockToggleClick(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        if (DataContext is not SettingsViewModel vm) return;
+        _ = await TryApplyAppLockChangeAsync(!vm.AppLockEnabled).ConfigureAwait(true);
+    }
+
+    private async Task<bool> TryApplyAppLockChangeAsync(bool enable)
+    {
+        if (DataContext is not SettingsViewModel vm) return false;
+
+        if (enable)
+        {
+            if (vm.AppLockEnabled)
+            {
+                return true;
+            }
 
             var available = await Windows.Security.Credentials.UI.UserConsentVerifier
-
                 .CheckAvailabilityAsync();
 
-
-
             if (available != Windows.Security.Credentials.UI.UserConsentVerifierAvailability.Available)
-
             {
-
                 var dlg = new ContentDialog
-
                 {
-
-                    Title = "Windows Hello Not Available",
-
-                    Content = "Your device does not support Windows Hello or it has not been set up. Go to Windows Settings → Accounts → Sign-in options to configure it.",
-
+                    Title = "Windows Hello not available",
+                    Content = "This device does not support Windows Hello or it is not configured. Open Windows Settings → Accounts → Sign-in options to set it up.",
                     CloseButtonText = "OK",
-
                     XamlRoot = XamlRoot,
-
                 };
-
                 await dlg.ShowAsync();
-
-                return;
-
+                return false;
             }
-
-
 
             vm.AppLockEnabled = true;
-
-            ShowToast("App Lock Enabled", "Windows Hello will be required on next launch.");
-
+            ShowToast("App lock enabled", "Windows Hello will be required on next launch.");
+            return true;
         }
 
-        else
-
+        if (!vm.AppLockEnabled)
         {
-
-            // Turning OFF — confirm with Windows Hello first
-
-            var result = await Windows.Security.Credentials.UI.UserConsentVerifier
-
-                .RequestVerificationAsync("Verify your identity to disable App Lock.");
-
-
-
-            if (result == Windows.Security.Credentials.UI.UserConsentVerificationResult.Verified)
-
-            {
-
-                vm.AppLockEnabled = false;
-
-                ShowToast("App Lock Disabled", "App will open without verification.");
-
-            }
-
+            return true;
         }
 
+        var result = await Windows.Security.Credentials.UI.UserConsentVerifier
+            .RequestVerificationAsync("Verify your identity to disable app lock.");
+
+        if (result != Windows.Security.Credentials.UI.UserConsentVerificationResult.Verified)
+        {
+            return false;
+        }
+
+        vm.AppLockEnabled = false;
+        ShowToast("App lock disabled", "The app will open without verification.");
+        return true;
     }
 
 

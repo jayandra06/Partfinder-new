@@ -24,9 +24,16 @@ analyzer-smoke-tests/jest.config.js
 **/dist/
 **/dist-ssr/
 
+# Repo analyzer (download via tools/install-scc.ps1)
+tools/scc/
+
 # Logs & OS
 *.log
 .DS_Store
 Thumbs.db
 
 PROJECT_OVERVIEW.md
+
+# Local analyzer copies (canonical export: docs/metrics/report.csv)
+/report.csv
+/report_detail.json

@@ -1,3 +1,5 @@
+using LiveChartsCore;
+using LiveChartsCore.SkiaSharpView;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using PartFinder.Services;
@@ -14,15 +16,52 @@ namespace PartFinder
 
         public App()
         {
+            // Required for WinUI: default Theme has no tooltip/legend until configured (otherwise Chart.Load throws).
+            LiveCharts.Configure(config =>
+                config.AddSkiaSharp().AddDefaultMappers().AddDefaultTheme());
+
             InitializeComponent();
             Services = ConfigureServices();
+
+            this.UnhandledException += (sender, e) =>
+            {
+                e.Handled = true;
+                try
+                {
+                    System.Diagnostics.Debug.WriteLine($"[PartFinder] XAML unhandled: {e.Exception}");
+                    DebugLogClient.Post("error", "XamlUnhandledException", e.Exception?.ToString() ?? e.Message);
+                    var logDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PartFinder", "Logs");
+                    Directory.CreateDirectory(logDir);
+                    File.AppendAllText(Path.Combine(logDir, "crash.log"), $"[{DateTime.UtcNow:O}] [XAML_UNHANDLED] {e.Exception?.ToString() ?? e.Message}\n");
+                }
+                catch { }
+            };
+
             AppDomain.CurrentDomain.UnhandledException += (_, e) =>
             {
-                DebugLogClient.Post(
-                    "error",
-                    "UnhandledException",
-                    e.ExceptionObject?.ToString());
+                try
+                {
+                    DebugLogClient.Post("error", "UnhandledException", e.ExceptionObject?.ToString());
+                    var logDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PartFinder", "Logs");
+                    Directory.CreateDirectory(logDir);
+                    File.AppendAllText(Path.Combine(logDir, "crash.log"), $"[{DateTime.UtcNow:O}] [APPDOMAIN_UNHANDLED] {e.ExceptionObject?.ToString()}\n");
+                }
+                catch { }
             };
+
+            TaskScheduler.UnobservedTaskException += (_, e) =>
+            {
+                e.SetObserved();
+                try
+                {
+                    DebugLogClient.Post("error", "UnobservedTaskException", e.Exception?.ToString());
+                    var logDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PartFinder", "Logs");
+                    Directory.CreateDirectory(logDir);
+                    File.AppendAllText(Path.Combine(logDir, "crash.log"), $"[{DateTime.UtcNow:O}] [UNOBSERVED_TASK] {e.Exception?.ToString()}\n");
+                }
+                catch { }
+            };
+
             DebugLogClient.Post("info", "PartFinder WinUI started", null);
         }
 
@@ -32,14 +71,22 @@ namespace PartFinder
 
             services.AddSingleton<INavigationService, NavigationService>();
             services.AddSingleton<IAppStateStore, AppStateStore>();
+            services.AddSingleton<IThemeService, ThemeService>();
             services.AddSingleton<LocalUserSecurityStore>();
             services.AddSingleton<AdminSessionStore>();
-            services.AddSingleton<LocalProfileStore>();
+            services.AddSingleton<LoginCredentialStore>();
+            services.AddSingleton<SavedLoginCredentialStore>();
+            services.AddSingleton<QuickLoginService>();
             services.AddSingleton<ILocalSetupContext, LocalSetupContext>();
+            services.AddSingleton<LocalProfileStore>();
             services.AddSingleton<BackendApiClient>();
+            services.AddSingleton<WmsApiClient>();
+            services.AddSingleton<WorksheetRelationCleanupService>();
             services.AddSingleton<IOrgUserDirectoryService, MongoOrgUserDirectoryService>();
             services.AddSingleton<ICurrentUserAccessService, CurrentUserAccessService>();
             services.AddSingleton<ITemplateSchemaService, MongoTemplateSchemaService>();
+            services.AddSingleton<BulkTemplateImportService>();
+            services.AddSingleton<BulkInventoryImportService>();
             services.AddSingleton<IMasterDataRecordsService, MongoMasterDataRecordsService>();
             services.AddSingleton<IContextActionsService, MongoContextActionsService>();
             services.AddSingleton<IPartsDataService, MongoPartsDataService>();
@@ -53,14 +100,18 @@ namespace PartFinder
             services.AddSingleton<MongoAlertsService>();
             services.AddSingleton<MongoSessionService>();
             services.AddSingleton<ActivityLogger>();
+            services.AddSingleton<CatalogBrowseSessionStore>();
+            services.AddSingleton<MasterDataCatalogCascadeService>();
 
             services.AddSingleton<ShellViewModel>();
             services.AddSingleton<IShellNavCoordinator>(sp => sp.GetRequiredService<ShellViewModel>());
-            services.AddTransient<DashboardViewModel>();
+            services.AddSingleton<DashboardViewModel>();
             services.AddTransient<PartsViewModel>();
             services.AddTransient<TemplatesViewModel>();
+            services.AddTransient<TemplateDataViewModel>();
             services.AddTransient<ViewDataViewModel>();
             services.AddTransient<WorksheetRelationsViewModel>();
+            services.AddTransient<LinkedTemplatesViewModel>();
             services.AddTransient<MasterDataViewModel>();
             services.AddTransient<SettingsViewModel>();
             services.AddTransient<UserManagementViewModel>();
@@ -68,17 +119,21 @@ namespace PartFinder
             services.AddTransient<AlertsViewModel>();
             services.AddTransient<AuditViewModel>();
             services.AddTransient<InventoryViewModel>();
+            services.AddTransient<WmsWorkbookViewModel>();
             services.AddTransient<FavouritesViewModel>();
 
             services.AddTransient<MasterDataPage>();
             services.AddTransient<DashboardPage>();
             services.AddTransient<PartsPage>();
             services.AddTransient<InventoryPage>();
+            services.AddTransient<WmsWorkbookPage>();
             services.AddTransient<AlertsPage>();
             services.AddTransient<AuditPage>();
             services.AddTransient<TemplatesPage>();
+            services.AddTransient<TemplateDataPage>();
             services.AddTransient<ViewDataPage>();
             services.AddTransient<WorksheetRelationsPage>();
+            services.AddTransient<LinkedTemplatesPage>();
             services.AddTransient<SettingsPage>();
             services.AddTransient<UserManagementPage>();
             services.AddTransient<QrCodeManagerPage>();

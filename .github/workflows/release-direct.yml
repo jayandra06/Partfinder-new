@@ -1,0 +1,78 @@
+# Creates a version bump commit, tag, and GitHub Release without opening a PR.
+# Use when Release Please cannot create PRs (org Actions policy).
+name: Release (direct)
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Semver bump"
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-direct
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Bump version files
+        shell: pwsh
+        run: |
+          if ('${{ inputs.bump }}' -eq 'patch') {
+            ./PartFinder/scripts/bump-store-msix-version.ps1 -BumpRevision
+          } else {
+            ./PartFinder/scripts/bump-version.ps1 -Bump ${{ inputs.bump }}
+          }
+
+      - name: Read new version
+        id: ver
+        shell: pwsh
+        run: |
+          $vj = Get-Content ./version.json -Raw | ConvertFrom-Json
+          if ($vj.msixVersion) {
+            "version=$($vj.msixVersion)" >> $env:GITHUB_OUTPUT
+            "tag=v$($vj.msixVersion)" >> $env:GITHUB_OUTPUT
+          } else {
+            $v = (Get-Content ./.github/.release-please-manifest.json -Raw | ConvertFrom-Json).'.'
+            "version=$v" >> $env:GITHUB_OUTPUT
+            "tag=v$v" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Commit version bump
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/.release-please-manifest.json version.json CHANGELOG.md PartFinder/PartFinder/Package.appxmanifest
+          git diff --staged --quiet && echo "No changes to commit" && exit 0
+          git commit -m "chore(release): ${{ steps.ver.outputs.version }}"
+
+      - name: Push commit and tag
+        shell: bash
+        run: |
+          git tag "${{ steps.ver.outputs.tag }}"
+          git push origin main
+          git push origin "${{ steps.ver.outputs.tag }}"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.ver.outputs.tag }}" \
+            --title "PartFinder ${{ steps.ver.outputs.version }}" \
+            --generate-notes

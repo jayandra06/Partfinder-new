@@ -25,10 +25,9 @@ public class MongoInventoryService
         if (!_setupContext.TryGetTenantMongoUri(out var raw) || string.IsNullOrWhiteSpace(raw))
             return null;
 
-        var cs = MongoConnectionStringUtil.Normalize(raw);
-        var url = new MongoUrl(cs);
+        var cs = MongoConnectionStringUtil.Prepare(raw, _setupContext.OrgCode);
         var client = new MongoClient(cs);
-        var db = client.GetDatabase(url.DatabaseName ?? "admin");
+        var db = MongoConnectionStringUtil.GetTenantDatabase(client, cs, _setupContext.OrgCode);
         return db.GetCollection<InventoryDoc>(CollectionName);
     }
 
@@ -69,6 +68,30 @@ public class MongoInventoryService
         return doc.MongoId.ToString();
     }
 
+    public async Task InsertManyAsync(IReadOnlyList<InventoryDoc> docs, CancellationToken ct = default)
+    {
+        if (docs.Count == 0)
+        {
+            return;
+        }
+
+        var coll = TryGetCollection()
+            ?? throw new InvalidOperationException("No tenant database configured.");
+
+        var now = DateTime.UtcNow;
+        foreach (var doc in docs)
+        {
+            if (doc.MongoId == ObjectId.Empty)
+            {
+                doc.MongoId = ObjectId.GenerateNewId();
+            }
+
+            doc.LastUpdated = now;
+        }
+
+        await coll.InsertManyAsync(docs, cancellationToken: ct).ConfigureAwait(false);
+    }
+
     public async Task DeleteAsync(string id, CancellationToken ct = default)
     {
         var coll = TryGetCollection();
@@ -81,6 +104,25 @@ public class MongoInventoryService
                 .ConfigureAwait(false);
         }
         catch { /* ignore if collection doesn't exist */ }
+    }
+
+    public async Task<long> DeleteAllAsync(CancellationToken ct = default)
+    {
+        var coll = TryGetCollection();
+        if (coll is null)
+        {
+            return 0;
+        }
+
+        try
+        {
+            var result = await coll.DeleteManyAsync(FilterDefinition<InventoryDoc>.Empty, ct).ConfigureAwait(false);
+            return result.DeletedCount;
+        }
+        catch
+        {
+            return 0;
+        }
     }
 }
 

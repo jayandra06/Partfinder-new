@@ -24,6 +24,8 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly MongoSessionService _sessionService;
     private readonly IOrgUserDirectoryService _users;
     private readonly ICurrentUserAccessService _access;
+    private readonly ITemplateSchemaService _templates;
+    private readonly CatalogBrowseSessionStore _catalogSession;
     private string? _pendingTwoFactorSecret;
 
     public SettingsViewModel(
@@ -35,7 +37,9 @@ public partial class SettingsViewModel : ViewModelBase
         ILocalSetupContext setupContext,
         MongoSessionService sessionService,
         IOrgUserDirectoryService users,
-        ICurrentUserAccessService access)
+        ICurrentUserAccessService access,
+        ITemplateSchemaService templates,
+        CatalogBrowseSessionStore catalogSession)
     {
         _security = security;
         _session = session;
@@ -46,6 +50,8 @@ public partial class SettingsViewModel : ViewModelBase
         _sessionService = sessionService;
         _users = users;
         _access = access;
+        _templates = templates;
+        _catalogSession = catalogSession;
         _setupContext.Refresh();
         RefreshAllState();
     }
@@ -132,10 +138,65 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     private bool _appLockEnabled;
 
+    private bool _syncingAppLockFromStore;
+
+    public string AppLockStatusDisplay =>
+        AppLockEnabled ? "Required when the app opens" : "Not enabled";
+
     partial void OnAppLockEnabledChanged(bool value)
     {
+        if (_syncingAppLockFromStore)
+        {
+            return;
+        }
+
         _security.SetAppLockEnabled(value);
         _activityLogger.LogUserAction("App Lock", value ? "Windows Hello lock enabled" : "Windows Hello lock disabled");
+        OnPropertyChanged(nameof(AppLockStatusDisplay));
+    }
+
+    private string _baselineProfileName = string.Empty;
+    private string _baselineProfileDepartment = string.Empty;
+    private string _baselineProfileDesignation = string.Empty;
+    private string _baselineProfileBio = string.Empty;
+
+    public bool HasProfileChanges =>
+        NormalizeProfileField(ProfileName) != _baselineProfileName
+        || NormalizeProfileField(ProfileDepartment) != _baselineProfileDepartment
+        || NormalizeProfileField(ProfileDesignation) != _baselineProfileDesignation
+        || NormalizeProfileField(ProfileBio) != _baselineProfileBio;
+
+    public bool CanSaveProfile => HasProfileChanges;
+
+    public bool CanUpdatePassword =>
+        !string.IsNullOrWhiteSpace(ChangeCurrentPassword)
+        && !string.IsNullOrWhiteSpace(ChangeNewPassword)
+        && string.Equals(ChangeNewPassword, ChangeConfirmPassword, StringComparison.Ordinal)
+        && IsStrongPassword(ChangeNewPassword);
+
+    private static string NormalizeProfileField(string? value) => value?.Trim() ?? string.Empty;
+
+    private void CaptureProfileBaseline()
+    {
+        _baselineProfileName = NormalizeProfileField(ProfileName);
+        _baselineProfileDepartment = NormalizeProfileField(ProfileDepartment);
+        _baselineProfileDesignation = NormalizeProfileField(ProfileDesignation);
+        _baselineProfileBio = NormalizeProfileField(ProfileBio);
+        NotifyProfileDirtyState();
+    }
+
+    private void NotifyProfileDirtyState()
+    {
+        OnPropertyChanged(nameof(HasProfileChanges));
+        OnPropertyChanged(nameof(CanSaveProfile));
+        SaveProfileCommand.NotifyCanExecuteChanged();
+        DiscardProfileChangesCommand.NotifyCanExecuteChanged();
+    }
+
+    private void NotifyPasswordFormState()
+    {
+        OnPropertyChanged(nameof(CanUpdatePassword));
+        ChangePasswordCommand.NotifyCanExecuteChanged();
     }
 
     [ObservableProperty]
@@ -184,6 +245,30 @@ public partial class SettingsViewModel : ViewModelBase
     private string _profileDepartment = string.Empty;
 
     [ObservableProperty]
+    private string _profileDesignation = string.Empty;
+
+    [ObservableProperty]
+    private string _profileBio = string.Empty;
+
+    [ObservableProperty]
+    private string _profileRoleDisplay = "—";
+
+    [ObservableProperty]
+    private string _profileStatusDisplay = "—";
+
+    [ObservableProperty]
+    private string _profilePartsAccessDisplay = "—";
+
+    [ObservableProperty]
+    private string _profileTemplatePermissionsDisplay = "—";
+
+    [ObservableProperty]
+    private string _profileMasterDataPermissionsDisplay = "—";
+
+    [ObservableProperty]
+    private string _profileMemberSinceDisplay = "Not available";
+
+    [ObservableProperty]
     private ImageSource? _avatarImageSource;
 
     /// <summary>Initials fallback when no avatar photo is set.</summary>
@@ -209,6 +294,10 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     private string _changePasswordMessage = string.Empty;
 
+    partial void OnChangeCurrentPasswordChanged(string value) => NotifyPasswordFormState();
+
+    partial void OnChangeConfirmPasswordChanged(string value) => NotifyPasswordFormState();
+
     partial void OnChangeNewPasswordChanged(string value)
     {
         OnPropertyChanged(nameof(PasswordStrengthScore));
@@ -218,6 +307,7 @@ public partial class SettingsViewModel : ViewModelBase
         OnPropertyChanged(nameof(PasswordStrengthBar2));
         OnPropertyChanged(nameof(PasswordStrengthBar3));
         OnPropertyChanged(nameof(PasswordStrengthBar4));
+        NotifyPasswordFormState();
     }
 
     public int PasswordStrengthScore => GetPasswordStrengthScore(ChangeNewPassword);
@@ -281,7 +371,14 @@ public partial class SettingsViewModel : ViewModelBase
     partial void OnProfileNameChanged(string value)
     {
         OnPropertyChanged(nameof(AvatarInitial));
+        NotifyProfileDirtyState();
     }
+
+    partial void OnProfileDepartmentChanged(string value) => NotifyProfileDirtyState();
+
+    partial void OnProfileDesignationChanged(string value) => NotifyProfileDirtyState();
+
+    partial void OnProfileBioChanged(string value) => NotifyProfileDirtyState();
 
     partial void OnAvatarImageSourceChanged(ImageSource? value)
     {
@@ -369,7 +466,10 @@ public partial class SettingsViewModel : ViewModelBase
         _session.Load();
         _profile.Load();
         PasscodeIsConfigured = _security.PasscodeIsSet;
+        _syncingAppLockFromStore = true;
         AppLockEnabled = _security.AppLockEnabled;
+        _syncingAppLockFromStore = false;
+        OnPropertyChanged(nameof(AppLockStatusDisplay));
         ShowAppLockEditor = false;
         TwoFactorEnabled = _security.TwoFactorEnabled;
         TwoFactorSetupVisible = false;
@@ -391,21 +491,25 @@ public partial class SettingsViewModel : ViewModelBase
         }
         SessionEmailDisplay = string.IsNullOrWhiteSpace(emailToShow) ? "—" : emailToShow;
 
-        // For invited users (not org creator), load profile name from database
-        var isOrgCreator = _access.Capabilities.CanAccessUserManagement;
-        if (!isOrgCreator && _setupContext.InvitedUserLogin && !string.IsNullOrWhiteSpace(emailToShow))
+        ProfileName = _profile.DisplayName ?? string.Empty;
+        ProfileDepartment = _profile.Department ?? string.Empty;
+        ProfileDesignation = _profile.Designation ?? string.Empty;
+        ProfileBio = _profile.Bio ?? string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(emailToShow) && emailToShow != "—")
         {
-            _ = LoadProfileFromDatabaseAsync(emailToShow);
+            _ = LoadProfileFromDirectoryAsync(emailToShow);
         }
         else
         {
-            ProfileName = _profile.DisplayName ?? string.Empty;
+            ApplyCapabilitiesOnlyProfile();
         }
 
-        ProfileDepartment = _profile.Department ?? string.Empty;
         _ = LoadAvatarAsync(_profile.AvatarPath);
+        CaptureProfileBaseline();
         OnPropertyChanged(nameof(IsStartTwoFactorEnabled));
         OnPropertyChanged(nameof(TwoFactorStatusText));
+        NotifyPasswordFormState();
     }
 
     [RelayCommand]
@@ -419,53 +523,250 @@ public partial class SettingsViewModel : ViewModelBase
         ChangePasswordMessage = string.Empty;
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanSaveProfile))]
     private void SaveProfile()
     {
         ProfileMessage = string.Empty;
 
-        // Only org creator can edit profile name
-        if (!_access.Capabilities.CanAccessUserManagement)
-        {
-            ProfileMessage = "Profile name is managed by your organization admin.";
-            return;
-        }
-
-        var trimmed = ProfileName.Trim();
-        if (trimmed.Length > 80)
+        var canEditName = _access.Capabilities.CanAccessUserManagement;
+        var trimmedName = ProfileName.Trim();
+        if (canEditName && trimmedName.Length > 80)
         {
             ProfileMessage = "Profile name must be 80 characters or fewer.";
             return;
         }
 
-        _profile.SaveProfile(trimmed, ProfileDepartment.Trim());
-        ProfileName = _profile.DisplayName ?? string.Empty;
+        var nameToSave = canEditName
+            ? trimmedName
+            : (_profile.DisplayName ?? trimmedName);
+
+        _profile.SaveProfile(
+            nameToSave,
+            ProfileDepartment.Trim(),
+            ProfileDesignation.Trim(),
+            ProfileBio.Trim());
+
+        if (canEditName)
+        {
+            ProfileName = _profile.DisplayName ?? string.Empty;
+        }
+
         ProfileDepartment = _profile.Department ?? string.Empty;
-        ProfileMessage = string.IsNullOrWhiteSpace(ProfileName)
-            ? "Profile name cleared. Email will be shown."
-            : "Profile name updated.";
-        _activityLogger.LogUserAction("Profile Updated", $"Display name set to \"{ProfileName}\"");
+        ProfileDesignation = _profile.Designation ?? string.Empty;
+        ProfileBio = _profile.Bio ?? string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(nameToSave))
+        {
+            var email = SessionEmailDisplay;
+            if (string.IsNullOrWhiteSpace(email) || email == "—")
+            {
+                _setupContext.Refresh();
+                email = _setupContext.AdminEmail?.Trim()
+                    ?? _session.Email?.Trim();
+            }
+
+            if (!string.IsNullOrWhiteSpace(email))
+            {
+                _ = SyncProfileDisplayNameToDirectoryAsync(email, nameToSave);
+            }
+        }
+
+        ProfileMessage = "Profile updated.";
+        _activityLogger.LogUserAction("Profile Updated", $"Profile saved for \"{SessionEmailDisplay}\"");
+        CaptureProfileBaseline();
     }
 
-    private async Task LoadProfileFromDatabaseAsync(string email)
+    private async Task SyncProfileDisplayNameToDirectoryAsync(string email, string displayName)
     {
         try
         {
-            var record = await _users.FindByEmailAsync(email).ConfigureAwait(true);
+            await _users.UpdateOrgAdminDisplayNameAsync(email, displayName).ConfigureAwait(false);
+        }
+        catch
+        {
+            // Local profile remains saved; Team Management overlays local name on load.
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanSaveProfile))]
+    private void DiscardProfileChanges()
+    {
+        ProfileMessage = string.Empty;
+        _profile.Load();
+
+        if (CanEditProfileName)
+        {
+            ProfileName = _profile.DisplayName ?? string.Empty;
+        }
+
+        ProfileDepartment = _profile.Department ?? string.Empty;
+        ProfileDesignation = _profile.Designation ?? string.Empty;
+        ProfileBio = _profile.Bio ?? string.Empty;
+        CaptureProfileBaseline();
+    }
+
+    private async Task LoadProfileFromDirectoryAsync(string email)
+    {
+        OrgAppUserSummary? record = null;
+        try
+        {
+            record = await _users.FindByEmailAsync(email).ConfigureAwait(true);
             if (record is not null)
             {
-                ProfileName = record.Name;
+                await ApplyOrgUserToProfileAsync(record).ConfigureAwait(true);
             }
             else
             {
-                ProfileName = _profile.DisplayName ?? string.Empty;
+                ApplyCapabilitiesOnlyProfile();
+                if (string.IsNullOrWhiteSpace(ProfileName))
+                {
+                    ProfileName = _profile.DisplayName ?? string.Empty;
+                }
             }
         }
         catch
         {
-            ProfileName = _profile.DisplayName ?? string.Empty;
+            ApplyCapabilitiesOnlyProfile();
         }
+
+        await ApplyMemberSinceDisplayAsync(email, record).ConfigureAwait(true);
         OnPropertyChanged(nameof(AvatarInitial));
+        CaptureProfileBaseline();
+    }
+
+    private async Task ApplyMemberSinceDisplayAsync(string email, OrgAppUserSummary? record)
+    {
+        if (record is not null && record.InvitedAtUtc != default)
+        {
+            ProfileMemberSinceDisplay = FormatMemberSinceDisplay(record.InvitedAtUtc);
+            return;
+        }
+
+        var adminSince = await _users.GetOrgAdminCreatedAtUtcAsync(email).ConfigureAwait(true);
+        if (adminSince is { } adminUtc && adminUtc != default)
+        {
+            ProfileMemberSinceDisplay = FormatMemberSinceDisplay(adminUtc);
+            return;
+        }
+
+        var bootstrap = await _users.GetTenantBootstrapDateUtcAsync().ConfigureAwait(true);
+        if (bootstrap is { } bootUtc && bootUtc != default)
+        {
+            ProfileMemberSinceDisplay = FormatMemberSinceDisplay(bootUtc);
+            return;
+        }
+
+        ProfileMemberSinceDisplay = "Not available";
+    }
+
+    private void ApplyCapabilitiesOnlyProfile()
+    {
+        var caps = _access.Capabilities;
+        ProfileRoleDisplay = caps.CanAccessUserManagement ? "Administrator" : "Employee";
+        ProfileStatusDisplay = "Active";
+        ProfilePartsAccessDisplay = caps.PartsAllTemplates
+            ? "All part templates"
+            : caps.AllowedTemplateIds.Count > 0
+                ? $"{caps.AllowedTemplateIds.Count} assigned template(s)"
+                : "—";
+        ProfileTemplatePermissionsDisplay = FormatTemplatePermissions(caps);
+        ProfileMasterDataPermissionsDisplay = FormatMasterDataPermissions(caps);
+    }
+
+    private async Task ApplyOrgUserToProfileAsync(OrgAppUserSummary record)
+    {
+        if (string.IsNullOrWhiteSpace(_profile.DisplayName))
+        {
+            ProfileName = record.Name;
+        }
+
+        ProfileRoleDisplay = record.Role;
+        ProfileStatusDisplay = record.Status;
+        ProfileTemplatePermissionsDisplay = FormatTemplatePermissions(record.TemplatePermissions);
+        ProfileMasterDataPermissionsDisplay = FormatMasterDataPermissions(record.MasterDataPermissions);
+
+        if (string.Equals(record.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+        {
+            ProfilePartsAccessDisplay = "Full access (all templates)";
+        }
+        else if (record.PartsAllTemplates)
+        {
+            ProfilePartsAccessDisplay = "All part templates";
+        }
+        else
+        {
+            try
+            {
+                var all = await _templates.GetTemplatesAsync().ConfigureAwait(true);
+                var names = all
+                    .Where(t => record.AllowedTemplateIds.Contains(t.Id, StringComparer.OrdinalIgnoreCase))
+                    .Select(t => t.Name)
+                    .OrderBy(n => n)
+                    .ToList();
+                ProfilePartsAccessDisplay = names.Count > 0
+                    ? string.Join(", ", names)
+                    : record.PartsScopeDisplay;
+            }
+            catch
+            {
+                ProfilePartsAccessDisplay = record.PartsScopeDisplay;
+            }
+        }
+    }
+
+    private static string FormatMemberSinceDisplay(DateTime utc) =>
+        utc == default ? "Not available" : utc.ToLocalTime().ToString("dd MMM yyyy");
+
+    private static string FormatTemplatePermissions(TemplatePermissionsDto? p)
+    {
+        if (p is null)
+        {
+            return "None configured";
+        }
+
+        var parts = new List<string>();
+        if (p.View) parts.Add("View");
+        if (p.Add) parts.Add("Add");
+        if (p.Edit) parts.Add("Edit");
+        if (p.Delete) parts.Add("Delete");
+        return parts.Count > 0 ? string.Join(", ", parts) : "None";
+    }
+
+    private static string FormatTemplatePermissions(UserAccessCapabilities caps)
+    {
+        var parts = new List<string>();
+        if (caps.CanViewTemplate) parts.Add("View");
+        if (caps.CanAddTemplate) parts.Add("Add");
+        if (caps.CanEditTemplate) parts.Add("Edit");
+        if (caps.CanDeleteTemplate) parts.Add("Delete");
+        return parts.Count > 0 ? string.Join(", ", parts) : "None";
+    }
+
+    private static string FormatMasterDataPermissions(MasterDataPermissionsDto? p)
+    {
+        if (p is null)
+        {
+            return "None configured";
+        }
+
+        var parts = new List<string>();
+        if (p.View) parts.Add("View");
+        if (p.Edit) parts.Add("Edit");
+        if (p.Add) parts.Add("Add");
+        if (p.Delete) parts.Add("Delete");
+        if (p.Copy) parts.Add("Copy");
+        return parts.Count > 0 ? string.Join(", ", parts) : "None";
+    }
+
+    private static string FormatMasterDataPermissions(UserAccessCapabilities caps)
+    {
+        var parts = new List<string>();
+        if (caps.CanViewMasterData) parts.Add("View");
+        if (caps.CanEditMasterData) parts.Add("Edit");
+        if (caps.CanAddMasterData) parts.Add("Add");
+        if (caps.CanDeleteMasterData) parts.Add("Delete");
+        if (caps.CanCopyMasterData) parts.Add("Copy");
+        return parts.Count > 0 ? string.Join(", ", parts) : "None";
     }
 
     [RelayCommand]
@@ -497,20 +798,8 @@ public partial class SettingsViewModel : ViewModelBase
             catch { /* fall through to default */ }
         }
 
-        // No custom photo — load default Assets/profile.jpg via stream so it's fully loaded before binding
-        try
-        {
-            var defaultFile = await StorageFile.GetFileFromApplicationUriAsync(
-                new Uri("ms-appx:///Assets/profile.jpg"));
-            using var defaultStream = await defaultFile.OpenReadAsync();
-            var defaultBitmap = new BitmapImage();
-            await defaultBitmap.SetSourceAsync(defaultStream);
-            AvatarImageSource = defaultBitmap;
-        }
-        catch
-        {
-            AvatarImageSource = null;
-        }
+        // No custom photo — keep null so initials fallback is rendered
+        AvatarImageSource = null;
     }
 
     [RelayCommand]
@@ -855,7 +1144,7 @@ public partial class SettingsViewModel : ViewModelBase
         }
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanUpdatePassword))]
     private async Task ChangePasswordAsync(CancellationToken ct)
     {
         ChangePasswordMessage = string.Empty;
@@ -879,12 +1168,24 @@ public partial class SettingsViewModel : ViewModelBase
             return;
         }
 
+        _setupContext.Refresh();
         var orgCode = _setupContext.OrgCode?.Trim();
-        var email = _setupContext.AdminEmail?.Trim();
+        var email = _session.Email?.Trim();
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            email = _setupContext.AdminEmail?.Trim();
+        }
+
+        if (string.IsNullOrWhiteSpace(email) &&
+            !string.IsNullOrWhiteSpace(SessionEmailDisplay) &&
+            SessionEmailDisplay != "—")
+        {
+            email = SessionEmailDisplay.Trim();
+        }
 
         if (string.IsNullOrWhiteSpace(orgCode) || string.IsNullOrWhiteSpace(email))
         {
-            ChangePasswordMessage = "Organization details are missing. Please complete setup first.";
+            ChangePasswordMessage = "Organisation details are missing. Please complete setup first.";
             return;
         }
 
@@ -907,6 +1208,7 @@ public partial class SettingsViewModel : ViewModelBase
         ChangeConfirmPassword = string.Empty;
         ChangePasswordMessage = "Password updated. If 2FA is enabled, use your authenticator app for any reset flows.";
         _activityLogger.LogUserAction("Password Changed", "Account password was changed");
+        NotifyPasswordFormState();
     }
 
     /// <summary>
@@ -1352,20 +1654,23 @@ public partial class SettingsViewModel : ViewModelBase
     {
         try
         {
-            foreach (var path in SetupPaths.SetupStateCandidatePaths)
+            SetupPaths.MigrateToCanonicalSetupStateIfNeeded();
+            var path = SetupPaths.GetAuthoritativeSetupStatePath();
+            if (!File.Exists(path))
             {
-                if (!File.Exists(path))
-                    continue;
+                return null;
+            }
 
-                using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(path));
-                var root = doc.RootElement;
+            using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(path));
+            var root = doc.RootElement;
 
-                if (root.TryGetProperty("adminEmail", out var ae) &&
-                    ae.ValueKind == System.Text.Json.JsonValueKind.String)
+            if (root.TryGetProperty("adminEmail", out var ae) &&
+                ae.ValueKind == System.Text.Json.JsonValueKind.String)
+            {
+                var email = ae.GetString()?.Trim();
+                if (!string.IsNullOrWhiteSpace(email))
                 {
-                    var email = ae.GetString()?.Trim();
-                    if (!string.IsNullOrWhiteSpace(email))
-                        return email;
+                    return email;
                 }
             }
         }

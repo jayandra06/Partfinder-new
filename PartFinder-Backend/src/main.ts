@@ -1,44 +1,48 @@
-import { ValidationPipe } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { HttpAdapterHost, NestFactory } from '@nestjs/core';
+import { NestFactory } from '@nestjs/core';
+import { ExpressAdapter } from '@nestjs/platform-express';
+import express, { type Express } from 'express';
 import { AppModule } from './app.module';
-import { MongoConnectivityExceptionFilter } from './common/filters/mongo-connectivity-exception.filter';
-import { AggregatingLogger } from './debug/aggregating-logger';
-import { DebugLogsService } from './debug/debug-logs.service';
+import { configureApplication } from './configure-application';
 
-async function bootstrap() {
+let cachedExpressServer: Express | undefined;
+
+export async function createExpressServer(): Promise<Express> {
+  if (cachedExpressServer) {
+    return cachedExpressServer;
+  }
+
+  const expressApp = express();
+  const app = await NestFactory.create(
+    AppModule,
+    new ExpressAdapter(expressApp),
+    { bufferLogs: true },
+  );
+  await configureApplication(app);
+  await app.init();
+  cachedExpressServer = expressApp;
+  return expressApp;
+}
+
+async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
-  const debugLogs = app.get(DebugLogsService);
-  app.useLogger(new AggregatingLogger(debugLogs));
+  await configureApplication(app);
   const config = app.get(ConfigService);
-
-  const corsOrigin = config.get<string>('CORS_ORIGIN') ?? '';
-  const origins = corsOrigin
-    .split(',')
-    .map((o) => o.trim())
-    .filter((o) => Boolean(o) && o !== '*');
-
-  app.enableCors({
-    origin: origins.length ? origins : true,
-    credentials: true,
-  });
-
-  app.setGlobalPrefix('api');
-
-  const httpAdapterHost = app.get(HttpAdapterHost);
-  app.useGlobalFilters(
-    new MongoConnectivityExceptionFilter(httpAdapterHost.httpAdapter),
-  );
-
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
-
   const port = config.get<number>('PORT') ?? 3000;
   await app.listen(port);
+  new Logger('Bootstrap').log(`Listening on http://127.0.0.1:${port}`);
 }
-bootstrap();
+
+if (!process.env.VERCEL) {
+  void bootstrap();
+}
+
+/** Vercel serverless entry — do not call listen(). */
+export default async function handler(
+  req: express.Request,
+  res: express.Response,
+): Promise<void> {
+  const server = await createExpressServer();
+  server(req, res);
+}

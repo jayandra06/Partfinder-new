@@ -11,17 +11,22 @@ public partial class FavouritesViewModel : ViewModelBase
     private readonly IFavouriteStore _favouriteStore;
     private readonly ITemplateSchemaService _templateSchema;
     private readonly IMasterDataRecordsService _records;
+    private readonly WorksheetRelationCleanupService _relationCleanup;
     private readonly Microsoft.UI.Dispatching.DispatcherQueue _dispatcherQueue;
 
     // Kept so OnFavouritesChanged can add newly-starred templates without a full reload
     private IReadOnlyList<PartTemplateDefinition> _allTemplates = Array.Empty<PartTemplateDefinition>();
 
-    public FavouritesViewModel(IFavouriteStore favouriteStore, ITemplateSchemaService templateSchema,
-        IMasterDataRecordsService records)
+    public FavouritesViewModel(
+        IFavouriteStore favouriteStore,
+        ITemplateSchemaService templateSchema,
+        IMasterDataRecordsService records,
+        WorksheetRelationCleanupService relationCleanup)
     {
         _favouriteStore = favouriteStore;
         _templateSchema = templateSchema;
         _records = records;
+        _relationCleanup = relationCleanup;
         _dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
 
         FavouriteTemplates.CollectionChanged += OnFavouriteTemplatesCollectionChanged;
@@ -155,6 +160,7 @@ public partial class FavouritesViewModel : ViewModelBase
             return;
         }
 
+        await _relationCleanup.DeleteAllRelationsInvolvingTemplateAsync(templateId).ConfigureAwait(true);
         await _templateSchema.DeleteTemplateAsync(templateId).ConfigureAwait(true);
 
         var card = FavouriteTemplates.FirstOrDefault(c => c.Template.Id == templateId);

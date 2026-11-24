@@ -4,6 +4,25 @@ using System.Text.Json;
 
 namespace PartFinder.Services;
 
+public static class InviteDownloadLinks
+{
+    public const string MicrosoftStore =
+        "https://apps.microsoft.com/detail/9n6xvkpx189w?hl=en-GB&gl=IN";
+
+    public static string Normalize(string? link)
+    {
+        if (string.IsNullOrWhiteSpace(link))
+        {
+            return MicrosoftStore;
+        }
+
+        var trimmed = link.Trim();
+        return trimmed.Contains("shipspan.com", StringComparison.OrdinalIgnoreCase)
+            ? MicrosoftStore
+            : trimmed;
+    }
+}
+
 public sealed class InviteEmailConfig
 {
     public string Host { get; init; } = string.Empty;
@@ -13,7 +32,7 @@ public sealed class InviteEmailConfig
     public string Password { get; init; } = string.Empty;
     public string FromEmail { get; init; } = string.Empty;
     public string FromName { get; init; } = "PartFinder";
-    public string DownloadLink { get; init; } = "https://shipspan.com";
+    public string DownloadLink { get; init; } = InviteDownloadLinks.MicrosoftStore;
 }
 
 public static class InviteEmailClient
@@ -53,12 +72,12 @@ public static class InviteEmailClient
             Body =
                 $"Hello {recipientName}," + Environment.NewLine + Environment.NewLine +
                 "You have been invited to PartFinder." + Environment.NewLine +
-                $"Organization code: {orgCode}" + Environment.NewLine +
+                $"Organisation code: {orgCode}" + Environment.NewLine +
                 $"Email: {toEmail}" + Environment.NewLine +
                 $"Temporary password: {temporaryPassword}" + Environment.NewLine +
                 $"Role: {role}" + Environment.NewLine + Environment.NewLine +
                 $"Download app: {Config.DownloadLink}" + Environment.NewLine + Environment.NewLine +
-                "After installing, enter your organization code, then sign in with your invited email and temporary password." + Environment.NewLine +
+                "After installing, enter your organisation code, then sign in with your invited email and temporary password." + Environment.NewLine +
                 "You can change your password after first sign-in.",
         };
 
@@ -100,7 +119,7 @@ public static class InviteEmailClient
                 Password = password ?? string.Empty,
                 FromEmail = fromEmail?.Trim() ?? string.Empty,
                 FromName = string.IsNullOrWhiteSpace(fromName) ? "PartFinder" : fromName.Trim(),
-                DownloadLink = string.IsNullOrWhiteSpace(downloadLink) ? "https://shipspan.com" : downloadLink.Trim(),
+                DownloadLink = InviteDownloadLinks.Normalize(downloadLink),
             };
         }
         catch

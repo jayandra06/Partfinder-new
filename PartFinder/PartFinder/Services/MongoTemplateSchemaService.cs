@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
@@ -21,6 +22,8 @@ public sealed class MongoTemplateSchemaService : ITemplateSchemaService
     public static bool IsExplorerTemplateName(string? name) =>
         ExplorerTemplateNames.IsExplorerTemplateName(name);
 
+    private static readonly ConcurrentDictionary<string, MongoClient> ClientCache = new();
+
     private readonly ILocalSetupContext _setupContext;
 
     public MongoTemplateSchemaService(ILocalSetupContext setupContext)
@@ -30,66 +33,94 @@ public sealed class MongoTemplateSchemaService : ITemplateSchemaService
 
     private IMongoCollection<TemplateDoc>? TryGetCollection()
     {
-        if (!_setupContext.TryGetTenantMongoUri(out var raw) || string.IsNullOrWhiteSpace(raw))
+        try
         {
+            if (!_setupContext.TryGetTenantMongoUri(out var raw) || string.IsNullOrWhiteSpace(raw))
+            {
+                return null;
+            }
+
+            var cs = MongoConnectionStringUtil.Prepare(raw, _setupContext.OrgCode);
+            var client = ClientCache.GetOrAdd(cs, static connectionString => new MongoClient(connectionString));
+            var db = MongoConnectionStringUtil.GetTenantDatabase(client, cs, _setupContext.OrgCode);
+            if (string.Equals(db.DatabaseNamespace.DatabaseName, "admin", StringComparison.OrdinalIgnoreCase))
+            {
+                var targetDb = !string.IsNullOrWhiteSpace(_setupContext.OrgCode) ? _setupContext.OrgCode.Trim() : "partfinder";
+                db = client.GetDatabase(targetDb);
+            }
+            return db.GetCollection<TemplateDoc>(CollectionName);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MongoTemplateSchemaService] TryGetCollection failed: {ex.Message}");
             return null;
         }
-
-        var cs = MongoConnectionStringUtil.Normalize(raw);
-        var url = new MongoUrl(cs);
-        var client = new MongoClient(cs);
-        var db = client.GetDatabase(url.DatabaseName ?? "admin");
-        return db.GetCollection<TemplateDoc>(CollectionName);
     }
 
     public async Task<IReadOnlyList<PartTemplateDefinition>> GetTemplatesAsync(
         CancellationToken cancellationToken = default)
     {
-        var coll = TryGetCollection();
-        if (coll is null)
+        try
         {
+            var coll = TryGetCollection();
+            if (coll is null)
+            {
+                return Array.Empty<PartTemplateDefinition>();
+            }
+
+            var docs = await coll.Find(FilterDefinition<TemplateDoc>.Empty)
+                .SortBy(d => d.Name)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+            var byId = docs.ToDictionary(d => d.TemplateId, StringComparer.Ordinal);
+            return docs.Select(d => MapToDefinition(d, byId)).ToList();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MongoTemplateSchemaService] GetTemplatesAsync failed: {ex.Message}");
             return Array.Empty<PartTemplateDefinition>();
         }
-
-        var docs = await coll.Find(FilterDefinition<TemplateDoc>.Empty)
-            .SortBy(d => d.Name)
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-        var byId = docs.ToDictionary(d => d.TemplateId, StringComparer.Ordinal);
-        return docs.Select(d => MapToDefinition(d, byId)).ToList();
     }
 
     public async Task<PartTemplateDefinition?> GetTemplateAsync(
         string templateId,
         CancellationToken cancellationToken = default)
     {
-        var coll = TryGetCollection();
-        if (coll is null)
+        try
         {
-            return null;
-        }
+            var coll = TryGetCollection();
+            if (coll is null)
+            {
+                return null;
+            }
 
-        var doc = await coll.Find(d => d.TemplateId == templateId)
-            .FirstOrDefaultAsync(cancellationToken)
-            .ConfigureAwait(false);
-        if (doc is null)
-        {
-            return null;
-        }
-
-        var lookup = new Dictionary<string, TemplateDoc>(StringComparer.Ordinal) { [doc.TemplateId] = doc };
-        if (!string.IsNullOrWhiteSpace(doc.BaseTemplateId))
-        {
-            var baseDoc = await coll.Find(d => d.TemplateId == doc.BaseTemplateId)
+            var doc = await coll.Find(d => d.TemplateId == templateId)
                 .FirstOrDefaultAsync(cancellationToken)
                 .ConfigureAwait(false);
-            if (baseDoc is not null)
+            if (doc is null)
             {
-                lookup[baseDoc.TemplateId] = baseDoc;
+                return null;
             }
-        }
 
-        return MapToDefinition(doc, lookup);
+            var lookup = new Dictionary<string, TemplateDoc>(StringComparer.Ordinal) { [doc.TemplateId] = doc };
+            if (!string.IsNullOrWhiteSpace(doc.BaseTemplateId))
+            {
+                var baseDoc = await coll.Find(d => d.TemplateId == doc.BaseTemplateId)
+                    .FirstOrDefaultAsync(cancellationToken)
+                    .ConfigureAwait(false);
+                if (baseDoc is not null)
+                {
+                    lookup[baseDoc.TemplateId] = baseDoc;
+                }
+            }
+
+            return MapToDefinition(doc, lookup);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MongoTemplateSchemaService] GetTemplateAsync failed: {ex.Message}");
+            return null;
+        }
     }
 
     public async Task SaveTemplateAsync(
@@ -100,18 +131,26 @@ public sealed class MongoTemplateSchemaService : ITemplateSchemaService
                    ?? throw new InvalidOperationException(
                        "No tenant database is configured. Complete setup and ensure setup-state.json contains dbUri.");
 
-        var existing = await coll.Find(d => d.TemplateId == template.Id)
-            .FirstOrDefaultAsync(cancellationToken)
-            .ConfigureAwait(false);
-        var doc = MapToDoc(template);
-        doc.MongoId = existing?.MongoId ?? ObjectId.GenerateNewId();
-        var filter = Builders<TemplateDoc>.Filter.Eq(d => d.TemplateId, template.Id);
-        _ = await coll.ReplaceOneAsync(
-                filter,
-                doc,
-                new ReplaceOptions { IsUpsert = true },
-                cancellationToken)
-            .ConfigureAwait(false);
+        try
+        {
+            var existing = await coll.Find(d => d.TemplateId == template.Id)
+                .FirstOrDefaultAsync(cancellationToken)
+                .ConfigureAwait(false);
+            var doc = MapToDoc(template);
+            doc.MongoId = existing?.MongoId ?? ObjectId.GenerateNewId();
+            var filter = Builders<TemplateDoc>.Filter.Eq(d => d.TemplateId, template.Id);
+            _ = await coll.ReplaceOneAsync(
+                    filter,
+                    doc,
+                    new ReplaceOptions { IsUpsert = true },
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MongoTemplateSchemaService] SaveTemplateAsync failed: {ex.Message}");
+            throw;
+        }
     }
 
     public async Task DeleteTemplateAsync(
@@ -122,8 +161,16 @@ public sealed class MongoTemplateSchemaService : ITemplateSchemaService
                    ?? throw new InvalidOperationException(
                        "No tenant database is configured. Complete setup and ensure setup-state.json contains dbUri.");
 
-        var filter = Builders<TemplateDoc>.Filter.Eq(d => d.TemplateId, templateId);
-        await coll.DeleteOneAsync(filter, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var filter = Builders<TemplateDoc>.Filter.Eq(d => d.TemplateId, templateId);
+            await coll.DeleteOneAsync(filter, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MongoTemplateSchemaService] DeleteTemplateAsync failed: {ex.Message}");
+            throw;
+        }
     }
 
     private static PartTemplateDefinition MapToDefinition(
@@ -140,6 +187,10 @@ public sealed class MongoTemplateSchemaService : ITemplateSchemaService
 
         var childFields = d.Fields.Select(ToFieldSnapshot).ToList();
         var merged = TemplateFieldMerge.MergeInheritedFields(baseFields, childFields);
+        var patterns = d.Fields
+            .Where(field => !string.IsNullOrWhiteSpace(field.Key))
+            .GroupBy(field => field.Key, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First().ValidationPattern, StringComparer.OrdinalIgnoreCase);
         var fields = merged
             .Select(
                 f => new TemplateFieldDefinition
@@ -149,7 +200,7 @@ public sealed class MongoTemplateSchemaService : ITemplateSchemaService
                     Type = ParseFieldType(f.Type),
                     IsRequired = f.IsRequired,
                     DisplayOrder = f.DisplayOrder,
-                    ValidationPattern = null,
+                    ValidationPattern = patterns.TryGetValue(f.Key, out var pattern) ? pattern : null,
                     Options = null,
                     LinkedTemplateId = f.LinkedTemplateId,
                     LinkedDisplayFieldKey = f.LinkedDisplayFieldKey,
@@ -163,9 +214,16 @@ public sealed class MongoTemplateSchemaService : ITemplateSchemaService
             Version = d.Version,
             IsPublished = d.IsPublished,
             BaseTemplateId = string.IsNullOrWhiteSpace(d.BaseTemplateId) ? null : d.BaseTemplateId,
+            IsMasterDataCatalog = d.IsMasterDataCatalog ?? !LooksLikeOrganizationTemplate(d),
             Fields = fields,
         };
     }
+
+    private static bool LooksLikeOrganizationTemplate(TemplateDoc d) =>
+        d.Fields.Count > 0
+        && d.Fields.All(f =>
+            f.Key.StartsWith("column_", StringComparison.OrdinalIgnoreCase)
+            || f.Key.StartsWith("col_", StringComparison.OrdinalIgnoreCase));
 
     private static FieldSnapshot ToFieldSnapshot(FieldDoc f) =>
         new(
@@ -186,6 +244,7 @@ public sealed class MongoTemplateSchemaService : ITemplateSchemaService
             Version = t.Version,
             IsPublished = t.IsPublished,
             BaseTemplateId = t.BaseTemplateId,
+            IsMasterDataCatalog = t.IsMasterDataCatalog,
             Fields = t.Fields
                 .OrderBy(f => f.DisplayOrder)
                 .Select(
@@ -237,6 +296,9 @@ public sealed class MongoTemplateSchemaService : ITemplateSchemaService
 
         [BsonElement("baseTemplateId")]
         public string? BaseTemplateId { get; set; }
+
+        [BsonElement("isMasterDataCatalog")]
+        public bool? IsMasterDataCatalog { get; set; }
 
         [BsonElement("fields")]
         public List<FieldDoc> Fields { get; set; } = [];

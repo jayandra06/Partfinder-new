@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
@@ -9,15 +9,15 @@
   IgnorableNamespaces="uap rescap systemai">
 
   <Identity
-    Name="608d9293-2a84-4bec-9233-250a2745c187"
-    Publisher="CN=DELL"
-    Version="1.0.0.0" />
+    Name="EuroasiannGroup.partfinder"
+    Publisher="CN=B96C9A11-7C90-42E9-8C6C-14AD9097B6CD"
+    Version="3.0.7.0" />
 
   <mp:PhoneIdentity PhoneProductId="608d9293-2a84-4bec-9233-250a2745c187" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
     <DisplayName>PartFinder</DisplayName>
-    <PublisherDisplayName>DELL</PublisherDisplayName>
+    <PublisherDisplayName>Euroasiann Group</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
 

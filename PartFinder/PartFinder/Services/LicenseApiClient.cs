@@ -33,12 +33,30 @@ public static class LicenseApiClient
 
     public static string GetBaseUrl()
     {
+        var baseDir = AppContext.BaseDirectory;
+#if DEBUG
+        var fromDev = TryReadLicenseApiBaseUrl(Path.Combine(baseDir, "appsettings.Development.json"));
+        if (!string.IsNullOrWhiteSpace(fromDev))
+        {
+            return fromDev;
+        }
+#endif
+        var fromDefault = TryReadLicenseApiBaseUrl(Path.Combine(baseDir, "appsettings.json"));
+        if (!string.IsNullOrWhiteSpace(fromDefault))
+        {
+            return fromDefault;
+        }
+
+        return "https://backend.partfinder.store";
+    }
+
+    private static string? TryReadLicenseApiBaseUrl(string path)
+    {
         try
         {
-            var path = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
             if (!File.Exists(path))
             {
-                return "https://partfinder-backend.vercel.app";
+                return null;
             }
 
             using var doc = JsonDocument.Parse(File.ReadAllText(path));
@@ -46,7 +64,8 @@ public static class LicenseApiClient
                 licenseApi.TryGetProperty("BaseUrl", out var baseUrlEl))
             {
                 var s = baseUrlEl.GetString();
-                if (!string.IsNullOrWhiteSpace(s))
+                if (!string.IsNullOrWhiteSpace(s) &&
+                    !s.Contains("vercel.app", StringComparison.OrdinalIgnoreCase))
                 {
                     return s.TrimEnd('/');
                 }
@@ -54,9 +73,10 @@ public static class LicenseApiClient
         }
         catch
         {
+            // fall through
         }
 
-        return "https://partfinder-backend.vercel.app";
+        return null;
     }
 
     public static async Task<LicenseVerifyResponse?> VerifyAsync(string orgCode, CancellationToken ct = default)
@@ -92,11 +112,11 @@ public static class LicenseApiClient
         if (string.IsNullOrWhiteSpace(json))
         {
             return response.IsSuccessStatusCode
-                ? new LicenseVerifyResponse(false, "EMPTY_RESPONSE", "Empty response from license server.", null, null, null)
+                ? new LicenseVerifyResponse(false, "EMPTY_RESPONSE", "Empty response from licence server.", null, null, null)
                 : new LicenseVerifyResponse(
                     false,
                     "HTTP_ERROR",
-                    $"License server returned {(int)response.StatusCode} with an empty body.",
+                    $"Licence server returned {(int)response.StatusCode} with an empty body.",
                     null,
                     null,
                     null);
@@ -114,7 +134,7 @@ public static class LicenseApiClient
                 return new LicenseVerifyResponse(
                     false,
                     "HTTP_ERROR",
-                    err ?? $"License server error ({(int)response.StatusCode}).",
+                    err ?? $"Licence server error ({(int)response.StatusCode}).",
                     null,
                     null,
                     maintUntilErr);
@@ -131,7 +151,7 @@ public static class LicenseApiClient
         }
         catch (JsonException)
         {
-            return new LicenseVerifyResponse(false, "INVALID_RESPONSE", "Invalid response from license server.", null, null, null);
+            return new LicenseVerifyResponse(false, "INVALID_RESPONSE", "Invalid response from licence server.", null, null, null);
         }
     }
 

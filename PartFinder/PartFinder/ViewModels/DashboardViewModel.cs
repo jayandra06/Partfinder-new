@@ -2,9 +2,12 @@ using LiveChartsCore;
 using LiveChartsCore.SkiaSharpView;
 using LiveChartsCore.SkiaSharpView.Painting;
 using LiveChartsCore.SkiaSharpView.Painting.Effects;
+using LiveChartsCore.Themes;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Dispatching;
+using PartFinder.Helpers;
+using PartFinder.Models;
 using PartFinder.Services;
 using SkiaSharp;
 using System.Collections.ObjectModel;
@@ -16,14 +19,43 @@ public partial class DashboardViewModel : ViewModelBase
 {
     private readonly BackendApiClient _api;
     private readonly INavigationService _nav;
+    private readonly IThemeService _themeService;
+    private readonly ITemplateSchemaService _templateSchema;
+    private readonly IMasterDataRecordsService _masterData;
+    private readonly MongoInventoryService _inventory;
+    private readonly MongoAuditService _audit;
+    private readonly IAppStateStore _appState;
+    private readonly IFavouriteStore _favouriteStore;
     private readonly DispatcherQueue? _uiQueue;
     private PeriodicTimer? _refreshTimer;
     private CancellationTokenSource? _refreshCts;
+    private CancellationTokenSource? _loadCts;
+    private CancellationTokenSource? _distributionCts;
+    private int _loadGeneration;
+    private DateTimeOffset _lastLoadUtc = DateTimeOffset.MinValue;
+    private bool _hasCompletedInitialLoad;
+    private double _lastImportSuccessRate;
 
-    public DashboardViewModel(BackendApiClient api, INavigationService nav)
+    public DashboardViewModel(
+        BackendApiClient api,
+        INavigationService nav,
+        IThemeService themeService,
+        ITemplateSchemaService templateSchema,
+        IMasterDataRecordsService masterData,
+        MongoInventoryService inventory,
+        MongoAuditService audit,
+        IAppStateStore appState,
+        IFavouriteStore favouriteStore)
     {
         _api = api;
         _nav = nav;
+        _themeService = themeService;
+        _templateSchema = templateSchema;
+        _masterData = masterData;
+        _inventory = inventory;
+        _audit = audit;
+        _appState = appState;
+        _favouriteStore = favouriteStore;
         _uiQueue = DispatcherQueue.GetForCurrentThread();
 
         // Greeting based on time of day
@@ -42,6 +74,7 @@ public partial class DashboardViewModel : ViewModelBase
         RecentActivity = [];
         LowStockItems  = [];
         DistributionItems = [];
+        FavouriteItems = [];
 
         TrendSeries        = [];
         TrendXLabels       = [];
@@ -49,18 +82,37 @@ public partial class DashboardViewModel : ViewModelBase
         StockLevelYLabels  = ["—"];
         DistributionSeries = BuildEmptyDistributionSeries();
         HealthGaugeSeries  = BuildHealthGaugeSeries(0);
-        LazyLoadTrendCommand = new AsyncRelayCommand(LoadDashboardAsync);
+        LazyLoadTrendCommand = new AsyncRelayCommand(() => PrepareForPageDisplayAsync());
+
+        _themeService.ThemeChanged += (_, _) => OnAppThemeChanged();
+        _favouriteStore.FavouritesChanged += (_, _) =>
+        {
+            if (_uiQueue is not null && !_uiQueue.HasThreadAccess)
+            {
+                _uiQueue.TryEnqueue(() => _ = RefreshFavouritesAsync());
+                return;
+            }
+
+            _ = RefreshFavouritesAsync();
+        };
+        RefreshChartAppearance();
     }
 
+    public DrawMarginFrame ChartDrawMarginFrame { get; private set; } = new();
+    public Axis[] ChartXAxes { get; private set; } = [];
+    public Axis[] ChartYAxes { get; private set; } = [];
+    public Axis[] TrendXAxes { get; private set; } = [];
+    public Axis[] StockLevelYAxes { get; private set; } = [];
     // ── Collections ──────────────────────────────────────────────────────────
     public ObservableCollection<KpiItem>              Kpis              { get; }
     public ObservableCollection<ActivityItem>         RecentActivity    { get; }
     public ObservableCollection<LowStockItem>         LowStockItems     { get; }
     public ObservableCollection<DistributionItem>     DistributionItems { get; }
+    public ObservableCollection<DashboardFavouriteItem> FavouriteItems { get; }
 
     // ── Chart series ─────────────────────────────────────────────────────────
     public ISeries[]  TrendSeries        { get; private set; }
-    public string[]   TrendXLabels       { get; private set; }
+    public string[]   TrendXLabels       { get; private set; } = [];
     public ISeries[]  StockLevelSeries   { get; private set; }
     public string[]   StockLevelYLabels  { get; private set; }
     public ISeries[]  DistributionSeries { get; private set; }
@@ -79,10 +131,30 @@ public partial class DashboardViewModel : ViewModelBase
     [ObservableProperty] private int _lowStockRaw;
     [ObservableProperty] private int _activeTemplatesRaw;
     [ObservableProperty] private double _importSuccessRaw;
+    [ObservableProperty] private bool _hasFavourites;
 
     // ── Navigation Commands ───────────────────────────────────────────────────
     [RelayCommand]
     private void GoToTemplates() => _nav.Navigate(AppPage.Templates);
+
+    [RelayCommand]
+    private void QuickActionNewTemplate()
+    {
+        _appState.TemplatesPendingAction = "Create";
+        _nav.Navigate(AppPage.Templates);
+    }
+
+    [RelayCommand]
+    private void QuickActionImportData() => _nav.Navigate(AppPage.MasterData);
+
+    [RelayCommand]
+    private void QuickActionInviteMember() => _nav.Navigate(AppPage.UserManagement);
+
+    [RelayCommand]
+    private void QuickActionExportReport() => _nav.Navigate(AppPage.Audit);
+
+    [RelayCommand]
+    private void QuickActionScanQr() => _nav.Navigate(AppPage.QrCodeManager);
 
     [RelayCommand]
     private void GoToExplorer() => _nav.Navigate(AppPage.MasterData);
@@ -96,100 +168,298 @@ public partial class DashboardViewModel : ViewModelBase
     [RelayCommand]
     private void GoToSettings() => _nav.Navigate(AppPage.Settings);
 
-    // ── Load ──────────────────────────────────────────────────────────────────
-    private async Task LoadDashboardAsync()
+    [RelayCommand]
+    public void OpenFavourite(DashboardFavouriteItem? item)
     {
-        if (IsLoading) return;
+        if (item is null || string.IsNullOrWhiteSpace(item.TemplateId))
+        {
+            return;
+        }
 
-        IsLoading = true;
+        if (item.IsMasterDataCatalog)
+        {
+            var args = new MasterDataNavigationArgs
+            {
+                Mode = MasterDataSurfaceMode.ReadOnlyCatalog,
+                TemplateId = item.TemplateId,
+            };
+            _nav.Navigate(AppPage.MasterData, args);
+            return;
+        }
+
+        _nav.Navigate(AppPage.TemplateData, item.TemplateId);
+    }
+
+    [RelayCommand]
+    public async Task RemoveFavouriteAsync(DashboardFavouriteItem? item)
+    {
+        if (item is null || string.IsNullOrWhiteSpace(item.TemplateId))
+        {
+            return;
+        }
+
+        await _favouriteStore.ToggleAsync(item.TemplateId).ConfigureAwait(true);
+        await RefreshFavouritesAsync().ConfigureAwait(true);
+    }
+
+    public async Task RefreshFavouritesAsync(CancellationToken cancellationToken = default)
+    {
         try
         {
-            var (statsOk, statsError, stats) = await _api.GetDashboardStatsAsync().ConfigureAwait(true);
-            var (trendOk, _, trend) = await _api.GetDashboardTrendAsync().ConfigureAwait(true);
+            await _favouriteStore.LoadAsync(cancellationToken).ConfigureAwait(true);
+            var templates = await _templateSchema.GetTemplatesAsync(cancellationToken).ConfigureAwait(true);
+            var favouriteIds = _favouriteStore.GetAll();
 
-            // If stats API failed, show zeros instead of dashes so UI doesn't look broken
-            if (!statsOk || stats is null)
+            var built = new List<DashboardFavouriteItem>();
+            foreach (var id in favouriteIds)
             {
-                System.Diagnostics.Debug.WriteLine($"[Dashboard] Stats API failed: {statsError}");
+                var template = templates.FirstOrDefault(t => string.Equals(t.Id, id, StringComparison.Ordinal));
+                if (template is null)
+                {
+                    continue;
+                }
+
+                var item = await BuildFavouriteItemAsync(template, cancellationToken).ConfigureAwait(true);
+                if (item is not null)
+                {
+                    built.Add(item);
+                }
+            }
+
+            FavouriteItems.Clear();
+            foreach (var item in built.OrderBy(f => f.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                FavouriteItems.Add(item);
+            }
+
+            HasFavourites = FavouriteItems.Count > 0;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Dashboard] RefreshFavouritesAsync failed: {ex.Message}");
+        }
+    }
+
+    private static async Task<DashboardFavouriteItem?> BuildFavouriteItemAsync(
+        PartTemplateDefinition template,
+        IMasterDataRecordsService records,
+        CancellationToken cancellationToken)
+    {
+        const int maxCols = 6;
+        const int maxRows = 8;
+
+        var fields = template.Fields.OrderBy(f => f.DisplayOrder).ToList();
+        var visibleFields = fields.Take(maxCols).ToList();
+        var headers = visibleFields.Select(f => string.IsNullOrWhiteSpace(f.Label) ? f.Key : f.Label).ToList();
+
+        IReadOnlyList<MasterDataRowRecord> rows;
+        int totalCount;
+        try
+        {
+            (rows, totalCount) = await records
+                .GetRowsPageAsync(template.Id, 0, maxRows, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch
+        {
+            rows = Array.Empty<MasterDataRowRecord>();
+            totalCount = 0;
+        }
+
+        var previewRows = rows
+            .OrderBy(r => r.RowOrder)
+            .Select(r => new DashboardFavouritePreviewRow
+            {
+                Cells = visibleFields
+                    .Select(f =>
+                    {
+                        if (r.Values.TryGetValue(f.Key, out var v) && !string.IsNullOrWhiteSpace(v))
+                        {
+                            return v.Trim();
+                        }
+
+                        return "—";
+                    })
+                    .ToList(),
+            })
+            .ToList();
+
+        return new DashboardFavouriteItem
+        {
+            TemplateId = template.Id,
+            Name = template.Name,
+            KindLabel = template.IsMasterDataCatalog ? "Master Data" : "Analytics",
+            IsMasterDataCatalog = template.IsMasterDataCatalog,
+            ColumnHeaders = headers,
+            PreviewRows = previewRows,
+            TotalRowCount = totalCount > 0 ? totalCount : rows.Count,
+            TotalColumnCount = fields.Count,
+        };
+    }
+
+    private Task<DashboardFavouriteItem?> BuildFavouriteItemAsync(
+        PartTemplateDefinition template,
+        CancellationToken cancellationToken) =>
+        BuildFavouriteItemAsync(template, _masterData, cancellationToken);
+
+    // ── Load ──────────────────────────────────────────────────────────────────
+    public Task WarmUpAsync() => LoadDashboardCoreAsync(showLoadingIndicator: false);
+
+    /// <summary>Home is favourites-only — load starred templates and their row previews.</summary>
+    public async Task PrepareForPageDisplayAsync()
+    {
+        var isFresh = _hasCompletedInitialLoad && _lastLoadUtc > DateTimeOffset.UtcNow.AddSeconds(-25);
+        if (isFresh)
+        {
+            return;
+        }
+
+        IsLoading = !_hasCompletedInitialLoad;
+        try
+        {
+            await RefreshFavouritesAsync().ConfigureAwait(true);
+            _hasCompletedInitialLoad = true;
+            _lastLoadUtc = DateTimeOffset.UtcNow;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task LoadDashboardCoreAsync(bool showLoadingIndicator)
+    {
+        _loadCts?.Cancel();
+        _loadCts?.Dispose();
+        _loadCts = new CancellationTokenSource();
+        var ct = _loadCts.Token;
+        var generation = Interlocked.Increment(ref _loadGeneration);
+
+        if (showLoadingIndicator)
+        {
+            IsLoading = true;
+        }
+
+        var loadDistributionAfter = false;
+        var animateCharts = !_hasCompletedInitialLoad;
+        try
+        {
+            ct.ThrowIfCancellationRequested();
+
+            await RefreshFavouritesAsync(ct).ConfigureAwait(true);
+
+            var statsTask = BuildWorkspaceStatsAsync(ct);
+            var trendTask = _api.GetDashboardTrendAsync(ct);
+            await Task.WhenAll(statsTask, trendTask).ConfigureAwait(true);
+            ct.ThrowIfCancellationRequested();
+
+            var stats = await statsTask.ConfigureAwait(true);
+            var (trendOk, _, apiTrend) = await trendTask.ConfigureAwait(true);
+
+            if (stats is null)
+            {
                 Kpis[0].Value = "0";
-                Kpis[0].Delta = statsError ?? "Unable to load";
+                Kpis[0].Delta = "Inventory unavailable";
                 Kpis[1].Value = "0";
                 Kpis[1].Delta = "—";
                 Kpis[2].Value = "0";
                 Kpis[2].Delta = "—";
                 Kpis[3].Value = "—";
-                Kpis[3].Delta = statsError ?? "Unable to load";
-                LastUpdated = "⚠ Connection issue";
+                Kpis[3].Delta = "—";
+                LastUpdated = "⚠ Could not read workspace data";
             }
-            else if (statsOk && stats is not null)
+            else
             {
                 TotalPartsRaw = stats.TotalParts;
                 LowStockRaw = stats.LowStock;
                 ActiveTemplatesRaw = stats.ActiveTemplates;
-                ImportSuccessRaw = stats.ImportSuccessRate;
+                ImportSuccessRaw = stats.HasImportHistory ? stats.ImportSuccessRate : 0;
 
-                // ── KPI values ────────────────────────────────────────────────
-                Kpis[0].Value      = stats.TotalParts.ToString("N0", CultureInfo.InvariantCulture);
-                Kpis[0].Delta      = $"{stats.TotalParts} items tracked";
+                Kpis[0].Value = stats.TotalParts.ToString("N0", CultureInfo.InvariantCulture);
+                Kpis[0].Delta = stats.PartsSource == "inventory"
+                    ? $"{stats.MasterDataRows:N0} master data rows"
+                    : "From master data";
                 Kpis[0].AlertLevel = KpiAlertLevel.Normal;
 
-                Kpis[1].Value      = stats.LowStock.ToString("N0", CultureInfo.InvariantCulture);
-                Kpis[1].Delta      = stats.LowStock > 0 ? "⚠ Attention needed" : "✓ All stocked";
+                Kpis[1].Value = stats.LowStock.ToString("N0", CultureInfo.InvariantCulture);
+                Kpis[1].Delta = stats.LowStock == 0
+                    ? "✓ All stocked"
+                    : stats.OutOfStock > 0 && stats.BelowMinimum > 0
+                        ? $"{stats.BelowMinimum} low · {stats.OutOfStock} out"
+                        : stats.OutOfStock > 0
+                            ? "Out of stock"
+                            : "⚠ Below minimum";
                 Kpis[1].AlertLevel = stats.LowStock > 0 ? KpiAlertLevel.Warning : KpiAlertLevel.Normal;
 
-                Kpis[2].Value      = stats.ActiveTemplates.ToString("N0", CultureInfo.InvariantCulture);
-                Kpis[2].Delta      = "Schemas active";
+                Kpis[2].Value = stats.ActiveTemplates.ToString("N0", CultureInfo.InvariantCulture);
+                Kpis[2].Delta = stats.LinkedTemplateCount > 0
+                    ? $"{stats.LinkedTemplateCount} linked"
+                    : "In master data";
                 Kpis[2].AlertLevel = KpiAlertLevel.Normal;
 
-                Kpis[3].Value      = $"{stats.ImportSuccessRate:0.0}%";
-                Kpis[3].Delta      = stats.ImportSuccessRate >= 90 ? "✓ Healthy" : "↓ Review needed";
-                Kpis[3].AlertLevel = stats.ImportSuccessRate < 80 ? KpiAlertLevel.Danger : KpiAlertLevel.Normal;
+                if (stats.HasImportHistory)
+                {
+                    Kpis[3].Value = $"{stats.ImportSuccessRate:0.0}%";
+                    Kpis[3].Delta = stats.ImportSuccessRate >= 90 ? "✓ Healthy" : "↓ Review needed";
+                    Kpis[3].AlertLevel = stats.ImportSuccessRate < 80 ? KpiAlertLevel.Danger : KpiAlertLevel.Normal;
+                    _lastImportSuccessRate = stats.ImportSuccessRate;
+                    HealthLabel = $"{stats.ImportSuccessRate:0.0}%";
+                }
+                else
+                {
+                    Kpis[3].Value = "—";
+                    Kpis[3].Delta = "No imports yet";
+                    Kpis[3].AlertLevel = KpiAlertLevel.Normal;
+                    _lastImportSuccessRate = 0;
+                    HealthLabel = "—";
+                }
 
-                // ── Health gauge ──────────────────────────────────────────────
-                HealthGaugeSeries = BuildHealthGaugeSeries(stats.ImportSuccessRate);
-                HealthLabel       = $"{stats.ImportSuccessRate:0.0}%";
+                HealthGaugeSeries = BuildHealthGaugeSeries(_lastImportSuccessRate);
                 OnPropertyChanged(nameof(HealthGaugeSeries));
 
-                // ── Recent activity ───────────────────────────────────────────
                 RecentActivity.Clear();
                 foreach (var line in stats.RecentActivity.Take(10))
                 {
                     RecentActivity.Add(ActivityItem.FromText(line));
                 }
 
-                // ── Low stock items ───────────────────────────────────────────
                 LowStockItems.Clear();
-                HasLowStock = stats.LowStock > 0;
-                if (HasLowStock)
+                foreach (var item in stats.LowStockItems)
                 {
-                    var sampleNames = new[] { "Fuel Filter", "Anchor Chain", "Shaft Seal", "Impeller", "O-Ring Kit" };
-                    var rng = new Random(stats.LowStock);
-                    for (int i = 0; i < Math.Min(stats.LowStock, 5); i++)
-                    {
-                        LowStockItems.Add(new LowStockItem(
-                            sampleNames[i % sampleNames.Length],
-                            rng.Next(0, 3),
-                            rng.Next(5, 15)));
-                    }
+                    LowStockItems.Add(item);
                 }
 
-                // ── Distribution (based on real template count) ───────────────
-                BuildDistributionFromStats(stats);
+                HasLowStock = stats.LowStock > 0;
 
-                // ── Stock level bar chart ─────────────────────────────────────
-                StockLevelSeries  = BuildStockLevelSeries(stats);
+                StockLevelSeries = BuildStockLevelSeries(stats.LowStockItems, !_themeService.IsDark);
                 StockLevelYLabels = LowStockItems.Select(i => i.Name).Take(5).ToArray();
-                if (StockLevelYLabels.Length == 0) StockLevelYLabels = ["—"];
+                if (StockLevelYLabels.Length == 0)
+                {
+                    StockLevelYLabels = ["—"];
+                }
+
+                StockLevelYAxes = DashboardChartAppearance.BuildStockLevelYAxes(StockLevelYLabels, _themeService.IsDark);
                 OnPropertyChanged(nameof(StockLevelSeries));
                 OnPropertyChanged(nameof(StockLevelYLabels));
+                OnPropertyChanged(nameof(StockLevelYAxes));
 
                 LastUpdated = $"Updated {DateTime.Now:HH:mm}";
+                loadDistributionAfter = true;
             }
 
-            if (!trendOk) return;
+            ct.ThrowIfCancellationRequested();
 
-            var points = trend.Select(t => t.Value).ToArray();
-            if (points.Length == 0) points = [0d];
+            IReadOnlyList<DashboardTrendPointDto> trendPoints = stats is { Trend.Count: > 0 }
+                ? stats.Trend
+                : trendOk ? apiTrend : [];
+            var points = trendPoints.Select(t => t.Value).ToArray();
+            if (points.Length == 0)
+            {
+                points = [0d];
+            }
+
+            var trendAnim = animateCharts ? TimeSpan.FromMilliseconds(400) : TimeSpan.Zero;
+            var avgAnim = animateCharts ? TimeSpan.FromMilliseconds(450) : TimeSpan.Zero;
 
             TrendSeries =
             [
@@ -198,7 +468,7 @@ public partial class DashboardViewModel : ViewModelBase
                     Values          = points,
                     GeometrySize    = 7,
                     GeometryStroke  = new SolidColorPaint(new SKColor(31, 122, 224), 2.5f),
-                    GeometryFill    = new SolidColorPaint(new SKColor(10, 14, 21)),
+                    GeometryFill    = new SolidColorPaint(DashboardChartAppearance.LinePointFill(!_themeService.IsDark)),
                     LineSmoothness  = 0.7,
                     Fill            = new LinearGradientPaint(
                                           new SKColor(31, 122, 224, 80),
@@ -206,7 +476,7 @@ public partial class DashboardViewModel : ViewModelBase
                                           new SKPoint(0.5f, 0f),
                                           new SKPoint(0.5f, 1f)),
                     Stroke          = new SolidColorPaint(new SKColor(31, 122, 224), 3f),
-                    AnimationsSpeed = TimeSpan.FromMilliseconds(1200),
+                    AnimationsSpeed = trendAnim,
                 },
                 new LineSeries<double>
                 {
@@ -220,72 +490,129 @@ public partial class DashboardViewModel : ViewModelBase
                     },
                     GeometryStroke = null,
                     GeometryFill   = null,
-                    AnimationsSpeed = TimeSpan.FromMilliseconds(1400),
+                    AnimationsSpeed = avgAnim,
                 }
             ];
 
-            TrendXLabels = trend.Select(t => t.Label).ToArray();
+            TrendXLabels = trendPoints.Select(t => t.Label).ToArray();
+            TrendXAxes = DashboardChartAppearance.BuildTrendXAxes(TrendXLabels, _themeService.IsDark);
             OnPropertyChanged(nameof(TrendSeries));
             OnPropertyChanged(nameof(TrendXLabels));
+            OnPropertyChanged(nameof(TrendXAxes));
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Dashboard] LoadDashboardCoreAsync failed: {ex.Message}");
         }
         finally
         {
-            IsLoading = false;
+            if (generation == _loadGeneration && showLoadingIndicator)
+            {
+                IsLoading = false;
+            }
+        }
+
+        if (generation != _loadGeneration)
+        {
+            return;
+        }
+
+        _lastLoadUtc = DateTimeOffset.UtcNow;
+        _hasCompletedInitialLoad = true;
+
+        if (loadDistributionAfter)
+        {
+            _ = BuildDistributionAsync(ct);
         }
 
         StartAutoRefresh();
     }
 
     // ── Distribution ──────────────────────────────────────────────────────────
-    private void BuildDistributionFromStats(DashboardStatsDto stats)
+    private async Task BuildDistributionAsync(CancellationToken cancellationToken = default)
     {
+        _distributionCts?.Cancel();
+        _distributionCts?.Dispose();
+        _distributionCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var ct = _distributionCts.Token;
+
         DistributionItems.Clear();
 
-        // Real proportional split based on total parts and template count
-        var total = Math.Max(1, stats.TotalParts);
-        var templateCount = Math.Max(1, stats.ActiveTemplates);
+        var sliceStroke = _themeService.IsDark
+            ? new SKColor(10, 14, 21)
+            : new SKColor(255, 255, 255);
 
-        // Generate proportional slices
-        var colors = new[] { "#1F7AE0", "#2ABD8F", "#FEBC2E", "#8B5CF6", "#FF6B6B" };
-        var names = new[] { "Primary", "Secondary", "Auxiliary", "Specialized", "Other" };
-        var rng = new Random(total + templateCount);
-
-        var sliceCount = Math.Min(templateCount, 5);
-        var remaining = 100;
-        var values = new int[sliceCount];
-
-        for (int i = 0; i < sliceCount; i++)
+        try
         {
-            if (i == sliceCount - 1)
-            {
-                values[i] = remaining;
-            }
-            else
-            {
-                values[i] = Math.Max(8, rng.Next(15, remaining - (sliceCount - i - 1) * 8));
-                remaining -= values[i];
-            }
-        }
+            ct.ThrowIfCancellationRequested();
 
-        var series = new ISeries[sliceCount];
-        for (int i = 0; i < sliceCount; i++)
+            var templates = (await _templateSchema.GetTemplatesAsync(ct).ConfigureAwait(true)).ToList();
+            ct.ThrowIfCancellationRequested();
+
+            if (templates.Count == 0)
+            {
+                DistributionSeries = BuildEmptyDistributionSeries();
+                OnPropertyChanged(nameof(DistributionSeries));
+                return;
+            }
+
+            var counts = await Task.WhenAll(
+                templates.Select(t => _masterData.GetRowCountAsync(t.Id, ct))).ConfigureAwait(true);
+            ct.ThrowIfCancellationRequested();
+            var slices = templates
+                .Select((template, index) => (Name: template.Name, Count: counts[index]))
+                .Where(slice => slice.Count > 0)
+                .OrderByDescending(slice => slice.Count)
+                .Take(5)
+                .ToList();
+
+            if (slices.Count == 0)
+            {
+                DistributionSeries = BuildEmptyDistributionSeries();
+                OnPropertyChanged(nameof(DistributionSeries));
+                return;
+            }
+
+            var totalParts = Math.Max(1, slices.Sum(s => s.Count));
+            var series = new ISeries[slices.Count];
+
+            for (var i = 0; i < slices.Count; i++)
+            {
+                var (name, count) = slices[i];
+                var pct = (int)Math.Round(100.0 * count / totalParts);
+                var hex = ResolveDistributionColorHex(name, i);
+                var color = ParseSkColor(hex);
+
+                series[i] = new PieSeries<int>
+                {
+                    Values = [count],
+                    Name = name,
+                    Fill = new SolidColorPaint(color),
+                    Stroke = new SolidColorPaint(sliceStroke) { StrokeThickness = 2f },
+                    InnerRadius = 45,
+                    Pushout = 2,
+                    AnimationsSpeed = TimeSpan.FromMilliseconds(900 + i * 120),
+                };
+                DistributionItems.Add(new DistributionItem(name, pct, hex));
+            }
+
+            DistributionSeries = series;
+            OnPropertyChanged(nameof(DistributionSeries));
+        }
+        catch (OperationCanceledException)
         {
-            var hex = colors[i % colors.Length];
-            var color = ParseSkColor(hex);
-            series[i] = new PieSeries<int>
-            {
-                Values = [values[i]],
-                Name = names[i % names.Length],
-                Fill = new SolidColorPaint(color),
-                InnerRadius = 50,
-                Pushout = i == 0 ? 5 : 0,
-                AnimationsSpeed = TimeSpan.FromMilliseconds(1000 + i * 200),
-            };
-            DistributionItems.Add(new DistributionItem(names[i % names.Length], values[i], hex));
+            // Superseded by a newer dashboard load.
         }
-
-        DistributionSeries = series;
-        OnPropertyChanged(nameof(DistributionSeries));
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Dashboard] BuildDistributionAsync failed: {ex.Message}");
+            DistributionSeries = BuildEmptyDistributionSeries();
+            OnPropertyChanged(nameof(DistributionSeries));
+        }
     }
 
     // ── Chart builders ────────────────────────────────────────────────────────
@@ -306,10 +633,12 @@ public partial class DashboardViewModel : ViewModelBase
         ];
     }
 
-    private static ISeries[] BuildStockLevelSeries(DashboardStatsDto stats)
+    private static ISeries[] BuildStockLevelSeries(IReadOnlyList<LowStockItem> items, bool isLight)
     {
-        var rng = new Random(stats.LowStock + stats.TotalParts);
-        int[] values = [rng.Next(0, 5), rng.Next(0, 4), rng.Next(1, 6), rng.Next(2, 7), rng.Next(0, 5)];
+        int[] values = items.Count == 0
+            ? [0]
+            : items.Select(item => item.Current).ToArray();
+        var labelColor = isLight ? new SKColor(33, 47, 66) : new SKColor(234, 242, 255);
         return
         [
             new RowSeries<int>
@@ -324,12 +653,36 @@ public partial class DashboardViewModel : ViewModelBase
                 MaxBarWidth     = 16,
                 Rx              = 4,
                 Ry              = 4,
-                DataLabelsPaint = new SolidColorPaint(new SKColor(234, 242, 255)),
+                DataLabelsPaint = new SolidColorPaint(labelColor),
                 DataLabelsSize  = 11,
                 DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.End,
                 AnimationsSpeed = TimeSpan.FromMilliseconds(1000),
             }
         ];
+    }
+
+    /// <summary>Template distribution: vendor = yellow, partfinder.parts = green, customers = blue.</summary>
+    private static string ResolveDistributionColorHex(string templateName, int fallbackIndex)
+    {
+        var name = templateName.Trim();
+        if (name.Contains("vendor", StringComparison.OrdinalIgnoreCase))
+        {
+            return "#FEBC2E";
+        }
+
+        if (name.Contains("partfinder.parts", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "parts", StringComparison.OrdinalIgnoreCase))
+        {
+            return "#2ABD8F";
+        }
+
+        if (name.Contains("customer", StringComparison.OrdinalIgnoreCase))
+        {
+            return "#1F7AE0";
+        }
+
+        var fallback = new[] { "#1F7AE0", "#2ABD8F", "#FEBC2E", "#8B5CF6", "#FF6B6B" };
+        return fallback[fallbackIndex % fallback.Length];
     }
 
     private static ISeries[] BuildEmptyDistributionSeries()
@@ -345,7 +698,7 @@ public partial class DashboardViewModel : ViewModelBase
         ];
     }
 
-    private static ISeries[] BuildHealthGaugeSeries(double rate)
+    private ISeries[] BuildHealthGaugeSeries(double rate)
     {
         var filled = Math.Min(100, Math.Max(0, rate));
         var fillColor = filled >= 90
@@ -353,6 +706,7 @@ public partial class DashboardViewModel : ViewModelBase
             : filled >= 70
                 ? new SKColor(254, 188, 46)
                 : new SKColor(255, 100, 100);
+        var trackColor = DashboardChartAppearance.GaugeTrackColor(_themeService.IsDark);
         return
         [
             new PieSeries<double>
@@ -366,12 +720,446 @@ public partial class DashboardViewModel : ViewModelBase
             new PieSeries<double>
             {
                 Values             = [100 - filled],
-                Fill               = new SolidColorPaint(new SKColor(26, 39, 52)),
+                Fill               = new SolidColorPaint(trackColor),
                 InnerRadius        = 58,
                 MaxRadialColumnWidth = 20,
                 AnimationsSpeed    = TimeSpan.FromMilliseconds(1400),
             },
         ];
+    }
+
+    private async Task<WorkspaceDashboardStats?> BuildWorkspaceStatsAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var templatesTask = _templateSchema.GetTemplatesAsync(cancellationToken);
+            var inventoryTask = _inventory.GetAllAsync(cancellationToken);
+            var relationsTask = _api.GetRelationsAsync(cancellationToken);
+            var auditTask = _audit.GetRecentAsync(40, null, cancellationToken);
+            await Task.WhenAll(templatesTask, inventoryTask, relationsTask, auditTask).ConfigureAwait(true);
+
+            var templates = (await templatesTask.ConfigureAwait(true)).ToList();
+            var inventory = await inventoryTask.ConfigureAwait(true);
+            var (relationsOk, _, relations) = await relationsTask.ConfigureAwait(true);
+            var audits = await auditTask.ConfigureAwait(true);
+            var relationList = relationsOk ? relations : Array.Empty<WorksheetRelationDto>();
+
+            var linkedTemplateIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var relation in relationList)
+            {
+                if (!string.IsNullOrWhiteSpace(relation.PrimaryTemplateId))
+                {
+                    linkedTemplateIds.Add(relation.PrimaryTemplateId);
+                }
+
+                if (!string.IsNullOrWhiteSpace(relation.LookupTemplateId))
+                {
+                    linkedTemplateIds.Add(relation.LookupTemplateId);
+                }
+            }
+
+            var counts = templates.Count == 0
+                ? Array.Empty<int>()
+                : await Task.WhenAll(templates.Select(t => _masterData.GetRowCountAsync(t.Id, cancellationToken)))
+                    .ConfigureAwait(true);
+            var masterDataRows = counts.Sum();
+
+            var activeIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (var i = 0; i < templates.Count; i++)
+            {
+                if (counts[i] > 0 || linkedTemplateIds.Contains(templates[i].Id))
+                {
+                    activeIds.Add(templates[i].Id);
+                }
+            }
+
+            var activeTemplates = activeIds.Count > 0 ? activeIds.Count : templates.Count;
+
+            int totalParts;
+            int belowMinimum;
+            int outOfStock;
+            List<LowStockItem> lowItems;
+            string partsSource;
+
+            if (inventory.Count > 0)
+            {
+                partsSource = "inventory";
+                totalParts = inventory.Count;
+                (lowItems, belowMinimum, outOfStock) = CollectInventoryStock(inventory);
+            }
+            else
+            {
+                partsSource = "master data";
+                var partsRows = 0;
+                for (var i = 0; i < templates.Count; i++)
+                {
+                    if (IsPartsTemplate(templates[i]) || templates[i].Fields.Any(IsQuantityField))
+                    {
+                        partsRows += counts[i];
+                    }
+                }
+
+                totalParts = partsRows > 0 ? partsRows : masterDataRows;
+                (lowItems, belowMinimum, outOfStock) = await ScanMasterDataStockAsync(templates, cancellationToken)
+                    .ConfigureAwait(true);
+            }
+
+            lowItems = lowItems
+                .OrderBy(item => item.Current)
+                .ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+                .Take(5)
+                .ToList();
+
+            var (importRate, hasImports) = ComputeImportSuccess(audits);
+
+            return new WorkspaceDashboardStats
+            {
+                TotalParts = totalParts,
+                LowStock = belowMinimum + outOfStock,
+                BelowMinimum = belowMinimum,
+                OutOfStock = outOfStock,
+                ActiveTemplates = activeTemplates,
+                LinkedTemplateCount = relationList.Count,
+                MasterDataRows = masterDataRows,
+                ImportSuccessRate = importRate,
+                HasImportHistory = hasImports,
+                PartsSource = partsSource,
+                RecentActivity = BuildActivityLines(audits, totalParts, masterDataRows, relationList.Count, partsSource),
+                LowStockItems = lowItems,
+                Trend = BuildInventoryTrend(inventory),
+            };
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Dashboard] BuildWorkspaceStatsAsync failed: {ex.Message}");
+            return null;
+        }
+    }
+
+    private static (List<LowStockItem> Items, int BelowMinimum, int OutOfStock) CollectInventoryStock(
+        IReadOnlyList<InventoryDoc> inventory)
+    {
+        var items = new List<LowStockItem>();
+        var belowMinimum = 0;
+        var outOfStock = 0;
+
+        foreach (var doc in inventory)
+        {
+            var minimum = doc.MinStock > 0 ? doc.MinStock : 10;
+            var quantity = doc.Quantity;
+            if (quantity >= minimum)
+            {
+                continue;
+            }
+
+            if (quantity == 0)
+            {
+                outOfStock++;
+            }
+            else
+            {
+                belowMinimum++;
+            }
+
+            var name = string.IsNullOrWhiteSpace(doc.PartName) ? doc.PartId : doc.PartName;
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                name = "Unnamed part";
+            }
+
+            items.Add(new LowStockItem(name.Trim(), quantity, minimum));
+        }
+
+        return (items, belowMinimum, outOfStock);
+    }
+
+    private async Task<(List<LowStockItem> Items, int BelowMinimum, int OutOfStock)> ScanMasterDataStockAsync(
+        IReadOnlyList<PartTemplateDefinition> templates,
+        CancellationToken cancellationToken)
+    {
+        var items = new List<LowStockItem>();
+        var belowMinimum = 0;
+        var outOfStock = 0;
+
+        foreach (var template in templates)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var quantityField = template.Fields.FirstOrDefault(IsQuantityField);
+            if (quantityField is null)
+            {
+                continue;
+            }
+
+            var minimumField = template.Fields.FirstOrDefault(IsMinimumField);
+            var nameField = template.Fields.FirstOrDefault(IsNameField);
+            var rows = await _masterData.GetRowsAsync(template.Id, cancellationToken).ConfigureAwait(true);
+
+            foreach (var row in rows)
+            {
+                if (!TryReadNumber(row.Values, quantityField, out var quantityValue))
+                {
+                    continue;
+                }
+
+                var quantity = (int)Math.Round(quantityValue);
+                double minimumValue = 0;
+                var hasMinimum = minimumField is not null
+                    && TryReadNumber(row.Values, minimumField, out minimumValue)
+                    && minimumValue > 0;
+                if (!hasMinimum)
+                {
+                    if (quantity > 0)
+                    {
+                        continue;
+                    }
+
+                    outOfStock++;
+                    items.Add(new LowStockItem(ReadRowName(row, nameField, template.Name), 0, 1));
+                    continue;
+                }
+
+                var minimum = (int)Math.Round(minimumValue);
+                if (quantity >= minimum)
+                {
+                    continue;
+                }
+
+                if (quantity <= 0)
+                {
+                    outOfStock++;
+                }
+                else
+                {
+                    belowMinimum++;
+                }
+
+                items.Add(new LowStockItem(
+                    ReadRowName(row, nameField, template.Name),
+                    Math.Max(0, quantity),
+                    minimum));
+            }
+        }
+
+        return (items, belowMinimum, outOfStock);
+    }
+
+    private static List<string> BuildActivityLines(
+        IReadOnlyList<AuditDoc> audits,
+        int totalParts,
+        int masterDataRows,
+        int linkedCount,
+        string partsSource)
+    {
+        var lines = new List<string>();
+        foreach (var doc in audits.Take(8))
+        {
+            var action = string.IsNullOrWhiteSpace(doc.Action) ? doc.EventType : doc.Action;
+            var details = doc.Details?.Trim();
+            var line = string.IsNullOrWhiteSpace(details) ? action : $"{action}: {details}";
+            if (!string.IsNullOrWhiteSpace(line))
+            {
+                lines.Add(line.Trim());
+            }
+        }
+
+        if (lines.Count == 0)
+        {
+            if (totalParts > 0)
+            {
+                lines.Add($"{totalParts} parts tracked in {partsSource}");
+            }
+
+            if (masterDataRows > 0)
+            {
+                lines.Add($"{masterDataRows} master data rows");
+            }
+
+            if (linkedCount > 0)
+            {
+                lines.Add($"{linkedCount} linked template relations");
+            }
+        }
+
+        if (lines.Count == 0)
+        {
+            lines.Add("No recent activity");
+        }
+
+        return lines;
+    }
+
+    private static (double Rate, bool HasHistory) ComputeImportSuccess(IReadOnlyList<AuditDoc> audits)
+    {
+        var imports = audits.Where(doc =>
+            ContainsText(doc, "import")).ToList();
+        if (imports.Count == 0)
+        {
+            return (0, false);
+        }
+
+        var failed = imports.Count(doc => ContainsText(doc, "fail") || ContainsText(doc, "error"));
+        var rate = 100.0 * (imports.Count - failed) / imports.Count;
+        return (rate, true);
+    }
+
+    private static bool ContainsText(AuditDoc doc, string term)
+    {
+        var text = $"{doc.EventType} {doc.Action} {doc.Details}";
+        return text.Contains(term, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static IReadOnlyList<DashboardTrendPointDto> BuildInventoryTrend(IReadOnlyList<InventoryDoc> inventory)
+    {
+        if (inventory.Count == 0)
+        {
+            return [];
+        }
+
+        var now = DateTime.UtcNow;
+        var start = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(-5);
+        var buckets = new int[6];
+        foreach (var doc in inventory)
+        {
+            var stamp = doc.LastUpdated == default ? now : doc.LastUpdated.ToUniversalTime();
+            var index = ((stamp.Year - start.Year) * 12) + stamp.Month - start.Month;
+            if (index is >= 0 and < 6)
+            {
+                buckets[index]++;
+            }
+        }
+
+        if (buckets.Sum() == 0)
+        {
+            buckets[5] = inventory.Count;
+        }
+
+        return Enumerable.Range(0, 6)
+            .Select(index => new DashboardTrendPointDto
+            {
+                Label = start.AddMonths(index).ToString("MMM", CultureInfo.InvariantCulture),
+                Value = buckets[index],
+            })
+            .ToList();
+    }
+
+    private static bool IsPartsTemplate(PartTemplateDefinition template) =>
+        MongoSharedPartsCatalog.IsCatalogTemplateName(template.Name)
+        || template.Name.Contains("part", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsQuantityField(TemplateFieldDefinition field) =>
+        MatchesField(field, QuantityFieldKeys);
+
+    private static bool IsMinimumField(TemplateFieldDefinition field) =>
+        MatchesField(field, MinimumFieldKeys);
+
+    private static bool IsNameField(TemplateFieldDefinition field) =>
+        MatchesField(field, NameFieldKeys);
+
+    private static readonly string[] QuantityFieldKeys =
+        ["quantity", "qty", "stock", "stocklevel", "onhand", "onhandqty", "availableqty"];
+
+    private static readonly string[] MinimumFieldKeys =
+        ["minstock", "minimumstock", "reorderlevel", "reorderqty", "threshold", "minqty", "minimumqty", "safetystock"];
+
+    private static readonly string[] NameFieldKeys =
+        ["partname", "itemname", "name", "description", "title"];
+
+    private static bool MatchesField(TemplateFieldDefinition field, string[] keys)
+    {
+        var key = NormalizeFieldName(field.Key);
+        var label = NormalizeFieldName(field.Label);
+        return keys.Contains(key) || keys.Contains(label);
+    }
+
+    private static string NormalizeFieldName(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return new string(value.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+    }
+
+    private static bool TryReadNumber(
+        IReadOnlyDictionary<string, string> values,
+        TemplateFieldDefinition field,
+        out double number)
+    {
+        number = 0;
+        if (!values.TryGetValue(field.Key, out var raw) || string.IsNullOrWhiteSpace(raw))
+        {
+            return false;
+        }
+
+        var cleaned = raw.Trim().Replace(",", string.Empty, StringComparison.Ordinal);
+        return double.TryParse(cleaned, NumberStyles.Float, CultureInfo.InvariantCulture, out number)
+            || double.TryParse(cleaned, NumberStyles.Float, CultureInfo.CurrentCulture, out number);
+    }
+
+    private static string ReadRowName(
+        MasterDataRowRecord row,
+        TemplateFieldDefinition? nameField,
+        string fallback)
+    {
+        if (nameField is not null
+            && row.Values.TryGetValue(nameField.Key, out var name)
+            && !string.IsNullOrWhiteSpace(name))
+        {
+            return name.Trim();
+        }
+
+        return string.IsNullOrWhiteSpace(fallback) ? "Unnamed part" : fallback.Trim();
+    }
+
+    private sealed class WorkspaceDashboardStats
+    {
+        public int TotalParts { get; init; }
+        public int LowStock { get; init; }
+        public int BelowMinimum { get; init; }
+        public int OutOfStock { get; init; }
+        public int ActiveTemplates { get; init; }
+        public int LinkedTemplateCount { get; init; }
+        public int MasterDataRows { get; init; }
+        public double ImportSuccessRate { get; init; }
+        public bool HasImportHistory { get; init; }
+        public string PartsSource { get; init; } = "inventory";
+        public List<string> RecentActivity { get; init; } = [];
+        public List<LowStockItem> LowStockItems { get; init; } = [];
+        public IReadOnlyList<DashboardTrendPointDto> Trend { get; init; } = [];
+    }
+
+    private void RefreshChartAppearance()
+    {
+        var appearance = DashboardChartAppearance.ForLightMode(_themeService.IsDark);
+        ChartDrawMarginFrame = appearance.DrawMarginFrame;
+        ChartXAxes = appearance.XAxes;
+        ChartYAxes = appearance.YAxes;
+        if (TrendXLabels is { Length: > 0 })
+        {
+            TrendXAxes = DashboardChartAppearance.BuildTrendXAxes(TrendXLabels, _themeService.IsDark);
+            OnPropertyChanged(nameof(TrendXAxes));
+        }
+
+        StockLevelYAxes = DashboardChartAppearance.BuildStockLevelYAxes(StockLevelYLabels, _themeService.IsDark);
+        OnPropertyChanged(nameof(StockLevelYAxes));
+
+        OnPropertyChanged(nameof(ChartDrawMarginFrame));
+        OnPropertyChanged(nameof(ChartXAxes));
+        OnPropertyChanged(nameof(ChartYAxes));
+    }
+
+    private void OnAppThemeChanged()
+    {
+        RefreshChartAppearance();
+        HealthGaugeSeries = BuildHealthGaugeSeries(_lastImportSuccessRate);
+        OnPropertyChanged(nameof(HealthGaugeSeries));
     }
 
     private static SKColor ParseSkColor(string hex)
@@ -400,7 +1188,9 @@ public partial class DashboardViewModel : ViewModelBase
                        await _refreshTimer.WaitForNextTickAsync(_refreshCts.Token).ConfigureAwait(false))
                 {
                     if (_uiQueue is not null)
-                        _ = _uiQueue.TryEnqueue(async () => await LoadDashboardAsync().ConfigureAwait(true));
+                    {
+                        _ = _uiQueue.TryEnqueue(() => _ = LoadDashboardCoreAsync(showLoadingIndicator: false));
+                    }
                 }
             }
             catch { }
@@ -505,6 +1295,8 @@ public sealed class DistributionItem
     public string Name       { get; }
     public int    Percentage { get; }
     public string ColorHex   { get; }
+
+    public string PercentDisplay => $"{Percentage}%";
 
     public Microsoft.UI.Xaml.Media.SolidColorBrush ColorBrush
     {

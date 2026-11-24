@@ -13,12 +13,15 @@ public partial class TemplatesViewModel : ViewModelBase
     private readonly IShellNavCoordinator _shellNav;
     private readonly ILocalSetupContext _setupContext;
     private readonly IContextActionsService _contextActions;
+    private readonly IMasterDataRecordsService _records;
     private readonly ActivityLogger _activityLogger;
     private readonly IFavouriteStore _favouriteStore;
 
     private readonly Microsoft.UI.Dispatching.DispatcherQueue _dispatcherQueue;
 
     private readonly ICurrentUserAccessService _access;
+    private readonly BulkTemplateImportService _bulkImport;
+    private readonly WorksheetRelationCleanupService _relationCleanup;
 
     public TemplatesViewModel(
         ITemplateSchemaService templateSchema,
@@ -27,7 +30,10 @@ public partial class TemplatesViewModel : ViewModelBase
         IContextActionsService contextActions,
         ActivityLogger activityLogger,
         IFavouriteStore favouriteStore,
-        ICurrentUserAccessService access)
+        ICurrentUserAccessService access,
+        BulkTemplateImportService bulkImport,
+        IMasterDataRecordsService records,
+        WorksheetRelationCleanupService relationCleanup)
     {
         _templateSchema = templateSchema;
         _shellNav = shellNav;
@@ -36,6 +42,9 @@ public partial class TemplatesViewModel : ViewModelBase
         _activityLogger = activityLogger;
         _favouriteStore = favouriteStore;
         _access = access;
+        _bulkImport = bulkImport;
+        _records = records;
+        _relationCleanup = relationCleanup;
         _dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
         
         ColumnLabels.Add(new ColumnLabelDraft());
@@ -89,12 +98,44 @@ public partial class TemplatesViewModel : ViewModelBase
 
     public bool IsAllTemplatesGalleryEmpty => Templates.Count == 0;
 
+    public async Task<BulkTemplateImportResult> ImportBulkTemplatesFromFileAsync(
+        string filePath,
+        IProgress<BulkImportProgress>? progress = null)
+    {
+        var caps = _access.Capabilities;
+        if (!caps.CanAddTemplate && !caps.CanAddMasterData)
+        {
+            return new BulkTemplateImportResult
+            {
+                Errors = ["You do not have permission to add templates or import data."],
+            };
+        }
+
+        var result = await _bulkImport
+            .ImportFromFileAsync(filePath, caps.CanAddTemplate, caps.CanAddMasterData, progress)
+            .ConfigureAwait(true);
+
+        if (result.HasWork)
+        {
+            _activityLogger.LogTemplateChange(
+                "Bulk Template Import",
+                $"Created {result.CreatedCount} template(s), imported {result.ImportedRowCount} row(s).");
+            await LoadAsync().ConfigureAwait(true);
+            await _shellNav.NotifyTemplatesChangedAsync().ConfigureAwait(true);
+            OnPropertyChanged(nameof(IsAllTemplatesGalleryEmpty));
+            AllTemplatesViewRequested?.Invoke(this, EventArgs.Empty);
+        }
+
+        return result;
+    }
+
     [RelayCommand]
     private async Task DeleteTemplateAsync(string templateId)
     {
         if (string.IsNullOrWhiteSpace(templateId) || !_access.Capabilities.CanDeleteTemplate) return;
         try
         {
+            await _relationCleanup.DeleteAllRelationsInvolvingTemplateAsync(templateId).ConfigureAwait(true);
             await _templateSchema.DeleteTemplateAsync(templateId).ConfigureAwait(true);
             _activityLogger.LogTemplateChange("Template Deleted", $"Template {templateId} deleted");
             ExitTemplateEditor();
@@ -201,6 +242,7 @@ public partial class TemplatesViewModel : ViewModelBase
                 OnPropertyChanged(nameof(LinkTargetCandidates));
                 OnPropertyChanged(nameof(CanSaveTemplate));
                 OnPropertyChanged(nameof(EditorHeaderTitle));
+                SaveTemplateCommand.NotifyCanExecuteChanged();
             }
         }
     }
@@ -300,6 +342,7 @@ public partial class TemplatesViewModel : ViewModelBase
     }
 
     private bool _hasTenantDb;
+    private int _orgTemplateCount;
 
     public bool ShowDbMissingBanner => !_hasTenantDb;
 
@@ -331,6 +374,7 @@ public partial class TemplatesViewModel : ViewModelBase
         OnPropertyChanged(nameof(LinkTargetCandidates));
         OnPropertyChanged(nameof(EditorHeaderTitle));
         OnPropertyChanged(nameof(ShowFavouritesSubPage));
+        SaveTemplateCommand.NotifyCanExecuteChanged();
     }
 
     public async Task ReloadContextActionsAsync(CancellationToken cancellationToken = default)
@@ -473,6 +517,7 @@ public partial class TemplatesViewModel : ViewModelBase
 
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
+        System.Diagnostics.Debug.WriteLine("[TemplatesViewModel] Loading templates...");
         FormError = string.Empty;
         if (!_access.Capabilities.CanViewTemplate)
         {
@@ -495,8 +540,9 @@ public partial class TemplatesViewModel : ViewModelBase
             templates = Array.Empty<PartTemplateDefinition>();
         }
 
-        // Filter templates based on user's allowed template IDs (employee restriction)
-        var filtered = _access.FilterTemplatesForParts(templates);
+        // Organization templates (Templates page) — exclude master data catalogs from the gallery.
+        var orgTemplates = TemplateCatalogFilters.OrganizationTemplates(templates);
+        var filtered = _access.FilterTemplatesForParts(orgTemplates);
 
         Templates.Clear();
         foreach (var template in filtered)
@@ -504,9 +550,8 @@ public partial class TemplatesViewModel : ViewModelBase
             Templates.Add(template);
         }
 
-        var hasMaster = templates.Any(
-            t => MongoTemplateSchemaService.IsExplorerTemplateName(t.Name));
-        CanAddAnotherTemplate = hasMaster && _access.Capabilities.CanAddTemplate;
+        _orgTemplateCount = templates.Count;
+        CanAddAnotherTemplate = _access.Capabilities.CanAddTemplate;
 
         SelectedTemplate = Templates.FirstOrDefault();
 
@@ -568,18 +613,9 @@ public partial class TemplatesViewModel : ViewModelBase
         ColumnLabels.Remove(draft);
     }
 
-    /// <summary>Opens the canvas editor for a new template (Master Data first if none exists).</summary>
+    /// <summary>Opens the canvas editor for a new template (any name).</summary>
     public void StartCreateFromGallery()
     {
-        var hasMaster = Templates.Any(
-            t => MongoTemplateSchemaService.IsExplorerTemplateName(t.Name));
-
-        if (!hasMaster && _hasTenantDb)
-        {
-            BeginMasterDataFlow();
-            return;
-        }
-
         if (!CanAddAnotherTemplate)
         {
             return;
@@ -596,6 +632,69 @@ public partial class TemplatesViewModel : ViewModelBase
         CellConnections.Clear();
         SelectedTemplate = null;
         NotifyTemplateUiState();
+    }
+
+    public string? LastCreatedTemplateId { get; private set; }
+
+    /// <summary>Creates a named template with one column; rows are added in the composer. Returns an error message, or null on success.</summary>
+    public async Task<string?> CreateDefaultTableTemplateAsync(string name, CancellationToken cancellationToken = default)
+    {
+        LastCreatedTemplateId = null;
+        name = name.Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return "Enter a template name.";
+        }
+
+        if (!CanAddTemplate)
+        {
+            return "You do not have permission to create a template.";
+        }
+
+        if (Templates.Any(t => string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase)))
+        {
+            return "A template with this name already exists.";
+        }
+
+        const int defaultColumns = 1;
+        var templateId = Guid.NewGuid().ToString("N");
+        var fields = new List<TemplateFieldDefinition>(defaultColumns);
+        for (var i = 1; i <= defaultColumns; i++)
+        {
+            fields.Add(new TemplateFieldDefinition
+            {
+                Key = $"column_{i}",
+                Label = $"Column {i}",
+                Type = TemplateFieldType.Text,
+                IsRequired = false,
+                DisplayOrder = i - 1,
+            });
+        }
+
+        var def = new PartTemplateDefinition
+        {
+            Id = templateId,
+            Name = name,
+            Version = 1,
+            IsPublished = true,
+            IsMasterDataCatalog = false,
+            Fields = fields,
+        };
+
+        try
+        {
+            await _templateSchema.SaveTemplateAsync(def, cancellationToken).ConfigureAwait(true);
+            LastCreatedTemplateId = templateId;
+            await LoadAsync(cancellationToken).ConfigureAwait(true);
+            _activityLogger.LogTemplateChange(
+                "Template Created",
+                $"Template \"{name}\" created with {defaultColumns} column (add rows in the editor)");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            return ex.Message;
+        }
     }
 
     [RelayCommand]
@@ -712,7 +811,7 @@ public partial class TemplatesViewModel : ViewModelBase
         NotifyTemplateUiState();
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanSaveTemplate))]
     private async Task SaveTemplateAsync()
     {
         FormError = string.Empty;
@@ -723,20 +822,12 @@ public partial class TemplatesViewModel : ViewModelBase
             return;
         }
 
-        var hasMasterAlready = Templates.Any(
-            t => MongoTemplateSchemaService.IsExplorerTemplateName(t.Name));
-
         if (!IsEditingExisting)
         {
-            if (!hasMasterAlready && !MongoTemplateSchemaService.IsExplorerTemplateName(name))
+            if (MongoTemplateSchemaService.IsExplorerTemplateName(name)
+                && Templates.Any(t => MongoTemplateSchemaService.IsExplorerTemplateName(t.Name)))
             {
-                FormError = "Your first template must be named Explorer.";
-                return;
-            }
-
-            if (hasMasterAlready && MongoTemplateSchemaService.IsExplorerTemplateName(name))
-            {
-                FormError = "A template named Explorer already exists.";
+                FormError = "A template named Explorer or Master Data already exists.";
                 return;
             }
 
@@ -794,7 +885,11 @@ public partial class TemplatesViewModel : ViewModelBase
                 version = existing.Version + 1;
             }
         }
-        else if (!hasMasterAlready)
+        else if (MongoTemplateSchemaService.IsExplorerTemplateName(name)
+                 && !Templates.Any(t => string.Equals(
+                     t.Id,
+                     MongoTemplateSchemaService.MasterDataTemplateId,
+                     StringComparison.Ordinal)))
         {
             templateId = MongoTemplateSchemaService.MasterDataTemplateId;
         }
@@ -875,11 +970,25 @@ public partial class TemplatesViewModel : ViewModelBase
             IsEditingExisting ? "Template Edited" : "Template Created",
             $"Template \"{name}\" {(IsEditingExisting ? "updated" : "created")}");
 
-        var firstMasterSave = !IsEditingExisting && !hasMasterAlready;
+        var firstMasterSave = !IsEditingExisting && _orgTemplateCount == 0;
+        var savedName = name;
         IsEditingExisting = false;
         EditingTemplateId = null;
         await LoadAsync().ConfigureAwait(true);
         await _shellNav.NotifyTemplatesChangedAsync(openMasterDataPage: firstMasterSave).ConfigureAwait(true);
+
+        SelectedTemplate = Templates.FirstOrDefault(
+            t => string.Equals(t.Name, savedName, StringComparison.OrdinalIgnoreCase))
+            ?? Templates.FirstOrDefault();
+
+        FormError = string.Empty;
+        IsTemplateNameReadOnly = false;
+        NewTemplateName = string.Empty;
+        ColumnLabels.Clear();
+        ColumnLabels.Add(new ColumnLabelDraft());
+        CellConnections.Clear();
+        IsCreatingTemplate = false;
+
         OnPropertyChanged(nameof(IsAllTemplatesGalleryEmpty));
         AllTemplatesViewRequested?.Invoke(this, EventArgs.Empty);
     }

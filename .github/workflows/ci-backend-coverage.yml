@@ -1,0 +1,27 @@
+name: Backend — unit tests + coverage
+
+on:
+  pull_request:
+    paths:
+      - 'PartFinder-Backend/**'
+  push:
+    branches: [main]
+    paths:
+      - 'PartFinder-Backend/**'
+  workflow_dispatch:
+
+jobs:
+  jest-coverage:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: PartFinder-Backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: PartFinder-Backend/package-lock.json
+      - run: npm ci
+      - run: npm test -- --coverage --passWithNoTests --coverageReporters=text-summary

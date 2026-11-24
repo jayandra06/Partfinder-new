@@ -1,0 +1,3 @@
+# Download with: .\tools\install-scc.ps1
+scc.exe
+*.zip

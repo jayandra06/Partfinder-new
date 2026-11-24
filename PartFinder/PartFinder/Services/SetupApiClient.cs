@@ -35,6 +35,43 @@ public sealed class SetupInviteUserResponse
     public string? EmailError { get; set; }
 }
 
+public sealed class SetupListOrgUsersResponse
+{
+    public bool Ok { get; set; }
+    public string? OrgDatabaseUri { get; set; }
+    public List<SetupOrgUserListItem>? Users { get; set; }
+}
+
+public sealed class SetupOrgUserListItem
+{
+    public string? Id { get; set; }
+    public string? Name { get; set; }
+    public string? Email { get; set; }
+    public string? Role { get; set; }
+    public bool PartsAllTemplates { get; set; }
+    public List<string>? AllowedTemplateIds { get; set; }
+    public DateTime InvitedAtUtc { get; set; }
+    public TemplatePermissionsDto? TemplatePermissions { get; set; }
+    public MasterDataPermissionsDto? MasterDataPermissions { get; set; }
+    public string? Status { get; set; }
+    public bool IsOrgAdminDirectoryEntry { get; set; }
+}
+
+/// <summary>User row embedded in setup status (ISO date strings).</summary>
+public sealed class SetupListOrgUserItem
+{
+    public string? Id { get; set; }
+    public string? Name { get; set; }
+    public string? Email { get; set; }
+    public string? Role { get; set; }
+    public bool PartsAllTemplates { get; set; }
+    public List<string>? AllowedTemplateIds { get; set; }
+    public string? InvitedAtUtc { get; set; }
+    public TemplatePermissionsDto? TemplatePermissions { get; set; }
+    public MasterDataPermissionsDto? MasterDataPermissions { get; set; }
+    public string? Status { get; set; }
+}
+
 public sealed class SetupInviteLoginResponse
 {
     public bool Ok { get; set; }
@@ -42,6 +79,17 @@ public sealed class SetupInviteLoginResponse
     public string? Email { get; set; }
     public string? Role { get; set; }
     public bool MustChangePassword { get; set; }
+    public string? AccessToken { get; set; }
+    public string? RefreshToken { get; set; }
+}
+
+public sealed class SetupRefreshSessionResponse
+{
+    public bool Ok { get; set; }
+    public string? Email { get; set; }
+    public string? AccessToken { get; set; }
+    public string? RefreshToken { get; set; }
+    public string? Message { get; set; }
 }
 
 public static class SetupApiClient
@@ -280,12 +328,187 @@ public static class SetupApiClient
         return (false, err ?? ParseApiError(text), null);
     }
 
+    public static async Task<(bool ok, string? error, IReadOnlyList<OrgAppUserSummary>? users)> ListOrgUsersAsync(
+        string orgCode,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(orgCode))
+        {
+            return (false, "Organisation code is required.", null);
+        }
+
+        var (success, err, text) = await RawPostAsync(
+            "/api/public/setup/list-org-users",
+            new { orgCode = orgCode.Trim() },
+            ct).ConfigureAwait(true);
+
+        if (!success || string.IsNullOrWhiteSpace(text))
+        {
+            return (false, err ?? "Could not load users from the server.", null);
+        }
+
+        try
+        {
+            var o = JsonSerializer.Deserialize<SetupListOrgUsersResponse>(text, ReadJson);
+            if (o?.Ok != true || o.Users is null)
+            {
+                return (false, err ?? ParseApiError(text), null);
+            }
+
+            if (!string.IsNullOrWhiteSpace(o.OrgDatabaseUri))
+            {
+                SetupStatePersistence.TryWriteDbUri(o.OrgDatabaseUri.Trim(), orgCode.Trim());
+            }
+
+            var mapped = o.Users
+                .Where(u => !string.IsNullOrWhiteSpace(u.Id) && !string.IsNullOrWhiteSpace(u.Email))
+                .Select(u => new OrgAppUserSummary
+                {
+                    Id = u.Id!,
+                    Name = string.IsNullOrWhiteSpace(u.Name) ? u.Email! : u.Name!,
+                    Email = u.Email!,
+                    Role = string.IsNullOrWhiteSpace(u.Role) ? "Employee" : u.Role!,
+                    PartsAllTemplates = u.PartsAllTemplates,
+                    AllowedTemplateIds = u.AllowedTemplateIds ?? [],
+                    InvitedAtUtc = u.InvitedAtUtc == default ? DateTime.UtcNow : u.InvitedAtUtc,
+                    TemplatePermissions = u.TemplatePermissions,
+                    MasterDataPermissions = u.MasterDataPermissions,
+                    Status = string.IsNullOrWhiteSpace(u.Status) ? "Pending" : u.Status!,
+                    IsOrgAdminDirectoryEntry = u.IsOrgAdminDirectoryEntry,
+                })
+                .ToList();
+
+            return (true, null, mapped);
+        }
+        catch
+        {
+            return (false, "Server returned user data that could not be read.", null);
+        }
+    }
+
+    public static IReadOnlyList<OrgAppUserSummary> MapOrgAppUserItems(
+        IEnumerable<SetupListOrgUserItem>? items)
+    {
+        if (items is null)
+        {
+            return Array.Empty<OrgAppUserSummary>();
+        }
+
+        return items
+            .Select(MapListOrgUserItem)
+            .Where(u => !string.IsNullOrWhiteSpace(u.Email))
+            .ToList();
+    }
+
+    private static OrgAppUserSummary MapListOrgUserItem(SetupListOrgUserItem item)
+    {
+        DateTime invitedAt = default;
+        if (!string.IsNullOrWhiteSpace(item.InvitedAtUtc)
+            && DateTime.TryParse(
+                item.InvitedAtUtc,
+                null,
+                System.Globalization.DateTimeStyles.RoundtripKind,
+                out var parsed))
+        {
+            invitedAt = parsed.Kind == DateTimeKind.Unspecified
+                ? DateTime.SpecifyKind(parsed, DateTimeKind.Utc)
+                : parsed.ToUniversalTime();
+        }
+
+        var status = string.IsNullOrWhiteSpace(item.Status) ? "Pending" : item.Status.Trim();
+        return new OrgAppUserSummary
+        {
+            Id = item.Id ?? string.Empty,
+            Name = item.Name?.Trim() ?? string.Empty,
+            Email = item.Email?.Trim() ?? string.Empty,
+            Role = item.Role?.Trim() ?? "Employee",
+            PartsAllTemplates = item.PartsAllTemplates,
+            AllowedTemplateIds = item.AllowedTemplateIds ?? [],
+            InvitedAtUtc = invitedAt,
+            TemplatePermissions = item.TemplatePermissions,
+            MasterDataPermissions = item.MasterDataPermissions,
+            Status = status,
+        };
+    }
+
+    private static bool ShouldRetryInviteLoginWithoutDeviceId(string? err, string? text)
+    {
+        var blob = $"{err}\n{text}";
+        return blob.Contains("deviceId", StringComparison.OrdinalIgnoreCase)
+               && blob.Contains("should not exist", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static bool LooksLikeNetworkError(string? error)
+    {
+        if (string.IsNullOrWhiteSpace(error))
+        {
+            return false;
+        }
+
+        var e = error.Trim();
+        return e.Contains("actively refused", StringComparison.OrdinalIgnoreCase)
+               || e.Contains("No such host", StringComparison.OrdinalIgnoreCase)
+               || e.Contains("timed out", StringComparison.OrdinalIgnoreCase)
+               || e.Contains("timeout", StringComparison.OrdinalIgnoreCase)
+               || e.Contains("network", StringComparison.OrdinalIgnoreCase)
+               || e.Contains("connection", StringComparison.OrdinalIgnoreCase)
+               || e.Contains("Could not reach", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static async Task<(bool ok, string? error, SetupRefreshSessionResponse? body)> RefreshSessionAsync(
+        string orgCode,
+        string email,
+        string deviceId,
+        string refreshToken,
+        CancellationToken ct = default)
+    {
+        var (success, err, text) = await RawPostAsync(
+            "/api/public/setup/refresh-session",
+            new { orgCode, email, deviceId, refreshToken },
+            ct).ConfigureAwait(true);
+
+        if (!success)
+        {
+            return (false, err ?? ParseApiError(text), null);
+        }
+
+        try
+        {
+            var o = JsonSerializer.Deserialize<SetupRefreshSessionResponse>(text, ReadJson);
+            if (o?.Ok == true && !string.IsNullOrWhiteSpace(o.AccessToken))
+            {
+                return (true, null, o);
+            }
+        }
+        catch
+        {
+        }
+
+        return (false, err ?? ParseApiError(text), null);
+    }
+
+    public static async Task<(bool ok, string? error)> RevokeSessionAsync(
+        string orgCode,
+        string email,
+        string deviceId,
+        string? refreshToken = null,
+        CancellationToken ct = default)
+    {
+        var (success, err, text) = await RawPostAsync(
+            "/api/public/setup/revoke-session",
+            new { orgCode, email, deviceId, refreshToken },
+            ct).ConfigureAwait(true);
+
+        return success ? (true, null) : (false, err ?? ParseApiError(text));
+    }
+
     public static async Task<(bool ok, string? error, SetupInviteLoginResponse? body)> ValidateInviteLoginAsync(
         string orgCode,
         string email,
         string temporaryPassword,
         CancellationToken ct = default)
     {
+        var deviceId = DeviceIdentityService.GetDeviceId();
         var (success, err, text) = await RawPostAsync(
             "/api/public/setup/invite-login",
             new
@@ -293,10 +516,30 @@ public static class SetupApiClient
                 orgCode,
                 email,
                 temporaryPassword,
+                deviceId,
             },
             ct).ConfigureAwait(true);
 
-        if (!success || string.IsNullOrWhiteSpace(text))
+        // Older license APIs reject unknown fields (forbidNonWhitelisted) before deviceId was added.
+        if (!success && ShouldRetryInviteLoginWithoutDeviceId(err, text))
+        {
+            (success, err, text) = await RawPostAsync(
+                "/api/public/setup/invite-login",
+                new
+                {
+                    orgCode,
+                    email,
+                    temporaryPassword,
+                },
+                ct).ConfigureAwait(true);
+        }
+
+        if (!success)
+        {
+            return (false, err ?? "Request failed.", null);
+        }
+
+        if (string.IsNullOrWhiteSpace(text))
         {
             return (false, err ?? "Request failed.", null);
         }
@@ -307,6 +550,42 @@ public static class SetupApiClient
             if (o is not null)
             {
                 return (o.Ok, o.Ok ? null : (o.Message ?? "Invalid invited credentials."), o);
+            }
+        }
+        catch
+        {
+        }
+
+        return (false, err ?? ParseApiError(text), null);
+    }
+
+    public sealed class SetupForgotPasswordResponse
+    {
+        public bool Ok { get; set; }
+        public string? Message { get; set; }
+    }
+
+    public static async Task<(bool ok, string? error, string? message)> RequestForgotPasswordAsync(
+        string orgCode,
+        string email,
+        CancellationToken ct = default)
+    {
+        var (success, err, text) = await RawPostAsync(
+            "/api/public/setup/forgot-password",
+            new { orgCode, email },
+            ct).ConfigureAwait(true);
+
+        if (!success || string.IsNullOrWhiteSpace(text))
+        {
+            return (false, err ?? "Request failed.", null);
+        }
+
+        try
+        {
+            var o = JsonSerializer.Deserialize<SetupForgotPasswordResponse>(text, ReadJson);
+            if (o?.Ok == true)
+            {
+                return (true, null, o.Message);
             }
         }
         catch
@@ -391,7 +670,64 @@ public static class SetupApiClient
             return (true, null, text);
         }
 
-        return (false, ParseApiError(text), text);
+        return (false, ParseHttpError(text, resp.StatusCode), text);
+    }
+
+    public static string FormatStatusFailureMessage(string? statusErr)
+    {
+        var api = LicenseApiClient.GetBaseUrl();
+        var detail = string.IsNullOrWhiteSpace(statusErr) ? "Request failed." : statusErr.Trim();
+
+        if (LooksLikeNetworkError(detail))
+        {
+            return
+                $"Cannot reach the PartFinder API at {api}. {detail} Check your internet connection and LicenseApi:BaseUrl in appsettings.json.";
+        }
+
+        if (detail.Contains("server error", StringComparison.OrdinalIgnoreCase) ||
+            detail.Contains("FUNCTION_INVOCATION", StringComparison.OrdinalIgnoreCase) ||
+            detail.Contains("(50", StringComparison.Ordinal))
+        {
+            return
+                $"The PartFinder API at {api} returned an error: {detail} The hosted backend may need redeploying, or run PartFinder-Backend locally and set LicenseApi:BaseUrl to http://127.0.0.1:3000 in appsettings.json.";
+        }
+
+        return
+            $"Cannot complete setup against {api}. {detail} Check LicenseApi:BaseUrl in appsettings.json (use http://127.0.0.1:3000 when running the API locally).";
+    }
+
+    private static string ParseHttpError(string? body, System.Net.HttpStatusCode statusCode)
+    {
+        if ((int)statusCode >= 500)
+        {
+            var snippet = body?.Trim();
+            if (!string.IsNullOrEmpty(snippet) && snippet.Length <= 280)
+            {
+                return $"Server error ({(int)statusCode}): {snippet}";
+            }
+
+            return $"Server error ({(int)statusCode}). The API at {LicenseApiClient.GetBaseUrl()} may be down or misconfigured.";
+        }
+
+        if (statusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            var snippet = body?.Trim();
+            if (string.IsNullOrEmpty(snippet))
+            {
+                return
+                    "The API at backend.partfinder.store returned 404 (not deployed). In Vercel, set Root Directory to PartFinder-Backend, add MONGODB_URI and JWT_SECRET, deploy the latest main branch, then try again.";
+            }
+
+            if (!string.IsNullOrEmpty(snippet) &&
+                (snippet.Contains("Cannot POST", StringComparison.OrdinalIgnoreCase) ||
+                 snippet.Contains("Cannot GET", StringComparison.OrdinalIgnoreCase)))
+            {
+                return
+                    "The license API does not support forgot-password yet. Deploy the latest PartFinder-Backend to backend.partfinder.store, then try again.";
+            }
+        }
+
+        return ParseApiError(body);
     }
 
     private static string ParseApiError(string? json)
@@ -399,6 +735,13 @@ public static class SetupApiClient
         if (string.IsNullOrWhiteSpace(json))
         {
             return "Request failed.";
+        }
+
+        var trimmed = json.Trim();
+        if (trimmed.StartsWith("Cannot POST", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("Cannot GET", StringComparison.OrdinalIgnoreCase))
+        {
+            return trimmed;
         }
 
         try

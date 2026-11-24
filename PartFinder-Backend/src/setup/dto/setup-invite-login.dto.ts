@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsEmail, IsString, Matches, MinLength } from 'class-validator';
+import { IsEmail, IsOptional, IsString, Matches, MinLength } from 'class-validator';
 
 export class SetupInviteLoginDto {
   @IsString()
@@ -16,5 +16,10 @@ export class SetupInviteLoginDto {
   @IsString()
   @MinLength(1)
   temporaryPassword: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
+  deviceId?: string;
 }
 

@@ -23,6 +23,7 @@ export class TemplatesController {
 
   @Get()
   async list(@Headers('x-org-id') orgId: string): Promise<{ data: unknown; success: boolean; message: string }> {
+    console.log(`[TemplatesController] Fetching templates for org: ${orgId}`);
     const data = await this.templatesService.list(orgId);
     return this.ok(data, 'Templates fetched');
   }

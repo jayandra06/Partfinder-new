@@ -17,12 +17,30 @@
     <EnableMsixTooling>true</EnableMsixTooling>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- App is not Native AOT; suppress MVVM Toolkit WinRT/AOT advisory on [ObservableProperty] fields. -->
+    <NoWarn>$(NoWarn);MVVMTK0045</NoWarn>
+    <!-- Stop VS breaking in App.g.i.cs on XAML exceptions we already handle in App.xaml.cs -->
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_BREAK_ON_UNHANDLED_EXCEPTION</DefineConstants>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Page Update="Views\Components\InventoryItemFormPanel.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Compile Update="Views\Components\InventoryItemFormPanel.xaml.cs">
+      <DependentUpon>InventoryItemFormPanel.xaml</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="PartFinder.Tests" />
+  </ItemGroup>
 
   <ItemGroup>
     <None Update="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="Package.StoreAssociation.xml" />
   </ItemGroup>
 
   <ItemGroup>
@@ -32,6 +50,8 @@
     <Content Include="Assets\Square44x44Logo.scale-200.png" />
     <Content Include="Assets\Square44x44Logo.targetsize-24_altform-unplated.png" />
     <Content Include="Assets\StoreLogo.png" />
+    <Content Include="Assets\PartFinderLogo-Darkmode.png" />
+    <Content Include="Assets\PartFinderLogo-Lightmode.png" />
     <Content Include="Assets\Wide310x150Logo.scale-200.png" />
     <Content Include="Assets\profile.jpg" />
   </ItemGroup>
@@ -68,12 +88,15 @@
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.1721" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260317003" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
     <PackageReference Include="ClosedXML" Version="0.105.0" />
     <PackageReference Include="LiveChartsCore" Version="2.0.0" />
     <PackageReference Include="LiveChartsCore.SkiaSharpView" Version="2.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.5" />
     <PackageReference Include="MongoDB.Driver" Version="2.28.0" />
     <PackageReference Include="QRCoder" Version="1.6.0" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
   </ItemGroup>
 
   <!--

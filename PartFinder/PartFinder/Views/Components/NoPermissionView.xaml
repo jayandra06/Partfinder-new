@@ -34,7 +34,7 @@
                        TextWrapping="Wrap" />
 
             <!-- Hint -->
-            <TextBlock Text="Contact your organization admin if you need access."
+            <TextBlock Text="Contact your organisation admin if you need access."
                        FontSize="12"
                        Foreground="{StaticResource TextTertiaryBrush}"
                        HorizontalAlignment="Center"

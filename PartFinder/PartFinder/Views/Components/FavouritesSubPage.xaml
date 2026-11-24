@@ -78,7 +78,7 @@
             <StackPanel Spacing="12" HorizontalAlignment="Center">
                 <TextBlock Text="Your favourites empty" FontSize="28" FontWeight="SemiBold"
                           HorizontalAlignment="Center" Foreground="{StaticResource TextPrimaryBrush}" />
-                <TextBlock Text="Star your favorite templates to see them here."
+                <TextBlock Text="Star your favourite templates to see them here."
                            FontSize="15" Foreground="{StaticResource TextTertiaryBrush}"
                            HorizontalAlignment="Center" TextAlignment="Center"
                            MaxWidth="400" TextWrapping="WrapWholeWords" />

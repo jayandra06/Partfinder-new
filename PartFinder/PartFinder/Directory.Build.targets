@@ -1,0 +1,37 @@
+<Project>
+  <!-- Imported after SDK/MSIX targets. -->
+  <!-- Partner Center rejects the WinUI template GUID and any publisher other than the reserved Store CN.
+       Signing with a different certificate subject rewrites Identity Publisher inside the MSIX. -->
+  <Target Name="PartFinderAssertStoreIdentity" BeforeTargets="PrepareMsixPackage"
+          Condition="'$(UapAppxPackageBuildMode)' == 'StoreOnly' or '$(GenerateTemporaryStoreCertificate)' == 'true'">
+    <XmlPeek XmlInputPath="$(MSBuildProjectDirectory)\Package.appxmanifest"
+             Query="/*[local-name()='Package']/*[local-name()='Identity']/@Name">
+      <Output TaskParameter="Result" PropertyName="_PfIdentityName" />
+    </XmlPeek>
+    <XmlPeek XmlInputPath="$(MSBuildProjectDirectory)\Package.appxmanifest"
+             Query="/*[local-name()='Package']/*[local-name()='Identity']/@Publisher">
+      <Output TaskParameter="Result" PropertyName="_PfIdentityPublisher" />
+    </XmlPeek>
+    <Error Condition="'$(_PfIdentityName)' != 'EuroasiannGroup.partfinder' or '$(_PfIdentityPublisher)' != 'CN=B96C9A11-7C90-42E9-8C6C-14AD9097B6CD'"
+           Text="Store package identity must be Name=EuroasiannGroup.partfinder Publisher=CN=B96C9A11-7C90-42E9-8C6C-14AD9097B6CD. Actual Name='$(_PfIdentityName)' Publisher='$(_PfIdentityPublisher)'." />
+  </Target>
+
+  <Target Name="PartFinderEnsureStoreSigningBeforePackaging"
+          DependsOnTargets="_ValidateSigningCertificate"
+          Condition="'$(UapAppxPackageBuildMode)' == 'StoreOnly' or '$(GenerateTemporaryStoreCertificate)' == 'true'">
+    <Message Importance="low" Text="PartFinder store signing: disposable cert thumbprint=$(PackageCertificateThumbprint)" />
+  </Target>
+
+  <PropertyGroup>
+    <_GenerateAppxPackageFileDependsOn>
+      PartFinderEnsureStoreSigningBeforePackaging;
+      $(_GenerateAppxPackageFileDependsOn)
+    </_GenerateAppxPackageFileDependsOn>
+  </PropertyGroup>
+
+  <Target Name="_RemoveDisposableSigningCertificate">
+    <WinAppSdkRemoveDisposableSigningCertificate
+      Condition="'$(GenerateTemporaryStoreCertificate)' == 'true' and '$(BuildAppxUploadPackageForUap)' == 'true' and '$(PackageCertificateThumbprint)' != ''"
+      CertificateThumbprint="$(PackageCertificateThumbprint)" />
+  </Target>
+</Project>

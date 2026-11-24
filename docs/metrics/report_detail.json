@@ -1,0 +1,437 @@
+[
+  {
+    "repo": "jayandra06/Partfinder-new",
+    "provider": "local",
+    "visibility": "local",
+    "created_at": "2026-04-11",
+    "last_activity": "2026-11-22",
+    "default_branch": "main",
+    "commits": 296,
+    "first_commit": "2026-04-11",
+    "last_commit": "2026-11-22",
+    "loc_branch": "main",
+    "languages": {
+      "JSON": 530899,
+      "JavaScript": 5729,
+      "TypeScript": 690570,
+      "Python": 24300,
+      "C#": 1518810,
+      "HTML": 1159,
+      "CSS": 34998,
+      "COBOL": 1187
+    },
+    "primary_language": "C#",
+    "contributors": 15,
+    "human_contributors": 14,
+    "total_mrs": 114,
+    "merged_mrs": 114,
+    "mrs_note": "estimated from git history \u2014 for an exact count use the GitLab/GitHub API provider",
+    "pct_simple": 69.3,
+    "pct_standard": 15.8,
+    "pct_rich": 0.0,
+    "pct_automated": 0.0,
+    "pct_other": 14.9,
+    "avg_loc_per_mr": 410.1,
+    "mr_sample_size": 114,
+    "source_files": 373,
+    "test_files": 20,
+    "untested_source_files": 353,
+    "pct_untested_files": 97.0,
+    "total_loc_estimate": 70526,
+    "ci_configured": "Yes",
+    "ci_systems": [
+      "GitHub Actions"
+    ],
+    "ci_config_files": 8,
+    "ci_jobs_approx": 8,
+    "ci_stages_approx": 8,
+    "ci_pipelines_total": "",
+    "ci_success_rate": "",
+    "ci_avg_duration_min": "",
+    "coverage_pct_gitlab": "",
+    "coverage_pct_github": "",
+    "coverage_pct_azuredevops": "",
+    "coverage_pct_local": "",
+    "ci_commits": 10,
+    "test_cases": 33,
+    "assertions": 41,
+    "genuine_test_files": 20,
+    "suspicious_test_files": 0,
+    "misnamed_test_files": 9,
+    "pct_test_to_code_ratio": 5.4,
+    "pct_genuine_tests": 100.0,
+    "suspicious_tests_detail": [],
+    "llm_commits_scanned": 296,
+    "llm_ai_commits": 48,
+    "llm_pct_commits": 16.2,
+    "llm_ai_mrs": 3,
+    "llm_pct_mrs": 2.6,
+    "ai_tool_configs": [
+      "Cursor"
+    ],
+    "ai_tool_config_files": 1,
+    "llm_code_files": 0,
+    "llm_files_scanned": 393,
+    "llm_commit_breakdown": {
+      "Cursor": 48
+    },
+    "llm_mr_breakdown": {
+      "Cursor": 3
+    },
+    "llm_combined_score": {
+      "Cursor": 151
+    },
+    "llm_evidence": [
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "fix(winui): use production API URL in Debug builds",
+        "location": "dd1db528e792"
+      },
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "fix(backend): deploy Nest on Vercel; use local API in Debug",
+        "location": "cd47e5b8bcd4"
+      },
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "fix: save-login prompt build and Vercel backend entry",
+        "location": "ba17323dd656"
+      },
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "Show save-login prompt only once per email on this device",
+        "location": "12c7d04331e9"
+      },
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "Fix saved logins for all teammates: robust save paths, logging, and tests",
+        "location": "4fdf7e1b7fd8"
+      },
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "Add WMS Phase 02A setup API and WinUI workbook.",
+        "location": "99537b0b5834"
+      },
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "feat: forgot-password email reset and top-nav scroll hints",
+        "location": "0be832ee3aba"
+      },
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "chore(release): PartFinder 3.0.7.0 for Microsoft Store",
+        "location": "60cff5fda78d"
+      },
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "Improve master data, warehouse, and template linking workflows.",
+        "location": "522b64be22a3"
+      },
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "Merge origin/main into Harshith; resolve MasterDataPage conflict",
+        "location": "6b97892891d8"
+      },
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "Show chosen linked-template columns beside the source table.",
+        "location": "0af8ab2619eb"
+      },
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "Improve login privacy and email input on setup screen.",
+        "location": "5291cc8cf64e"
+      },
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "Add template list/data UX, linked templates browser, and master data link panel.",
+        "location": "6a034427c1a0"
+      },
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "Show detailed Mongo ping errors during login and setup.",
+        "location": "7daea96a9d0a"
+      },
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "Update CodeMesh MCP server path for extension 0.4.317.",
+        "location": "56ac5d3756e5"
+      },
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "Use stacked ellipses for vertical Team Management overflow icon.",
+        "location": "45ffae7de511"
+      },
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "Fix Team Management actions and harden Mongo ping messaging.",
+        "location": "552b361879bc"
+      },
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "Improve dashboard load speed, theme logos, and title bar after logout.",
+        "location": "1a9305609195"
+      },
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "Improve user directory, master data UX, theming, and British English copy",
+        "location": "6c6eae39c97e"
+      },
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "Add Team Management user listing and Status column for invited users.",
+        "location": "24f3dc05de4e"
+      },
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "Merge origin/main and combine Vercel SPA + API rewrites.",
+        "location": "3ce522619eff"
+      },
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "Harden Razorpay licence checkout env loading and diagnostics.",
+        "location": "ac8ef8fca0d1"
+      },
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "Improve desktop shell navigation, inventory UX, and portfolio admin login.",
+        "location": "034f2630c6f2"
+      },
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "Add marketing pages, Razorpay licence checkout, and portfolio navigation.",
+        "location": "4edede5f8a1e"
+      },
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "Replace licence and sign-in header modals with dedicated routes.",
+        "location": "20bed486cf1f"
+      },
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "fix(store): MSIX version revision must be 0; release 3.0.6.0",
+        "location": "026f464f702c"
+      },
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "chore(release): 3.0.5.1 Store package for master data, templates, and relations fixes.",
+        "location": "54ab61915b3a"
+      },
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "Implement Stitch Solutions marketing UI for PartFinder portfolio with Get Licence flow and org accou",
+        "location": "8d24e715027d"
+      },
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "Fix template linking, master data grid UX, and carousel previews.",
+        "location": "6628a36a4689"
+      },
+      {
+        "source": "commit",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "Fix bulk template upload, CSV import, and templates preview table.",
+        "location": "40fef927ef95"
+      },
+      {
+        "source": "mr/pr",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "Merge origin/main and combine Vercel SPA + API rewrites.",
+        "location": "commit 3ce522619e"
+      },
+      {
+        "source": "mr/pr",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "Merge branch 'ansh' into main",
+        "location": "commit 8ad541a6f8"
+      },
+      {
+        "source": "mr/pr",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": "Merge jayandra06/Partfinder-new main; keep local PartFinder and portfolio changes.",
+        "location": "commit ea0cd3065a"
+      },
+      {
+        "source": "config-file",
+        "llm": [
+          "Cursor"
+        ],
+        "sample": ".cursor/mcp.json",
+        "location": ".cursor/mcp.json"
+      }
+    ],
+    "llm_detected": "Yes",
+    "primary_llm": "Cursor",
+    "llm_usage_pct": 16.2,
+    "llm_usage_basis": "48/296 commits",
+    "built_by_company": "jayandra06",
+    "built_by_confidence": "medium",
+    "built_by_evidence": [
+      "VCS owner/organization: \"jayandra06\"",
+      "commit emails: 27/296 (9.1%) from @euroasianngroup.com"
+    ],
+    "built_for_company": "Partfinder New",
+    "built_for_confidence": "medium",
+    "built_for_evidence": [
+      "package.json: name field",
+      "repo/folder name: \"jayandra06/Partfinder-new\""
+    ],
+    "license": "NONE",
+    "license_risk": "no-license (all rights reserved)",
+    "quality_files_scanned": 393,
+    "total_functions": 1461,
+    "total_classes": 349,
+    "blank_ratio_pct": 10.1,
+    "total_comment_lines": 1199,
+    "total_blank_lines": 7123,
+    "syntax_valid_pct": 66.7,
+    "avg_line_length": 30.5,
+    "pct_long_lines": 0.9,
+    "comment_ratio_pct": 1.7,
+    "docstring_pct": 66.7,
+    "avg_func_length": 48.1,
+    "duplicate_files": 0,
+    "duplicate_pct": 0.0,
+    "secrets_found": 4,
+    "secrets_detail": [
+      {
+        "type": "Hardcoded secret",
+        "file": "PartFinder-Backend/src/license-purchase/license-purchase.signature.spec.ts",
+        "masked": "secr\u2026t'"
+      },
+      {
+        "type": "Hardcoded secret",
+        "file": "PartFinder-Backend/src/seed/seed-admin.ts",
+        "masked": "pass\u20266'"
+      },
+      {
+        "type": "Hardcoded secret",
+        "file": "PartFinder-Backend/src/users/users.service.ts",
+        "masked": "pass\u20266'"
+      },
+      {
+        "type": "Hardcoded secret",
+        "file": "PartFinder/PartFinder.Tests/LoginCredentialStoreTests.cs",
+        "masked": "pass\u20261\""
+      }
+    ],
+    "pii_emails": 17,
+    "eval_contamination_files": 0,
+    "eval_contamination_detail": [],
+    "quality_score": 58.3,
+    "training_suitability": "C",
+    "quality_reasons": [
+      "33% Python files syntax-invalid",
+      "almost zero comments",
+      "4 secrets/keys found",
+      "no license \u2014 training use is risky"
+    ],
+    "loc_source": "built-in scanner",
+    "swe_quality_score": 45.0,
+    "swe_quality_level": "Mixed",
+    "swe_quality_reasons": [
+      "CI/CD configured",
+      "almost no rich/reviewed PRs",
+      "100.0% genuine tests",
+      "almost no comments",
+      "low code duplication",
+      "66.7% syntax-valid Python (some invalid files)",
+      "4 hardcoded secret(s) found"
+    ]
+  }
+]

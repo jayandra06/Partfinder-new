@@ -2,6 +2,7 @@
     x:Class="PartFinder.Views.Pages.SettingsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:components="using:PartFinder.Views.Components"
     xmlns:converters="using:PartFinder.Converters">
     <Page.Resources>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
@@ -49,14 +50,14 @@
         <Style x:Key="NavButtonStyle" TargetType="Button">
             <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Background" Value="#06000000" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Padding" Value="16,12" />
-            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="CornerRadius" Value="12" />
         </Style>
     </Page.Resources>
 
-    <Grid Background="{StaticResource PageBackgroundBrush}">
+    <Grid Background="Transparent" Transitions="{StaticResource LuxuryPanelTransitions}">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="220" />
             <ColumnDefinition Width="*" />
@@ -70,9 +71,9 @@
             VerticalAlignment="Bottom"
             Margin="0,0,32,32"
             Padding="20,16"
-            CornerRadius="8"
+            CornerRadius="14"
             Background="{StaticResource ElevatedCardBackgroundBrush}"
-            BorderBrush="{StaticResource BorderDefaultBrush}"
+            BorderBrush="{StaticResource GlassStrokeBrush}"
             BorderThickness="1"
             Opacity="0"
             IsHitTestVisible="False"
@@ -90,8 +91,8 @@
         </Border>
 
         <!-- LEFT SIDEBAR: Editorial Navigation -->
-        <Border Grid.Column="0" Background="{StaticResource CardBackgroundBrush}" 
-                BorderBrush="{StaticResource BorderDefaultBrush}" BorderThickness="0,0,1,0" 
+        <Border Grid.Column="0" Background="{StaticResource ShellSurfaceBrush}" 
+                BorderBrush="{StaticResource GlassStrokeBrush}" BorderThickness="0,0,1,0" 
                 Padding="0,32" Translation="0,0,32">
             <Grid>
                 <Grid RowSpacing="32">
@@ -132,16 +133,6 @@
                                 </Button>
                             </Border>
 
-                            <!-- App Lock -->
-                            <Border x:Name="NavAppLockItem" CornerRadius="6" Background="Transparent">
-                                <Button Style="{StaticResource NavButtonStyle}" Click="OnNavAppLockClick">
-                                    <StackPanel Orientation="Horizontal" Spacing="16">
-                                        <FontIcon Glyph="&#xE72E;" FontSize="18" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
-                                        <TextBlock Text="App Lock" FontSize="14" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
-                                    </StackPanel>
-                                </Button>
-                            </Border>
-
                             <!-- Login Management -->
                             <Border x:Name="NavLoginMgmtItem" CornerRadius="6" Background="Transparent">
                                 <Button Style="{StaticResource NavButtonStyle}" Click="OnNavLoginMgmtClick">
@@ -167,7 +158,7 @@
                                 <!-- Divider -->
                                 <Border Height="1" Background="{StaticResource BorderDefaultBrush}" Margin="0,0,0,2" />
                                 <!-- Section label -->
-                                <TextBlock Text="ORGANIZATION"
+                                <TextBlock Text="ORGANISATION"
                                            FontSize="10"
                                            FontWeight="Bold"
                                            CharacterSpacing="80"
@@ -236,7 +227,7 @@
 
                 <StackPanel x:Name="ProfileSection" Visibility="Visible" Margin="48,0,0,0">
                     <TextBlock Text="PROFILE &amp; IDENTITY" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="Manage your identity, personal information, and how you appear to others within the organization. Changes are reflected across the entire workspace." Style="{StaticResource SectionDescriptionStyle}" />
+                    <TextBlock Text="Manage your identity, personal information, and how you appear to others within the organisation. Changes are reflected across the entire workspace." Style="{StaticResource SectionDescriptionStyle}" />
 
                     <!-- Avatar Row -->
                     <Border Style="{StaticResource SettingRowBorderStyle}">
@@ -273,10 +264,10 @@
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                         <Border Background="#101F7AE0" BorderBrush="#301F7AE0" BorderThickness="1" CornerRadius="4" Padding="8,2">
-                                            <TextBlock Text="Administrator" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource AccentPrimaryBrush}" />
+                                            <TextBlock Text="{Binding ProfileRoleDisplay}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource AccentPrimaryBrush}" />
                                         </Border>
                                         <Border Background="#102ABD8F" BorderBrush="#302ABD8F" BorderThickness="1" CornerRadius="4" Padding="8,2">
-                                            <TextBlock Text="Verified User" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource SuccessBrush}" />
+                                            <TextBlock Text="{Binding ProfileStatusDisplay}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource SuccessBrush}" />
                                         </Border>
                                     </StackPanel>
                                 </StackPanel>
@@ -319,7 +310,8 @@
 
                                 <StackPanel Grid.Row="1" Grid.Column="0" Spacing="6">
                                     <TextBlock Text="Designation" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
-                                    <TextBox Style="{StaticResource StandardTextBoxStyle}" PlaceholderText="e.g. Lead Engineer" />
+                                    <TextBox Style="{StaticResource StandardTextBoxStyle}" PlaceholderText="e.g. Lead Engineer"
+                                             Text="{Binding ProfileDesignation, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 </StackPanel>
 
                                 <StackPanel Grid.Row="1" Grid.Column="1" Spacing="6">
@@ -344,25 +336,77 @@
                             </StackPanel>
 
                             <StackPanel Grid.Column="1" Spacing="20">
-                                <TextBox Style="{StaticResource StandardTextBoxStyle}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="100" />
-                                
-                                <Grid ColumnSpacing="24">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <ToggleSwitch Grid.Column="0" Header="Public Explorer Visibility" IsOn="True" />
-                                    <ToggleSwitch Grid.Column="1" Header="Show Online Status" IsOn="True" />
-                                </Grid>
+                                <TextBox Style="{StaticResource StandardTextBoxStyle}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="100"
+                                         PlaceholderText="Brief description of your role and responsibilities…"
+                                         Text="{Binding ProfileBio, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
                         </Grid>
                     </Border>
 
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12" Margin="0,32,0,0"
-                              Visibility="{Binding CanEditProfileName, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <!-- App lock (Windows Hello) -->
+                    <Border Style="{StaticResource SettingRowBorderStyle}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="2*" />
+                                <ColumnDefinition Width="3*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="App lock" Style="{StaticResource SettingLabelStyle}" />
+                                <TextBlock Text="Require Windows Hello (face, fingerprint, or device PIN) each time PartFinder opens on this device." Style="{StaticResource SettingHintStyle}" />
+                            </StackPanel>
+                            <Grid Grid.Column="1" ColumnSpacing="16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="4" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding AppLockStatusDisplay}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                    <TextBlock Text="Uses your Windows sign-in options — no separate app password." FontSize="11" Foreground="{StaticResource TextTertiaryBrush}" TextWrapping="WrapWholeWords" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="ProfileAppLockToggle"
+                                                Grid.Column="1"
+                                                VerticalAlignment="Center"
+                                                Toggled="OnProfileAppLockToggled" />
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <!-- Organization access (from directory) -->
+                    <Border Style="{StaticResource SettingRowBorderStyle}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="2*" />
+                                <ColumnDefinition Width="3*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Access &amp; Permissions" Style="{StaticResource SettingLabelStyle}" />
+                                <TextBlock Text="Role, template scope, and permissions assigned to your account." Style="{StaticResource SettingHintStyle}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="12">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Member since" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                    <TextBlock Text="{Binding ProfileMemberSinceDisplay}" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
+                                </StackPanel>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Template access" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                    <TextBlock Text="{Binding ProfilePartsAccessDisplay}" FontSize="13" TextWrapping="WrapWholeWords" />
+                                </StackPanel>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Template permissions" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                    <TextBlock Text="{Binding ProfileTemplatePermissionsDisplay}" FontSize="13" />
+                                </StackPanel>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Master data permissions" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                    <TextBlock Text="{Binding ProfileMasterDataPermissionsDisplay}" FontSize="13" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12" Margin="0,32,0,0">
                         <TextBlock Text="{Binding ProfileMessage}" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,16,0" />
-                        <Button Style="{StaticResource GhostButtonStyle}" Content="Discard" />
-                        <Button Style="{StaticResource PrimaryButtonStyle}" Content="Save Changes" Command="{Binding SaveProfileCommand}" Padding="24,8" />
+                        <Button Style="{StaticResource GhostButtonStyle}" Content="Discard" Command="{Binding DiscardProfileChangesCommand}" IsEnabled="{Binding CanSaveProfile}" />
+                        <Button Style="{StaticResource PrimaryButtonStyle}" Content="Save Changes" Command="{Binding SaveProfileCommand}" IsEnabled="{Binding CanSaveProfile}" Padding="24,8" />
                     </StackPanel>
                 </StackPanel>
 
@@ -593,31 +637,46 @@
                 <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
                 <!-- PASSWORD SECTION                                   -->
                 <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-                <StackPanel x:Name="PasswordSection" Visibility="Collapsed" Margin="16,0,0,0">
-                    <TextBlock Text="PASSWORD MANAGEMENT" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="Change your account password. Enter your current password to verify identity, then set a new strong password." Style="{StaticResource SectionDescriptionStyle}" />
+                <StackPanel x:Name="PasswordSection" Visibility="Collapsed" Margin="48,0,0,0">
+                    <TextBlock Text="UPDATE PASSWORD" Style="{StaticResource SectionTitleStyle}" />
+                    <TextBlock Text="Change the password for your signed-in workspace account. All fields are on this page — nothing opens in a separate dialog." Style="{StaticResource SectionDescriptionStyle}" />
 
-                    <!-- Card wrapper -->
-                    <Border Background="{StaticResource CardBackgroundBrush}"
-                            BorderBrush="{StaticResource BorderDefaultBrush}"
-                            BorderThickness="1" CornerRadius="12" Padding="32,28">
-                        <StackPanel Spacing="24">
-
-                            <!-- CURRENT PASSWORD -->
+                    <!-- Account -->
+                    <Border Style="{StaticResource SettingRowBorderStyle}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="2*" />
+                                <ColumnDefinition Width="3*" />
+                            </Grid.ColumnDefinitions>
                             <StackPanel Spacing="8">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Border Width="32" Height="32" CornerRadius="8"
-                                            Background="#101F7AE0" BorderBrush="#201F7AE0" BorderThickness="1">
-                                        <FontIcon Glyph="&#xE8D7;" FontSize="14" Foreground="{StaticResource AccentPrimaryBrush}" />
-                                    </Border>
-                                    <TextBlock Text="Current Password" FontSize="15" FontWeight="SemiBold"
-                                               Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
+                                <TextBlock Text="Account" Style="{StaticResource SettingLabelStyle}" />
+                                <TextBlock Text="The password you set applies to this email address." Style="{StaticResource SettingHintStyle}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="6">
+                                <TextBlock Text="Email address" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                <TextBox Style="{StaticResource StandardTextBoxStyle}" IsReadOnly="True" Text="{Binding SessionEmailDisplay}" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Current password -->
+                    <Border Style="{StaticResource SettingRowBorderStyle}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="2*" />
+                                <ColumnDefinition Width="3*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Current password" Style="{StaticResource SettingLabelStyle}" />
+                                <TextBlock Text="Required to confirm it is you before applying a new password." Style="{StaticResource SettingHintStyle}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="8">
                                 <Grid>
                                     <PasswordBox x:Name="CurrentPasswordBox"
                                                  PlaceholderText="Enter your current password"
                                                  PasswordChanged="OnCurrentPasswordChanged"
                                                  PasswordRevealMode="Hidden"
+                                                 MinHeight="40"
                                                  Padding="12,10,44,10" />
                                     <Button x:Name="CurrentPasswordRevealButton"
                                             Click="OnCurrentPasswordRevealClick"
@@ -643,62 +702,41 @@
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
+                        </Grid>
+                    </Border>
 
-                            <!-- Divider -->
-                            <Border Height="1" Background="{StaticResource BorderDefaultBrush}" />
-
-                            <!-- NEW PASSWORD -->
+                    <!-- New password -->
+                    <Border Style="{StaticResource SettingRowBorderStyle}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="2*" />
+                                <ColumnDefinition Width="3*" />
+                            </Grid.ColumnDefinitions>
                             <StackPanel Spacing="8">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Border Width="32" Height="32" CornerRadius="8"
-                                            Background="#102ABD8F" BorderBrush="#202ABD8F" BorderThickness="1">
-                                        <FontIcon Glyph="&#xE72E;" FontSize="14" Foreground="{StaticResource SuccessBrush}" />
-                                    </Border>
-                                    <TextBlock Text="New Password" FontSize="15" FontWeight="SemiBold"
-                                               Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-
-                                <!-- Auto-generate row -->
-                                <Border Background="{StaticResource ElevatedCardBackgroundBrush}"
-                                        BorderBrush="{StaticResource BorderDefaultBrush}"
-                                        BorderThickness="1" CornerRadius="8" Padding="16,12">
-                                    <Grid ColumnSpacing="12">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Spacing="2" VerticalAlignment="Center">
-                                            <TextBlock Text="Auto-generate a strong password"
-                                                       FontSize="13" FontWeight="SemiBold"
-                                                       Foreground="{StaticResource TextPrimaryBrush}" />
-                                            <TextBlock Text="16 chars · upper · lower · digits · symbols"
-                                                       FontSize="11" Foreground="{StaticResource TextTertiaryBrush}" />
+                                <TextBlock Text="New password" Style="{StaticResource SettingLabelStyle}" />
+                                <TextBlock Text="Minimum 8 characters with upper and lower case and at least one number. A special character is recommended." Style="{StaticResource SettingHintStyle}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="10">
+                                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Left">
+                                    <Button Style="{StaticResource OutlinedButtonStyle}" Padding="14,8" FontSize="12"
+                                            Click="OnGeneratePasswordClick">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <FontIcon Glyph="&#xE72C;" FontSize="12" />
+                                            <TextBlock Text="Generate strong password" />
                                         </StackPanel>
-                                        <Button Grid.Column="1"
-                                                Style="{StaticResource PrimaryButtonStyle}"
-                                                Padding="16,8" FontSize="13"
-                                                Click="OnGeneratePasswordClick">
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <FontIcon Glyph="&#xE72C;" FontSize="12" />
-                                                <TextBlock Text="Generate" />
-                                            </StackPanel>
-                                        </Button>
-                                        <Button Grid.Column="2" Style="{StaticResource GhostButtonStyle}"
-                                                Width="36" Height="36" Padding="0"
-                                                ToolTipService.ToolTip="Copy generated password"
-                                                Click="OnCopyGeneratedPasswordClick">
-                                            <FontIcon Glyph="&#xE8C8;" FontSize="13" />
-                                        </Button>
-                                    </Grid>
-                                </Border>
-
-                                <!-- New password input + strength -->
+                                    </Button>
+                                    <Button Style="{StaticResource GhostButtonStyle}" Width="36" Height="36" Padding="0"
+                                            ToolTipService.ToolTip="Copy generated password"
+                                            Click="OnCopyGeneratedPasswordClick">
+                                        <FontIcon Glyph="&#xE8C8;" FontSize="13" />
+                                    </Button>
+                                </StackPanel>
                                 <Grid>
                                     <PasswordBox x:Name="NewPasswordBox"
-                                                 PlaceholderText="Enter or paste new password"
+                                                 PlaceholderText="Enter new password"
                                                  PasswordChanged="OnNewPasswordChanged"
                                                  PasswordRevealMode="Hidden"
+                                                 MinHeight="40"
                                                  Padding="12,10,44,10" />
                                     <Button x:Name="NewPasswordRevealButton"
                                             Click="OnNewPasswordRevealClick"
@@ -729,85 +767,67 @@
                                            Foreground="{StaticResource TextTertiaryBrush}"
                                            HorizontalAlignment="Right" />
                             </StackPanel>
+                        </Grid>
+                    </Border>
 
-                            <!-- Divider -->
-                            <Border Height="1" Background="{StaticResource BorderDefaultBrush}" />
-
-                            <!-- CONFIRM PASSWORD -->
+                    <!-- Confirm password -->
+                    <Border Style="{StaticResource SettingRowBorderStyle}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="2*" />
+                                <ColumnDefinition Width="3*" />
+                            </Grid.ColumnDefinitions>
                             <StackPanel Spacing="8">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Border Width="32" Height="32" CornerRadius="8"
-                                            Background="#10E8A040" BorderBrush="#20E8A040" BorderThickness="1">
-                                        <FontIcon Glyph="&#xE73E;" FontSize="14" Foreground="#E8A040" />
-                                    </Border>
-                                    <TextBlock Text="Confirm New Password" FontSize="15" FontWeight="SemiBold"
-                                               Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                                <Grid>
-                                    <PasswordBox x:Name="ConfirmPasswordBox"
-                                                 PlaceholderText="Re-enter new password"
-                                                 PasswordChanged="OnConfirmPasswordChanged"
-                                                 PasswordRevealMode="Hidden"
-                                                 Padding="12,10,44,10" />
-                                    <Button x:Name="ConfirmPasswordRevealButton"
-                                            Click="OnConfirmPasswordRevealClick"
-                                            Style="{StaticResource GhostButtonStyle}"
-                                            BorderThickness="0"
-                                            Background="Transparent"
-                                            Width="36" Height="36"
-                                            HorizontalAlignment="Right"
-                                            VerticalAlignment="Center"
-                                            Margin="0,0,4,0"
-                                            Padding="0">
-                                        <FontIcon x:Name="ConfirmPasswordRevealIcon" Glyph="&#xE890;" FontSize="14" Foreground="{StaticResource TextSecondaryBrush}" />
-                                    </Button>
-                                </Grid>
+                                <TextBlock Text="Confirm new password" Style="{StaticResource SettingLabelStyle}" />
+                                <TextBlock Text="Must match the new password exactly." Style="{StaticResource SettingHintStyle}" />
                             </StackPanel>
+                            <Grid Grid.Column="1">
+                                <PasswordBox x:Name="ConfirmPasswordBox"
+                                             PlaceholderText="Re-enter new password"
+                                             PasswordChanged="OnConfirmPasswordChanged"
+                                             PasswordRevealMode="Hidden"
+                                             MinHeight="40"
+                                             Padding="12,10,44,10" />
+                                <Button x:Name="ConfirmPasswordRevealButton"
+                                        Click="OnConfirmPasswordRevealClick"
+                                        Style="{StaticResource GhostButtonStyle}"
+                                        BorderThickness="0"
+                                        Background="Transparent"
+                                        Width="36" Height="36"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        Margin="0,0,4,0"
+                                        Padding="0">
+                                    <FontIcon x:Name="ConfirmPasswordRevealIcon" Glyph="&#xE890;" FontSize="14" Foreground="{StaticResource TextSecondaryBrush}" />
+                                </Button>
+                            </Grid>
+                        </Grid>
+                    </Border>
 
-                            <!-- Requirements hint -->
-                            <Border Background="{StaticResource ElevatedCardBackgroundBrush}"
-                                    BorderBrush="{StaticResource BorderDefaultBrush}"
-                                    BorderThickness="1" CornerRadius="8" Padding="16,12">
-                                <StackPanel Orientation="Horizontal" Spacing="16">
-                                    <FontIcon Glyph="&#xE946;" FontSize="13" Foreground="{StaticResource TextTertiaryBrush}" VerticalAlignment="Center" />
-                                    <StackPanel Spacing="3">
-                                        <TextBlock Text="Password Requirements" FontSize="12" FontWeight="SemiBold"
-                                                   Foreground="{StaticResource TextSecondaryBrush}" />
-                                        <StackPanel Orientation="Horizontal" Spacing="16">
-                                            <TextBlock Text="• Min 8 characters" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}" />
-                                            <TextBlock Text="• Uppercase &amp; lowercase" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}" />
-                                            <TextBlock Text="• At least one number" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}" />
-                                            <TextBlock Text="• Special character recommended" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}" />
-                                        </StackPanel>
-                                    </StackPanel>
-                                </StackPanel>
-                            </Border>
-
-                            <!-- Message -->
-                            <Border x:Name="PasswordMessageBorder" Visibility="Collapsed"
-                                    BorderThickness="1" CornerRadius="6" Padding="12,10">
-                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <FontIcon x:Name="PasswordMessageIcon" Glyph="&#xE946;"
-                                              FontSize="13" VerticalAlignment="Top" Margin="0,1,0,0" />
-                                    <TextBlock x:Name="PasswordMessageText"
-                                               FontSize="12" TextWrapping="WrapWholeWords" />
-                                </StackPanel>
-                            </Border>
-
-                            <!-- Actions -->
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
-                                <Button Style="{StaticResource GhostButtonStyle}" Content="Clear"
-                                        Click="OnClearPasswordFieldsClick" Padding="20,10" />
-                                <Button Style="{StaticResource PrimaryButtonStyle}"
-                                        Content="Update Password"
-                                        Command="{Binding ChangePasswordCommand}"
-                                        Padding="24,10" />
-                            </StackPanel>
-
+                    <!-- Inline status (success / error) -->
+                    <Border x:Name="PasswordMessageBorder" Visibility="Collapsed"
+                            BorderThickness="1" CornerRadius="8"
+                            Padding="12,10" Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <FontIcon x:Name="PasswordMessageIcon" Glyph="&#xE946;"
+                                      FontSize="13" VerticalAlignment="Top" Margin="0,1,0,0" />
+                            <TextBlock x:Name="PasswordMessageText"
+                                       FontSize="12" TextWrapping="WrapWholeWords"
+                                       Foreground="{StaticResource TextPrimaryBrush}" />
                         </StackPanel>
                     </Border>
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12" Margin="0,32,0,0">
+                        <Button Style="{StaticResource GhostButtonStyle}" Content="Clear form"
+                                Click="OnClearPasswordFieldsClick" Padding="20,8" />
+                        <Button Style="{StaticResource PrimaryButtonStyle}"
+                                Content="Update password"
+                                Command="{Binding ChangePasswordCommand}"
+                                IsEnabled="{Binding CanUpdatePassword}"
+                                Padding="24,8" />
+                    </StackPanel>
                 </StackPanel>
-                <!-- APP LOCK SECTION -->
+                <!-- APP LOCK SECTION (legacy — moved to Profile) -->
                 <StackPanel x:Name="AppLockSection" Visibility="Collapsed" Margin="48,0,0,0">
                     <TextBlock Text="APPLICATION LOCK" Style="{StaticResource SectionTitleStyle}" />
                     <TextBlock Text="When enabled, Windows Hello (fingerprint, face, or device PIN) is required every time the app opens." Style="{StaticResource SectionDescriptionStyle}" />
@@ -943,13 +963,10 @@
                     <TextBlock Text="View and manage all devices where your account is currently signed in. You can remotely sign out from any device except the one you're using right now." Style="{StaticResource SectionDescriptionStyle}" />
 
                     <!-- Loading indicator -->
-                    <StackPanel Visibility="{Binding IsLoadingSessions, Converter={StaticResource BoolToVisibilityConverter}}"
-                                HorizontalAlignment="Center" Margin="0,16,0,16">
-                        <ProgressRing IsActive="True" Width="32" Height="32" />
-                        <TextBlock Text="Loading sessions..." FontSize="12"
-                                   Foreground="{StaticResource TextSecondaryBrush}"
-                                   HorizontalAlignment="Center" Margin="0,8,0,0" />
-                    </StackPanel>
+                    <components:LoadingSkeleton
+                        Kind="Lines"
+                        Margin="0,16,0,16"
+                        Visibility="{Binding IsLoadingSessions, Converter={StaticResource BoolToVisibilityConverter}}" />
 
                     <!-- Sessions List - built in code-behind for full control -->
                     <StackPanel x:Name="SessionCardsPanel" Spacing="12" />

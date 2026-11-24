@@ -20,6 +20,8 @@ public sealed class SetupStatusResult
     public bool? RequiresInviteLogin { get; set; }
     public string? FirstAdminEmail { get; set; }
 
+    public List<SetupListOrgUserItem>? OrgAppUsers { get; set; }
+
     /** When reason is PLATFORM_MAINTENANCE, ISO end of maintenance window. */
     public string? MaintenanceUntil { get; set; }
 }

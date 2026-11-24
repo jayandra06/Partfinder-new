@@ -1,0 +1,9 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PF-RADAR.
+      * Sandbox COBOL sample — not compiled by PartFinder.sln
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 WS-MSG PIC X(32) VALUE "PARTFINDER SANDBOX RADAR STUB".
+       PROCEDURE DIVISION.
+           DISPLAY WS-MSG
+           STOP RUN.

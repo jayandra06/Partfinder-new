@@ -3,6 +3,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
 import { AuthService } from './auth.service';
 import { AdminBootstrapDto } from './dto/bootstrap.dto';
+import { RegisterAdminDto } from './dto/register-admin.dto';
 import { ChangeAdminPasswordDto } from './dto/change-admin-password.dto';
 import { CreateAdminUserDto } from './dto/create-admin-user.dto';
 import { AdminLoginDto } from './dto/login.dto';
@@ -18,6 +19,11 @@ export class AuthController {
   @Post('admin/login')
   login(@Body() dto: AdminLoginDto) {
     return this.authService.login(dto);
+  }
+
+  @Post('admin/register')
+  register(@Body() dto: RegisterAdminDto) {
+    return this.authService.registerAdmin(dto);
   }
 
   @Post('admin/bootstrap')

@@ -1,7 +1,11 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
+using Microsoft.UI.Xaml.Navigation;
 using PartFinder.Services;
 using PartFinder.ViewModels;
 using PartFinder.Views.Components;
@@ -15,18 +19,17 @@ public sealed partial class UserManagementPage : Page
         InitializeComponent();
         var vm = App.Services.GetRequiredService<UserManagementViewModel>();
         DataContext = vm;
-        Loaded += OnLoaded;
     }
 
-    private async void OnLoaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    protected override async void OnNavigatedTo(NavigationEventArgs e)
     {
-        Loaded -= OnLoaded;
+        base.OnNavigatedTo(e);
+
         var access = App.Services.GetRequiredService<ICurrentUserAccessService>();
         await access.RefreshAsync().ConfigureAwait(true);
         if (!access.Capabilities.CanAccessUserManagement)
         {
-            NoPermissionOverlay.Message = "Only the organization creator can manage users. Contact them if you need user management access.";
-            NoPermissionOverlay.Visibility = Visibility.Visible;
+            App.Services.GetRequiredService<INavigationService>().Navigate(AppPage.Parts);
             return;
         }
 
@@ -78,10 +81,121 @@ public sealed partial class UserManagementPage : Page
         ShowToast("User Invited", msg);
     }
 
-    private async void OnEditUserClicked(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    private void OnUserActionsButtonClick(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        if (sender is not Button btn)
+        {
+            return;
+        }
+
+        // Row DataContext is the user; Tag also binds to the same item for templates where Tag is clearer.
+        var user = btn.DataContext as Models.OrgAppUserSummary ?? btn.Tag as Models.OrgAppUserSummary;
+        if (user is null)
+        {
+            return;
+        }
+
+        var flyout = BuildUserActionsFlyout(user);
+        flyout.XamlRoot = btn.XamlRoot;
+        flyout.ShowAt(btn, new FlyoutShowOptions { Placement = FlyoutPlacementMode.Bottom });
+    }
+
+    private MenuFlyout BuildUserActionsFlyout(Models.OrgAppUserSummary user)
+    {
+        var flyout = new MenuFlyout { ShouldConstrainToRootBounds = false };
+
+        var canManage = user.CanEditInUserManagement;
+
+        var edit = new MenuFlyoutItem
+        {
+            Text = "Edit",
+        };
+        ToolTipService.SetToolTip(
+            edit,
+            canManage
+                ? "Change name, role, and access for this user."
+                : "Organisation directory admins (owner/bootstrap) are not edited on this screen.");
+
+        edit.Click += (_, _) =>
+        {
+            flyout.Hide();
+            if (!user.CanEditInUserManagement)
+            {
+                EnqueueAfterFlyoutClosed(() => _ = ShowOrgAdminNotManagedDialogAsync(
+                    "Cannot edit this user",
+                    "This account is the organisation directory admin (often the owner). It is not edited from Team Management. Use Account Settings or your backend admin tools if you need to change it."));
+                return;
+            }
+
+            EnqueueAfterFlyoutClosed(() => _ = RunEditUserAsync(user));
+        };
+        flyout.Items.Add(edit);
+
+        var delete = new MenuFlyoutItem
+        {
+            Text = "Delete",
+        };
+        if (Application.Current.Resources.TryGetValue("DangerBrush", out var dangerObj) && dangerObj is Brush dangerBrush)
+        {
+            delete.Foreground = dangerBrush;
+        }
+
+        ToolTipService.SetToolTip(
+            delete,
+            canManage
+                ? "Remove this user from the organisation."
+                : "Organisation directory admins cannot be removed from this list.");
+
+        delete.Click += (_, _) =>
+        {
+            flyout.Hide();
+            if (!user.CanEditInUserManagement)
+            {
+                EnqueueAfterFlyoutClosed(() => _ = ShowOrgAdminNotManagedDialogAsync(
+                    "Cannot delete this user",
+                    "This account is the organisation directory admin (often the owner). It is not removed from Team Management."));
+                return;
+            }
+
+            EnqueueAfterFlyoutClosed(() => _ = RunDeleteUserAsync(user));
+        };
+        flyout.Items.Add(delete);
+
+        return flyout;
+    }
+
+    /// <summary>
+    /// WinUI does not reliably show a <see cref="ContentDialog"/> while a <see cref="MenuFlyout"/> is still open.
+    /// Hide the flyout first, then run the action on the UI thread after it closes.
+    /// </summary>
+    private void EnqueueAfterFlyoutClosed(Action action)
+    {
+        var dq = DispatcherQueue.GetForCurrentThread();
+        if (dq is null)
+        {
+            action();
+            return;
+        }
+
+        _ = dq.TryEnqueue(DispatcherQueuePriority.Normal, () => action());
+    }
+
+    private async Task ShowOrgAdminNotManagedDialogAsync(string title, string message)
+    {
+        var dialog = new ContentDialog
+        {
+            Title = title,
+            Content = message,
+            CloseButtonText = "OK",
+            XamlRoot = XamlRoot,
+        };
+
+        await dialog.ShowAsync();
+    }
+
+    private async Task RunEditUserAsync(Models.OrgAppUserSummary user)
     {
         if (DataContext is not UserManagementViewModel vm) return;
-        if (sender is not Button btn || btn.DataContext is not Models.OrgAppUserSummary user) return;
 
         await vm.PrepareEditDialogAsync(user).ConfigureAwait(true);
         var content = new InviteUserControl { DataContext = vm };
@@ -115,10 +229,9 @@ public sealed partial class UserManagementPage : Page
         ShowToast("User Updated", "User details updated successfully.");
     }
 
-    private async void OnDeleteUserClicked(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    private async Task RunDeleteUserAsync(Models.OrgAppUserSummary user)
     {
         if (DataContext is not UserManagementViewModel vm) return;
-        if (sender is not Button btn || btn.DataContext is not Models.OrgAppUserSummary user) return;
 
         var dialog = new ContentDialog
         {

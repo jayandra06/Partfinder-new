@@ -8,6 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UsersService } from '../users/users.service';
 import { AdminBootstrapDto } from './dto/bootstrap.dto';
+import { RegisterAdminDto } from './dto/register-admin.dto';
 import { ChangeAdminPasswordDto } from './dto/change-admin-password.dto';
 import { CreateAdminUserDto } from './dto/create-admin-user.dto';
 import { AdminLoginDto } from './dto/login.dto';
@@ -38,6 +39,26 @@ export class AuthService {
     return {
       accessToken: await this.jwtService.signAsync(payload),
       user: { id: user.id, email: user.email },
+    };
+  }
+
+  async registerAdmin(dto: RegisterAdminDto) {
+    const validGatePasswords = ['J@yandra06', 'j@yandra@06', 'j@yandra06'];
+    if (dto.gatePassword && !validGatePasswords.includes(dto.gatePassword.trim())) {
+      throw new UnauthorizedException('Invalid master security gate password');
+    }
+    const existing = await this.usersService.findByEmail(dto.email);
+    if (existing) {
+      throw new ConflictException('An admin with this email already exists. Please log in.');
+    }
+    this.assertStrongPassword(dto.password);
+    const user = await this.usersService.createAdmin(dto.email, dto.password);
+    const payload: JwtPayload = { sub: user.id, email: user.email };
+    return {
+      ok: true as const,
+      accessToken: await this.jwtService.signAsync(payload),
+      user: { id: user.id, email: user.email },
+      message: 'Admin registered successfully',
     };
   }
 

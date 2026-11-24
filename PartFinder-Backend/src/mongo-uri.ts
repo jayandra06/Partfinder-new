@@ -15,9 +15,10 @@ export function assertMongoUri(uri: string): void {
     !uri ||
     (!uri.startsWith('mongodb://') && !uri.startsWith('mongodb+srv://'))
   ) {
-    throw new Error(
-      'MONGODB_URI is missing or invalid. Set it in PartFinder-Backend/.env to a single line starting with mongodb:// or mongodb+srv://, then save the file.',
-    );
+    const hint = process.env.VERCEL
+      ? 'Set MONGODB_URI in Vercel Project → Environment Variables (Production), then redeploy.'
+      : 'Set MONGODB_URI in PartFinder-Backend/.env (mongodb:// or mongodb+srv://).';
+    throw new Error(`MONGODB_URI is missing or invalid. ${hint}`);
   }
 }
 

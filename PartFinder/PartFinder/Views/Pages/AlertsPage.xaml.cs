@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using PartFinder.Helpers;
 using PartFinder.Services;
 using PartFinder.ViewModels;
 
@@ -27,27 +28,48 @@ public sealed partial class AlertsPage : Page
     private async void OnPageLoaded(object sender, RoutedEventArgs e)
     {
         await ViewModel.LoadAlertsAsync();
+
+        var shell = App.Services.GetRequiredService<ShellViewModel>();
+        await shell.MarkNotificationsSeenAsync().ConfigureAwait(true);
+        foreach (var alert in ViewModel.Alerts)
+            alert.IsRead = true;
+    }
+
+    private static async Task RefreshNavNotificationBadgeAsync()
+    {
+        var shell = App.Services.GetRequiredService<ShellViewModel>();
+        await shell.RefreshAlertBadgeAsync().ConfigureAwait(true);
     }
 
     private async void OnMarkAllReadClick(object sender, RoutedEventArgs e)
     {
-        ViewModel.MarkAllAsReadCommand.Execute(null);
+        await ViewModel.MarkAllAsReadCommand.ExecuteAsync(null);
+        await RefreshNavNotificationBadgeAsync();
         await ShowInfoAsync("Done", "All alerts marked as read.");
     }
 
     private async void OnConfigureAlertsClick(object sender, RoutedEventArgs e)
     {
+        if (XamlRoot is null)
+        {
+            return;
+        }
+
         var content = new StackPanel { Spacing = 14, MinWidth = 400 };
         content.Children.Add(new TextBlock { Text = "Alert Thresholds", FontSize = 14, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
 
         var lowStockPanel = new StackPanel { Spacing = 6 };
-        lowStockPanel.Children.Add(new TextBlock { Text = "LOW STOCK THRESHOLD (units)", FontSize = 11, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Foreground = (Microsoft.UI.Xaml.Media.Brush)Resources["TextSecondaryBrush"] });
-        lowStockPanel.Children.Add(new TextBox { Text = "50", FontSize = 13, Padding = new Thickness(12, 10, 12, 10) });
+        lowStockPanel.Children.Add(UiResourceHelper.CreateDialogLabel("LOW STOCK THRESHOLD (units)"));
+        var lowStockBox = new TextBox { Text = "50", FontSize = 13, Padding = new Thickness(12, 10, 12, 10) };
+        UiResourceHelper.ApplyLightDialogTextBox(lowStockBox);
+        lowStockPanel.Children.Add(lowStockBox);
         content.Children.Add(lowStockPanel);
 
         var criticalPanel = new StackPanel { Spacing = 6 };
-        criticalPanel.Children.Add(new TextBlock { Text = "CRITICAL STOCK THRESHOLD (units)", FontSize = 11, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Foreground = (Microsoft.UI.Xaml.Media.Brush)Resources["TextSecondaryBrush"] });
-        criticalPanel.Children.Add(new TextBox { Text = "10", FontSize = 13, Padding = new Thickness(12, 10, 12, 10) });
+        criticalPanel.Children.Add(UiResourceHelper.CreateDialogLabel("CRITICAL STOCK THRESHOLD (units)"));
+        var criticalBox = new TextBox { Text = "10", FontSize = 13, Padding = new Thickness(12, 10, 12, 10) };
+        UiResourceHelper.ApplyLightDialogTextBox(criticalBox);
+        criticalPanel.Children.Add(criticalBox);
         content.Children.Add(criticalPanel);
 
         content.Children.Add(new ToggleSwitch { Header = "Email notifications", IsOn = true });
@@ -69,11 +91,30 @@ public sealed partial class AlertsPage : Page
 
     private async void OnResolveAlertClick(object sender, RoutedEventArgs e)
     {
+        if (XamlRoot is null)
+        {
+            return;
+        }
+
         if (sender is Button btn && btn.DataContext is AlertItem alert)
         {
             var content = new StackPanel { Spacing = 12, MinWidth = 380 };
-            content.Children.Add(new TextBlock { Text = "Add a resolution note (optional):", FontSize = 12, Foreground = (Microsoft.UI.Xaml.Media.Brush)Resources["TextSecondaryBrush"] });
-            var notesBox = new TextBox { PlaceholderText = "Describe how this was resolved...", FontSize = 13, Padding = new Thickness(12, 10, 12, 10), AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 80 };
+            content.Children.Add(new TextBlock
+            {
+                Text = "Add a resolution note (optional):",
+                FontSize = 12,
+                Foreground = UiResourceHelper.TryAppBrush("TextSecondaryBrush", "#4B5563"),
+            });
+            var notesBox = new TextBox
+            {
+                PlaceholderText = "Describe how this was resolved...",
+                FontSize = 13,
+                Padding = new Thickness(12, 10, 12, 10),
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.Wrap,
+                MinHeight = 80,
+            };
+            UiResourceHelper.ApplyLightDialogTextBox(notesBox);
             content.Children.Add(notesBox);
 
             var dialog = new ContentDialog
@@ -101,6 +142,7 @@ public sealed partial class AlertsPage : Page
                 }).ConfigureAwait(true);
 
                 await ViewModel.LoadAlertsAsync().ConfigureAwait(true);
+                await RefreshNavNotificationBadgeAsync();
                 await ShowInfoAsync("Resolved", "Alert marked as resolved.");
             }
         }
@@ -123,6 +165,7 @@ public sealed partial class AlertsPage : Page
             }).ConfigureAwait(true);
 
             await ViewModel.LoadAlertsAsync().ConfigureAwait(true);
+            await RefreshNavNotificationBadgeAsync();
         }
     }
 

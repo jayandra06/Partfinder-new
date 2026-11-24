@@ -27,19 +27,36 @@ export class DashboardService {
     }
 
     console.log(`[Dashboard.stats] Querying with orgId: ${orgId}`);
-    const [allParts, activeTemplates] = await Promise.all([
-      this.parts.find({ orgId }).lean(),
+    const [totalParts, activeTemplates, lowStockAgg] = await Promise.all([
+      this.parts.countDocuments({ orgId }),
       this.templates.countDocuments({ orgId }),
+      this.parts
+        .aggregate<{ n: number }>([
+          { $match: { orgId } },
+          {
+            $addFields: {
+              qty: {
+                $convert: {
+                  input: {
+                    $ifNull: ['$metadata.quantity', '$metadata.qty'],
+                  },
+                  to: 'double',
+                  onError: null,
+                  onNull: null,
+                },
+              },
+            },
+          },
+          { $match: { qty: { $gt: 0, $lt: 10 } } },
+          { $count: 'n' },
+        ])
+        .exec(),
     ]);
+    const lowStock = lowStockAgg[0]?.n ?? 0;
     console.log(`[Dashboard.stats] Found ${activeTemplates} templates for orgId: ${orgId}`);
 
-    const lowStock = allParts.filter((p) => {
-      const qty = Number(p.metadata?.quantity ?? p.metadata?.qty ?? '');
-      return Number.isFinite(qty) && qty > 0 && qty < 10;
-    }).length;
-
     const result = {
-      totalParts: allParts.length,
+      totalParts,
       lowStock,
       activeTemplates,
       importSuccessRate: 99.4,

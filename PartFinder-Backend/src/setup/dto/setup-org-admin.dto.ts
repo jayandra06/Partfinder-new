@@ -16,7 +16,7 @@ export class SetupOrgAdminDto {
   email: string;
 
   @IsString()
-  @MinLength(8)
+  @MinLength(1)
   oldPassword: string;
 
   @IsString()

@@ -90,8 +90,9 @@ public partial class AlertsViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void MarkAllAsRead()
+    private async Task MarkAllAsReadAsync()
     {
+        await _alertsService.MarkAllActiveAsReadAsync().ConfigureAwait(true);
         foreach (var alert in Alerts)
             alert.IsRead = true;
     }

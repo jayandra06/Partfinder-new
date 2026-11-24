@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "codemesh": {
+      "command": "c:\\Users\\user\\.cursor\\extensions\\codemesh.vscode-codemesh-0.4.403-universal\\bin\\win32-x64\\codemesh.exe",
+      "args": [
+        "mcp-stdio"
+      ],
+      "env": {
+        "CODEMESH_API_URL": "https://codemesh.cloud",
+        "CODEMESH_SCOPE_ROOT": "c:\\Users\\user\\Desktop\\Euroasiann\\Partfinder-new"
+      }
+    }
+  }
+}

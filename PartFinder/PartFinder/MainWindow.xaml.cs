@@ -1,3 +1,4 @@
+using Microsoft.UI.Input;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -9,6 +10,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text.Json;
 using Windows.Foundation;
+using Windows.Graphics;
+using WinRT.Interop;
 
 namespace PartFinder;
 
@@ -27,33 +30,224 @@ public sealed partial class MainWindow : Window
     private string? _resolvedSignedInEmail;
     private string? _resolvedSignedInRole;
     private bool _mustChangePassword = true;
+    private bool _signedInThisSession;
+    private bool _loginTotpVerifiedThisSession;
     private SetupStatusResult? _lastStatus;
+    private bool _showForgotPasswordPanel;
 
     private Microsoft.UI.Xaml.DispatcherTimer? _maintenanceTimer;
     private DateTimeOffset? _maintenanceUntilUtc;
     private string? _orgCodeForMaintenanceRetry;
+    private bool _shellTitleBarRegionsActive;
 
     private readonly string _setupFilePath = SetupPaths.SetupStateFilePath;
-
-    private AppWindow? _shellTitleBarAppWindow;
-    private TypedEventHandler<AppWindow, AppWindowChangedEventArgs>? _shellTitleBarAppWindowChangedHandler;
 
     public MainWindow()
     {
         InitializeComponent();
+        // WinUI ignores XAML EventTrigger, so a Loaded fade left this screen at opacity 0.
+        SetupRoot.Opacity = 1;
         // Setup / blocked / app-lock use the standard caption strip; shell applies extended chrome.
         ExtendsContentIntoTitleBar = false;
         BackButton.IsEnabled = false;
-
-
-        if (IsSetupCompleted())
-        {
-            RootGrid.Loaded += OnRootGridLoadedPostSetupValidate;
-            return;
-        }
+        ShellRoot.SizeChanged += OnShellRootSizeChanged;
 
         RootGrid.Loaded += OnRootGridLoadedResumeWizard;
         UpdateStepUi();
+
+        var themeService = App.Services.GetRequiredService<IThemeService>();
+        themeService.AttachWindowRoot(RootGrid);
+        themeService.ThemeChanged += OnShellThemeChangedForTitleBar;
+    }
+
+    private void OnShellThemeChangedForTitleBar(object? sender, EventArgs e)
+    {
+        if (_shellTitleBarRegionsActive)
+        {
+            ApplyShellTitleBarChrome();
+        }
+    }
+
+    private AppWindow? TryGetAppWindow()
+    {
+        try
+        {
+            var hwnd = WindowNative.GetWindowHandle(this);
+            var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
+            return AppWindow.GetFromWindowId(windowId);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Standard (non-extended) caption strip for login, setup, and blocked screens.</summary>
+    private void ApplySetupTitleBarChrome()
+    {
+        if (!AppWindowTitleBar.IsCustomizationSupported())
+        {
+            return;
+        }
+
+        var titleBar = TryGetAppWindow()?.TitleBar;
+        if (titleBar is null)
+        {
+            return;
+        }
+
+        var background = Windows.UI.Color.FromArgb(255, 10, 14, 21);
+        var foreground = Windows.UI.Color.FromArgb(255, 234, 242, 255);
+        var muted = Windows.UI.Color.FromArgb(255, 123, 141, 168);
+        var hoverBg = Windows.UI.Color.FromArgb(255, 26, 39, 64);
+        var pressedBg = Windows.UI.Color.FromArgb(255, 42, 61, 88);
+
+        titleBar.BackgroundColor = background;
+        titleBar.ForegroundColor = foreground;
+        titleBar.InactiveBackgroundColor = background;
+        titleBar.InactiveForegroundColor = muted;
+        titleBar.ButtonBackgroundColor = Windows.UI.Color.FromArgb(0, 0, 0, 0);
+        titleBar.ButtonForegroundColor = foreground;
+        titleBar.ButtonHoverBackgroundColor = hoverBg;
+        titleBar.ButtonHoverForegroundColor = foreground;
+        titleBar.ButtonPressedBackgroundColor = pressedBg;
+        titleBar.ButtonPressedForegroundColor = foreground;
+        titleBar.ButtonInactiveBackgroundColor = Windows.UI.Color.FromArgb(0, 0, 0, 0);
+        titleBar.ButtonInactiveForegroundColor = muted;
+    }
+
+    /// <summary>Extended shell title bar: transparent strip with theme-aware control glyphs.</summary>
+    private void ApplyShellTitleBarChrome()
+    {
+        if (!AppWindowTitleBar.IsCustomizationSupported())
+        {
+            return;
+        }
+
+        var titleBar = TryGetAppWindow()?.TitleBar;
+        if (titleBar is null)
+        {
+            return;
+        }
+
+        var isDark = App.Services.GetRequiredService<IThemeService>().IsDark;
+        var foreground = isDark
+            ? Windows.UI.Color.FromArgb(255, 244, 248, 255)
+            : Windows.UI.Color.FromArgb(255, 23, 34, 52);
+        var muted = isDark
+            ? Windows.UI.Color.FromArgb(255, 196, 208, 223)
+            : Windows.UI.Color.FromArgb(255, 75, 95, 119);
+        var hoverBg = isDark
+            ? Windows.UI.Color.FromArgb(64, 255, 255, 255)
+            : Windows.UI.Color.FromArgb(48, 0, 0, 0);
+        var pressedBg = isDark
+            ? Windows.UI.Color.FromArgb(96, 255, 255, 255)
+            : Windows.UI.Color.FromArgb(72, 0, 0, 0);
+        var transparent = Windows.UI.Color.FromArgb(0, 0, 0, 0);
+
+        titleBar.BackgroundColor = transparent;
+        titleBar.InactiveBackgroundColor = transparent;
+        titleBar.ForegroundColor = foreground;
+        titleBar.InactiveForegroundColor = muted;
+        titleBar.ButtonBackgroundColor = transparent;
+        titleBar.ButtonForegroundColor = foreground;
+        titleBar.ButtonHoverBackgroundColor = hoverBg;
+        titleBar.ButtonHoverForegroundColor = foreground;
+        titleBar.ButtonPressedBackgroundColor = pressedBg;
+        titleBar.ButtonPressedForegroundColor = foreground;
+        titleBar.ButtonInactiveBackgroundColor = transparent;
+        titleBar.ButtonInactiveForegroundColor = muted;
+    }
+
+    private void EnableShellTitleBar()
+    {
+        try
+        {
+            ExtendsContentIntoTitleBar = true;
+            SetTitleBar(ShellRoot.TitleBarDragElement);
+        }
+        catch (System.Runtime.InteropServices.COMException)
+        {
+            _shellTitleBarRegionsActive = false;
+            return;
+        }
+
+        _shellTitleBarRegionsActive = true;
+
+        if (!AppWindowTitleBar.IsCustomizationSupported())
+        {
+            ShellRoot.UpdateTitleBarInsets(0, 0);
+            UpdateShellTitleBarRegions();
+            return;
+        }
+
+        ShellRoot.UpdateTitleBarInsets(0, 0);
+        UpdateShellTitleBarRegions();
+        ApplyShellTitleBarChrome();
+    }
+
+    private void DisableShellTitleBar()
+    {
+        _shellTitleBarRegionsActive = false;
+        try
+        {
+            ExtendsContentIntoTitleBar = false;
+            SetTitleBar(null);
+        }
+        catch (System.Runtime.InteropServices.COMException)
+        {
+            // Window closing — ignore.
+        }
+
+        ShellRoot.UpdateTitleBarInsets(0, 0);
+        ApplySetupTitleBarChrome();
+    }
+
+    private void OnShellRootSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (_shellTitleBarRegionsActive)
+        {
+            UpdateShellTitleBarRegions();
+        }
+    }
+
+    public void RefreshShellTitleBarRegions()
+    {
+        UpdateShellTitleBarRegions();
+    }
+     
+    private void UpdateShellTitleBarRegions()
+    {
+        if (!_shellTitleBarRegionsActive || ShellRoot is null || ShellRoot.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+
+        try
+        {
+            var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(WindowNative.GetWindowHandle(this));
+            var inputSource = InputNonClientPointerSource.GetForWindowId(windowId);
+            if (inputSource is null)
+            {
+                return;
+            }
+
+            var rects = ShellRoot.GetTitleBarPassthroughRects();
+            inputSource.SetRegionRects(NonClientRegionKind.Passthrough, rects);
+        }
+        catch (System.Runtime.InteropServices.COMException ex)
+            when (ex.HResult == unchecked((int)0x80010108)
+                  || ex.HResult == unchecked((int)0x800710DD)
+                  || ex.HResult == unchecked((int)0x80004005)
+                  || ex.Message.Contains("closed", StringComparison.OrdinalIgnoreCase)
+                  || ex.Message.Contains("not valid", StringComparison.OrdinalIgnoreCase))
+        {
+            _shellTitleBarRegionsActive = false;
+        }
+        catch (Exception ex)
+        {
+            DebugLogClient.Post("warn", "UpdateShellTitleBarRegions", ex.Message);
+        }
     }
 
     private sealed class SetupState
@@ -90,6 +284,7 @@ public sealed partial class MainWindow : Window
     {
         Directory.CreateDirectory(Path.GetDirectoryName(_setupFilePath)!);
         File.WriteAllText(_setupFilePath, JsonSerializer.Serialize(state, SetupJson));
+        SetupPaths.PurgeLegacySetupStateFiles();
     }
 
     private bool IsSetupCompleted()
@@ -105,48 +300,481 @@ public sealed partial class MainWindow : Window
     private async void OnRootGridLoadedResumeWizard(object sender, RoutedEventArgs e)
     {
         RootGrid.Loaded -= OnRootGridLoadedResumeWizard;
+        ApplySetupTitleBarChrome();
+        SetupRoot.Opacity = 1;
+        SetupRoot.Visibility = Visibility.Collapsed;
+        ShellRoot.Visibility = Visibility.Collapsed;
 
-        var saved = LoadSetupState();
-        if (saved.invitedUserLogin && !string.IsNullOrWhiteSpace(saved.adminEmail))
+        _signedInThisSession = false;
+
+        if (IsSetupCompleted())
         {
-            _resolvedSignedInEmail = saved.adminEmail.Trim();
+            var quickLogin = App.Services.GetRequiredService<QuickLoginService>();
+            var result = await quickLogin.TryQuickLoginAsync().ConfigureAwait(true);
+            if (result.Kind == QuickLoginResultKind.Success)
+            {
+                _signedInThisSession = true;
+                _resolvedSignedInEmail = result.Email;
+                _resolvedSignedInRole = null;
+                _loginTotpVerifiedThisSession = false;
+                await ValidateAndShowShellAsync().ConfigureAwait(true);
+                return;
+            }
+
+            if (result.Kind == QuickLoginResultKind.NetworkError)
+            {
+                ShowManualLoginAfterQuickLoginFailure(
+                    "Could not verify saved sign-in. Check your internet connection, then sign in with your password.");
+                return;
+            }
+
+            if (result.Kind == QuickLoginResultKind.InvalidSession)
+            {
+                ShowManualLoginAfterQuickLoginFailure(
+                    "Saved sign-in is no longer valid. Enter your organisation code and password.");
+                return;
+            }
         }
 
-        var code = TryReadOrgCodeFromSetup();
-        if (string.IsNullOrWhiteSpace(code))
+        ShowManualLoginAfterQuickLoginFailure(null);
+    }
+
+    private void ShowManualLoginAfterQuickLoginFailure(string? message)
+    {
+        _workingOrgCode = string.Empty;
+        _lastStatus = null;
+        OrgCodeBox.Text = string.Empty;
+        LicenseSummaryPanel.Visibility = Visibility.Collapsed;
+
+        InviteLoginEmailBox.Text = string.Empty;
+        InviteLoginPasswordBox.Password = string.Empty;
+        _step = 1;
+        SetupRoot.Visibility = Visibility.Visible;
+        ShellRoot.Visibility = Visibility.Collapsed;
+        ValidationText.Text = message ?? string.Empty;
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            ApplySavedLoginFromStore();
+            UpdateStepUi();
+        });
+    }
+
+    private async Task PromptSaveLoginInformationIfOfferedAsync(
+        string orgCode,
+        string email,
+        string? refreshToken)
+    {
+        if (string.IsNullOrWhiteSpace(refreshToken))
         {
             return;
         }
 
-        OrgCodeBox.Text = code;
-        _workingOrgCode = code;
-
-        var (status, _) = await SetupApiClient.StatusAsync(_workingOrgCode);
-        if (status is null || !status.Valid)
+        var store = App.Services.GetRequiredService<SavedLoginCredentialStore>();
+        if (!store.ShouldOfferSaveLoginPrompt(email))
         {
             return;
         }
 
-        _lastStatus = status;
-        _cachedOrgDatabaseUri = status.OrgDatabaseUri;
-        UpdateLicenseSummary(status);
-        _step = ResolveTargetStep(status);
-        UpdateStepUi();
+        var dialog = new ContentDialog
+        {
+            Title = "Save Login Information?",
+            Content =
+                "Would you like PartFinder to securely remember your login on this device so you can access your account automatically next time?",
+            PrimaryButtonText = "Save Login",
+            CloseButtonText = "Not Now",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = RootGrid.XamlRoot,
+        };
+
+        var result = await dialog.ShowAsync();
+        store.MarkSaveLoginPromptAnswered(email);
+
+        if (result != ContentDialogResult.Primary)
+        {
+            return;
+        }
+
+        try
+        {
+            var existing = store.LoadProfile();
+            if (existing is not null
+                && (!string.Equals(existing.OrgCode, orgCode, StringComparison.Ordinal)
+                    || !string.Equals(existing.Email, email, StringComparison.OrdinalIgnoreCase)))
+            {
+                await RevokeSavedLoginIfAnyAsync().ConfigureAwait(true);
+            }
+
+            store.Save(orgCode, email, refreshToken);
+
+            var password = InviteLoginPasswordBox.Password;
+            if (!string.IsNullOrWhiteSpace(password))
+            {
+                PersistLoginCredential(orgCode, email, password);
+            }
+        }
+        catch
+        {
+            // Saving failed — user can sign in normally next time.
+        }
+    }
+
+    private static async Task RevokeSavedLoginIfAnyAsync()
+    {
+        try
+        {
+            var store = App.Services.GetRequiredService<SavedLoginCredentialStore>();
+            var profile = store.LoadProfile();
+            if (profile?.OrgCode is null || profile.Email is null)
+            {
+                store.Clear();
+                return;
+            }
+
+            var refreshToken = store.TryReadRefreshToken(profile);
+            var deviceId = DeviceIdentityService.GetDeviceId();
+            if (!string.IsNullOrWhiteSpace(refreshToken))
+            {
+                _ = await SetupApiClient
+                    .RevokeSessionAsync(profile.OrgCode, profile.Email, deviceId, refreshToken)
+                    .ConfigureAwait(false);
+            }
+
+            store.Clear();
+        }
+        catch
+        {
+            try
+            {
+                App.Services.GetRequiredService<SavedLoginCredentialStore>().Clear();
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    private bool _inviteLoginEmailLowercaseGuard;
+    private bool _suppressCredentialAutofill;
+    private bool _suppressSavedLoginCombo;
+
+    private void OnInviteLoginEmailBoxTextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_inviteLoginEmailLowercaseGuard || sender is not TextBox box)
+        {
+            return;
+        }
+
+        var text = box.Text;
+        var lower = text.ToLowerInvariant();
+        if (!string.Equals(text, lower, StringComparison.Ordinal))
+        {
+            _inviteLoginEmailLowercaseGuard = true;
+            var caret = box.SelectionStart;
+            box.Text = lower;
+            box.SelectionStart = Math.Clamp(caret, 0, lower.Length);
+            _inviteLoginEmailLowercaseGuard = false;
+        }
+
+        if (!_suppressCredentialAutofill)
+        {
+            ApplySavedPasswordForEmail(lower);
+        }
+    }
+
+    private void ApplySavedLoginFromStore()
+    {
+        var store = App.Services.GetRequiredService<LoginCredentialStore>();
+        var (orgCode, email, password) = store.GetLastUsed();
+
+        var setup = LoadSetupState();
+        if (string.IsNullOrWhiteSpace(email) && !string.IsNullOrWhiteSpace(setup.adminEmail))
+        {
+            email = setup.adminEmail.Trim().ToLowerInvariant();
+        }
+
+        if (string.IsNullOrWhiteSpace(orgCode) && !string.IsNullOrWhiteSpace(setup.orgCode))
+        {
+            orgCode = setup.orgCode.Trim();
+        }
+
+        if (string.IsNullOrWhiteSpace(password) &&
+            !string.IsNullOrWhiteSpace(email) &&
+            !string.IsNullOrWhiteSpace(orgCode) &&
+            orgCode.Length == 6)
+        {
+            store.TryGetPassword(orgCode, email, out password);
+        }
+
+        RefreshSavedLoginsCombo(orgCode, email);
+
+        if (string.IsNullOrWhiteSpace(email) &&
+            string.IsNullOrWhiteSpace(orgCode) &&
+            string.IsNullOrWhiteSpace(password))
+        {
+            return;
+        }
+
+        ApplySavedLoginFields(orgCode, email, password);
+    }
+
+    private void ApplySavedLoginFields(string? orgCode, string? email, string? password)
+    {
+        _suppressCredentialAutofill = true;
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(orgCode))
+            {
+                OrgCodeBox.Text = orgCode;
+            }
+
+            if (!string.IsNullOrWhiteSpace(email))
+            {
+                InviteLoginEmailBox.Text = email;
+            }
+
+            if (!string.IsNullOrWhiteSpace(password))
+            {
+                InviteLoginPasswordBox.Password = password;
+            }
+            else if (!string.IsNullOrWhiteSpace(email))
+            {
+                ApplySavedPasswordForEmail(email);
+            }
+        }
+        finally
+        {
+            _suppressCredentialAutofill = false;
+        }
+    }
+
+    private void RefreshSavedLoginsCombo(string? selectOrg = null, string? selectEmail = null)
+    {
+        var store = App.Services.GetRequiredService<LoginCredentialStore>();
+        var entries = store.GetAll();
+        if (entries.Count == 0)
+        {
+            SavedLoginsPanel.Visibility = Visibility.Collapsed;
+            SavedLoginsCombo.ItemsSource = null;
+            return;
+        }
+
+        SavedLoginsPanel.Visibility = Visibility.Visible;
+        _suppressSavedLoginCombo = true;
+        try
+        {
+            SavedLoginsCombo.ItemsSource = entries;
+
+            var (lastOrg, lastEmail, _) = store.GetLastUsed();
+            var targetOrg = selectOrg?.Trim() ?? lastOrg;
+            var targetEmail = selectEmail?.Trim().ToLowerInvariant() ?? lastEmail;
+            SavedLoginEntry? selected = null;
+            if (!string.IsNullOrWhiteSpace(targetOrg) && !string.IsNullOrWhiteSpace(targetEmail))
+            {
+                selected = entries.FirstOrDefault(e =>
+                    string.Equals(e.OrgCode, targetOrg, StringComparison.Ordinal) &&
+                    string.Equals(e.Email, targetEmail, StringComparison.OrdinalIgnoreCase));
+            }
+
+            selected ??= entries.FirstOrDefault();
+            if (selected is not null)
+            {
+                SavedLoginsCombo.SelectedItem = selected;
+            }
+        }
+        finally
+        {
+            _suppressSavedLoginCombo = false;
+        }
+    }
+
+    private void OnSavedLoginsComboSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressSavedLoginCombo || SavedLoginsCombo.SelectedItem is not SavedLoginEntry entry)
+        {
+            return;
+        }
+
+        var store = App.Services.GetRequiredService<LoginCredentialStore>();
+        store.TryGetPassword(entry.OrgCode, entry.Email, out var password);
+        store.TouchLastUsed(entry.OrgCode, entry.Email);
+        ApplySavedLoginFields(entry.OrgCode, entry.Email, string.IsNullOrEmpty(password) ? null : password);
+    }
+
+    private void ApplySavedPasswordForEmail(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email) || !IsValidEmail(email))
+        {
+            return;
+        }
+
+        var store = App.Services.GetRequiredService<LoginCredentialStore>();
+        var org = OrgCodeBox.Text.Trim();
+        string password;
+        if (org.Length == 6 && org.All(char.IsDigit) && store.TryGetPassword(org, email, out password))
+        {
+            // matched current org
+        }
+        else if (!store.TryGetPassword(email, out password))
+        {
+            return;
+        }
+
+        _suppressCredentialAutofill = true;
+        try
+        {
+            InviteLoginPasswordBox.Password = password;
+            if (org.Length != 6 || !org.All(char.IsDigit))
+            {
+                var savedOrg = store.GetOrgCodeForEmail(email);
+                if (!string.IsNullOrWhiteSpace(savedOrg))
+                {
+                    OrgCodeBox.Text = savedOrg;
+                }
+            }
+        }
+        finally
+        {
+            _suppressCredentialAutofill = false;
+        }
+    }
+
+    private void MaybePersistStep1Credentials(string orgCode)
+    {
+        var email = InviteLoginEmailBox.Text.Trim();
+        var password = InviteLoginPasswordBox.Password;
+        if (!IsValidEmail(email) || string.IsNullOrEmpty(password))
+        {
+            return;
+        }
+
+        if (PersistLoginCredential(orgCode, email, password))
+        {
+            System.Diagnostics.Debug.WriteLine($"[Login] Saved credentials for org {orgCode} / {email}");
+        }
+    }
+
+    private void PersistLoginCredential(string email, string password) =>
+        PersistLoginCredential(null, email, password);
+
+    private bool PersistLoginCredential(string? orgCode, string email, string password)
+    {
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+        {
+            return false;
+        }
+
+        var org = orgCode?.Trim();
+        if (string.IsNullOrWhiteSpace(org))
+        {
+            org = !string.IsNullOrWhiteSpace(_workingOrgCode)
+                ? _workingOrgCode.Trim()
+                : OrgCodeBox.Text.Trim();
+        }
+
+        if (string.IsNullOrWhiteSpace(org))
+        {
+            org = TryReadOrgCodeFromSetup();
+        }
+
+        var store = App.Services.GetRequiredService<LoginCredentialStore>();
+        if (!store.Save(email, password, org))
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"[Login] Credential not saved (org={org ?? "missing"}, email={email}).");
+            return false;
+        }
+
+        RefreshSavedLoginsCombo(org, email);
+        return true;
+    }
+
+    private void OnOrgCodeBoxTextChanged(object sender, TextChangedEventArgs e)
+    {
+        var text = OrgCodeBox.Text.Trim();
+        var previousOrg = LoadSetupState().orgCode?.Trim();
+        if (!string.IsNullOrEmpty(previousOrg) &&
+            text.Length == 6 &&
+            !string.Equals(previousOrg, text, StringComparison.Ordinal))
+        {
+            _resolvedSignedInEmail = null;
+            _resolvedSignedInRole = null;
+            _mustChangePassword = true;
+            InviteLoginPasswordBox.Password = string.Empty;
+        }
+
+        LicenseSummaryPanel.Visibility = Visibility.Collapsed;
+
+        if (!_suppressCredentialAutofill && text.Length == 6 && text.All(char.IsDigit))
+        {
+            TryAutofillSavedLoginForOrg(text);
+        }
+    }
+
+    private void TryAutofillSavedLoginForOrg(string orgCode)
+    {
+        var store = App.Services.GetRequiredService<LoginCredentialStore>();
+        var forOrg = store.GetForOrg(orgCode);
+        if (forOrg.Count == 0)
+        {
+            return;
+        }
+
+        SavedLoginEntry pick;
+        var email = InviteLoginEmailBox.Text.Trim().ToLowerInvariant();
+        if (!string.IsNullOrWhiteSpace(email) && IsValidEmail(email))
+        {
+            pick = forOrg.FirstOrDefault(e =>
+                string.Equals(e.Email, email, StringComparison.OrdinalIgnoreCase)) ?? forOrg[0];
+        }
+        else if (forOrg.Count == 1)
+        {
+            pick = forOrg[0];
+        }
+        else
+        {
+            RefreshSavedLoginsCombo(orgCode, email);
+            return;
+        }
+
+        store.TryGetPassword(pick.OrgCode, pick.Email, out var password);
+        ApplySavedLoginFields(pick.OrgCode, pick.Email, string.IsNullOrEmpty(password) ? null : password);
+        RefreshSavedLoginsCombo(pick.OrgCode, pick.Email);
     }
 
     private async void OnRootGridLoadedPostSetupValidate(object sender, RoutedEventArgs e)
     {
         RootGrid.Loaded -= OnRootGridLoadedPostSetupValidate;
+        // Never open the shell without an explicit sign-in this session.
+        if (!_signedInThisSession)
+        {
+            _step = 1;
+            SetupRoot.Visibility = Visibility.Visible;
+            ShellRoot.Visibility = Visibility.Collapsed;
+            ApplySavedLoginFromStore();
+            UpdateStepUi();
+            return;
+        }
+
         await ValidateAndShowShellAsync().ConfigureAwait(true);
     }
 
     private async Task ValidateAndShowShellAsync()
     {
+        if (!_signedInThisSession)
+        {
+            _step = 1;
+            SetupRoot.Visibility = Visibility.Visible;
+            ShellRoot.Visibility = Visibility.Collapsed;
+            ApplySavedLoginFromStore();
+            UpdateStepUi();
+            return;
+        }
+
         var orgCode = TryReadOrgCodeFromSetup();
         if (string.IsNullOrWhiteSpace(orgCode))
         {
             ShowSubscriptionBlocked(
-                "No organization code was found in local setup. Use \"Re-enter organization code\" or complete setup again.");
+                "No organisation code was found in local setup. Use \"Re-enter organisation code\" or complete setup again.");
             return;
         }
 
@@ -154,17 +782,14 @@ public sealed partial class MainWindow : Window
         if (string.IsNullOrWhiteSpace(dbUri))
         {
             ShowSubscriptionBlocked(
-                "No database URI in local setup. Use \"Re-enter organization code\" to run setup again.");
+                "No database URI in local setup. Use \"Re-enter organisation code\" to run setup again.");
             return;
         }
 
         var (status, statusErr) = await SetupApiClient.StatusAsync(orgCode);
         if (status is null)
         {
-            var api = LicenseApiClient.GetBaseUrl();
-            var detail = string.IsNullOrWhiteSpace(statusErr) ? "" : " " + statusErr.Trim();
-            ShowSubscriptionBlocked(
-                $"Active internet is required. Cannot reach the license server at {api}.{detail} Start PartFinder-Backend (npm run start in PartFinder-Backend) and check LicenseApi:BaseUrl in appsettings.json next to the app.");
+            ShowSubscriptionBlocked(SetupApiClient.FormatStatusFailureMessage(statusErr));
             return;
         }
 
@@ -172,15 +797,19 @@ public sealed partial class MainWindow : Window
         {
             ShowSubscriptionBlocked(
                 string.IsNullOrWhiteSpace(status.Message)
-                    ? "This organization is not licensed to use PartFinder right now."
+                    ? "This organisation is not licenced to use PartFinder right now."
                     : status.Message);
             return;
         }
 
-        if (!await MongoConnectionTester.TryPingAsync(dbUri))
+        var ping = await MongoConnectionTester.PingAsync(dbUri, orgCode);
+        if (!ping.Ok)
         {
+            var detail = string.IsNullOrWhiteSpace(ping.ErrorDetail)
+                ? ""
+                : " " + ping.ErrorDetail.Trim();
             ShowSubscriptionBlocked(
-                "Cannot reach your organization MongoDB from this PC. Check the network or MongoDB URI.");
+                "Cannot reach your organisation MongoDB from this PC." + detail);
             return;
         }
 
@@ -188,7 +817,7 @@ public sealed partial class MainWindow : Window
         if (verify is null)
         {
             ShowSubscriptionBlocked(
-                "Active internet is required to verify your license. Connect to the internet, then restart the app or use \"Re-enter organization code\" to try again.");
+                "Active internet is required to verify your licence. Connect to the internet, then restart the app or use \"Re-enter organisation code\" to try again.");
             return;
         }
 
@@ -203,7 +832,7 @@ public sealed partial class MainWindow : Window
 
             ShowSubscriptionBlocked(
                 string.IsNullOrWhiteSpace(verify.Message)
-                    ? "License check failed. Is PartFinder-Backend running?"
+                    ? "Licence check failed. Is PartFinder-Backend running?"
                     : verify.Message);
             return;
         }
@@ -221,7 +850,7 @@ public sealed partial class MainWindow : Window
     private void ShowSubscriptionBlocked(string message)
     {
         StopMaintenanceTimer();
-        RestoreNonShellTitleBarChrome();
+        DisableShellTitleBar();
         MaintenanceBlockedRoot.Visibility = Visibility.Collapsed;
         SubscriptionBlockedMessage.Text = message;
         SubscriptionBlockedRoot.Visibility = Visibility.Visible;
@@ -232,7 +861,7 @@ public sealed partial class MainWindow : Window
     private void ShowMaintenanceBlocked(string maintenanceUntilIso, string orgCode)
     {
         StopMaintenanceTimer();
-        RestoreNonShellTitleBarChrome();
+        DisableShellTitleBar();
         SubscriptionBlockedRoot.Visibility = Visibility.Collapsed;
         _orgCodeForMaintenanceRetry = orgCode.Trim();
         if (!DateTimeOffset.TryParse(
@@ -354,7 +983,7 @@ public sealed partial class MainWindow : Window
         if (verify is null)
         {
             ShowSubscriptionBlocked(
-                "Active internet is required to verify your license after maintenance. Connect to the internet and try again.");
+                "Active internet is required to verify your licence after maintenance. Connect to the internet and try again.");
             return;
         }
 
@@ -364,14 +993,18 @@ public sealed partial class MainWindow : Window
             if (string.IsNullOrWhiteSpace(dbUri))
             {
                 ShowSubscriptionBlocked(
-                    "No database URI in local setup. Use \"Re-enter organization code\" to run setup again.");
+                    "No database URI in local setup. Use \"Re-enter organisation code\" to run setup again.");
                 return;
             }
 
-            if (!await MongoConnectionTester.TryPingAsync(dbUri))
+            var pingAfterMaintenance = await MongoConnectionTester.PingAsync(dbUri, code);
+            if (!pingAfterMaintenance.Ok)
             {
+                var detail = string.IsNullOrWhiteSpace(pingAfterMaintenance.ErrorDetail)
+                    ? ""
+                    : " " + pingAfterMaintenance.ErrorDetail.Trim();
                 ShowSubscriptionBlocked(
-                    "Cannot reach your organization MongoDB from this PC. Check the network or MongoDB URI.");
+                    "Cannot reach your organisation MongoDB from this PC." + detail);
                 return;
             }
 
@@ -390,7 +1023,7 @@ public sealed partial class MainWindow : Window
 
         ShowSubscriptionBlocked(
             string.IsNullOrWhiteSpace(verify.Message)
-                ? "License check failed after maintenance."
+                ? "Licence check failed after maintenance."
                 : verify.Message);
     }
 
@@ -414,8 +1047,10 @@ public sealed partial class MainWindow : Window
     public void ResetToSetup()
     {
         StopMaintenanceTimer();
-        RestoreNonShellTitleBarChrome();
+        DisableShellTitleBar();
         MaintenanceBlockedRoot.Visibility = Visibility.Collapsed;
+
+        _ = RevokeSavedLoginIfAnyAsync();
 
         // Clear ALL cached state from previous session
         try
@@ -432,27 +1067,22 @@ public sealed partial class MainWindow : Window
         }
         catch { }
 
-        try
-        {
-            if (File.Exists(_setupFilePath))
-            {
-                File.Delete(_setupFilePath);
-            }
-        }
-        catch
-        {
-        }
+        SetupPaths.ClearAllSetupStateFiles();
 
         SubscriptionBlockedRoot.Visibility = Visibility.Collapsed;
         SetupRoot.Visibility = Visibility.Visible;
         ShellRoot.Visibility = Visibility.Collapsed;
         AppLockRoot.Visibility = Visibility.Collapsed;
+        LoginTwoFactorRoot.Visibility = Visibility.Collapsed;
+        _loginTotpVerifiedThisSession = false;
+        LoginTotpBox.Text = string.Empty;
         _step = 1;
         _workingOrgCode = "";
         _cachedOrgDatabaseUri = null;
         _resolvedSignedInEmail = null;
         _resolvedSignedInRole = null;
         _mustChangePassword = true;
+        _signedInThisSession = false;
         _lastStatus = null;
         OrgCodeBox.Text = "";
         InviteLoginEmailBox.Text = "";
@@ -467,20 +1097,11 @@ public sealed partial class MainWindow : Window
         if (SetupConfirmPasswordRevealIcon != null) SetupConfirmPasswordRevealIcon.Glyph = "\uE890";
         ValidationText.Text = "";
         LicenseSummaryPanel.Visibility = Visibility.Collapsed;
+        _showForgotPasswordPanel = false;
+        ForgotPasswordOrgCodeBox.Text = "";
+        ForgotPasswordEmailBox.Text = "";
+        ApplySavedLoginFromStore();
         UpdateStepUi();
-    }
-
-    private void UpdateLicenseSummary(SetupStatusResult s)
-    {
-        LicenseSummaryPanel.Visibility = Visibility.Visible;
-        LicenseOrgNameText.Text = $"Organization: {s.OrganizationName ?? "—"}";
-        LicenseCodeText.Text = $"Code: {s.OrgCode ?? "—"}";
-        LicenseStatusText.Text = $"Status: {s.Status ?? "—"}";
-        LicenseExpiryText.Text = string.IsNullOrWhiteSpace(s.ValidUntil)
-            ? "Validity: —"
-            : $"Valid until (UTC): {s.ValidUntil}";
-        LicenseLimitsText.Text =
-            $"Limits: max users {s.MaxUsers ?? 0}, max parts {s.MaxParts ?? 0}";
     }
 
     private static int ResolveTargetStep(SetupStatusResult s)
@@ -501,6 +1122,15 @@ public sealed partial class MainWindow : Window
     private void SaveProgressOrgCodeOnly(string code)
     {
         var st = LoadSetupState();
+        if (!string.Equals(st.orgCode?.Trim(), code.Trim(), StringComparison.Ordinal))
+        {
+            st.dbUri = null;
+            st.completed = false;
+            st.databaseMode = null;
+            st.adminName = null;
+            _cachedOrgDatabaseUri = null;
+        }
+
         st.orgCode = code;
         if (!string.IsNullOrWhiteSpace(_resolvedSignedInEmail))
         {
@@ -519,7 +1149,15 @@ public sealed partial class MainWindow : Window
     {
         var st = LoadSetupState();
         st.orgCode = code;
-        st.dbUri = uri;
+        try
+        {
+            st.dbUri = MongoConnectionStringUtil.Prepare(uri, code);
+        }
+        catch (ArgumentException)
+        {
+            st.dbUri = uri;
+        }
+
         SaveSetupState(st);
     }
 
@@ -529,9 +1167,22 @@ public sealed partial class MainWindow : Window
         var st = LoadSetupState();
         st.completed = true;
         st.orgCode = _workingOrgCode;
-        st.dbUri = _cachedOrgDatabaseUri;
+        var storedUri = _cachedOrgDatabaseUri;
+        if (!string.IsNullOrWhiteSpace(storedUri))
+        {
+            try
+            {
+                storedUri = MongoConnectionStringUtil.Prepare(storedUri, _workingOrgCode);
+            }
+            catch (ArgumentException)
+            {
+                // Keep the URI that was entered when it is not a Mongo connection string.
+            }
+        }
+
+        st.dbUri = storedUri;
         st.databaseMode = mode;
-        st.adminName = "Organization Admin";
+        st.adminName = "Organisation Admin";
         st.adminEmail = string.IsNullOrWhiteSpace(_resolvedSignedInEmail)
             ? InviteLoginEmailBox.Text.Trim()
             : _resolvedSignedInEmail;
@@ -539,173 +1190,128 @@ public sealed partial class MainWindow : Window
         SaveSetupState(st);
     }
 
-    private void UnsubscribeShellTitleBarAppWindowChanged()
-    {
-        if (_shellTitleBarAppWindow is not null && _shellTitleBarAppWindowChangedHandler is not null)
-        {
-            _shellTitleBarAppWindow.Changed -= _shellTitleBarAppWindowChangedHandler;
-        }
-    }
-
-    private void OnShellTitleBarAppWindowChanged(AppWindow sender, AppWindowChangedEventArgs args)
-    {
-        SyncShellTitleBarCaptionInsets();
-    }
-
-    private void ApplyShellExtendedTitleBar()
-    {
-        if (ShellRoot.Visibility != Visibility.Visible)
-        {
-            return;
-        }
-
-        try
-        {
-            UnsubscribeShellTitleBarAppWindowChanged();
-            _shellTitleBarAppWindowChangedHandler = null;
-            _shellTitleBarAppWindow = null;
-
-            var appWindow = AppWindow;
-            _shellTitleBarAppWindow = appWindow;
-
-            var caption = appWindow.TitleBar;
-            caption.ExtendsContentIntoTitleBar = true;
-
-            ExtendsContentIntoTitleBar = true;
-            SetTitleBar(ShellRoot.ShellTitleBarDragTarget);
-
-            Windows.UI.Color bar = Windows.UI.Color.FromArgb(255, 10, 14, 21);
-            caption.BackgroundColor = bar;
-            caption.InactiveBackgroundColor = bar;
-            caption.ForegroundColor = Windows.UI.Color.FromArgb(255, 234, 242, 255);
-            caption.InactiveForegroundColor = Windows.UI.Color.FromArgb(255, 127, 141, 168);
-
-            caption.ButtonBackgroundColor = bar;
-            caption.ButtonInactiveBackgroundColor = bar;
-            caption.ButtonForegroundColor = Windows.UI.Color.FromArgb(255, 234, 242, 255);
-            caption.ButtonInactiveForegroundColor = Windows.UI.Color.FromArgb(255, 120, 130, 150);
-            caption.ButtonHoverBackgroundColor = Windows.UI.Color.FromArgb(255, 30, 45, 70);
-            caption.ButtonHoverForegroundColor = Windows.UI.Color.FromArgb(255, 255, 255, 255);
-            caption.ButtonPressedBackgroundColor = Windows.UI.Color.FromArgb(255, 25, 38, 58);
-            caption.ButtonPressedForegroundColor = Windows.UI.Color.FromArgb(255, 255, 255, 255);
-
-            _shellTitleBarAppWindowChangedHandler = OnShellTitleBarAppWindowChanged;
-            appWindow.Changed += _shellTitleBarAppWindowChangedHandler;
-
-            SyncShellTitleBarCaptionInsets();
-        }
-        catch
-        {
-            RestoreNonShellTitleBarChrome();
-        }
-    }
-
-    private void RestoreNonShellTitleBarChrome()
-    {
-        UnsubscribeShellTitleBarAppWindowChanged();
-        _shellTitleBarAppWindowChangedHandler = null;
-        _shellTitleBarAppWindow = null;
-
-        try
-        {
-            SetTitleBar(null);
-        }
-        catch
-        {
-            // ignore
-        }
-
-        ExtendsContentIntoTitleBar = false;
-
-        try
-        {
-            var caption = AppWindow.TitleBar;
-            caption.ExtendsContentIntoTitleBar = false;
-            caption.BackgroundColor = null;
-            caption.InactiveBackgroundColor = null;
-            caption.ForegroundColor = null;
-            caption.InactiveForegroundColor = null;
-            caption.ButtonBackgroundColor = null;
-            caption.ButtonInactiveBackgroundColor = null;
-            caption.ButtonForegroundColor = null;
-            caption.ButtonInactiveForegroundColor = null;
-            caption.ButtonHoverBackgroundColor = null;
-            caption.ButtonHoverForegroundColor = null;
-            caption.ButtonPressedBackgroundColor = null;
-            caption.ButtonPressedForegroundColor = null;
-        }
-        catch
-        {
-            // ignore
-        }
-
-        ShellRoot.ResetShellTitleBarCaptionInsets();
-    }
-
-    private void SyncShellTitleBarCaptionInsets()
-    {
-        if (_shellTitleBarAppWindow is null || ShellRoot.Visibility != Visibility.Visible)
-        {
-            return;
-        }
-
-        var caption = _shellTitleBarAppWindow.TitleBar;
-        var scale = ShellRoot.XamlRoot?.RasterizationScale ?? 1.0;
-        ShellRoot.UpdateShellTitleBarCaptionInsets(caption.LeftInset, caption.RightInset, scale);
-    }
-
     private async void ShowShell()
     {
-        RestoreNonShellTitleBarChrome();
-        SetupRoot.Visibility = Visibility.Collapsed;
-
-        // Check if Windows Hello app lock is enabled
-        var security = App.Services.GetRequiredService<LocalUserSecurityStore>();
-        security.Load();
-
-        if (security.AppLockEnabled)
+        if (!_signedInThisSession)
         {
-            // Check availability
-            var available = await Windows.Security.Credentials.UI.UserConsentVerifier
-                .CheckAvailabilityAsync();
-
-            if (available == Windows.Security.Credentials.UI.UserConsentVerifierAvailability.Available)
-            {
-                var result = await Windows.Security.Credentials.UI.UserConsentVerifier
-                    .RequestVerificationAsync("Verify your identity to open PartFinder.");
-
-                if (result == Windows.Security.Credentials.UI.UserConsentVerificationResult.Verified)
-                {
-                    AppLockRoot.Visibility = Visibility.Collapsed;
-                    ShellRoot.Visibility = Visibility.Visible;
-                    ApplyShellExtendedTitleBar();
-                    await ReinitializeShellAsync();
-                    return;
-                }
-
-                // Not verified — show lock screen with retry
-                AppLockRoot.Visibility = Visibility.Visible;
-                ShellRoot.Visibility = Visibility.Collapsed;
-                AppLockErrorText.Text = "Verification failed. Try again.";
-                AppLockErrorBorder.Visibility = Visibility.Visible;
-                return;
-            }
+            _step = 1;
+            SetupRoot.Visibility = Visibility.Visible;
+            ShellRoot.Visibility = Visibility.Collapsed;
+            ApplySavedLoginFromStore();
+            UpdateStepUi();
+            return;
         }
 
-        // App lock off or Windows Hello not available — open directly
-        AppLockRoot.Visibility = Visibility.Collapsed;
-        ShellRoot.Visibility = Visibility.Visible;
-        ApplyShellExtendedTitleBar();
-        await ReinitializeShellAsync();
+        try
+        {
+            DisableShellTitleBar();
+            SetupRoot.Visibility = Visibility.Collapsed;
+
+            var security = App.Services.GetRequiredService<LocalUserSecurityStore>();
+            security.Load();
+
+            if (security.TwoFactorEnabled && !_loginTotpVerifiedThisSession)
+            {
+                LoginTotpErrorBorder.Visibility = Visibility.Collapsed;
+                LoginTotpBox.Text = string.Empty;
+                LoginTwoFactorRoot.Visibility = Visibility.Visible;
+                ShellRoot.Visibility = Visibility.Collapsed;
+                AppLockRoot.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            LoginTwoFactorRoot.Visibility = Visibility.Collapsed;
+
+            if (security.AppLockEnabled)
+            {
+                // Check availability
+                var available = await Windows.Security.Credentials.UI.UserConsentVerifier
+                    .CheckAvailabilityAsync();
+
+                if (available == Windows.Security.Credentials.UI.UserConsentVerifierAvailability.Available)
+                {
+                    var result = await Windows.Security.Credentials.UI.UserConsentVerifier
+                        .RequestVerificationAsync("Verify your identity to open PartFinder.");
+
+                    if (result == Windows.Security.Credentials.UI.UserConsentVerificationResult.Verified)
+                    {
+                        AppLockRoot.Visibility = Visibility.Collapsed;
+                        ShellRoot.Visibility = Visibility.Visible;
+                        EnableShellTitleBar();
+                        await ReinitializeShellAsync();
+                        return;
+                    }
+
+                    // Not verified — show lock screen with retry
+                    DisableShellTitleBar();
+                    AppLockRoot.Visibility = Visibility.Visible;
+                    ShellRoot.Visibility = Visibility.Collapsed;
+                    AppLockErrorText.Text = "Verification failed. Try again.";
+                    AppLockErrorBorder.Visibility = Visibility.Visible;
+                    return;
+                }
+            }
+
+            // App lock off or Windows Hello not available — open directly
+            AppLockRoot.Visibility = Visibility.Collapsed;
+            ShellRoot.Visibility = Visibility.Visible;
+            EnableShellTitleBar();
+            await ReinitializeShellAsync();
+        }
+        catch (Exception ex)
+        {
+            DebugLogClient.Post("error", "ShowShellException", ex.ToString());
+            ShowSubscriptionBlocked($"Could not load application workspace: {ex.Message}");
+        }
     }
 
     private async Task ReinitializeShellAsync()
     {
         // Always re-initialize shell with fresh data (permissions, name, nav items)
         // This ensures no stale data from previous user session.
+        App.Services.GetRequiredService<INavigationService>().Clear();
         var shellVm = App.Services.GetRequiredService<ShellViewModel>();
         await shellVm.InitializeAsync().ConfigureAwait(true);
         LogAutoLoginIfSessionActive();
+    }
+
+    private void OnLoginTotpVerifyClick(object sender, RoutedEventArgs e)
+    {
+        LoginTotpErrorBorder.Visibility = Visibility.Collapsed;
+        var code = LoginTotpBox.Text.Trim();
+        if (code.Length != 6 || !code.All(char.IsDigit))
+        {
+            LoginTotpErrorText.Text = "Enter the 6-digit code from your authenticator app.";
+            LoginTotpErrorBorder.Visibility = Visibility.Visible;
+            return;
+        }
+
+        var security = App.Services.GetRequiredService<LocalUserSecurityStore>();
+        security.Load();
+        var secret = security.GetTwoFactorSecret();
+        if (secret is null || !TotpHelper.Verify(code, secret))
+        {
+            LoginTotpErrorText.Text = "That code is not valid. Check the time on your device and try again.";
+            LoginTotpErrorBorder.Visibility = Visibility.Visible;
+            return;
+        }
+
+        _loginTotpVerifiedThisSession = true;
+        LoginTwoFactorRoot.Visibility = Visibility.Collapsed;
+        ShowShell();
+    }
+
+    private void OnLoginTotpBackClick(object sender, RoutedEventArgs e)
+    {
+        _signedInThisSession = false;
+        _loginTotpVerifiedThisSession = false;
+        LoginTotpBox.Text = string.Empty;
+        LoginTwoFactorRoot.Visibility = Visibility.Collapsed;
+        LoginTotpErrorBorder.Visibility = Visibility.Collapsed;
+        SetupRoot.Visibility = Visibility.Visible;
+        _step = 1;
+        ApplySavedLoginFromStore();
+        UpdateStepUi();
     }
 
     private void LogAutoLoginIfSessionActive()
@@ -736,7 +1342,7 @@ public sealed partial class MainWindow : Window
         {
             AppLockRoot.Visibility = Visibility.Collapsed;
             ShellRoot.Visibility = Visibility.Visible;
-            ApplyShellExtendedTitleBar();
+            EnableShellTitleBar();
             LogAutoLoginIfSessionActive();
         }
         else
@@ -769,22 +1375,31 @@ public sealed partial class MainWindow : Window
 
     private async void OnNextClicked(object sender, RoutedEventArgs e)
     {
-        ValidationText.Text = string.Empty;
-
-        if (_step == 1)
+        try
         {
-            _resolvedSignedInEmail = null;
+            ValidationText.Text = string.Empty;
+
+            if (_step == 1)
+        {
             if (string.IsNullOrWhiteSpace(OrgCodeBox.Text))
             {
-                ValidationText.Text = "Please enter organization code.";
+                ShowValidationMessage("Please enter organisation code.");
                 return;
             }
 
             var trimmed = OrgCodeBox.Text.Trim();
             if (trimmed.Length != 6 || !trimmed.All(char.IsDigit))
             {
-                ValidationText.Text = "Organization code must be exactly 6 digits.";
+                ShowValidationMessage("Organisation code must be exactly 6 digits.");
                 return;
+            }
+
+            if (!string.Equals(_workingOrgCode, trimmed, StringComparison.Ordinal))
+            {
+                _resolvedSignedInEmail = null;
+                _resolvedSignedInRole = null;
+                _signedInThisSession = false;
+                _mustChangePassword = true;
             }
 
             NextButton.IsEnabled = false;
@@ -793,25 +1408,22 @@ public sealed partial class MainWindow : Window
                 var (status, statusErr) = await SetupApiClient.StatusAsync(trimmed);
                 if (status is null)
                 {
-                    var api = LicenseApiClient.GetBaseUrl();
-                    var detail = string.IsNullOrWhiteSpace(statusErr) ? "" : " " + statusErr.Trim();
-                    ValidationText.Text =
-                        $"Active internet is required. Cannot reach {api}.{detail} Start PartFinder-Backend (port 3000 by default) and check LicenseApi:BaseUrl in appsettings.json.";
+                    ShowValidationMessage(SetupApiClient.FormatStatusFailureMessage(statusErr));
                     return;
                 }
 
                 if (!status.Valid)
                 {
-                    ValidationText.Text = string.IsNullOrWhiteSpace(status.Message)
-                        ? "This organization code is not valid for PartFinder."
-                        : status.Message;
+                    ShowValidationMessage(string.IsNullOrWhiteSpace(status.Message)
+                        ? "This organisation code is not valid for PartFinder."
+                        : status.Message);
                     return;
                 }
 
                 _workingOrgCode = trimmed;
                 _lastStatus = status;
                 _cachedOrgDatabaseUri = status.OrgDatabaseUri;
-                UpdateLicenseSummary(status);
+                LicenseSummaryPanel.Visibility = Visibility.Collapsed;
                 var needsInviteLogin =
                     status.RequiresInviteLogin == true ||
                     string.Equals(status.OrgAdminStatus, "yes", StringComparison.OrdinalIgnoreCase);
@@ -819,53 +1431,118 @@ public sealed partial class MainWindow : Window
                 {
                     var invitedEmail = InviteLoginEmailBox.Text.Trim();
                     var tempPassword = InviteLoginPasswordBox.Password;
-                    if (string.IsNullOrWhiteSpace(invitedEmail) || string.IsNullOrWhiteSpace(tempPassword))
-                    {
-                        ValidationText.Text =
-                            "This organization is already configured. Enter invited Email ID and temporary password.";
-                        return;
-                    }
+                    var alreadySignedInThisStep =
+                        _signedInThisSession &&
+                        string.Equals(_resolvedSignedInEmail, invitedEmail, StringComparison.OrdinalIgnoreCase);
 
-                    if (!IsValidEmail(invitedEmail))
+                    if (alreadySignedInThisStep)
                     {
-                        ValidationText.Text = "Please enter a valid invited Email ID.";
-                        return;
+                        MaybePersistStep1Credentials(trimmed);
                     }
-
-                    var (okInviteLogin, inviteErr, inviteLoginResponse) = await SetupApiClient
-                        .ValidateInviteLoginAsync(trimmed, invitedEmail, tempPassword)
-                        .ConfigureAwait(true);
-                    if (!okInviteLogin)
+                    else
                     {
-                        ValidationText.Text = inviteErr ?? "Invalid invited Email ID or temporary password.";
-                        return;
-                    }
+                        if (string.IsNullOrWhiteSpace(invitedEmail) || string.IsNullOrWhiteSpace(tempPassword))
+                        {
+                            ShowValidationMessage(
+                                "This organisation is already configured. Enter invited Email ID and temporary password.");
+                            return;
+                        }
 
-                    _resolvedSignedInEmail = invitedEmail;
-                    _mustChangePassword = inviteLoginResponse?.MustChangePassword ?? true;
-                    _resolvedSignedInRole = inviteLoginResponse?.Role;
+                        if (!IsValidEmail(invitedEmail))
+                        {
+                            ShowValidationMessage("Please enter a valid invited Email ID.");
+                            return;
+                        }
+
+                        var (okInviteLogin, inviteErr, inviteLoginResponse) = await SetupApiClient
+                            .ValidateInviteLoginAsync(trimmed, invitedEmail, tempPassword)
+                            .ConfigureAwait(true);
+                        if (!okInviteLogin)
+                        {
+                            ShowValidationMessage(inviteErr ?? "Invalid invited Email ID or temporary password.");
+                            return;
+                        }
+
+                        _resolvedSignedInEmail = invitedEmail;
+                        _mustChangePassword = inviteLoginResponse?.MustChangePassword ?? true;
+                        _resolvedSignedInRole = inviteLoginResponse?.Role;
+                        _signedInThisSession = true;
+                        PersistLoginCredential(trimmed, invitedEmail, tempPassword);
+
+                        if (!string.IsNullOrWhiteSpace(inviteLoginResponse?.AccessToken))
+                        {
+                            var adminSession = App.Services.GetRequiredService<AdminSessionStore>();
+                            adminSession.Save(inviteLoginResponse.AccessToken, invitedEmail);
+                        }
+
+                        var savedLoginStore = App.Services.GetRequiredService<SavedLoginCredentialStore>();
+                        var existingSaved = savedLoginStore.LoadProfile();
+                        if (existingSaved is not null
+                            && (!string.Equals(existingSaved.OrgCode, trimmed, StringComparison.Ordinal)
+                                || !string.Equals(existingSaved.Email, invitedEmail, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            _ = RevokeSavedLoginIfAnyAsync();
+                        }
+
+                        await PromptSaveLoginInformationIfOfferedAsync(
+                            trimmed,
+                            invitedEmail,
+                            inviteLoginResponse?.RefreshToken).ConfigureAwait(true);
+
+                        if (!_mustChangePassword)
+                        {
+                            var directory = App.Services.GetService<IOrgUserDirectoryService>();
+                            if (directory is not null)
+                            {
+                                _ = await directory.MarkInvitedUserActiveAfterLoginAsync(invitedEmail)
+                                    .ConfigureAwait(true);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    MaybePersistStep1Credentials(trimmed);
+                }
+
+                if (_signedInThisSession)
+                {
+                    MaybePersistStep1Credentials(trimmed);
                 }
 
                 SaveProgressOrgCodeOnly(trimmed);
                 _step = ResolveTargetStep(status);
 
-                // If we can jump straight to Step 4 (org already fully configured),
-                // persist completed setup so the shell can load orgCode/adminEmail/dbUri.
-                // BUT: invited users MUST go through Step 3 (Change Password) first.
+                // Configured org: require successful sign-in above; never open shell from Step 1.
                 if (_step == 4 && !string.IsNullOrWhiteSpace(status.OrgDatabaseUri))
                 {
                     _cachedOrgDatabaseUri = status.OrgDatabaseUri;
                     SaveProgressAfterDatabase(trimmed, status.OrgDatabaseUri);
 
-                    if (!string.IsNullOrWhiteSpace(_resolvedSignedInEmail) && _mustChangePassword)
+                    if (string.IsNullOrWhiteSpace(_resolvedSignedInEmail))
+                    {
+                        ShowValidationMessage(
+                            "This organisation requires sign-in. Enter your email and password.");
+                        _step = 1;
+                        UpdateStepUi();
+                        return;
+                    }
+
+                    if (_mustChangePassword)
                     {
                         // Invited user with temporary password — force password change step.
                         _step = 3;
                     }
                     else
                     {
-                        // Admin setup OR invited user who already changed password — complete.
                         SaveCompletedSetup();
+                        var appState = App.Services.GetRequiredService<IAppStateStore>();
+                        appState.OrgDisplayName = !string.IsNullOrWhiteSpace(status.OrganizationName)
+                            ? status.OrganizationName
+                            : trimmed;
+                        appState.OrgPlan = !string.IsNullOrWhiteSpace(status.Plan) ? status.Plan : string.Empty;
+                        appState.OrgType = !string.IsNullOrWhiteSpace(status.OrgType) ? status.OrgType : string.Empty;
+                        _step = 4;
                     }
                 }
             }
@@ -882,7 +1559,7 @@ public sealed partial class MainWindow : Window
         {
             if (string.IsNullOrWhiteSpace(_workingOrgCode))
             {
-                ValidationText.Text = "Organization code is missing. Go back to step 1.";
+                ValidationText.Text = "Organisation code is missing. Go back to step 1.";
                 return;
             }
 
@@ -924,9 +1601,12 @@ public sealed partial class MainWindow : Window
                         return;
                     }
 
-                    if (!await MongoConnectionTester.TryPingAsync(customUri))
+                    var customPing = await MongoConnectionTester.PingAsync(customUri, _workingOrgCode);
+                    if (!customPing.Ok)
                     {
-                        ValidationText.Text = "Cannot reach this MongoDB from this PC.";
+                        ValidationText.Text = string.IsNullOrWhiteSpace(customPing.ErrorDetail)
+                            ? "Cannot reach this MongoDB from this PC."
+                            : customPing.ErrorDetail;
                         return;
                     }
 
@@ -934,7 +1614,7 @@ public sealed partial class MainWindow : Window
                         await SetupApiClient.SaveCustomDatabaseAsync(_workingOrgCode, customUri, false);
                     if (!ok)
                     {
-                        if (!await MongoTenantBootstrap.TryInitializeTenantAsync(customUri))
+                        if (!await MongoTenantBootstrap.TryInitializeTenantAsync(customUri, _workingOrgCode))
                         {
                             ValidationText.Text = err ?? "Server could not save database URI.";
                             return;
@@ -984,7 +1664,7 @@ public sealed partial class MainWindow : Window
         {
             if (string.IsNullOrWhiteSpace(_workingOrgCode))
             {
-                ValidationText.Text = "Organization code is missing. Go back to step 1.";
+                ValidationText.Text = "Organisation code is missing. Go back to step 1.";
                 return;
             }
 
@@ -1020,8 +1700,45 @@ public sealed partial class MainWindow : Window
                 // Invited employees use ChangePassword; first org admin uses CreateOrgAdmin.
                 bool ok;
                 string? err;
+                var isFirstAdminTempChange =
+                    _mustChangePassword &&
+                    _lastStatus?.RequiresInviteLogin == true &&
+                    !string.IsNullOrWhiteSpace(_lastStatus.FirstAdminEmail) &&
+                    string.Equals(_resolvedSignedInEmail, _lastStatus.FirstAdminEmail, StringComparison.OrdinalIgnoreCase);
 
-                if (_mustChangePassword && !string.Equals(_lastStatus?.OrgAdminStatus, "no", StringComparison.OrdinalIgnoreCase))
+                if (isFirstAdminTempChange)
+                {
+                    var (loginOk, loginErr, _) = await SetupApiClient
+                        .ValidateInviteLoginAsync(_workingOrgCode, _resolvedSignedInEmail!, CurrentPasswordBox.Password)
+                        .ConfigureAwait(true);
+                    if (!loginOk)
+                    {
+                        ValidationText.Text = loginErr ?? "Current temporary password is invalid.";
+                        return;
+                    }
+
+                    var uri = !string.IsNullOrWhiteSpace(_cachedOrgDatabaseUri)
+                        ? _cachedOrgDatabaseUri
+                        : _lastStatus?.OrgDatabaseUri;
+                    if (string.IsNullOrWhiteSpace(uri) ||
+                        !await MongoTenantBootstrap.TrySetOrgAdminPasswordAsync(
+                            uri,
+                            _resolvedSignedInEmail!,
+                            NewPasswordBox.Password).ConfigureAwait(true))
+                    {
+                        ValidationText.Text = "Could not save the new password. Check the organisation database connection.";
+                        return;
+                    }
+
+                    var (adminOk, adminErr, _) = await SetupApiClient.CreateOrgAdminAsync(
+                        _workingOrgCode,
+                        _resolvedSignedInEmail!,
+                        CurrentPasswordBox.Password,
+                        NewPasswordBox.Password).ConfigureAwait(true);
+                    ok = true;
+                    err = adminOk ? null : adminErr;
+                }
+                else if (_mustChangePassword && !string.Equals(_lastStatus?.OrgAdminStatus, "no", StringComparison.OrdinalIgnoreCase))
                 {
                     // Invited user (employee or returning admin) — use change-password endpoint
                     (ok, err) = await SetupApiClient.ChangePasswordAsync(
@@ -1043,7 +1760,7 @@ public sealed partial class MainWindow : Window
 
                     if (body?.Skipped == true)
                     {
-                        ValidationText.Text = "An admin already exists for this organization. Continuing.";
+                        ValidationText.Text = "An admin already exists for this organisation. Continuing.";
                     }
                 }
 
@@ -1051,6 +1768,23 @@ public sealed partial class MainWindow : Window
                 {
                     ValidationText.Text = err ?? "Could not change password.";
                     return;
+                }
+
+                if (!string.IsNullOrWhiteSpace(_resolvedSignedInEmail))
+                {
+                    var directory = App.Services.GetService<IOrgUserDirectoryService>();
+                    if (directory is not null)
+                    {
+                        _ = await directory.CompleteInvitedUserActivationAsync(
+                            _resolvedSignedInEmail,
+                            NewPasswordBox.Password).ConfigureAwait(true);
+                    }
+                }
+
+                _signedInThisSession = true;
+                if (!string.IsNullOrWhiteSpace(_resolvedSignedInEmail))
+                {
+                    PersistLoginCredential(_workingOrgCode, _resolvedSignedInEmail!, NewPasswordBox.Password);
                 }
 
                 SaveCompletedSetup();
@@ -1071,9 +1805,36 @@ public sealed partial class MainWindow : Window
             UpdateStepUi();
         }
     }
+    catch (Exception ex)
+    {
+        NextButton.IsEnabled = true;
+        ValidationText.Text = $"Error: {ex.Message}";
+        DebugLogClient.Post("error", "OnNextClickedException", ex.ToString());
+    }
+}
 
     private async void OnLetsGoClicked(object sender, RoutedEventArgs e)
     {
+        if (!_signedInThisSession && string.IsNullOrWhiteSpace(_resolvedSignedInEmail))
+        {
+            ValidationText.Text = "Sign in on Step 1 before launching PartFinder.";
+            _step = 1;
+            UpdateStepUi();
+            return;
+        }
+
+        _signedInThisSession = true;
+
+        var launchOrg = TryReadOrgCodeFromSetup() ?? _workingOrgCode ?? OrgCodeBox.Text.Trim();
+        var launchEmail = _resolvedSignedInEmail ?? InviteLoginEmailBox.Text.Trim();
+        var launchPassword = InviteLoginPasswordBox.Password;
+        if (!string.IsNullOrWhiteSpace(launchPassword) &&
+            !string.IsNullOrWhiteSpace(launchEmail) &&
+            !string.IsNullOrWhiteSpace(launchOrg))
+        {
+            PersistLoginCredential(launchOrg, launchEmail, launchPassword);
+        }
+
         // Fetch and store org display name + plan before showing shell
         // so Settings page ORGANIZATION section is never blank after login.
         var orgCode = TryReadOrgCodeFromSetup();
@@ -1145,10 +1906,12 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        var ok = await MongoConnectionTester.TryPingAsync(MongoUriBox.Text.Trim());
-        if (!ok)
+        var testPing = await MongoConnectionTester.PingAsync(MongoUriBox.Text.Trim(), _workingOrgCode);
+        if (!testPing.Ok)
         {
-            ValidationText.Text = "Cannot ping this MongoDB URI from this PC.";
+            ValidationText.Text = string.IsNullOrWhiteSpace(testPing.ErrorDetail)
+                ? "Cannot ping this MongoDB URI from this PC."
+                : testPing.ErrorDetail;
             _isCustomDbConnectionSuccessful = false;
             NextButton.IsEnabled = false;
             return;
@@ -1174,11 +1937,25 @@ public sealed partial class MainWindow : Window
 
     private void UpdateStepUi()
     {
-        Step1Panel.Visibility = _step == 1 ? Visibility.Visible : Visibility.Collapsed;
+        if (_step != 1)
+        {
+            _showForgotPasswordPanel = false;
+        }
+
+        var showForgotOnStep1 = _step == 1 && _showForgotPasswordPanel;
+        Step1Panel.Visibility = _step == 1 && !showForgotOnStep1
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        ForgotPasswordPanel.Visibility = showForgotOnStep1 ? Visibility.Visible : Visibility.Collapsed;
+        ForgotPasswordButton.Visibility = _step == 1 && !showForgotOnStep1
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         Step2Panel.Visibility = _step == 2 ? Visibility.Visible : Visibility.Collapsed;
         Step3Panel.Visibility = _step == 3 ? Visibility.Visible : Visibility.Collapsed;
         Step4Panel.Visibility = _step == 4 ? Visibility.Visible : Visibility.Collapsed;
-        NavigationRow.Visibility = _step == 4 ? Visibility.Collapsed : Visibility.Visible;
+        NavigationRow.Visibility = _step == 4 || showForgotOnStep1
+            ? Visibility.Collapsed
+            : Visibility.Visible;
         BackButton.IsEnabled = _step > 1;
         if (_step == 2)
         {
@@ -1196,9 +1973,11 @@ public sealed partial class MainWindow : Window
             NextButton.IsEnabled = true;
         }
 
-        StepTitle.Text = _step switch
+        StepTitle.Text = showForgotOnStep1
+            ? "Forgot password"
+            : _step switch
         {
-            1 => "Step 1 of 4: Organization",
+            1 => "Step 1 of 4: Organisation",
             2 => "Step 2 of 4: Database",
             3 => "Step 3 of 4: Change Password",
             _ => "Step 4 of 4: Completed",
@@ -1210,6 +1989,11 @@ public sealed partial class MainWindow : Window
             3 => "● ● ● ○",
             _ => "● ● ● ●",
         };
+
+        if (_step == 1 && !showForgotOnStep1)
+        {
+            RefreshSavedLoginsCombo(OrgCodeBox.Text.Trim(), InviteLoginEmailBox.Text.Trim());
+        }
 
         // Update left panel step circles
         UpdateStepCircle(Step1Circle, Step1CircleText, Step1Label, stepNum: 1);
@@ -1277,6 +2061,63 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private void OnForgotPasswordClicked(object sender, RoutedEventArgs e)
+    {
+        ValidationText.Text = string.Empty;
+        _showForgotPasswordPanel = true;
+        ForgotPasswordOrgCodeBox.Text = OrgCodeBox.Text.Trim();
+        ForgotPasswordEmailBox.Text = InviteLoginEmailBox.Text.Trim();
+        UpdateStepUi();
+    }
+
+    private void OnForgotPasswordBackClicked(object sender, RoutedEventArgs e)
+    {
+        ValidationText.Text = string.Empty;
+        _showForgotPasswordPanel = false;
+        UpdateStepUi();
+    }
+
+    private async void OnForgotPasswordSendClicked(object sender, RoutedEventArgs e)
+    {
+        ValidationText.Text = string.Empty;
+        var orgCode = ForgotPasswordOrgCodeBox.Text.Trim();
+        var email = ForgotPasswordEmailBox.Text.Trim();
+
+        if (orgCode.Length != 6 || !orgCode.All(char.IsDigit))
+        {
+            ShowValidationMessage("Organisation code must be exactly 6 digits.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(email) || !IsValidEmail(email))
+        {
+            ShowValidationMessage("Enter a valid email address.");
+            return;
+        }
+
+        ForgotPasswordSendButton.IsEnabled = false;
+        try
+        {
+            var (ok, err, message) = await SetupApiClient
+                .RequestForgotPasswordAsync(orgCode, email)
+                .ConfigureAwait(true);
+
+            if (!ok)
+            {
+                ShowValidationMessage(err ?? "Could not send reset email. Check your connection and try again.");
+                return;
+            }
+
+            ShowValidationMessage(
+                message ??
+                "If the organisation code and email match our records, we sent a password reset link. The link works for 10 minutes only.");
+        }
+        finally
+        {
+            ForgotPasswordSendButton.IsEnabled = true;
+        }
+    }
+
     private void OnInviteLoginPasswordRevealClick(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
         if (InviteLoginPasswordBox.PasswordRevealMode == Microsoft.UI.Xaml.Controls.PasswordRevealMode.Hidden)
@@ -1330,6 +2171,21 @@ public sealed partial class MainWindow : Window
         {
             ConfirmPasswordBox.PasswordRevealMode = Microsoft.UI.Xaml.Controls.PasswordRevealMode.Hidden;
             SetupConfirmPasswordRevealIcon.Glyph = "\uE890";
+        }
+    }
+
+    private void ShowValidationMessage(string message)
+    {
+        ValidationText.Text = message;
+        ValidationText.UpdateLayout();
+        try
+        {
+            var top = Math.Max(0, ValidationText.ActualOffset.Y - 24);
+            SetupFormScrollViewer?.ChangeView(null, top, null, disableAnimation: true);
+        }
+        catch
+        {
+            // Best effort — message is still set.
         }
     }
 

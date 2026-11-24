@@ -11,117 +11,417 @@
     <UserControl.Resources>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
         <converters:InvertedBoolToVisibilityConverter x:Key="InvertedBoolToVisibilityConverter" />
+        <Style x:Key="TopNavScrollChevronButtonStyle" TargetType="Button" BasedOn="{StaticResource GhostButtonStyle}">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="52" />
+            <Setter Property="MinHeight" Value="52" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="{StaticResource InputBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource GlassStrokeBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+        </Style>
+        <Style x:Key="TopNavIconButtonStyle" TargetType="Button" BasedOn="{StaticResource GhostButtonStyle}">
+            <Setter Property="Width" Value="64" />
+            <Setter Property="Height" Value="52" />
+            <Setter Property="MinHeight" Value="52" />
+            <Setter Property="Padding" Value="4,2" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="12" />
+        </Style>
+        <Style x:Key="HeaderActionButtonStyle" TargetType="Button" BasedOn="{StaticResource TopNavIconButtonStyle}">
+            <Setter Property="Width" Value="36" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="MinHeight" Value="36" />
+        </Style>
+        <Storyboard x:Key="AmbientDriftStoryboard" RepeatBehavior="Forever" AutoReverse="True">
+            <DoubleAnimation Storyboard.TargetName="AmbientBlueTransform" Storyboard.TargetProperty="X" From="0" To="48" Duration="0:0:8">
+                <DoubleAnimation.EasingFunction>
+                    <SineEase EasingMode="EaseInOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="AmbientBlueTransform" Storyboard.TargetProperty="Y" From="0" To="20" Duration="0:0:8">
+                <DoubleAnimation.EasingFunction>
+                    <SineEase EasingMode="EaseInOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="AmbientPurpleTransform" Storyboard.TargetProperty="X" From="0" To="-42" Duration="0:0:9">
+                <DoubleAnimation.EasingFunction>
+                    <SineEase EasingMode="EaseInOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="AmbientPurpleTransform" Storyboard.TargetProperty="Y" From="0" To="-28" Duration="0:0:9">
+                <DoubleAnimation.EasingFunction>
+                    <SineEase EasingMode="EaseInOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="AmbientPinkTransform" Storyboard.TargetProperty="X" From="0" To="-20" Duration="0:0:10">
+                <DoubleAnimation.EasingFunction>
+                    <SineEase EasingMode="EaseInOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="AmbientPinkTransform" Storyboard.TargetProperty="Y" From="0" To="24" Duration="0:0:10">
+                <DoubleAnimation.EasingFunction>
+                    <SineEase EasingMode="EaseInOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
     </UserControl.Resources>
 
-    <!-- Root grid -->
-    <Grid x:Name="RootGrid" Background="{ThemeResource AppBackgroundBrush}">
+    <Grid x:Name="RootGrid" Background="Transparent">
         <Grid.RowDefinitions>
-            <RowDefinition Height="56" />
+            <RowDefinition Height="32" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- ═══════════════════════════════════════════════════ -->
-        <!-- HEADER BAR (contains logo, brand, nav, bell, profile) -->
-        <!-- ═══════════════════════════════════════════════════ -->
-        <Border x:Name="ShellTitleBarRoot"
+        <Grid Grid.RowSpan="3" IsHitTestVisible="False">
+            <Ellipse Width="540" Height="540" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-180,-160,0,0" Opacity="0.9">
+                <Ellipse.Fill>
+                    <RadialGradientBrush>
+                        <GradientStop Color="{ThemeResource AmbientBlueColor}" Offset="0" />
+                        <GradientStop Color="#00000000" Offset="1" />
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+                <Ellipse.RenderTransform>
+                    <TranslateTransform x:Name="AmbientBlueTransform" />
+                </Ellipse.RenderTransform>
+            </Ellipse>
+            <Ellipse Width="460" Height="460" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-110,-120,0" Opacity="0.85">
+                <Ellipse.Fill>
+                    <RadialGradientBrush>
+                        <GradientStop Color="{ThemeResource AmbientPurpleColor}" Offset="0" />
+                        <GradientStop Color="#00000000" Offset="1" />
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+                <Ellipse.RenderTransform>
+                    <TranslateTransform x:Name="AmbientPurpleTransform" />
+                </Ellipse.RenderTransform>
+            </Ellipse>
+            <Ellipse Width="420" Height="420" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-120,-120" Opacity="0.65">
+                <Ellipse.Fill>
+                    <RadialGradientBrush>
+                        <GradientStop Color="{ThemeResource AmbientPinkColor}" Offset="0" />
+                        <GradientStop Color="#00000000" Offset="1" />
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+                <Ellipse.RenderTransform>
+                    <TranslateTransform x:Name="AmbientPinkTransform" />
+                </Ellipse.RenderTransform>
+            </Ellipse>
+        </Grid>
+
+        <Border
+                x:Name="TitleBarDragStrip"
                 Grid.Row="0"
-                Background="#0A0E15"
-                BorderBrush="{ThemeResource AppBorderBrush}"
+                Background="{StaticResource HeaderBarBackgroundBrush}"
+                BorderBrush="Transparent"
+                BorderThickness="0"
+                CornerRadius="0" />
+
+        <Border x:Name="AppTitleBar"
+                Grid.Row="1"
+                Margin="0"
+                Background="{StaticResource HeaderBarBackgroundBrush}"
+                BorderBrush="{StaticResource GlassStrokeBrush}"
                 BorderThickness="0,0,0,1"
-                Padding="12,0,16,0">
-            <Grid ColumnSpacing="12">
+                CornerRadius="0">
+            <Grid x:Name="AppTitleBarLayout" Height="92">
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition x:Name="TitleBarLeftInsetColumn" Width="0" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition x:Name="TitleBarRightInsetColumn" Width="0" />
                 </Grid.ColumnDefinitions>
 
-                <!-- LEFT: Logo + brand — sole title-bar drag region so nav/profile stay clickable -->
-                <Grid x:Name="ShellTitleBarDragRegion"
-                      Grid.Column="0"
-                      VerticalAlignment="Stretch"
-                      HorizontalAlignment="Stretch">
-                    <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
-                        <Border Width="50" Height="50" CornerRadius="20"
-                                Background="{StaticResource ElevatedCardBackgroundBrush}">
-                            <Image Source="ms-appx:///Assets/logo.png" Stretch="Uniform" Margin="5" />
-                        </Border>
-                        <StackPanel Spacing="2" VerticalAlignment="Center">
-                            <TextBlock Text="PartFinder"
-                                       FontSize="17" FontWeight="Bold"
-                                       Foreground="{StaticResource TextPrimaryBrush}" />
-                            <TextBlock Text="Inventory Management"
-                                       FontSize="11"
-                                       Foreground="{StaticResource TextSecondaryBrush}"
-                                       CharacterSpacing="12"
-                                       TextWrapping="NoWrap" />
-                        </StackPanel>
-                    </StackPanel>
-                </Grid>
+                <Border
+                    Grid.ColumnSpan="6"
+                    Height="1"
+                    VerticalAlignment="Bottom"
+                    Background="{StaticResource GlassHighlightBrush}"
+                    Opacity="0.6" />
 
-                <!-- CENTER: Primary nav + More overflow (all icons together) -->
                 <StackPanel
                     Grid.Column="1"
                     Orientation="Horizontal"
-                    Spacing="8"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center">
-                    <ItemsRepeater
-                        x:Name="NavListView"
-                        ItemsSource="{Binding PrimaryNavigationItems}"
-                        VerticalAlignment="Center">
-                        <ItemsRepeater.Layout>
-                            <StackLayout Orientation="Horizontal" Spacing="16" />
-                        </ItemsRepeater.Layout>
-                        <ItemsRepeater.ItemTemplate>
-                            <DataTemplate x:DataType="viewModels:NavItemViewModel">
-                                <Grid Width="40" Height="40"
-                                      CornerRadius="8"
-                                      PointerEntered="OnNavItemPointerEntered"
-                                      PointerExited="OnNavItemPointerExited"
-                                      Tapped="OnNavItemTapped"
-                                      Tag="{x:Bind Label}">
-                                    <FontIcon
-                                        Glyph="{x:Bind IconGlyph}"
-                                        FontSize="20"
-                                        HorizontalAlignment="Center"
-                                        VerticalAlignment="Center" />
-                                </Grid>
-                            </DataTemplate>
-                        </ItemsRepeater.ItemTemplate>
-                    </ItemsRepeater>
-                    <Button
-                        x:Name="MoreNavButton"
-                        Width="40"
-                        Height="40"
-                        Padding="0"
-                        CornerRadius="8"
-                        Background="Transparent"
-                        BorderBrush="{StaticResource BorderDefaultBrush}"
-                        BorderThickness="1"
-                        Visibility="{Binding HasOverflowNavigation, Converter={StaticResource BoolToVisibilityConverter}}"
-                        Click="OnMoreNavButtonClick">
-                        <FontIcon Glyph="&#xE712;" FontSize="16" Foreground="{StaticResource TextSecondaryBrush}" />
-                    </Button>
+                    VerticalAlignment="Center"
+                    Margin="16,0,28,0">
+                    <Image
+                        Source="{ThemeResource PartFinderLogoImage}"
+                        Width="76"
+                        Height="76"
+                        Stretch="Uniform" />
                 </StackPanel>
 
-                <!-- RIGHT: Profile card (sticky right) -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" HorizontalAlignment="Right">
-                    <Button Padding="8,4"
-                            ToolTipService.ToolTip="Profile menu"
-                            x:Name="ProfileMenuButton">
+                <Grid x:Name="TopNavInteractiveRegion" Grid.Column="2" Margin="28,0,8,0" VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Button
+                        x:Name="TopNavScrollLeftButton"
+                        Grid.Column="0"
+                        Style="{StaticResource TopNavScrollChevronButtonStyle}"
+                        Margin="0,0,4,0"
+                        VerticalAlignment="Center"
+                        Visibility="Collapsed"
+                        ToolTipService.ToolTip="Show earlier menu items"
+                        Click="OnTopNavScrollLeftButtonClick">
+                        <FontIcon Glyph="&#xE76B;" FontSize="12" Foreground="{StaticResource AccentPrimaryBrush}" />
+                    </Button>
+
+                    <Grid Grid.Column="1" VerticalAlignment="Center">
+                        <ScrollViewer
+                            x:Name="TopNavScrollViewer"
+                            HorizontalScrollMode="Enabled"
+                            HorizontalScrollBarVisibility="Hidden"
+                            VerticalScrollBarVisibility="Disabled"
+                            VerticalScrollMode="Disabled"
+                            ZoomMode="Disabled"
+                            ViewChanged="OnTopNavScrollViewerViewChanged"
+                            SizeChanged="OnTopNavScrollViewerSizeChanged">
+                            <ItemsRepeater
+                                x:Name="TopNavRepeater"
+                                ItemsSource="{Binding NavigationItems}">
+                                <ItemsRepeater.Layout>
+                                    <StackLayout Orientation="Horizontal" Spacing="2" />
+                                </ItemsRepeater.Layout>
+                                <ItemsRepeater.ItemTemplate>
+                                    <DataTemplate x:DataType="viewModels:NavItemViewModel">
+                                        <Grid Width="64" MinHeight="56" Margin="0,2">
+                                        <Border
+                                            Margin="3,4"
+                                            CornerRadius="12"
+                                            Background="{StaticResource NavItemSelectedBrush}"
+                                            BorderBrush="{StaticResource NavItemSelectedBorderBrush}"
+                                            BorderThickness="1"
+                                            Visibility="{x:Bind IsSelected, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                        <Border
+                                            Height="2"
+                                            Margin="12,0"
+                                            VerticalAlignment="Bottom"
+                                            Background="{StaticResource AccentPrimaryBrush}"
+                                            Visibility="{x:Bind IsSelected, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                        <Button
+                                            Style="{StaticResource TopNavIconButtonStyle}"
+                                            Click="OnTopNavItemClicked"
+                                            DataContext="{x:Bind}"
+                                            ToolTipService.ToolTip="{x:Bind Label}">
+                                            <StackPanel
+                                                Spacing="2"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center">
+                                                <Grid Height="20" HorizontalAlignment="Center">
+                                                    <FontIcon
+                                                        Glyph="{x:Bind IconGlyph}"
+                                                        FontSize="16"
+                                                        Foreground="{StaticResource TextSecondaryBrush}"
+                                                        Opacity="0.92"
+                                                        Visibility="{x:Bind IsSelected, Mode=OneWay, Converter={StaticResource InvertedBoolToVisibilityConverter}}" />
+                                                    <FontIcon
+                                                        Glyph="{x:Bind IconGlyph}"
+                                                        FontSize="16"
+                                                        Foreground="{StaticResource AccentPrimaryBrush}"
+                                                        Visibility="{x:Bind IsSelected, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                </Grid>
+                                                <TextBlock
+                                                    Text="{x:Bind Label}"
+                                                    FontSize="9"
+                                                    LineHeight="11"
+                                                    TextAlignment="Center"
+                                                    TextTrimming="CharacterEllipsis"
+                                                    TextWrapping="NoWrap"
+                                                    MaxWidth="60"
+                                                    Foreground="{StaticResource TextSecondaryBrush}" />
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsRepeater.ItemTemplate>
+                            </ItemsRepeater>
+                        </ScrollViewer>
+
+                        <Border
+                            x:Name="TopNavFadeLeft"
+                            Width="20"
+                            HorizontalAlignment="Left"
+                            IsHitTestVisible="False"
+                            Visibility="Collapsed">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
+                                    <GradientStop Color="{ThemeResource HeaderBarBackgroundColor}" Offset="0" />
+                                    <GradientStop Color="#00000000" Offset="1" />
+                                </LinearGradientBrush>
+                            </Border.Background>
+                        </Border>
+                        <Border
+                            x:Name="TopNavFadeRight"
+                            Width="28"
+                            HorizontalAlignment="Right"
+                            IsHitTestVisible="False"
+                            Visibility="Collapsed">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="1,0.5" EndPoint="0,0.5">
+                                    <GradientStop Color="{ThemeResource HeaderBarBackgroundColor}" Offset="0" />
+                                    <GradientStop Color="#00000000" Offset="1" />
+                                </LinearGradientBrush>
+                            </Border.Background>
+                        </Border>
+                    </Grid>
+
+                    <Button
+                        x:Name="TopNavScrollRightButton"
+                        Grid.Column="2"
+                        Style="{StaticResource TopNavScrollChevronButtonStyle}"
+                        Margin="4,0,0,0"
+                        VerticalAlignment="Center"
+                        Visibility="Collapsed"
+                        ToolTipService.ToolTip="Show more menu items (e.g. Settings)"
+                        Click="OnTopNavScrollRightButtonClick">
+                        <FontIcon Glyph="&#xE76C;" FontSize="12" Foreground="{StaticResource AccentPrimaryBrush}" />
+                    </Button>
+                </Grid>
+
+                <Border
+                    x:Name="TopNavSearchRegion"
+                    Grid.Column="3"
+                    Width="280"
+                    MaxWidth="320"
+                    Margin="0,0,8,0"
+                    VerticalAlignment="Center"
+                    CornerRadius="18"
+                    Background="{StaticResource InputBackgroundBrush}"
+                    BorderBrush="Transparent"
+                    BorderThickness="0"
+                    Padding="10,0">
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <FontIcon
+                            Glyph="&#xE721;"
+                            FontSize="13"
+                            Foreground="{ThemeResource AppSubtleTextBrush}"
+                            VerticalAlignment="Center" />
+                        <TextBox
+                            BorderThickness="0"
+                            Background="Transparent"
+                            PlaceholderText="Search templates, parts, reports..."
+                            FontSize="13"
+                            MinWidth="180"
+                            MaxWidth="260"
+                            VerticalAlignment="Center"
+                            Text="{Binding SearchText, Mode=TwoWay}" />
+                    </StackPanel>
+                </Border>
+
+                <StackPanel
+                    x:Name="TopNavActionsRegion"
+                    Grid.Column="4"
+                    Orientation="Horizontal"
+                    Spacing="6"
+                    VerticalAlignment="Center"
+                    Margin="0,0,8,0">
+                    <Button
+                        Width="36"
+                        Height="36"
+                        Padding="0"
+                        Style="{StaticResource HeaderActionButtonStyle}"
+                        Command="{Binding ToggleThemeCommand}"
+                        ToolTipService.ToolTip="{Binding ThemeToggleTooltip, Mode=OneWay}">
+                        <FontIcon
+                            Glyph="{Binding ThemeToggleGlyph, Mode=OneWay}"
+                            FontSize="17"
+                            Foreground="{StaticResource TextPrimaryBrush}" />
+                    </Button>
+                    <Grid>
+                        <Button
+                            Width="36"
+                            Height="36"
+                            Padding="0"
+                            Style="{StaticResource HeaderActionButtonStyle}"
+                            ToolTipService.ToolTip="Alerts"
+                            Click="OnBellClicked">
+                            <FontIcon Glyph="&#xEA8F;" FontSize="18" Foreground="{StaticResource TextPrimaryBrush}" />
+                        </Button>
+                        <Border
+                            MinWidth="16"
+                            Height="16"
+                            CornerRadius="8"
+                            Padding="4,0"
+                            Background="#E05252"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            Margin="0,2,2,0"
+                            IsHitTestVisible="False"
+                            Visibility="{Binding HasUnreadAlerts, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <TextBlock
+                                Text="{Binding UnreadNotificationBadgeText, Mode=OneWay}"
+                                FontSize="10"
+                                FontWeight="SemiBold"
+                                Foreground="White"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                LineHeight="14" />
+                        </Border>
+                    </Grid>
+                    <Button
+                        x:Name="ProfileMenuButton"
+                        Padding="4,0"
+                        Background="Transparent"
+                        BorderBrush="Transparent"
+                        BorderThickness="0"
+                        Foreground="{StaticResource TextPrimaryBrush}"
+                        ToolTipService.ToolTip="Profile menu">
                         <Button.Content>
-                            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
-                                        DataContext="{Binding ElementName=ProfileMenuButton, Path=DataContext}">
-                                <Border Width="28" Height="28" CornerRadius="14"
-                                        Background="{StaticResource AccentPrimaryBrush}">
-                                    <Image Source="{Binding CurrentUserAvatarSource}"
-                                           Stretch="UniformToFill" Width="28" Height="28" />
-                                </Border>
-                                <TextBlock VerticalAlignment="Center" FontSize="13"
-                                           Text="{Binding CurrentUserName}"
-                                           TextTrimming="CharacterEllipsis" MaxWidth="90" />
-                                <FontIcon VerticalAlignment="Center" Glyph="&#xE70D;" FontSize="11" />
+                            <StackPanel
+                                Orientation="Horizontal"
+                                Spacing="6"
+                                VerticalAlignment="Center"
+                                DataContext="{Binding ElementName=ProfileMenuButton, Path=DataContext}">
+                                <Grid Width="28" Height="28">
+                                    <Border
+                                        Width="28"
+                                        Height="28"
+                                        CornerRadius="14"
+                                        Background="#151F7AE0"
+                                        Visibility="{Binding HasUserAvatar, Mode=OneWay, Converter={StaticResource InvertedBoolToVisibilityConverter}}">
+                                        <FontIcon
+                                            Glyph="&#xE77B;"
+                                            FontSize="14"
+                                            Foreground="{StaticResource AccentPrimaryBrush}"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center" />
+                                    </Border>
+                                    <Border
+                                        Width="28"
+                                        Height="28"
+                                        CornerRadius="14"
+                                        Background="{StaticResource ElevatedCardBackgroundBrush}"
+                                        Visibility="{Binding HasUserAvatar, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <Image
+                                            Source="{Binding CurrentUserAvatarSource}"
+                                            Stretch="UniformToFill"
+                                            Width="28"
+                                            Height="28" />
+                                    </Border>
+                                </Grid>
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    FontSize="13"
+                                    FontWeight="SemiBold"
+                                    Foreground="{StaticResource TextPrimaryBrush}"
+                                    Text="{Binding CurrentUserName}"
+                                    TextTrimming="CharacterEllipsis"
+                                    MaxWidth="90" />
+                                <FontIcon
+                                    VerticalAlignment="Center"
+                                    Glyph="&#xE70D;"
+                                    FontSize="11"
+                                    Foreground="{StaticResource TextSecondaryBrush}" />
                             </StackPanel>
                         </Button.Content>
                         <Button.Flyout>
@@ -136,37 +436,11 @@
             </Grid>
         </Border>
 
-        <!-- ═══════════════════════════════════════════════════ -->
-        <!-- CONTENT FRAME — full width now                      -->
-        <!-- ═══════════════════════════════════════════════════ -->
-        <Frame x:Name="ContentFrame"
-               Grid.Row="1"
-               HorizontalAlignment="Stretch"
-               VerticalAlignment="Stretch" />
-
-        <!-- ═══════════════════════════════════════════════════ -->
-        <!-- TOOLTIP OVERLAY — shows below nav icons on hover    -->
-        <!-- ═══════════════════════════════════════════════════ -->
-        <Border x:Name="NavTooltipOverlay"
-                Grid.RowSpan="2"
-                IsHitTestVisible="False"
-                Visibility="Collapsed"
-                Canvas.ZIndex="999">
-            <Canvas>
-                <Border x:Name="NavTooltipBox"
-                        Background="#1E2D45"
-                        BorderBrush="#2A3D58"
-                        BorderThickness="1"
-                        CornerRadius="7"
-                        Padding="12,7"
-                        IsHitTestVisible="False">
-                    <TextBlock x:Name="NavTooltipLabel"
-                               FontSize="13"
-                               FontWeight="SemiBold"
-                               Foreground="#EAF2FF" />
-                </Border>
-            </Canvas>
-        </Border>
-
+        <Grid Grid.Row="2">
+            <Frame x:Name="ContentFrame"
+                   Background="{StaticResource ContentShellBackgroundBrush}"
+                   HorizontalAlignment="Stretch"
+                   VerticalAlignment="Stretch" />
+        </Grid>
     </Grid>
 </UserControl>

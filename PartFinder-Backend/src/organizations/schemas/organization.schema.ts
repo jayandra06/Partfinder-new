@@ -45,6 +45,16 @@ export class Organization {
   @Prop({ default: 100000 })
   maxParts: number;
 
+  /** Warehouse Management Workbook feature (Phase 02A+). */
+  @Prop({ default: true })
+  wmsEnabled: boolean;
+
+  @Prop({ default: 10 })
+  maxWmsWarehouses: number;
+
+  @Prop({ default: 50 })
+  maxStockOwners: number;
+
   @Prop({ type: String, default: null })
   firstAdminEmail: string | null;
 

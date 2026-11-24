@@ -2,8 +2,8 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { MongooseModule } from '@nestjs/mongoose';
-import { join } from 'path';
 import { AppController } from './app.controller';
+import { backendEnvFilePaths } from './config/backend-env';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { assertMongoUri, normalizeMongoUri } from './mongo-uri';
@@ -11,6 +11,7 @@ import { DbClustersModule } from './db-clusters/db-clusters.module';
 import { DebugModule } from './debug/debug.module';
 import { ImportModule } from './import/import.module';
 import { LicenseModule } from './license/license.module';
+import { LicensePurchaseModule } from './license-purchase/license-purchase.module';
 import { RedisModule } from './common/redis/redis.module';
 import { ElasticsearchModule } from './common/elasticsearch/elasticsearch.module';
 import { OrganizationsModule } from './organizations/organizations.module';
@@ -22,13 +23,14 @@ import { TemplatesModule } from './templates/templates.module';
 import { UsersModule } from './users/users.module';
 import { ViewDataModule } from './view-data/view-data.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { WmsModule } from './wms/wms.module';
 
 @Module({
   imports: [
     EventEmitterModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: [join(process.cwd(), '.env')],
+      envFilePath: backendEnvFilePaths(),
     }),
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
@@ -46,6 +48,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     OrganizationsModule,
     DbClustersModule,
     LicenseModule,
+    LicensePurchaseModule,
     PlatformModule,
     TemplatesModule,
     RelationsModule,
@@ -54,6 +57,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     ViewDataModule,
     ImportModule,
     SetupModule,
+    WmsModule,
     DebugModule,
   ],
   controllers: [AppController],

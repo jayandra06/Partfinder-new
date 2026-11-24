@@ -125,7 +125,13 @@ export class RelationsService {
     ]);
 
     return {
-      ...relation,
+      id,
+      orgId: relation.orgId,
+      primaryTemplateId: relation.primaryTemplateId,
+      lookupTemplateId: relation.lookupTemplateId,
+      name: relation.name,
+      triggerColumn: relation.triggerColumn,
+      menuLabel: relation.menuLabel,
       matchKeys: matchKeys.map((m) => ({ sourceColumn: m.sourceColumn, targetColumn: m.targetColumn })),
       displayColumns: displayColumns.map((d) => d.columnName),
     };

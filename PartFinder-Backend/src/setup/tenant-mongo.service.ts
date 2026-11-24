@@ -147,4 +147,10 @@ export class TenantMongoService implements OnModuleDestroy {
     const coll = this.orgAppUsersCollection(c);
     await coll.insertOne(user);
   }
+
+  async listOrgAppUsers(uri: string) {
+    const c = await this.getConnection(uri);
+    const coll = this.orgAppUsersCollection(c);
+    return coll.find({}).sort({ invitedAtUtc: -1 }).toArray();
+  }
 }

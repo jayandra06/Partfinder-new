@@ -45,6 +45,7 @@ public partial class QrCodeManagerViewModel : ViewModelBase
     public async Task InitializeAsync()
     {
         IsLoading = true;
+        StatusMessage = "Loading templates...";
         try
         {
             var templates = await _templateSchema.GetTemplatesAsync().ConfigureAwait(true);
@@ -54,6 +55,12 @@ public partial class QrCodeManagerViewModel : ViewModelBase
             {
                 Templates.Add(t);
             }
+            StatusMessage = Templates.Count == 0 ? "No templates available." : string.Empty;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[QrCodeManagerViewModel] InitializeAsync failed: {ex.Message}");
+            StatusMessage = "Could not load templates. Check connection settings.";
         }
         finally
         {
@@ -75,6 +82,11 @@ public partial class QrCodeManagerViewModel : ViewModelBase
             }
 
             StatusMessage = $"{Parts.Count} part(s) loaded.";
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[QrCodeManagerViewModel] LoadPartsForTemplateAsync failed: {ex.Message}");
+            StatusMessage = "Failed to load parts.";
         }
         finally
         {

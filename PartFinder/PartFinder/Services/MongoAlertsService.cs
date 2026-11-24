@@ -1,4 +1,4 @@
-using MongoDB.Bson;
+    using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
 
@@ -24,10 +24,9 @@ public sealed class MongoAlertsService
         if (!_setupContext.TryGetTenantMongoUri(out var raw) || string.IsNullOrWhiteSpace(raw))
             return null;
 
-        var cs = MongoConnectionStringUtil.Normalize(raw);
-        var url = new MongoUrl(cs);
+        var cs = MongoConnectionStringUtil.Prepare(raw, _setupContext.OrgCode);
         var client = new MongoClient(cs);
-        var db = client.GetDatabase(url.DatabaseName ?? "admin");
+        var db = MongoConnectionStringUtil.GetTenantDatabase(client, cs, _setupContext.OrgCode);
         return db.GetCollection<AlertDoc>(CollectionName);
     }
 
@@ -93,6 +92,41 @@ public sealed class MongoAlertsService
         {
             await coll.DeleteOneAsync(
                 Builders<AlertDoc>.Filter.Eq(d => d.MongoId, oid), ct)
+                .ConfigureAwait(false);
+        }
+        catch { }
+    }
+
+    private static FilterDefinition<AlertDoc> ActiveUnreadFilter =>
+        Builders<AlertDoc>.Filter.And(
+            Builders<AlertDoc>.Filter.Eq(d => d.IsResolved, false),
+            Builders<AlertDoc>.Filter.Eq(d => d.IsRead, false));
+
+    public async Task<int> GetUnreadCountAsync(CancellationToken ct = default)
+    {
+        var coll = TryGetCollection();
+        if (coll is null) return 0;
+
+        try
+        {
+            return (int)await coll.CountDocumentsAsync(ActiveUnreadFilter, cancellationToken: ct)
+                .ConfigureAwait(false);
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    public async Task MarkAllActiveAsReadAsync(CancellationToken ct = default)
+    {
+        var coll = TryGetCollection();
+        if (coll is null) return;
+
+        try
+        {
+            var update = Builders<AlertDoc>.Update.Set(d => d.IsRead, true);
+            await coll.UpdateManyAsync(ActiveUnreadFilter, update, cancellationToken: ct)
                 .ConfigureAwait(false);
         }
         catch { }

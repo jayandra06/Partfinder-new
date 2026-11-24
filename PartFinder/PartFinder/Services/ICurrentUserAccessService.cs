@@ -4,10 +4,17 @@ public interface ICurrentUserAccessService
 {
     UserAccessCapabilities Capabilities { get; }
 
+    /// <summary>Org creator or invited user with Admin role (not Employee).</summary>
+    bool IsOrganizationAdministrator { get; }
+
     /// <summary>Resolves the signed-in / setup email and loads org user record from Mongo.</summary>
     Task RefreshAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Filters templates for the Parts page (Master Data template excluded for employees).</summary>
     IReadOnlyList<Models.PartTemplateDefinition> FilterTemplatesForParts(
         IReadOnlyList<Models.PartTemplateDefinition> templates);
+
+    string? GetCurrentUserEmail();
+
+    bool CanViewAllAuditHistory { get; }
 }

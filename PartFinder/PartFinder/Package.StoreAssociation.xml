@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StoreAssociation xmlns="http://schemas.microsoft.com/appx/2010/storeassociation" FormatVersion="1">
+  <Publisher>CN=B96C9A11-7C90-42E9-8C6C-14AD9097B6CD</Publisher>
+  <PublisherDisplayName>Euroasiann Group</PublisherDisplayName>
+  <GeneratePackageHash>http://www.w3.org/2001/XMLSchema-instance</GeneratePackageHash>
+  <SupportedLocales>
+    <Language Code="en-us" />
+  </SupportedLocales>
+  <ProductReservedInfo>
+    <MainPackageIdentityName>EuroasiannGroup.partfinder</MainPackageIdentityName>
+    <ReservedNames>
+      <ReservedName>PartFinder</ReservedName>
+    </ReservedNames>
+  </ProductReservedInfo>
+</StoreAssociation>

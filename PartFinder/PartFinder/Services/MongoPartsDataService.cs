@@ -11,24 +11,60 @@ namespace PartFinder.Services;
 public sealed class MongoPartsDataService : IPartsDataService
 {
     private readonly ILocalSetupContext _setupContext;
+    private readonly ITemplateSchemaService _templateSchema;
 
-    public MongoPartsDataService(ILocalSetupContext setupContext)
+    public MongoPartsDataService(
+        ILocalSetupContext setupContext,
+        ITemplateSchemaService templateSchema)
     {
         _setupContext = setupContext;
+        _templateSchema = templateSchema;
     }
 
-    private IMongoCollection<MasterDataRowDoc>? TryGetCollection()
+    private bool TryGetClient(out MongoClient client)
     {
-        if (!_setupContext.TryGetTenantMongoUri(out var raw) || string.IsNullOrWhiteSpace(raw))
+        client = null!;
+        try
         {
+            if (!_setupContext.TryGetTenantMongoUri(out var raw) || string.IsNullOrWhiteSpace(raw))
+            {
+                return false;
+            }
+
+            var cs = MongoConnectionStringUtil.Prepare(raw, _setupContext.OrgCode);
+            client = new MongoClient(cs);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MongoPartsDataService] TryGetClient failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    private IMongoCollection<MasterDataRowDoc>? TryGetCollection(MongoClient client)
+    {
+        try
+        {
+            if (!_setupContext.TryGetTenantMongoUri(out var raw) || string.IsNullOrWhiteSpace(raw))
+            {
+                return null;
+            }
+
+            var cs = MongoConnectionStringUtil.Prepare(raw, _setupContext.OrgCode);
+            var db = MongoConnectionStringUtil.GetTenantDatabase(client, cs, _setupContext.OrgCode);
+            if (string.Equals(db.DatabaseNamespace.DatabaseName, "admin", StringComparison.OrdinalIgnoreCase))
+            {
+                var targetDb = !string.IsNullOrWhiteSpace(_setupContext.OrgCode) ? _setupContext.OrgCode.Trim() : "partfinder";
+                db = client.GetDatabase(targetDb);
+            }
+            return db.GetCollection<MasterDataRowDoc>(MongoMasterDataRecordsService.CollectionName);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MongoPartsDataService] TryGetCollection failed: {ex.Message}");
             return null;
         }
-
-        var cs = MongoConnectionStringUtil.Normalize(raw);
-        var url = new MongoUrl(cs);
-        var client = new MongoClient(cs);
-        var db = client.GetDatabase(url.DatabaseName ?? "admin");
-        return db.GetCollection<MasterDataRowDoc>(MongoMasterDataRecordsService.CollectionName);
     }
 
     public async Task<(IReadOnlyList<PartRecord> Records, bool HasMore)> GetPageAsync(
@@ -37,25 +73,71 @@ public sealed class MongoPartsDataService : IPartsDataService
         int pageSize,
         CancellationToken cancellationToken = default)
     {
-        var coll = TryGetCollection();
-        if (coll is null)
+        try
         {
+            if (!TryGetClient(out var client))
+            {
+                return (Array.Empty<PartRecord>(), false);
+            }
+
+            var template = await _templateSchema
+                .GetTemplateAsync(templateId, cancellationToken)
+                .ConfigureAwait(false);
+            if (template is not null
+                && MongoSharedPartsCatalog.IsCatalogTemplateName(template.Name)
+                && !string.IsNullOrWhiteSpace(_setupContext.OrgCode))
+            {
+                var (rows, hasMore) = await MongoSharedPartsCatalog.LoadPageAsync(
+                        client,
+                        _setupContext.OrgCode,
+                        template.Fields,
+                        offset,
+                        pageSize,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                return (rows.Select(MapMasterRow).ToList(), hasMore);
+            }
+
+            var coll = TryGetCollection(client);
+            if (coll is null)
+            {
+                return (Array.Empty<PartRecord>(), false);
+            }
+
+            var docs = await coll.Find(d => d.TemplateId == templateId)
+                .SortBy(d => d.RowOrder)
+                .Skip(offset)
+                .Limit(pageSize + 1)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            var hasMoreRows = docs.Count > pageSize;
+            var records = docs
+                .Take(pageSize)
+                .Select(Map)
+                .ToList();
+            return (records, hasMoreRows);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MongoPartsDataService] GetPageAsync failed: {ex.Message}");
             return (Array.Empty<PartRecord>(), false);
         }
+    }
 
-        var docs = await coll.Find(d => d.TemplateId == templateId)
-            .SortBy(d => d.RowOrder)
-            .Skip(offset)
-            .Limit(pageSize + 1)
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
+    private static PartRecord MapMasterRow(MasterDataRowRecord d)
+    {
+        var values = new Dictionary<string, object?>(StringComparer.Ordinal);
+        foreach (var kv in d.Values)
+        {
+            values[kv.Key] = kv.Value;
+        }
 
-        var hasMore = docs.Count > pageSize;
-        var records = docs
-            .Take(pageSize)
-            .Select(Map)
-            .ToList();
-        return (records, hasMore);
+        return new PartRecord
+        {
+            Id = d.Id,
+            Values = values,
+        };
     }
 
     private static PartRecord Map(MasterDataRowDoc d)

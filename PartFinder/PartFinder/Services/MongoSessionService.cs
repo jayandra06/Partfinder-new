@@ -36,10 +36,9 @@ public sealed class MongoSessionService
         if (!_setupContext.TryGetTenantMongoUri(out var raw) || string.IsNullOrWhiteSpace(raw))
             return null;
 
-        var cs = MongoConnectionStringUtil.Normalize(raw);
+        var cs = MongoConnectionStringUtil.Prepare(raw, _setupContext.OrgCode);
         var client = _clientCache.GetOrAdd(cs, static c => new MongoClient(c));
-        var url = new MongoUrl(cs);
-        var db = client.GetDatabase(url.DatabaseName ?? "admin");
+        var db = MongoConnectionStringUtil.GetTenantDatabase(client, cs, _setupContext.OrgCode);
         return db.GetCollection<LoginSessionRecord>(CollectionName);
     }
 

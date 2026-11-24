@@ -1,0 +1,12 @@
+{
+  "name": "partfinder-new",
+  "private": true,
+  "scripts": {
+    "dev:portfolio": "npm run dev --prefix Partfinder-Portfolio",
+    "dev:backend": "npm run start:dev --prefix PartFinder-Backend",
+    "dev:local": "npx --yes concurrently -n backend,portfolio -c blue,green \"npm run dev:backend\" \"npm run dev:portfolio\"",
+    "build:portfolio": "npm run build --prefix Partfinder-Portfolio",
+    "build:backend": "npm run build --prefix PartFinder-Backend",
+    "config:diagnostics": "npm run config:diagnostics --prefix PartFinder-Backend"
+  }
+}
