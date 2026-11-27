@@ -48,6 +48,62 @@ export class WmsSkuService {
     return { ...this.mapSku(sku), identifiers };
   }
 
+  async resolveSkuIdsByQuery(
+    ctx: WmsRequestContext,
+    query: string,
+    limit = 20,
+  ): Promise<Array<{ skuId: string; displayName: string; primaryUom: string }>> {
+    const trimmed = query.trim();
+    if (!trimmed) {
+      return [];
+    }
+    await this.collections.ensurePhase02Indexes(ctx.tenantUri);
+    const [skusColl, idsColl] = await Promise.all([
+      this.collections.skus(ctx.tenantUri),
+      this.collections.skuIdentifiers(ctx.tenantUri),
+    ]);
+
+    const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escaped, 'i');
+
+    const [idMatches, directSkus] = await Promise.all([
+      idsColl
+        .find({ status: 'active', value: regex })
+        .limit(limit)
+        .toArray(),
+      skusColl
+        .find({
+          status: 'active',
+          $or: [{ skuId: trimmed }, { displayName: regex }],
+        })
+        .limit(limit)
+        .toArray(),
+    ]);
+
+    const candidateIds = new Set<string>();
+    for (const d of directSkus as Array<Record<string, unknown>>) {
+      if (d.skuId) candidateIds.add(String(d.skuId));
+    }
+    for (const m of idMatches as Array<Record<string, unknown>>) {
+      if (m.skuId) candidateIds.add(String(m.skuId));
+    }
+
+    if (candidateIds.size === 0) {
+      return [];
+    }
+
+    const docs = await skusColl
+      .find({ skuId: { $in: Array.from(candidateIds) }, status: 'active' })
+      .limit(limit)
+      .toArray();
+
+    return (docs as Array<Record<string, unknown>>).map((d) => ({
+      skuId: String(d.skuId),
+      displayName: String(d.displayName ?? ''),
+      primaryUom: String(d.primaryUom ?? ''),
+    }));
+  }
+
   async createSku(ctx: WmsRequestContext, dto: CreateWmsSkuDto) {
     assertWmsAdminWrite(ctx);
     await this.uom.assertUomExists(ctx, dto.primaryUom);

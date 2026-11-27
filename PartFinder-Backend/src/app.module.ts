@@ -25,6 +25,7 @@ import { UsersModule } from './users/users.module';
 import { ViewDataModule } from './view-data/view-data.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { WmsModule } from './wms/wms.module';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -62,6 +63,7 @@ import { WmsModule } from './wms/wms.module';
     ImportModule,
     SetupModule,
     WmsModule,
+    AiModule,
     DebugModule,
   ],
   controllers: [AppController],

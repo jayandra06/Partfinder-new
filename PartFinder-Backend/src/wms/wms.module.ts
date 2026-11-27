@@ -20,12 +20,14 @@ import { WmsTransactionGuardService } from './services/wms-transaction-guard.ser
 import { WmsReceivingService } from './services/wms-receiving.service';
 import { WmsStagingGateService } from './services/wms-staging-gate.service';
 import { WmsOperatorGrantsService } from './services/wms-operator-grants.service';
+import { WmsContextResolverService } from './services/wms-context-resolver.service';
 
 @Module({
   imports: [AuthModule, OrganizationsModule, SetupModule],
   controllers: [WmsSetupController, WmsPhase02Controller, WmsPhase03aController],
   providers: [
     WmsSessionGuard,
+    WmsContextResolverService,
     WmsSetupService,
     WmsTenantCollectionsService,
     WmsDiagnosticsService,
@@ -40,6 +42,12 @@ import { WmsOperatorGrantsService } from './services/wms-operator-grants.service
     WmsReceivingService,
     WmsStagingGateService,
     WmsOperatorGrantsService,
+  ],
+  exports: [
+    WmsContextResolverService,
+    WmsSetupService,
+    WmsInventoryReadService,
+    WmsSkuService,
   ],
 })
 export class WmsModule {}

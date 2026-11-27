@@ -1,12 +1,28 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text;
 using PartFinder.Helpers;
 
 namespace PartFinder.Services;
 
-public sealed class BackendApiClient
+public interface IBackendAiClient
+{
+    Task<BackendAiChatResult> PostAiChatAsync(
+        AiChatRequestDto request,
+        CancellationToken ct = default);
+}
+
+public sealed record BackendAiChatResult(
+    bool Ok,
+    HttpStatusCode? StatusCode,
+    string? Error,
+    AiChatResponseDto? Data,
+    bool TimedOut = false);
+
+public sealed class BackendApiClient : IBackendAiClient
 {
     // Security: strict timeout, max response size 10 MB
     private static readonly HttpClient Http = new(new SocketsHttpHandler
@@ -51,6 +67,84 @@ public sealed class BackendApiClient
         return result.Ok
             ? (true, null, (IReadOnlyList<DashboardTrendPointDto>)(result.Data?.Data ?? []))
             : (false, result.Error, Array.Empty<DashboardTrendPointDto>());
+    }
+
+    public async Task<BackendAiChatResult> PostAiChatAsync(
+        AiChatRequestDto request,
+        CancellationToken ct = default)
+    {
+        _session.Load();
+        _setup.Refresh();
+        var orgId = _setup.OrgCode?.Trim();
+        var token = _session.AccessToken?.Trim();
+
+        if (string.IsNullOrWhiteSpace(orgId))
+        {
+            return new BackendAiChatResult(false, null, "Missing organisation context. Please complete setup.", null);
+        }
+
+        if (!IsValidOrgCode(orgId))
+        {
+            return new BackendAiChatResult(false, null, "Invalid organisation context.", null);
+        }
+
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return new BackendAiChatResult(false, HttpStatusCode.Unauthorized, "Authentication required. Please sign in again.", null);
+        }
+
+        var baseUrl = LicenseApiClient.GetBaseUrl().TrimEnd('/');
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            return new BackendAiChatResult(false, null, "Backend API base URL is not configured.", null);
+        }
+
+        using var req = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/api/ai/chat");
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        req.Headers.Add("X-Org-Id", orgId);
+        req.Content = new StringContent(
+            JsonSerializer.Serialize(request, WriteJson),
+            Encoding.UTF8,
+            "application/json");
+
+        HttpResponseMessage resp;
+        try
+        {
+            resp = await Http.SendAsync(req, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (OperationCanceledException)
+        {
+            return new BackendAiChatResult(false, null, "The AI request timed out. Please try again.", null, TimedOut: true);
+        }
+        catch (HttpRequestException ex)
+        {
+            return new BackendAiChatResult(false, null, $"Unable to reach the PartFinder AI server: {ex.Message}", null);
+        }
+        catch (Exception ex)
+        {
+            return new BackendAiChatResult(false, null, ex.Message, null);
+        }
+
+        var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+        if (!resp.IsSuccessStatusCode)
+        {
+            var friendly = ApiErrorFormatter.ToUserMessage(text);
+            return new BackendAiChatResult(false, resp.StatusCode, friendly, null);
+        }
+
+        try
+        {
+            var envelope = JsonSerializer.Deserialize<Envelope<AiChatResponseDto>>(text, ReadJson);
+            return new BackendAiChatResult(true, resp.StatusCode, null, envelope?.Data);
+        }
+        catch (Exception ex)
+        {
+            return new BackendAiChatResult(false, resp.StatusCode, $"Invalid AI response payload: {ex.Message}", null);
+        }
     }
 
     public async Task<(bool Ok, string? Error, string? JobId)> StartTemplateImportAsync(
@@ -449,4 +543,43 @@ public sealed class WorksheetRelationDto
     public string MenuLabel { get; set; } = string.Empty;
     public List<RelationMatchPairDto> MatchKeys { get; set; } = [];
     public List<string> DisplayColumns { get; set; } = [];
+}
+
+public sealed class AiAppContextDto
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? CurrentPage { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? SelectedTemplateId { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? SelectedCatalogId { get; set; }
+}
+
+public sealed class AiChatRequestDto
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ConversationId { get; set; }
+
+    public string Message { get; set; } = string.Empty;
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AiAppContextDto? AppContext { get; set; }
+}
+
+public sealed class AiChatResponseDto
+{
+    public string ConversationId { get; set; } = string.Empty;
+    public string ReplyText { get; set; } = string.Empty;
+    public List<AiUiActionDto> UiActions { get; set; } = [];
+    public AiChatMetadataDto? Metadata { get; set; }
+}
+
+public sealed class AiChatMetadataDto
+{
+    public bool InferenceConfigured { get; set; }
+    public string? Model { get; set; }
+    public double DurationMs { get; set; }
+    public string Status { get; set; } = string.Empty;
 }
