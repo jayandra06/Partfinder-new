@@ -5,6 +5,7 @@ namespace PartFinder.Services;
 public interface INavigationService
 {
     void Initialize(Frame frame);
+    AppPage? CurrentPage { get; }
     bool IsFrameReady { get; }
     Task WaitForFrameReadyAsync(CancellationToken cancellationToken = default);
     bool Navigate(AppPage page, object? parameter = null);

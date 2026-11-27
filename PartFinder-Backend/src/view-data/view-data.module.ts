@@ -1,4 +1,4 @@
-﻿import { Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from '../auth/auth.module';
 import { RelationDisplayColumn, RelationDisplayColumnSchema } from '../relations/schemas/relation-display-column.schema';
@@ -26,5 +26,6 @@ import { ViewDataService } from './view-data.service';
   ],
   controllers: [ViewDataController],
   providers: [ViewDataService],
+  exports: [ViewDataService],
 })
 export class ViewDataModule {}

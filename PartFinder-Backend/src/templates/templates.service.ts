@@ -233,6 +233,437 @@ export class TemplatesService {
     return { deleted: true };
   }
 
+  async findMissingValues(
+    orgId: string,
+    templateId: string,
+    options: {
+      columnIds?: string[];
+      columnNames?: string[];
+      missingCriteria?: 'blank' | 'null_or_empty' | 'include_na';
+      page?: number;
+      limit?: number;
+    },
+  ): Promise<{
+    templateId: string;
+    templateName: string;
+    columnsAnalyzed: Array<{ id: string; name: string }>;
+    missingCountsByColumn: Record<string, number>;
+    totalAffectedRows: number;
+    page: number;
+    limit: number;
+    rows: Array<{
+      rowId: string;
+      missingColumns: string[];
+      cells: Record<string, string>;
+    }>;
+  }> {
+    const { template, targetColumns } = await this.resolveTargetColumns(
+      orgId,
+      templateId,
+      options.columnIds,
+      options.columnNames,
+    );
+    const safePage = Math.max(1, options.page ?? 1);
+    const safeLimit = Math.min(500, Math.max(1, options.limit ?? 50));
+    const skip = (safePage - 1) * safeLimit;
+    const criteria = options.missingCriteria ?? 'blank';
+    const targetColIds = targetColumns.map((c) => c._id.toString());
+
+    const colValueExpr = (colId: string) => ({
+      $let: {
+        vars: {
+          matched: {
+            $arrayElemAt: [
+              {
+                $filter: {
+                  input: '$matchedCells',
+                  as: 'cell',
+                  cond: { $eq: ['$$cell.columnId', colId] },
+                },
+              },
+              0,
+            ],
+          },
+        },
+        in: { $ifNull: ['$$matched.value', null] },
+      },
+    });
+
+    const isMissingExpr = (valExpr: unknown) => {
+      if (criteria === 'null_or_empty') {
+        return {
+          $or: [{ $eq: [valExpr, null] }, { $eq: [valExpr, ''] }],
+        };
+      }
+      const trimmedExpr = {
+        $trim: { input: { $toString: { $ifNull: [valExpr, ''] } } },
+      };
+      if (criteria === 'include_na') {
+        return {
+          $or: [
+            { $eq: [valExpr, null] },
+            { $eq: [trimmedExpr, ''] },
+            {
+              $in: [
+                { $toLower: trimmedExpr },
+                ['n/a', 'na', '-', 'null', 'none'],
+              ],
+            },
+          ],
+        };
+      }
+      return {
+        $or: [{ $eq: [valExpr, null] }, { $eq: [trimmedExpr, ''] }],
+      };
+    };
+
+    const columnChecks: Record<string, unknown> = {};
+    const groupAccumulators: { _id: null; [key: string]: any } = {
+      _id: null,
+      totalAffectedRows: { $sum: 1 },
+    };
+    const missingNamesExpr: unknown[] = [];
+    const cellsProjection: Record<string, unknown> = {};
+
+    targetColumns.forEach((col, idx) => {
+      const colId = col._id.toString();
+      const flagField = `m_${idx}`;
+      const valField = `v_${idx}`;
+      columnChecks[valField] = colValueExpr(colId);
+      columnChecks[flagField] = isMissingExpr(`$${valField}`);
+      groupAccumulators[flagField] = {
+        $sum: { $cond: [`$${flagField}`, 1, 0] },
+      };
+      missingNamesExpr.push({
+        $cond: [`$${flagField}`, [col.name], []],
+      });
+      cellsProjection[col.name] = { $ifNull: [`$${valField}`, ''] };
+    });
+
+    const anyMissingCond =
+      targetColumns.length === 1
+        ? { m_0: true }
+        : {
+            $or: targetColumns.map((_, idx) => ({ [`m_${idx}`]: true })),
+          };
+
+    const [agg] = await this.rows.aggregate<{
+      totals: Array<Record<string, number>>;
+      rows: Array<{
+        rowId: string;
+        missingColumns: string[];
+        cells: Record<string, string>;
+      }>;
+    }>([
+      { $match: { orgId, templateId } },
+      { $addFields: { rowIdStr: { $toString: '$_id' } } },
+      {
+        $lookup: {
+          from: 'template_cells',
+          let: { rid: '$rowIdStr' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$rowId', '$$rid'] },
+                    { $in: ['$columnId', targetColIds] },
+                  ],
+                },
+              },
+            },
+            { $project: { _id: 0, columnId: 1, value: 1 } },
+          ],
+          as: 'matchedCells',
+        },
+      },
+      {
+        $addFields: Object.fromEntries(
+          targetColumns.map((col, idx) => [
+            `v_${idx}`,
+            colValueExpr(col._id.toString()),
+          ]),
+        ),
+      },
+      {
+        $addFields: Object.fromEntries(
+          targetColumns.map((_, idx) => [
+            `m_${idx}`,
+            isMissingExpr(`$v_${idx}`),
+          ]),
+        ),
+      },
+      { $match: anyMissingCond },
+      {
+        $facet: {
+          totals: [{ $group: groupAccumulators }],
+          rows: [
+            { $sort: { _id: 1 } },
+            { $skip: skip },
+            { $limit: safeLimit },
+            {
+              $project: {
+                _id: 0,
+                rowId: '$rowIdStr',
+                missingColumns: { $concatArrays: missingNamesExpr },
+                cells: cellsProjection,
+              },
+            },
+          ],
+        },
+      },
+    ]);
+
+    const totalsDoc = agg?.totals?.[0] ?? {};
+    const missingCountsByColumn: Record<string, number> = {};
+    targetColumns.forEach((col, idx) => {
+      missingCountsByColumn[col.name] = Number(totalsDoc[`m_${idx}`] ?? 0);
+    });
+
+    return {
+      templateId,
+      templateName: String(template.name ?? ''),
+      columnsAnalyzed: targetColumns.map((c) => ({
+        id: c._id.toString(),
+        name: c.name,
+      })),
+      missingCountsByColumn,
+      totalAffectedRows: Number(totalsDoc.totalAffectedRows ?? 0),
+      page: safePage,
+      limit: safeLimit,
+      rows: agg?.rows ?? [],
+    };
+  }
+
+  async findDuplicateRecords(
+    orgId: string,
+    templateId: string,
+    options: {
+      columnIds?: string[];
+      columnNames?: string[];
+      caseSensitive?: boolean;
+      ignoreEmpty?: boolean;
+      page?: number;
+      limit?: number;
+    },
+  ): Promise<{
+    templateId: string;
+    templateName: string;
+    keyColumns: Array<{ id: string; name: string }>;
+    totalDuplicateGroups: number;
+    page: number;
+    limit: number;
+    duplicateGroups: Array<{
+      keyValues: Record<string, string>;
+      duplicateCount: number;
+      rowIds: string[];
+    }>;
+  }> {
+    const { template, targetColumns } = await this.resolveTargetColumns(
+      orgId,
+      templateId,
+      options.columnIds,
+      options.columnNames,
+    );
+    const safePage = Math.max(1, options.page ?? 1);
+    const safeLimit = Math.min(500, Math.max(1, options.limit ?? 50));
+    const skip = (safePage - 1) * safeLimit;
+    const caseSensitive = options.caseSensitive ?? false;
+    const ignoreEmpty = options.ignoreEmpty ?? true;
+    const targetColIds = targetColumns.map((c) => c._id.toString());
+
+    const rawKeyObjProjection: Record<string, unknown> = {};
+    const keyObjProjection: Record<string, unknown> = {};
+    const nonEmptyChecks: unknown[] = [];
+
+    for (const col of targetColumns) {
+      const colId = col._id.toString();
+      const rawExpr = {
+        $let: {
+          vars: {
+            matched: {
+              $arrayElemAt: [
+                {
+                  $filter: {
+                    input: '$matchedCells',
+                    as: 'cell',
+                    cond: { $eq: ['$$cell.columnId', colId] },
+                  },
+                },
+                0,
+              ],
+            },
+          },
+          in: {
+            $trim: {
+              input: { $toString: { $ifNull: ['$$matched.value', ''] } },
+            },
+          },
+        },
+      };
+      const normalizedExpr = caseSensitive
+        ? rawExpr
+        : { $toLower: rawExpr };
+      rawKeyObjProjection[col.name] = rawExpr;
+      keyObjProjection[col.name] = normalizedExpr;
+      nonEmptyChecks.push({ $ne: [normalizedExpr, ''] });
+    }
+
+    const pipeline: Array<Record<string, unknown>> = [
+      { $match: { orgId, templateId } },
+      { $addFields: { rowIdStr: { $toString: '$_id' } } },
+      {
+        $lookup: {
+          from: 'template_cells',
+          let: { rid: '$rowIdStr' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$rowId', '$$rid'] },
+                    { $in: ['$columnId', targetColIds] },
+                  ],
+                },
+              },
+            },
+            { $project: { _id: 0, columnId: 1, value: 1 } },
+          ],
+          as: 'matchedCells',
+        },
+      },
+      {
+        $addFields: {
+          rawKeyObj: rawKeyObjProjection,
+          keyObj: keyObjProjection,
+          allKeyColumnsNonEmpty:
+            nonEmptyChecks.length === 1
+              ? nonEmptyChecks[0]
+              : { $and: nonEmptyChecks },
+        },
+      },
+    ];
+
+    if (ignoreEmpty) {
+      pipeline.push({ $match: { allKeyColumnsNonEmpty: true } });
+    }
+
+    pipeline.push(
+      {
+        $group: {
+          _id: '$keyObj',
+          sampleKeyValues: { $first: '$rawKeyObj' },
+          duplicateCount: { $sum: 1 },
+          rowIds: { $push: '$rowIdStr' },
+        },
+      },
+      { $match: { duplicateCount: { $gt: 1 } } },
+      { $sort: { duplicateCount: -1, _id: 1 } },
+      {
+        $facet: {
+          totals: [{ $count: 'totalDuplicateGroups' }],
+          groups: [
+            { $skip: skip },
+            { $limit: safeLimit },
+            {
+              $project: {
+                _id: 0,
+                keyValues: '$sampleKeyValues',
+                duplicateCount: 1,
+                rowIds: { $slice: ['$rowIds', 20] },
+              },
+            },
+          ],
+        },
+      },
+    );
+
+    const [agg] = await this.rows.aggregate<{
+      totals: Array<{ totalDuplicateGroups: number }>;
+      groups: Array<{
+        keyValues: Record<string, string>;
+        duplicateCount: number;
+        rowIds: string[];
+      }>;
+    }>(pipeline as never);
+
+    return {
+      templateId,
+      templateName: String(template.name ?? ''),
+      keyColumns: targetColumns.map((c) => ({
+        id: c._id.toString(),
+        name: c.name,
+      })),
+      totalDuplicateGroups: Number(agg?.totals?.[0]?.totalDuplicateGroups ?? 0),
+      page: safePage,
+      limit: safeLimit,
+      duplicateGroups: agg?.groups ?? [],
+    };
+  }
+
+  private async resolveTargetColumns(
+    orgId: string,
+    templateId: string,
+    columnIds?: string[],
+    columnNames?: string[],
+  ) {
+    const template = await this.ensureTemplate(orgId, templateId);
+    const allColumns = await this.columns
+      .find({ templateId })
+      .sort({ order: 1 })
+      .lean();
+
+    const requestedIds = (columnIds ?? [])
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const requestedNames = (columnNames ?? [])
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    if (!requestedIds.length && !requestedNames.length) {
+      throw new BadRequestException(
+        'At least one of columnIds or columnNames must be provided.',
+      );
+    }
+
+    const byId = new Map(allColumns.map((c) => [c._id.toString(), c]));
+    const byName = new Map(
+      allColumns.map((c) => [c.name.trim().toLowerCase(), c]),
+    );
+
+    const selected = new Map<string, (typeof allColumns)[number]>();
+    const unknown: string[] = [];
+
+    for (const id of requestedIds) {
+      const found = byId.get(id);
+      if (!found) {
+        unknown.push(id);
+      } else {
+        selected.set(found._id.toString(), found);
+      }
+    }
+
+    for (const name of requestedNames) {
+      const found = byName.get(name.toLowerCase());
+      if (!found) {
+        unknown.push(name);
+      } else {
+        selected.set(found._id.toString(), found);
+      }
+    }
+
+    if (unknown.length > 0) {
+      throw new BadRequestException(
+        `Requested column(s) do not belong to template ${templateId}: ${unknown.join(', ')}`,
+      );
+    }
+
+    return {
+      template,
+      targetColumns: Array.from(selected.values()),
+    };
+  }
+
   private async ensureTemplate(orgId: string, templateId: string) {
     this.ensureObjectId(templateId, 'template id');
     const template = await this.templates.findOne({ _id: templateId, orgId }).lean();

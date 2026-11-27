@@ -80,6 +80,7 @@ namespace PartFinder
             services.AddSingleton<ILocalSetupContext, LocalSetupContext>();
             services.AddSingleton<LocalProfileStore>();
             services.AddSingleton<BackendApiClient>();
+            services.AddSingleton<IBackendAiClient>(sp => sp.GetRequiredService<BackendApiClient>());
             services.AddSingleton<WmsApiClient>();
             services.AddSingleton<WorksheetRelationCleanupService>();
             services.AddSingleton<IOrgUserDirectoryService, MongoOrgUserDirectoryService>();
@@ -102,6 +103,11 @@ namespace PartFinder
             services.AddSingleton<ActivityLogger>();
             services.AddSingleton<CatalogBrowseSessionStore>();
             services.AddSingleton<MasterDataCatalogCascadeService>();
+            services.AddSingleton<ChatbotStateService>();
+            services.AddSingleton<IAiExportSaveService, AiExportSaveService>();
+            services.AddSingleton<LocalMockChatbotResponder>();
+            services.AddSingleton<IChatbotResponder, BackendChatbotResponder>();
+            services.AddSingleton<ChatbotViewModel>();
 
             services.AddSingleton<ShellViewModel>();
             services.AddSingleton<IShellNavCoordinator>(sp => sp.GetRequiredService<ShellViewModel>());

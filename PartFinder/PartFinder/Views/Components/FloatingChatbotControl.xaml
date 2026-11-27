@@ -1,0 +1,318 @@
+<UserControl
+    x:Class="PartFinder.Views.Components.FloatingChatbotControl"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:converters="using:PartFinder.Converters"
+    xmlns:services="using:PartFinder.Services"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    HorizontalAlignment="Stretch"
+    VerticalAlignment="Stretch">
+
+    <UserControl.Resources>
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+        <converters:InvertedBoolToVisibilityConverter x:Key="InvertedBoolToVisibilityConverter" />
+
+        <ThemeShadow x:Key="FabShadow" />
+        <ThemeShadow x:Key="PanelShadow" />
+
+        <Storyboard x:Key="FabHoverInStoryboard">
+            <DoubleAnimation
+                Storyboard.TargetName="FabScaleTransform"
+                Storyboard.TargetProperty="ScaleX"
+                To="1.08"
+                Duration="0:0:0.15">
+                <DoubleAnimation.EasingFunction>
+                    <QuadraticEase EasingMode="EaseOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation
+                Storyboard.TargetName="FabScaleTransform"
+                Storyboard.TargetProperty="ScaleY"
+                To="1.08"
+                Duration="0:0:0.15">
+                <DoubleAnimation.EasingFunction>
+                    <QuadraticEase EasingMode="EaseOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+
+        <Storyboard x:Key="FabHoverOutStoryboard">
+            <DoubleAnimation
+                Storyboard.TargetName="FabScaleTransform"
+                Storyboard.TargetProperty="ScaleX"
+                To="1.0"
+                Duration="0:0:0.15">
+                <DoubleAnimation.EasingFunction>
+                    <QuadraticEase EasingMode="EaseOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation
+                Storyboard.TargetName="FabScaleTransform"
+                Storyboard.TargetProperty="ScaleY"
+                To="1.0"
+                Duration="0:0:0.15">
+                <DoubleAnimation.EasingFunction>
+                    <QuadraticEase EasingMode="EaseOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+    </UserControl.Resources>
+
+    <!-- Background is null so pointer/wheel events pass directly through to pages & spreadsheets -->
+    <Canvas
+        x:Name="OverlayCanvas"
+        Background="{x:Null}"
+        HorizontalAlignment="Stretch"
+        VerticalAlignment="Stretch"
+        SizeChanged="OnOverlayCanvasSizeChanged">
+
+        <!-- Expandable AI Chatbot Window -->
+        <Border
+            x:Name="ChatPanel"
+            Width="360"
+            Height="460"
+            CornerRadius="18"
+            BorderThickness="1"
+            Shadow="{StaticResource PanelShadow}"
+            Translation="0,0,32"
+            Visibility="Collapsed">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- Header -->
+                <Border
+                    x:Name="ChatHeaderBorder"
+                    Grid.Row="0"
+                    Padding="14,12"
+                    CornerRadius="18,18,0,0"
+                    BorderThickness="0,0,0,1">
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border Width="32" Height="32" CornerRadius="16">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                    <GradientStop Color="#2F86EE" Offset="0" />
+                                    <GradientStop Color="#155DAF" Offset="1" />
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <Path
+                                Data="M12 2L14.3 8.2L20.5 10.5L14.3 12.8L12 19L9.7 12.8L3.5 10.5L9.7 8.2L12 2ZM19 15L20.1 17.9L23 19L20.1 20.1L19 23L17.9 20.1L15 19L17.9 17.9L19 15Z"
+                                Fill="White"
+                                Width="18"
+                                Height="18"
+                                Stretch="Uniform"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center" />
+                        </Border>
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                            <TextBlock
+                                x:Name="ChatTitleText"
+                                Text="PartFinder AI"
+                                FontSize="14"
+                                FontWeight="SemiBold" />
+                            <TextBlock
+                                x:Name="ChatSubtitleText"
+                                Text="Local assistant preview"
+                                FontSize="11" />
+                        </StackPanel>
+
+                        <Button
+                            Grid.Column="2"
+                            Width="30"
+                            Height="30"
+                            Padding="0"
+                            CornerRadius="8"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            ToolTipService.ToolTip="Clear conversation"
+                            Click="OnClearChatClick">
+                            <FontIcon x:Name="ClearIcon" Glyph="&#xE74D;" FontSize="13" />
+                        </Button>
+
+                        <Button
+                            Grid.Column="3"
+                            Width="30"
+                            Height="30"
+                            Padding="0"
+                            CornerRadius="8"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            ToolTipService.ToolTip="Close"
+                            Click="OnCloseChatClick">
+                            <FontIcon x:Name="CloseIcon" Glyph="&#xE711;" FontSize="13" />
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <!-- Messages -->
+                <ScrollViewer
+                    x:Name="MessagesScroll"
+                    Grid.Row="1"
+                    Padding="12,10"
+                    VerticalScrollBarVisibility="Auto"
+                    HorizontalScrollBarVisibility="Disabled">
+                    <ItemsControl x:Name="MessagesItemsControl" ItemsSource="{Binding Messages}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="services:ChatMessageItem">
+                                <Grid Margin="0,0,0,10">
+                                    <!-- Assistant message -->
+                                    <Border
+                                        HorizontalAlignment="Left"
+                                        MaxWidth="280"
+                                        Padding="12,9"
+                                        CornerRadius="12,12,12,4"
+                                        Background="{ThemeResource CardBackgroundBrush}"
+                                        BorderBrush="{ThemeResource BorderDefaultBrush}"
+                                        BorderThickness="1"
+                                        Visibility="{x:Bind IsAssistant, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock
+                                                Text="{x:Bind Text}"
+                                                FontSize="12.5"
+                                                LineHeight="18"
+                                                TextWrapping="WrapWholeWords"
+                                                Foreground="{ThemeResource TextPrimaryBrush}" />
+                                            <TextBlock
+                                                Text="{x:Bind TimestampDisplay}"
+                                                FontSize="10"
+                                                Foreground="{ThemeResource TextTertiaryBrush}" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- User message -->
+                                    <Border
+                                        HorizontalAlignment="Right"
+                                        MaxWidth="280"
+                                        Padding="12,9"
+                                        CornerRadius="12,12,4,12"
+                                        Background="#1F7AE0"
+                                        Visibility="{x:Bind IsUser, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock
+                                                Text="{x:Bind Text}"
+                                                FontSize="12.5"
+                                                LineHeight="18"
+                                                TextWrapping="WrapWholeWords"
+                                                Foreground="White" />
+                                            <TextBlock
+                                                Text="{x:Bind TimestampDisplay}"
+                                                FontSize="10"
+                                                HorizontalAlignment="Right"
+                                                Foreground="#CCEAF2FF" />
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <!-- Thinking indicator -->
+                <StackPanel
+                    Grid.Row="2"
+                    Orientation="Horizontal"
+                    Spacing="8"
+                    Margin="14,0,14,6"
+                    Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <ProgressRing Width="14" Height="14" IsActive="{Binding IsBusy}" />
+                    <TextBlock
+                        x:Name="ThinkingText"
+                        Text="Thinking..."
+                        FontSize="11" />
+                </StackPanel>
+
+                <!-- Input bar -->
+                <Border
+                    x:Name="ChatInputBorder"
+                    Grid.Row="3"
+                    Padding="10,10"
+                    CornerRadius="0,0,18,18"
+                    BorderThickness="0,1,0,0">
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBox
+                            x:Name="MessageInputBox"
+                            Grid.Column="0"
+                            PlaceholderText="Ask PartFinder AI..."
+                            FontSize="13"
+                            Padding="10,8"
+                            CornerRadius="10"
+                            Text="{Binding InputText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                            KeyDown="OnMessageInputKeyDown" />
+
+                        <Button
+                            Grid.Column="1"
+                            Width="38"
+                            Height="38"
+                            Padding="0"
+                            CornerRadius="10"
+                            Background="#1F7AE0"
+                            BorderThickness="0"
+                            IsEnabled="{Binding CanSend}"
+                            ToolTipService.ToolTip="Send"
+                            Click="OnSendClick">
+                            <FontIcon Glyph="&#xE724;" FontSize="15" Foreground="White" />
+                        </Button>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- Movable Circular Blue Floating Action Button (56x56) -->
+        <Border
+            x:Name="FloatingButtonContainer"
+            Width="56"
+            Height="56"
+            CornerRadius="28"
+            BorderThickness="1.5"
+            BorderBrush="#55FFFFFF"
+            Shadow="{StaticResource FabShadow}"
+            Translation="0,0,16"
+            RenderTransformOrigin="0.5,0.5"
+            ToolTipService.ToolTip="PartFinder AI Assistant (drag to move, click to open)"
+            PointerEntered="OnFabPointerEntered"
+            PointerExited="OnFabPointerExited"
+            PointerPressed="OnFabPointerPressed"
+            PointerMoved="OnFabPointerMoved"
+            PointerReleased="OnFabPointerReleased"
+            PointerCanceled="OnFabPointerCanceled">
+            <Border.RenderTransform>
+                <ScaleTransform x:Name="FabScaleTransform" ScaleX="1" ScaleY="1" />
+            </Border.RenderTransform>
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                    <GradientStop Color="#2F86EE" Offset="0" />
+                    <GradientStop Color="#155DAF" Offset="1" />
+                </LinearGradientBrush>
+            </Border.Background>
+
+            <!-- White AI Assistant Sparkle Icon -->
+            <Path
+                Data="M12 2L14.3 8.2L20.5 10.5L14.3 12.8L12 19L9.7 12.8L3.5 10.5L9.7 8.2L12 2ZM19 15L20.1 17.9L23 19L20.1 20.1L19 23L17.9 20.1L15 19L17.9 17.9L19 15Z"
+                Fill="White"
+                Width="26"
+                Height="26"
+                Stretch="Uniform"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center" />
+        </Border>
+    </Canvas>
+</UserControl>

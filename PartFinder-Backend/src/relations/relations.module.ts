@@ -1,4 +1,4 @@
-﻿import { Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from '../auth/auth.module';
 import { RelationDisplayColumn, RelationDisplayColumnSchema } from './schemas/relation-display-column.schema';
@@ -18,5 +18,6 @@ import { RelationsService } from './relations.service';
   ],
   controllers: [RelationsController],
   providers: [RelationsService],
+  exports: [RelationsService],
 })
 export class RelationsModule {}

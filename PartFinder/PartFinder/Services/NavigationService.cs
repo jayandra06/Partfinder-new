@@ -31,6 +31,7 @@ public sealed class NavigationService : INavigationService
     private int _resetGeneration;
     private readonly TaskCompletionSource _frameReady = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    public AppPage? CurrentPage { get; private set; }
     public bool IsFrameReady => _frame is not null;
 
     public async Task WaitForFrameReadyAsync(CancellationToken cancellationToken = default)
@@ -110,6 +111,7 @@ public sealed class NavigationService : INavigationService
     public void Clear()
     {
         _resetGeneration++;
+        CurrentPage = null;
         if (_frame is null)
         {
             return;
@@ -171,6 +173,7 @@ public sealed class NavigationService : INavigationService
 
         if (_frame.Content?.GetType() == targetType)
         {
+            CurrentPage = page;
             if (parameter is not null && _frame.Content is INavigationParameterSink sink)
             {
                 sink.ReceiveNavigationParameter(parameter);
@@ -182,6 +185,10 @@ public sealed class NavigationService : INavigationService
 
         System.Diagnostics.Debug.WriteLine($"[NavigationService] Navigating to {page} ({targetType.Name})...");
         bool result = _frame.Navigate(targetType, parameter, transition);
+        if (result)
+        {
+            CurrentPage = page;
+        }
         System.Diagnostics.Debug.WriteLine($"[NavigationService] Frame.Navigate result: {result}");
         return result;
     }
