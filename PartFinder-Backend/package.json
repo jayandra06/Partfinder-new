@@ -67,7 +67,7 @@
     "@vercel/node": "^5.5.4",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.0.0",
-    "@types/nodemailer": "^8.0.0",
+    "@types/nodemailer": "^8.0.2",
     "@types/passport-jwt": "^4.0.1",
     "@types/supertest": "^7.0.0",
     "eslint": "^9.18.0",
